@@ -1,6 +1,6 @@
-# Project Status
+# Story Analytics - Project Status
 
-AI-first dashboard builder using Evidence.dev + Claude.
+Conversational AI dashboard builder using Evidence.dev + Claude.
 
 ## What's Built
 
