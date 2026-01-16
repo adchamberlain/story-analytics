@@ -82,6 +82,71 @@ class ClaudeProvider(LLMProvider):
             raw_response=response,
         )
 
+    def generate_with_image(
+        self,
+        prompt: str,
+        image_base64: str,
+        image_media_type: str = "image/png",
+        max_tokens: int = 4096,
+        temperature: float = 0.3,
+    ) -> LLMResponse:
+        """
+        Generate a response using Claude with an image input.
+
+        Args:
+            prompt: The text prompt to accompany the image.
+            image_base64: Base64-encoded image data.
+            image_media_type: MIME type of the image.
+            max_tokens: Maximum tokens in response.
+            temperature: Sampling temperature.
+
+        Returns:
+            LLMResponse with the generated content.
+        """
+        # Build message with image
+        messages = [
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "image",
+                        "source": {
+                            "type": "base64",
+                            "media_type": image_media_type,
+                            "data": image_base64,
+                        },
+                    },
+                    {
+                        "type": "text",
+                        "text": prompt,
+                    },
+                ],
+            }
+        ]
+
+        response = self._client.messages.create(
+            model=self._model,
+            max_tokens=max_tokens,
+            temperature=temperature,
+            messages=messages,
+        )
+
+        # Extract content
+        content = ""
+        for block in response.content:
+            if hasattr(block, "text"):
+                content += block.text
+
+        return LLMResponse(
+            content=content,
+            model=response.model,
+            usage={
+                "input_tokens": response.usage.input_tokens,
+                "output_tokens": response.usage.output_tokens,
+            },
+            raw_response=response,
+        )
+
 
 def get_provider() -> LLMProvider:
     """Factory function to get the configured LLM provider."""

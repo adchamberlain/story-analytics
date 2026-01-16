@@ -61,11 +61,14 @@ class Schema:
 
     def to_prompt_context(self) -> str:
         """Convert schema to a string suitable for LLM context."""
-        lines = [f"Database: {self.database}.{self.schema_name}", ""]
+        lines = [f"Source: snowflake_saas (Snowflake: {self.database}.{self.schema_name})", ""]
+        lines.append("IMPORTANT: In SQL queries, reference tables as 'snowflake_saas.tablename'")
+        lines.append("")
 
         for table in self.tables:
             row_info = f" ({table.row_count:,} rows)" if table.row_count else ""
-            lines.append(f"Table: {table.name}{row_info}")
+            # Show full reference path
+            lines.append(f"Table: snowflake_saas.{table.name.lower()}{row_info}")
 
             for col in table.columns:
                 nullable = "NULL" if col.nullable else "NOT NULL"

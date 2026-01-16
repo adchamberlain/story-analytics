@@ -10,10 +10,12 @@ from pathlib import Path
 from typing import Any, Callable
 
 from .config import get_config
+from .config_loader import get_config_loader
 from .generator import create_dashboard_from_markdown
 from .llm.base import LLMResponse, Message
 from .llm.claude import get_provider
 from .parser import DashboardParser, ParsedDashboard
+from .qa import DashboardQA, QAResult
 from .schema import get_schema_context
 
 
@@ -39,47 +41,11 @@ class ConversationState:
     dashboard_title: str | None = None
     generated_markdown: str | None = None
     created_file: Path | None = None
+    original_request: str | None = None  # Store original request for QA
 
 
-# System prompts for different phases
-SYSTEM_PROMPTS = {
-    "base": """You are an expert data analyst and dashboard designer. You help users create
-beautiful, insightful dashboards using Evidence (an open-source BI tool that uses markdown).
-
-You have access to a Snowflake database with the following schema:
-
-{schema}
-
-CRITICAL SQL RULES:
-- In SQL queries, reference tables by name ONLY (e.g., "FROM customers"), NOT with database/schema prefixes
-- NEVER use "FROM database.schema.table" format - Evidence handles the connection automatically
-- Table names are: customers, users, subscriptions, events, invoices
-
-When generating dashboards, use Evidence markdown syntax:
-- SQL queries in ```sql query_name ... ``` blocks
-- Charts: <BarChart data={{query_name}} x="col" y="col" />
-- Tables: <DataTable data={{query_name}} />
-- Filters: <Dropdown name="filter" data={{query_name}} value="col" />
-- Big numbers: <BigValue data={{query_name}} value="col" />
-
-Keep dashboards focused and actionable - fewer, more meaningful visualizations are better.""",
-    "create": """Help the user create a new dashboard. Guide them through:
-1. Understanding what decisions this dashboard should support
-2. Identifying relevant data from the available tables
-3. Defining key metrics and calculations
-4. Generating a clean, focused dashboard
-
-Ask clarifying questions when needed. Be conversational but efficient.""",
-    "edit": """Help the user modify an existing dashboard. The current dashboard content is:
-
-{dashboard_content}
-
-Help them make targeted changes while preserving the existing structure where appropriate.
-Show them what you plan to change before making modifications.""",
-    "generate": """Generate a complete Evidence markdown dashboard based on the conversation.
-Output ONLY the markdown content, nothing else. Start with a # Title and include all necessary
-SQL queries and visualizations. Make it production-ready.""",
-}
+# System prompts are now loaded from YAML config files
+# See engine/prompts/ directory for customizable prompt templates
 
 
 class ConversationManager:
@@ -87,10 +53,12 @@ class ConversationManager:
 
     def __init__(self):
         self.config = get_config()
+        self.config_loader = get_config_loader()
         self.llm = get_provider()
         self.parser = DashboardParser()
         self.state = ConversationState()
         self._schema_context: str | None = None
+        self._default_source = "snowflake_saas"  # TODO: make configurable
 
     def reset(self):
         """Reset conversation state."""
@@ -104,22 +72,36 @@ class ConversationManager:
 
     def get_system_prompt(self) -> str:
         """Get the appropriate system prompt for current phase."""
-        schema = self.get_schema_context()
-        base_prompt = SYSTEM_PROMPTS["base"].format(schema=schema)
+        # Build base prompt from config
+        base_prompt = self.config_loader.get_base_prompt()
 
+        # Add schema context
+        schema = self.get_schema_context()
+        base_prompt += f"\n\nDATABASE SCHEMA:\n{schema}"
+
+        # Add SQL dialect rules
+        dialect_prompt = self.config_loader.get_dialect_prompt(self._default_source)
+        if dialect_prompt:
+            base_prompt += f"\n\n{dialect_prompt}"
+
+        # Add component documentation
+        components_prompt = self.config_loader.get_components_prompt()
+        base_prompt += f"\n\n{components_prompt}"
+
+        # Add phase-specific prompt
         if self.state.intent == "edit" and self.state.target_dashboard:
             # Load dashboard content for edit mode
             dashboards = self.parser.list_dashboards()
             for dash_path in dashboards:
                 if dash_path.stem == self.state.target_dashboard:
                     content = dash_path.read_text()
-                    edit_prompt = SYSTEM_PROMPTS["edit"].format(dashboard_content=content)
+                    edit_prompt = self.config_loader.get_edit_prompt(content)
                     return base_prompt + "\n\n" + edit_prompt
 
         if self.state.phase == ConversationPhase.GENERATION:
-            return base_prompt + "\n\n" + SYSTEM_PROMPTS["generate"]
+            return base_prompt + "\n\n" + self.config_loader.get_generate_prompt()
 
-        return base_prompt + "\n\n" + SYSTEM_PROMPTS["create"]
+        return base_prompt + "\n\n" + self.config_loader.get_create_prompt()
 
     def process_message(self, user_input: str) -> str:
         """
@@ -170,6 +152,7 @@ class ConversationManager:
         # Check for explicit create intent or treat as create by default
         self.state.intent = "create"
         self.state.phase = ConversationPhase.CONTEXT
+        self.state.original_request = user_input  # Save for QA
 
         # If the message contains dashboard topic, pass it to LLM
         if len(user_input.split()) > 3:  # More than just "create dashboard"
@@ -182,11 +165,11 @@ class ConversationManager:
     def _handle_conversation_phase(self, user_input: str) -> str:
         """Handle general conversation with LLM."""
         # Check if user wants to generate
-        lower_input = user_input.lower()
+        lower_input = user_input.lower().strip()
         if any(
             phrase in lower_input
-            for phrase in ["generate", "create it", "build it", "looks good", "that's it", "let's do it"]
-        ):
+            for phrase in ["generate", "create it", "build it", "looks good", "that's it", "let's do it", "do it"]
+        ) or lower_input == "create":
             self.state.phase = ConversationPhase.GENERATION
             return self._generate_dashboard()
 
@@ -197,8 +180,32 @@ class ConversationManager:
             temperature=0.7,
         )
 
-        self.state.messages.append(Message(role="assistant", content=response.content))
-        return response.content
+        content = response.content
+
+        # Post-process: if response contains code blocks (a proposal), ensure proper messaging
+        if "```sql" in content or "<BarChart" in content or "<LineChart" in content:
+            content = self._fix_proposal_messaging(content)
+
+        self.state.messages.append(Message(role="assistant", content=content))
+        return content
+
+    def _fix_proposal_messaging(self, content: str) -> str:
+        """Ensure proposal responses have correct messaging."""
+        # Remove misleading phrases
+        misleading = [
+            "DASHBOARD CREATED", "Dashboard created", "dashboard created",
+            "I've created", "I have created", "is now live", "is live",
+            "Your dashboard is ready", "Here's your dashboard",
+        ]
+        for phrase in misleading:
+            content = content.replace(phrase, "PROPOSED DASHBOARD")
+
+        # Ensure call-to-action is present
+        call_to_action = "\n\n→ Type 'create' to generate this dashboard, or tell me what you'd like to change."
+        if "Type 'create'" not in content:
+            content = content.rstrip() + call_to_action
+
+        return content
 
     def _handle_generation_phase(self, user_input: str) -> str:
         """Generate the dashboard."""
@@ -251,14 +258,54 @@ Use the snowflake_saas source for all queries."""
             self.state.phase = ConversationPhase.REFINEMENT
 
             url = f"{self.config.dev_url}/{file_path.stem}"
+
+            # Run QA validation with auto-fix loop (if enabled)
+            qa_result = None
+            auto_fixed = False
+            all_fixed_issues = []
+
+            if self.config_loader.is_qa_enabled():
+                max_fix_attempts = self.config_loader.get_max_auto_fix_attempts()
+                should_auto_fix = self.config_loader.should_auto_fix_critical()
+
+                for attempt in range(max_fix_attempts + 1):
+                    qa_result = self._run_qa_validation(file_path.stem)
+
+                    if qa_result is None:
+                        break
+
+                    if qa_result.needs_auto_fix and should_auto_fix and attempt < max_fix_attempts:
+                        # Auto-fix critical issues
+                        all_fixed_issues.extend(qa_result.critical_issues)
+                        fixed_markdown = self._auto_fix_issues(qa_result.critical_issues)
+                        file_path.write_text(fixed_markdown)
+                        self.state.generated_markdown = fixed_markdown
+                        auto_fixed = True
+                        # Loop continues to re-run QA
+                    else:
+                        # No critical issues or max attempts reached
+                        break
+
+            # Build result message
             result = f"""✓ Dashboard created: {file_path.name}
 
 View it at: {url}
 
 Here's what I created:
-{self._summarize_markdown(markdown)}
+{self._summarize_markdown(self.state.generated_markdown)}
+"""
+            if auto_fixed:
+                result += f"\n🔧 Auto-fixed {len(all_fixed_issues)} critical issue(s):\n"
+                for issue in all_fixed_issues:
+                    result += f"  • {issue}\n"
 
-What would you like to change?"""
+            if qa_result:
+                result += self._format_qa_result(qa_result, auto_fixed=auto_fixed)
+
+            if qa_result and qa_result.suggestions:
+                result += "\nWould you like me to implement any of these suggestions? Or tell me what else to change."
+            else:
+                result += "\nWhat would you like to change?"
 
         except Exception as e:
             result = f"Error creating dashboard: {e}\n\nHere's the markdown I generated:\n\n{markdown[:500]}..."
@@ -355,6 +402,97 @@ What else would you like to change?"""
                 lines.append(f"- {count} {comp}(s)")
 
         return "\n".join(lines) if lines else "- Dashboard content generated"
+
+    def _run_qa_validation(self, dashboard_slug: str) -> QAResult | None:
+        """
+        Run QA validation on a generated dashboard.
+
+        Args:
+            dashboard_slug: The dashboard slug to validate.
+
+        Returns:
+            QAResult object, or None if QA couldn't run.
+        """
+        if not self.state.original_request:
+            return None
+
+        try:
+            qa = DashboardQA()
+            return qa.validate(
+                dashboard_slug=dashboard_slug,
+                original_request=self.state.original_request,
+            )
+        except Exception as e:
+            # Return a failed result with the error
+            return QAResult(
+                passed=False,
+                summary=f"QA could not run: {e}",
+                critical_issues=[],
+                suggestions=[],
+            )
+
+    def _auto_fix_issues(self, critical_issues: list[str]) -> str:
+        """
+        Automatically fix critical issues in the dashboard.
+
+        Args:
+            critical_issues: List of critical issues to fix.
+
+        Returns:
+            Updated markdown content.
+        """
+        current_content = self.state.created_file.read_text()
+
+        # Get fix prompt from config
+        fix_prompt = self.config_loader.get_qa_auto_fix_prompt(
+            issues=critical_issues,
+            current_content=current_content
+        )
+
+        self.state.messages.append(Message(role="user", content=fix_prompt))
+
+        response = self.llm.generate(
+            messages=self.state.messages,
+            system_prompt=self.get_system_prompt(),
+            temperature=0.3,
+        )
+
+        new_markdown = response.content
+
+        # Clean up markdown fences
+        if new_markdown.startswith("```markdown"):
+            new_markdown = new_markdown[len("```markdown"):].strip()
+        if new_markdown.startswith("```"):
+            new_markdown = new_markdown.split("\n", 1)[1] if "\n" in new_markdown else new_markdown[3:]
+        if new_markdown.endswith("```"):
+            new_markdown = new_markdown.rsplit("```", 1)[0]
+
+        return new_markdown.strip()
+
+    def _format_qa_result(self, result: QAResult, auto_fixed: bool = False) -> str:
+        """Format QA result for display to user."""
+        if auto_fixed:
+            status = "✓ QA PASSED (after auto-fix)"
+        else:
+            status = "✓ QA PASSED" if result.passed else "✗ QA NEEDS ATTENTION"
+
+        output = f"\n--- QA Validation ---\n{status}\n"
+
+        if result.summary:
+            output += f"Summary: {result.summary}\n"
+
+        # Don't show critical issues if we auto-fixed (they're resolved)
+        if result.critical_issues and not auto_fixed:
+            output += "\nCritical issues (will auto-fix):\n"
+            for issue in result.critical_issues:
+                output += f"  • {issue}\n"
+
+        if result.suggestions:
+            output += "\nSuggestions (optional):\n"
+            for suggestion in result.suggestions:
+                output += f"  • {suggestion}\n"
+
+        return output
 
     def select_dashboard_for_edit(self, dashboard_name: str) -> str:
         """Select a dashboard for editing."""

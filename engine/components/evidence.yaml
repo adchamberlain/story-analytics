@@ -1,0 +1,93 @@
+# Evidence component reference
+# Defines valid components and their props for the LLM
+
+framework: evidence
+version: "40.x"
+
+components:
+  LineChart:
+    description: "Line chart for time series data"
+    required_props:
+      - data: "Query name reference, e.g., {query_name}"
+      - x: "Column name for x-axis"
+      - y: "Column name(s) for y-axis"
+    optional_props:
+      - title: "Chart title"
+      - subtitle: "Chart subtitle"
+    notes:
+      - "Single series: y=\"column_name\""
+      - "Multiple series: y={[\"column1\", \"column2\"]} (array syntax)"
+      - "NEVER use y2, y3, etc. - these props DO NOT EXIST"
+    example: |
+      <LineChart
+        data={query_name}
+        x="month"
+        y={["sales_2024", "sales_2025"]}
+        title="Sales Comparison"
+      />
+
+  BarChart:
+    description: "Bar chart for categorical comparisons"
+    required_props:
+      - data: "Query name reference"
+      - x: "Column name for x-axis (categories)"
+      - y: "Column name for y-axis (values)"
+    optional_props:
+      - title: "Chart title"
+      - subtitle: "Chart subtitle"
+    example: |
+      <BarChart
+        data={query_name}
+        x="category"
+        y="count"
+        title="Count by Category"
+      />
+
+  AreaChart:
+    description: "Area chart for cumulative data"
+    required_props:
+      - data: "Query name reference"
+      - x: "Column name for x-axis"
+      - y: "Column name(s) for y-axis"
+    optional_props:
+      - title: "Chart title"
+    notes:
+      - "Same y syntax as LineChart"
+
+  DataTable:
+    description: "Interactive data table"
+    required_props:
+      - data: "Query name reference"
+    optional_props:
+      - title: "Table title"
+    example: |
+      <DataTable data={query_name} />
+
+  BigValue:
+    description: "Large KPI/metric display"
+    required_props:
+      - data: "Query name reference"
+      - value: "Column name for the value to display"
+    optional_props:
+      - title: "Label for the metric"
+    example: |
+      <BigValue data={query_name} value="total_revenue" title="Total Revenue" />
+
+  Dropdown:
+    description: "Filter dropdown"
+    required_props:
+      - name: "Unique filter name"
+      - data: "Query name reference"
+      - value: "Column name for dropdown values"
+    optional_props:
+      - title: "Dropdown label"
+      - defaultValue: "Default selected value"
+    example: |
+      <Dropdown name="region_filter" data={regions} value="region_name" title="Select Region" />
+
+# Common mistakes to avoid
+common_mistakes:
+  - mistake: "Using y2, y3 for multiple series"
+    correct: "Use y={[\"col1\", \"col2\"]} array syntax"
+  - mistake: "Missing curly braces around data reference"
+    correct: "Always use data={query_name}, not data=\"query_name\""

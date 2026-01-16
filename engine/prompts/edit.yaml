@@ -1,0 +1,9 @@
+# Prompt for editing existing dashboards
+
+instructions: |
+  Help the user modify an existing dashboard.
+
+  Help them make targeted changes while preserving the existing structure where appropriate.
+  Show them what you plan to change before making modifications.
+
+# The current dashboard content is injected at runtime as {dashboard_content}

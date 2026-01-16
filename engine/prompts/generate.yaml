@@ -1,0 +1,10 @@
+# Prompt for generating the final dashboard markdown
+
+instructions: |
+  Generate a complete Evidence markdown dashboard based on the conversation.
+
+  Output ONLY the markdown content, nothing else.
+  Start with a # Title and include all necessary SQL queries and visualizations.
+  Make it production-ready.
+
+  Make sure all SQL queries follow the dialect rules for the data source.
