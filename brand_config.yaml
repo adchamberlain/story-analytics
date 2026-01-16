@@ -4,7 +4,7 @@
 
 brand:
   # Company name (displayed in header/footer)
-  name: ""
+  name: "Story"
 
   # Path to logo file (place in static/ folder)
   # Recommended: SVG or PNG, max height 40px

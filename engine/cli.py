@@ -34,9 +34,9 @@ console = Console(theme=custom_theme)
 def print_welcome():
     """Print welcome message."""
     welcome = """
-# Dashboard Builder
+# Story Analytics
 
-Create and edit Evidence dashboards using natural language.
+Create and edit dashboards using natural language.
 
 **Commands:**
 - Type your request to create or edit a dashboard
@@ -50,7 +50,7 @@ Create and edit Evidence dashboards using natural language.
 - "Edit the saas-dashboard"
 - "I need a revenue trends dashboard"
 """
-    console.print(Panel(Markdown(welcome), title="Welcome", border_style="blue"))
+    console.print(Panel(Markdown(welcome), title="Story", border_style="blue"))
 
 
 def apply_brand():
