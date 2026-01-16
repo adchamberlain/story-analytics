@@ -1,48 +1,67 @@
-# Evidence Template Project
+# Story Analytics
 
-## Using Codespaces
+Conversational AI for building data dashboards. Tell Story what you need, and it creates the dashboard for you.
 
-If you are using this template in Codespaces, click the `Start Evidence` button in the bottom status bar. This will install dependencies and open a preview of your project in your browser - you should get a popup prompting you to open in browser.
+**Website:** [story.bi](https://story.bi)
 
-Or you can use the following commands to get started:
+## What is Story?
+
+Story is an AI-powered dashboard builder that lets you create and edit data visualizations using natural language. Instead of writing SQL and configuring charts manually, you simply describe what you want to see.
+
+Built on [Evidence.dev](https://evidence.dev) for rendering and powered by Claude for understanding your intent.
+
+## Quick Start
 
 ```bash
+# Install dependencies
 npm install
-npm run sources
-npm run dev -- --host 0.0.0.0
+
+# Set your API key
+export ANTHROPIC_API_KEY='your-key-here'
+
+# Start the Evidence dev server
+npm run dev
+
+# In a separate terminal, run Story
+python -m engine
 ```
 
-See [the CLI docs](https://docs.evidence.dev/cli/) for more command information.
+## Usage
 
-**Note:** Codespaces is much faster on the Desktop app. After the Codespace has booted, select the hamburger menu → Open in VS Code Desktop.
+Once running, simply describe what you want:
 
-## Get Started from VS Code
+- "Create a customer churn dashboard"
+- "Show me revenue trends by region"
+- "I need a dashboard tracking user signups over time"
+- "Edit the sales dashboard to add a monthly breakdown"
 
-The easiest way to get started is using the [VS Code Extension](https://marketplace.visualstudio.com/items?itemName=Evidence.evidence-vscode):
+Story will gather context, understand your data, and generate the dashboard.
 
+## Commands
 
+| Command | Description |
+|---------|-------------|
+| `list` | Show existing dashboards |
+| `new` | Start a fresh conversation |
+| `brand` | Apply brand configuration from `brand_config.yaml` |
+| `quit` | Exit the CLI |
 
-1. Install the extension from the VS Code Marketplace
-2. Open the Command Palette (Ctrl/Cmd + Shift + P) and enter `Evidence: New Evidence Project`
-3. Click `Start Evidence` in the bottom status bar
+## Configuration
 
-## Get Started using the CLI
+| File | Purpose |
+|------|---------|
+| `engine_config.yaml` | LLM provider and database connection settings |
+| `brand_config.yaml` | Customize colors, fonts, and logo |
+| `evidence.config.yaml` | Evidence theme and chart colors |
 
-```bash
-npx degit evidence-dev/template my-project
-cd my-project 
-npm install 
-npm run sources
-npm run dev 
-```
+## Requirements
 
-Check out the docs for [alternative install methods](https://docs.evidence.dev/getting-started/install-evidence) including Docker, Github Codespaces, and alongside dbt.
+- Node.js 18+
+- Python 3.8+
+- Anthropic API key
+- Data source (Snowflake, DuckDB, PostgreSQL, etc.)
 
+## Learn More
 
-
-## Learning More
-
-- [Docs](https://docs.evidence.dev/)
-- [Github](https://github.com/evidence-dev/evidence)
-- [Slack Community](https://slack.evidence.dev/)
-- [Evidence Home Page](https://www.evidence.dev)
+- [Evidence.dev Documentation](https://docs.evidence.dev/)
+- [Anthropic API](https://docs.anthropic.com/)

@@ -1,5 +1,5 @@
 {
-  "name": "my-evidence-project",
+  "name": "story-analytics",
   "version": "0.0.1",
   "scripts": {
     "build": "dotenv -- evidence build",
