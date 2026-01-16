@@ -1,0 +1,65 @@
+/* Auto-generated brand CSS variables */
+/* Do not edit directly - modify brand_config.yaml instead */
+
+:root {
+  /* Colors */
+  --brand-primary: #1d81a2;
+  --brand-accent: #f2a83b;
+  --brand-heading: #1a1a1a;
+  --brand-text: #333333;
+  --brand-muted: #666666;
+  --brand-background: #ffffff;
+  --brand-background-subtle: #f9f9f9;
+  --brand-border: #e5e5e5;
+
+  /* Typography */
+  --brand-heading-font: 'Inter', system-ui, sans-serif;
+  --brand-body-font: 'Inter', system-ui, sans-serif;
+  --brand-base-size: 1rem;
+
+  /* Layout */
+  --brand-max-width: 900px;
+
+  /* Charts */
+  --brand-gridline-color: #e5e5e5;
+}
+
+/* Apply brand variables to Datawrapper theme */
+:root {
+  --datawrapper-heading-color: var(--brand-heading);
+  --datawrapper-text-color: var(--brand-text);
+  --datawrapper-muted-color: var(--brand-muted);
+  --datawrapper-border-color: var(--brand-border);
+  --datawrapper-bg-subtle: var(--brand-background-subtle);
+}
+
+/* Typography overrides */
+h1.markdown, h1.title, h2.markdown, h3.markdown, h4.markdown, h5.markdown, h6.markdown {
+  font-family: var(--brand-heading-font);
+}
+
+.markdown, p.markdown, li.markdown {
+  font-family: var(--brand-body-font);
+}
+
+body {
+  font-size: var(--brand-base-size);
+  background-color: var(--brand-background);
+}
+
+article.markdown {
+  max-width: var(--brand-max-width);
+}
+
+/* Link and accent colors */
+a.markdown:hover {
+  color: var(--brand-primary);
+}
+
+select:hover, select:focus {
+  border-color: var(--brand-primary);
+}
+
+select:focus {
+  box-shadow: 0 0 0 2px #1d81a233;
+}

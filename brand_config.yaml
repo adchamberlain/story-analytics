@@ -1,0 +1,84 @@
+# Brand Configuration
+# Customize your dashboard appearance by editing this file.
+# Leave fields empty to use defaults.
+
+brand:
+  # Company name (displayed in header/footer)
+  name: ""
+
+  # Path to logo file (place in static/ folder)
+  # Recommended: SVG or PNG, max height 40px
+  logo: ""
+
+  # Favicon path (place in static/ folder)
+  favicon: ""
+
+colors:
+  # Primary brand color (buttons, links, chart accents)
+  # Default: #1d81a2 (Datawrapper blue)
+  primary: ""
+
+  # Accent color (highlights, secondary elements)
+  # Default: #f2a83b (warm orange)
+  accent: ""
+
+  # Heading text color
+  # Default: #1a1a1a
+  heading: ""
+
+  # Body text color
+  # Default: #333333
+  text: ""
+
+  # Muted/secondary text
+  # Default: #666666
+  muted: ""
+
+  # Background color
+  # Default: #ffffff
+  background: ""
+
+  # Subtle background (cards, alternating rows)
+  # Default: #f9f9f9
+  background_subtle: ""
+
+  # Border color
+  # Default: #e5e5e5
+  border: ""
+
+typography:
+  # Font for headings
+  # Options: "Inter" (default), "Spectral" (serif), or any Google Font name
+  heading_font: ""
+
+  # Font for body text
+  # Options: "Inter" (default), "Spectral", or any Google Font name
+  body_font: ""
+
+  # Base font size in rem
+  # Default: 1 (16px)
+  base_size: ""
+
+# Chart-specific customization
+charts:
+  # Color palette for chart series (list of hex colors)
+  # Leave empty to use defaults from evidence.config.yaml
+  palette: []
+
+  # Show/hide gridlines
+  # Default: true
+  show_gridlines: true
+
+  # Gridline color
+  # Default: #e5e5e5
+  gridline_color: ""
+
+# Layout options
+layout:
+  # Maximum content width in pixels
+  # Default: 900
+  max_width: 900
+
+  # Show Evidence branding in footer
+  # Default: true
+  show_evidence_branding: true
