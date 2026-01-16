@@ -2,13 +2,13 @@
   "name": "story-analytics",
   "version": "0.0.1",
   "scripts": {
-    "build": "dotenv -- evidence build",
-    "build:strict": "dotenv -- evidence build:strict",
-    "dev": "dotenv -- evidence dev --open /",
-    "test": "dotenv -- evidence build",
-    "sources": "dotenv -- evidence sources",
-    "sources:strict": "dotenv -- evidence sources --strict",
-    "preview": "dotenv -- evidence preview"
+    "build": "npx dotenv-cli -- evidence build",
+    "build:strict": "npx dotenv-cli -- evidence build:strict",
+    "dev": "npx dotenv-cli -- evidence dev --open /",
+    "test": "npx dotenv-cli -- evidence build",
+    "sources": "npx dotenv-cli -- evidence sources",
+    "sources:strict": "npx dotenv-cli -- evidence sources --strict",
+    "preview": "npx dotenv-cli -- evidence preview"
   },
   "engines": {
     "npm": ">=7.0.0",

@@ -1,0 +1,124 @@
+# QA validation rules
+# Configures how dashboards are validated and what gets auto-fixed
+
+validation:
+  # Whether to run QA validation after dashboard creation
+  enabled: true
+
+  # Maximum number of auto-fix attempts before giving up
+  max_auto_fix_attempts: 2
+
+  # Timeout for screenshot capture (milliseconds)
+  screenshot_timeout: 30000
+
+  # Wait for data to load before screenshot
+  wait_for_data: true
+
+# Critical issues - these get auto-fixed without asking the user
+critical_issues:
+  description: "Issues that make the dashboard broken or incorrect"
+  auto_fix: true
+  categories:
+    - name: "Data errors"
+      examples:
+        - "Wrong calculations"
+        - "Missing data that should be shown"
+        - "Incorrect totals or aggregations"
+
+    - name: "SQL errors"
+      examples:
+        - "Database error messages visible"
+        - "Binder errors"
+        - "Function not found errors"
+        - "Syntax errors in queries"
+
+    - name: "Broken visualizations"
+      examples:
+        - "Charts not rendering"
+        - "Error messages displayed instead of charts"
+        - "Timeout errors"
+
+    - name: "Missing required elements"
+      examples:
+        - "User asked for X but it's not there"
+        - "Required chart type missing"
+
+    - name: "Wrong output type"
+      examples:
+        - "User asked for line chart but got bar chart"
+        - "Wrong visualization for the data"
+
+# Suggestions - these are optional improvements, presented to user
+suggestions:
+  description: "Nice-to-have improvements that aren't required"
+  auto_fix: false
+  categories:
+    - name: "Additional features"
+      examples:
+        - "Add trend lines"
+        - "Add year-over-year comparisons"
+        - "Add more breakdowns"
+
+    - name: "Aesthetic improvements"
+      examples:
+        - "Better colors"
+        - "Add labels"
+        - "Improve formatting"
+
+    - name: "Extra analysis"
+      examples:
+        - "Add summary statistics"
+        - "Add growth rate calculations"
+        - "Add context or benchmarks"
+
+# Prompt template for QA validation
+# Variables: {original_request}, {expected_components}
+validation_prompt: |
+  You are a QA analyst reviewing a data dashboard. Analyze this screenshot and validate it against the original request.
+
+  ORIGINAL REQUEST:
+  {original_request}
+
+  Please analyze the dashboard screenshot and provide:
+
+  1. VALIDATION RESULT: Does this dashboard fulfill the original request? Answer PASS or FAIL.
+
+  2. SUMMARY: A brief 1-2 sentence summary of what the dashboard shows.
+
+  3. CRITICAL ISSUES: List any problems that MUST be fixed - these are errors that make the dashboard incorrect or broken:
+     - Data errors (wrong calculations, missing data that should be shown, incorrect totals)
+     - Broken visualizations (charts not rendering, error messages displayed)
+     - Missing required elements (user asked for X but it's not there)
+     - Incorrect chart type (user asked for line chart but got bar chart)
+
+  4. SUGGESTIONS: List optional improvements that would be nice-to-have but aren't required:
+     - Additional features (add trend lines, add comparisons)
+     - Aesthetic improvements (better colors, labels)
+     - Extra analysis (add more breakdowns, add context)
+
+  Format your response exactly like this:
+  RESULT: [PASS or FAIL]
+  SUMMARY: [your summary]
+  CRITICAL:
+  - [critical issue 1]
+  - [critical issue 2]
+  SUGGESTIONS:
+  - [suggestion 1]
+  - [suggestion 2]
+
+  If there are no critical issues or suggestions, write "None" for that section.
+
+# Prompt template for auto-fixing issues
+# Variables: {issues}, {current_content}
+auto_fix_prompt: |
+  The dashboard has these CRITICAL issues that must be fixed:
+
+  {issues}
+
+  Current dashboard markdown:
+  ```markdown
+  {current_content}
+  ```
+
+  Generate the complete FIXED markdown. Fix ALL the critical issues listed above.
+  Output ONLY the corrected markdown, nothing else.

@@ -1,0 +1,77 @@
+# SQL dialect rules for Snowflake via Evidence
+# These rules help the LLM generate valid SQL for this data source
+
+dialect: snowflake
+source_name: snowflake_saas
+
+# How to reference tables in queries
+table_reference:
+  format: "{source_name}.{table_name}"
+  example: "snowflake_saas.customers"
+  note: "ALWAYS prefix table names with the source name"
+
+# Date/time function rules
+date_functions:
+  # Functions that work
+  allowed:
+    - name: DATE_TRUNC
+      syntax: "DATE_TRUNC('month', date_column)"
+      description: "Truncate date to specified precision"
+      example: "DATE_TRUNC('month', signup_date) as month"
+
+    - name: YEAR
+      syntax: "YEAR(date_column)"
+      description: "Extract year from date"
+      example: "WHERE YEAR(signup_date) = 2025"
+
+    - name: MONTH
+      syntax: "MONTH(date_column)"
+      description: "Extract month from date"
+
+    - name: EXTRACT
+      syntax: "EXTRACT(part FROM date_column)"
+      description: "Extract date part"
+      example: "EXTRACT(year FROM signup_date)"
+
+    - name: "Date comparisons"
+      syntax: "date_column >= '2025-01-01'"
+      description: "Simple date comparisons with string literals"
+
+  # Functions to NEVER use (cause errors in Evidence/DuckDB)
+  forbidden:
+    - name: DATEADD
+      reason: "Not supported in Evidence's DuckDB layer"
+      alternative: "Use simple date comparisons or DATE_TRUNC"
+
+    - name: DATE_SUB
+      reason: "Not supported in Evidence's DuckDB layer"
+      alternative: "Use simple date comparisons"
+
+    - name: INTERVAL
+      reason: "Syntax varies and often fails"
+      alternative: "Use explicit date strings"
+
+# Aggregation functions
+aggregation:
+  allowed:
+    - COUNT(*)
+    - SUM(column)
+    - AVG(column)
+    - MIN(column)
+    - MAX(column)
+    - COUNT(DISTINCT column)
+
+# String functions
+string_functions:
+  allowed:
+    - UPPER(column)
+    - LOWER(column)
+    - CONCAT(col1, col2)
+    - TRIM(column)
+
+# General SQL rules
+general_rules:
+  - "Always use explicit column aliases with AS keyword"
+  - "Use single quotes for string literals"
+  - "Column names are case-insensitive but preserve case in output"
+  - "Use GROUP BY with all non-aggregated columns"

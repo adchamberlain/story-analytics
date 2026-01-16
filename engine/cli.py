@@ -139,7 +139,8 @@ def run_conversation(manager: ConversationManager):
             console.print(Panel(response, border_style="dim"))
 
         except KeyboardInterrupt:
-            console.print("\n[info]Use 'quit' to exit.[/info]")
+            console.print("\n[warning]Cancelled.[/warning]")
+            continue  # Go back to prompt, don't exit
         except Exception as e:
             console.print(f"[error]Error: {e}[/error]")
 
