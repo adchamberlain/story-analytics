@@ -1,0 +1,269 @@
+/* Story Analytics Landing Page - Retro Terminal Aesthetic */
+
+:root {
+    --terminal-accent: #7c9eff;
+    --terminal-accent-dim: #4a6eb3;
+    --terminal-bg: #0a0a0a;
+    --terminal-bg-lighter: #111111;
+    --glow-color: rgba(124, 158, 255, 0.3);
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html {
+    font-size: 16px;
+}
+
+body {
+    font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Code', 'Courier New', monospace;
+    background-color: var(--terminal-bg);
+    color: var(--terminal-accent);
+    line-height: 1.6;
+    min-height: 100vh;
+}
+
+/* Scanline effect overlay */
+body::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    background: repeating-linear-gradient(
+        0deg,
+        rgba(0, 0, 0, 0.15),
+        rgba(0, 0, 0, 0.15) 1px,
+        transparent 1px,
+        transparent 2px
+    );
+    z-index: 1000;
+}
+
+.terminal {
+    max-width: 700px;
+    margin: 0 auto;
+    padding: 2rem 1.5rem;
+    position: relative;
+}
+
+/* Header / Navigation */
+header {
+    margin-bottom: 3rem;
+}
+
+nav {
+    display: flex;
+    gap: 2rem;
+    justify-content: flex-end;
+}
+
+nav a {
+    color: var(--terminal-accent-dim);
+    text-decoration: none;
+    font-size: 0.875rem;
+    transition: color 0.2s, text-shadow 0.2s;
+}
+
+nav a:hover {
+    color: var(--terminal-accent);
+    text-shadow: 0 0 10px var(--glow-color);
+}
+
+/* Hero Section */
+.hero {
+    text-align: center;
+    margin-bottom: 2.5rem;
+}
+
+.logo {
+    font-size: 3rem;
+    font-weight: bold;
+    letter-spacing: 0.3em;
+    text-shadow: 0 0 20px var(--glow-color), 0 0 40px var(--glow-color);
+    margin-bottom: 1rem;
+}
+
+.tagline {
+    font-size: 1.125rem;
+    color: var(--terminal-accent);
+    opacity: 0.9;
+}
+
+/* Blinking cursor */
+.cursor {
+    display: inline-block;
+    width: 0.6em;
+    height: 1.1em;
+    background-color: var(--terminal-accent);
+    margin-left: 0.1em;
+    vertical-align: text-bottom;
+    animation: blink 1s step-end infinite;
+}
+
+@keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0; }
+}
+
+/* Coming Soon Section */
+.coming-soon {
+    text-align: center;
+    margin-bottom: 2.5rem;
+}
+
+.coming-soon .status {
+    display: inline-block;
+    padding: 0.5rem 1.5rem;
+    border: 1px solid var(--terminal-accent-dim);
+    font-size: 0.875rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    opacity: 0.8;
+}
+
+/* Features Section */
+.features {
+    margin-bottom: 2.5rem;
+}
+
+.features ul {
+    list-style: none;
+}
+
+.features li {
+    padding: 0.5rem 0;
+    font-size: 1rem;
+}
+
+.features .prompt {
+    color: var(--terminal-accent);
+    margin-right: 0.75rem;
+    text-shadow: 0 0 5px var(--glow-color);
+}
+
+/* Description Section */
+.description {
+    margin-bottom: 2.5rem;
+    padding: 1.5rem;
+    border-left: 2px solid var(--terminal-accent-dim);
+    background: linear-gradient(90deg, var(--terminal-bg-lighter), transparent);
+}
+
+.description p {
+    font-size: 0.9375rem;
+    line-height: 1.8;
+    opacity: 0.9;
+}
+
+/* Sign-off Section */
+.sign-off {
+    text-align: center;
+    margin-bottom: 3rem;
+}
+
+.motto {
+    font-style: italic;
+    color: var(--terminal-accent-dim);
+    font-size: 0.9375rem;
+}
+
+/* Footer */
+footer {
+    text-align: center;
+    padding-top: 2rem;
+    border-top: 1px solid var(--terminal-accent-dim);
+}
+
+footer p {
+    font-size: 0.8125rem;
+    color: var(--terminal-accent-dim);
+}
+
+footer a {
+    color: var(--terminal-accent);
+    text-decoration: none;
+}
+
+footer a:hover {
+    text-shadow: 0 0 10px var(--glow-color);
+}
+
+/* Legal Pages (Privacy, Terms) */
+.legal-page h1 {
+    font-size: 1.75rem;
+    margin-bottom: 0.5rem;
+    text-shadow: 0 0 15px var(--glow-color);
+}
+
+.legal-page .last-updated {
+    font-size: 0.8125rem;
+    color: var(--terminal-accent-dim);
+    margin-bottom: 2rem;
+}
+
+.legal-page section {
+    margin-bottom: 2rem;
+}
+
+.legal-page h2 {
+    font-size: 1.125rem;
+    margin-bottom: 0.75rem;
+    color: var(--terminal-accent);
+}
+
+.legal-page p {
+    font-size: 0.9375rem;
+    margin-bottom: 0.75rem;
+    opacity: 0.9;
+}
+
+.legal-page ul {
+    list-style: none;
+    margin-left: 1rem;
+}
+
+.legal-page li {
+    padding: 0.5rem 0;
+    font-size: 0.9375rem;
+}
+
+.legal-page li::before {
+    content: '>';
+    color: var(--terminal-accent);
+    margin-right: 0.75rem;
+}
+
+.legal-page a {
+    color: var(--terminal-accent);
+    text-decoration: underline;
+}
+
+.legal-page a:hover {
+    text-shadow: 0 0 10px var(--glow-color);
+}
+
+/* Responsive adjustments */
+@media (max-width: 600px) {
+    .terminal {
+        padding: 1.5rem 1rem;
+    }
+
+    .logo {
+        font-size: 2rem;
+        letter-spacing: 0.2em;
+    }
+
+    .tagline {
+        font-size: 1rem;
+    }
+
+    .features li {
+        font-size: 0.9375rem;
+    }
+}
