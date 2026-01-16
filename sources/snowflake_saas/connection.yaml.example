@@ -1,0 +1,10 @@
+# Copy this file to connection.yaml and fill in your credentials
+name: snowflake_saas
+type: snowflake
+options:
+  account: YOUR_ACCOUNT_IDENTIFIER
+  username: YOUR_USERNAME
+  password: YOUR_PASSWORD
+  database: ANALYTICS_POC
+  warehouse: COMPUTE_WH
+  schema: SAAS_DEMO

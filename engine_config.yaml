@@ -1,0 +1,11 @@
+llm:
+  provider: claude
+  model: claude-sonnet-4-20250514
+  api_key_env: ANTHROPIC_API_KEY
+
+snowflake:
+  connection_file: sources/snowflake_saas/connection.yaml
+
+evidence:
+  pages_dir: pages/
+  dev_url: http://localhost:3000
