@@ -503,10 +503,17 @@ Here's what I created:
         lower_input = user_input.lower().strip()
 
         # Check if user wants to create a NEW dashboard (not edit current one)
-        if any(
-            phrase in lower_input
-            for phrase in ["create a new", "new dashboard", "different dashboard", "another dashboard", "start over", "new"]
-        ) or lower_input == "new":
+        # Must be explicit phrases - not just "new" anywhere (e.g., "remove New MRR")
+        new_dashboard_phrases = [
+            "create a new",
+            "new dashboard",
+            "different dashboard",
+            "another dashboard",
+            "start over",
+            "start fresh",
+            "begin again",
+        ]
+        if any(phrase in lower_input for phrase in new_dashboard_phrases) or lower_input == "new":
             self.reset()
             self.state.intent = "create"
             self.state.phase = ConversationPhase.CONTEXT
