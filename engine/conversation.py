@@ -268,8 +268,16 @@ class ConversationManager:
         """Determine if user wants to create or edit."""
         lower_input = user_input.lower()
 
-        # Check for edit intent
-        if any(word in lower_input for word in ["edit", "modify", "change", "update"]):
+        # Check for edit intent - must be explicit edit phrases, not just the word appearing anywhere
+        # e.g., "edit the dashboard" or "modify my report" but NOT "show MRR changes"
+        edit_phrases = [
+            "edit ", "edit the", "edit my", "edit this",
+            "modify ", "modify the", "modify my", "modify this",
+            "update ", "update the", "update my", "update this",
+            "change the", "change my", "change this",
+            "fix the", "fix my", "fix this",
+        ]
+        if any(phrase in lower_input for phrase in edit_phrases):
             self.state.intent = "edit"
             dashboards = self.parser.get_dashboard_summaries()
 
