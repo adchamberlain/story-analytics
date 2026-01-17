@@ -102,7 +102,7 @@
 	<!-- Logo -->
 	<div class="p-4 border-b border-terminal-border">
 		<h1 class="text-terminal-accent font-bold text-xl tracking-widest">
-			STORY<span class="inline-block w-2 h-5 bg-terminal-accent ml-1 align-middle cursor-blink"></span>
+			STORY<span class="inline-block w-2 h-5 bg-terminal-accent ml-1 align-middle cursor-blink"></span><span class="inline-block w-2 h-5 bg-terminal-accent ml-0.5 align-middle cursor-blink"></span>
 		</h1>
 		<p class="text-terminal-dim text-xs mt-1">AI-native analytics.</p>
 	</div>

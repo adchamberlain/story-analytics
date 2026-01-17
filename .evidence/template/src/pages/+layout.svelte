@@ -41,6 +41,7 @@
 		color: #7c9eff !important;
 	}
 
+	/* Dual cursor design - human + AI collaboration */
 	:global(header a[href="/"]::after) {
 		content: '';
 		display: inline-block;
@@ -50,6 +51,7 @@
 		margin-left: 0.2em;
 		vertical-align: text-bottom;
 		animation: blink 1s step-end infinite;
+		box-shadow: 0.65em 0 0 #7c9eff;
 	}
 
 	@keyframes blink {

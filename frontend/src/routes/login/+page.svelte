@@ -39,7 +39,7 @@
 
 		<div class="p-6">
 			<h1 class="text-terminal-accent font-bold text-2xl tracking-widest mb-1">
-				STORY<span class="inline-block w-2 h-5 bg-terminal-accent ml-1 align-middle cursor-blink"></span>
+				STORY<span class="inline-block w-2 h-5 bg-terminal-accent ml-1 align-middle cursor-blink"></span><span class="inline-block w-2 h-5 bg-terminal-accent ml-0.5 align-middle cursor-blink"></span>
 			</h1>
 			<p class="text-terminal-dim text-sm mb-4">AI-native analytics.</p>
 
