@@ -1,6 +1,6 @@
 # Story Analytics - Project Status
 
-Conversational AI dashboard builder using Evidence.dev + Claude.
+Conversational AI dashboard builder using Evidence.dev + Claude/OpenAI/Gemini.
 
 ## What's Built
 
@@ -19,17 +19,23 @@ Conversational AI dashboard builder using Evidence.dev + Claude.
   - `PATCH /conversation/{id}` - Rename conversation
   - `DELETE /conversation/{id}` - Delete conversation
   - `GET /dashboards` - List user's dashboards
+  - `GET /dashboards/{slug}` - Get dashboard details
+  - `GET /dashboards/{slug}/content` - Get dashboard markdown
+  - `PUT /dashboards/{slug}/content` - Update dashboard markdown
+  - `DELETE /dashboards/{slug}` - Delete dashboard
 
 #### SvelteKit Frontend (`frontend/`)
 - **Auth flow**: Login/register with magic links
 - **Chat UI**: Conversation interface with message history
 - **Conversation sidebar**: List, rename, delete conversations
-- **Dashboard links**: Open in new browser tabs
+- **Dashboard list**: View, edit, delete dashboards
+- **Split-pane editor**: Side-by-side markdown editing with live preview
+- **Settings page**: LLM provider selection (Claude, OpenAI, Gemini)
 - **State management**: Svelte stores for auth, conversations, messages
 
 ### 2. LLM Conversation Engine (`engine/`)
 - **Conversation flow**: Intent → Generation → Refinement
-- **Multi-provider support**: Claude (primary), OpenAI, Gemini
+- **Multi-provider support**: Claude, OpenAI, Gemini (user-selectable)
 - **Features**:
   - Create dashboards via natural language
   - Edit/refine existing dashboards
@@ -42,7 +48,7 @@ Conversational AI dashboard builder using Evidence.dev + Claude.
 - `engine/conversation.py` - Conversation state machine
 - `engine/llm/claude.py` - Claude API integration
 - `engine/llm/openai_provider.py` - OpenAI integration
-- `engine/llm/gemini.py` - Gemini integration
+- `engine/llm/gemini_provider.py` - Gemini integration (gemini-2.0-flash)
 - `engine/schema.py` - Snowflake schema introspection
 - `engine/generator.py` - Evidence markdown generation
 - `engine/sql_validator.py` - DuckDB SQL pre-validation
@@ -50,26 +56,28 @@ Conversational AI dashboard builder using Evidence.dev + Claude.
 
 ### 3. QA Validation System (`engine/qa.py`)
 - **Screenshot capture**: Playwright takes dashboard screenshots
-- **Vision analysis**: Claude vision API validates against original request
+- **Vision analysis**: Uses user's selected LLM provider for validation
 - **Auto-fix**: Automatically fixes critical issues (up to 2 attempts)
 - **Issue categorization**: Critical issues vs suggestions
 - **Format detection**: Catches formatting errors like "$,1290507.0f"
+- **Provider consistency**: QA uses same provider as dashboard generation
 
 ### 4. SQL Pre-Validation (`engine/sql_validator.py`)
 - **DuckDB testing**: Validates SQL before writing dashboards
 - **Error detection**: Catches syntax errors, missing columns, bad functions
 - **Auto-fix loop**: LLM fixes SQL errors (up to 3 attempts)
 - **Dialect enforcement**: Prevents Snowflake-specific SQL in Evidence
+- **Semicolon handling**: Strips trailing semicolons to avoid subquery errors
 
 ### 5. Configuration-Driven Architecture
 
 ```
 engine/
 ├── prompts/           # LLM prompt templates
-│   ├── base.yaml      # Base system prompt
+│   ├── base.yaml      # Base system prompt + DuckDB SQL rules
 │   ├── create.yaml    # Dashboard creation prompts
 │   ├── edit.yaml      # Dashboard editing prompts
-│   └── generate.yaml  # Generation prompts
+│   └── generate.yaml  # Generation prompts + forbidden SQL functions
 ├── components/        # UI component definitions
 │   └── evidence.yaml  # Evidence component reference
 ├── qa/                # QA validation rules
@@ -87,9 +95,18 @@ sources/
 - **Demo tables**: customers (200), users (1000), subscriptions (200), events (10000), invoices (~1800)
 - **Connection**: `sources/snowflake_saas/connection.yaml` (gitignored)
 
-### 7. Datawrapper-Style Theming
-- **Color palette** in `evidence.config.yaml` - muted, professional colors
-- **Custom CSS** in `.evidence/template/src/app.css` - clean typography
+### 7. Story Branding
+- **Favicon**: Blue cursor icon (matches blinking cursor in logo)
+- **Browser title**: "Story" across all pages
+- **Slogan**: "AI-native analytics."
+- **Color palette**: Brand blue (#7c9eff) throughout
+- **Terminal aesthetic**: Monospace fonts, dark theme
+
+### 8. Dashboard Features
+- **View Source link**: Links from dashboard pages to split-pane editor
+- **Split-pane editor**: Edit markdown with live preview side-by-side
+- **AI-assisted editing**: Chat-based dashboard modifications
+- **Manual editing**: Direct markdown editing option
 
 ## How to Run
 
@@ -121,17 +138,20 @@ python -m engine
 
 | Variable | Required | Purpose |
 |----------|----------|---------|
-| `ANTHROPIC_API_KEY` | Yes | Claude API for conversation engine |
+| `ANTHROPIC_API_KEY` | Yes* | Claude API for conversation engine |
 | `SECRET_KEY` | Yes | JWT token signing for auth |
 | `SMTP_*` | For auth | Email sending for magic links |
 | `OPENAI_API_KEY` | Optional | OpenAI provider support |
 | `GOOGLE_API_KEY` | Optional | Gemini provider support |
 
+*At least one LLM provider API key required
+
 ## Database Schema
 
 ```
 users
-├── id, email, created_at
+├── id, email, name, preferred_provider
+├── created_at
 
 conversation_sessions
 ├── id, user_id, title, messages (JSON)
@@ -151,11 +171,15 @@ qa_history
 
 ## Known Issues / Fixes Applied
 
-1. **SQL generation**: LLM uses DuckDB syntax, not Snowflake (enforced via dialect.yaml)
+1. **SQL generation**: LLM uses DuckDB syntax, not Snowflake (enforced via prompts)
 2. **Format strings**: Auto-converted from Python-style to Evidence keywords
 3. **QA false positives**: Fixed to properly detect broken dashboards
 4. **Refinement state**: Session state properly restored from database
 5. **Grey boxes**: Normal Evidence behavior, ignored by QA
+6. **Gemini models**: Updated to gemini-2.0-flash (old models deprecated)
+7. **Gemini API key**: Fixed to prioritize GOOGLE_API_KEY env var
+8. **SQL validation**: Fixed trailing semicolon issue in subqueries
+9. **Provider race condition**: Fixed ProviderSelect binding issue
 
 ## What's Next
 
@@ -164,12 +188,15 @@ qa_history
 - [ ] Dashboard templates
 - [ ] Multi-user permissions
 - [ ] Dashboard sharing/embedding
+- [ ] Production deployment
 
 ## Dependencies
 
 ```
 # Python (requirements.txt)
 anthropic>=0.18.0
+openai>=1.0.0
+google-generativeai>=0.3.0
 fastapi>=0.109.0
 sqlalchemy>=2.0.0
 pyjwt>=2.8.0
@@ -184,5 +211,5 @@ duckdb>=0.9.0
 evidence + snowflake connector
 
 # Frontend (frontend/package.json)
-svelte, sveltekit, marked
+svelte, sveltekit, marked, monaco-editor
 ```

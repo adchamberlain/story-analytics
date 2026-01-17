@@ -1,21 +1,23 @@
 # Story Analytics
 
-Conversational AI for building data dashboards. Tell Story what you need, and it creates the dashboard for you.
+AI-native analytics. Create dashboards by describing what you need.
 
-**Website:** [story.bi](https://story.bi)
+**Website:** [storyanalytics.dev](https://storyanalytics.dev)
 
 ## What is Story?
 
-Story is an AI-powered dashboard builder that lets you create and edit data visualizations using natural language. Instead of writing SQL and configuring charts manually, you simply describe what you want to see.
+Story is an AI-powered dashboard builder. Describe what you want to see, and Story's AI agents write the SQL, design the visualizations, and catch errors automatically.
 
-Built on [Evidence.dev](https://evidence.dev) for rendering and powered by Claude for understanding your intent.
+Built on [Evidence.dev](https://evidence.dev) for rendering. Choose Claude, OpenAI, or Gemini as your AI.
 
 ## Features
 
-- **Natural language dashboard creation** - Describe what you want, Story builds it
+- **Natural language to dashboard** - Describe what you want, Story builds it
+- **Choose your AI** - Claude, OpenAI, or Gemini
 - **Automatic SQL generation** - No need to write queries manually
 - **QA validation** - Screenshots and validates dashboards automatically
 - **Auto-fix** - Detects and fixes broken dashboards
+- **Split-pane editor** - Edit markdown with live preview
 - **Web app + CLI** - Use via browser or command line
 
 ## Quick Start
@@ -26,6 +28,7 @@ Built on [Evidence.dev](https://evidence.dev) for rendering and powered by Claud
 # Install dependencies
 npm install
 pip install -r requirements.txt
+playwright install chromium
 
 # Set environment variables
 export ANTHROPIC_API_KEY='your-key-here'
@@ -64,14 +67,15 @@ Once running, simply describe what you want:
 
 Story will gather context, understand your data, and generate the dashboard.
 
-## CLI Commands
+## LLM Providers
 
-| Command | Description |
-|---------|-------------|
-| `list` | Show existing dashboards |
-| `new` | Start a fresh conversation |
-| `brand` | Apply brand configuration from `brand_config.yaml` |
-| `quit` | Exit the CLI |
+Story supports multiple AI providers. Set your preferred provider in Settings:
+
+| Provider | Environment Variable | Models |
+|----------|---------------------|--------|
+| Claude | `ANTHROPIC_API_KEY` | claude-sonnet-4-20250514 |
+| OpenAI | `OPENAI_API_KEY` | gpt-4o |
+| Gemini | `GOOGLE_API_KEY` | gemini-2.0-flash |
 
 ## Architecture
 
@@ -90,6 +94,8 @@ story-analytics/
 │   ├── components/      # Evidence component reference
 │   ├── qa/              # QA validation rules
 │   └── llm/             # LLM provider integrations
+├── pages/               # Evidence dashboard pages
+├── static/              # Static assets (favicon, icons)
 └── sources/             # Database connections
 ```
 
@@ -107,20 +113,21 @@ story-analytics/
 
 | Variable | Required | Purpose |
 |----------|----------|---------|
-| `ANTHROPIC_API_KEY` | Yes | Claude API for conversation engine |
+| `ANTHROPIC_API_KEY` | Yes* | Claude API for conversation engine |
 | `SECRET_KEY` | For web app | JWT token signing |
 | `OPENAI_API_KEY` | Optional | OpenAI provider support |
 | `GOOGLE_API_KEY` | Optional | Gemini provider support |
+
+*At least one LLM provider API key required
 
 ## Requirements
 
 - Node.js 18+
 - Python 3.10+
-- Anthropic API key
-- Data source (Snowflake, DuckDB, PostgreSQL, etc.)
+- At least one LLM API key (Anthropic, OpenAI, or Google)
+- Data source (Snowflake, BigQuery, PostgreSQL, etc.)
 
 ## Learn More
 
 - [Evidence.dev Documentation](https://docs.evidence.dev/)
-- [Anthropic API](https://docs.anthropic.com/)
 - [Project Status](PROJECT_STATUS.md) - Detailed implementation status
