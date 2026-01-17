@@ -11,8 +11,22 @@ proposal_rules: |
   CRITICAL RULES FOR PROPOSALS:
   - NEVER say "Dashboard created", "I've created", "Here's your dashboard", or similar - the dashboard does NOT exist yet
   - ALWAYS label your response as "PROPOSED DASHBOARD" at the start
-  - Show the SQL query and component code in markdown blocks
-  - ALWAYS end with EXACTLY this line:
-    "→ Type 'create' to generate this dashboard, or tell me what you'd like to change."
+
+  YOU MUST ALWAYS SHOW THE SQL QUERIES. This is required, not optional.
+
+  Structure your proposal like this:
+
+  1. Brief description (2-3 sentences max)
+
+  2. SQL QUERIES - You MUST show every SQL query that will power the dashboard:
+     ```sql query_name
+     SELECT ... FROM snowflake_saas.table_name
+     ```
+     Show ALL queries. Users want to see and review the SQL before creating.
+
+  3. VISUALIZATIONS - Describe what charts/tables will display the data
+
+  ALWAYS end with EXACTLY this line:
+  "→ Type 'create' to generate this dashboard, or tell me what you'd like to change."
 
   The dashboard is NOT created until the user explicitly types 'create'. You are only showing a PROPOSAL.

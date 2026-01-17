@@ -197,7 +197,11 @@ class EvidenceGenerator:
             Path to the created file.
         """
         markdown = self.generate_markdown(spec)
-        file_path = self.config.pages_dir / f"{spec.slug}.md"
+
+        # Evidence expects: pages_dir/slug/+page.md
+        dashboard_dir = self.config.pages_dir / spec.slug
+        dashboard_dir.mkdir(parents=True, exist_ok=True)
+        file_path = dashboard_dir / "+page.md"
 
         # Create backup if file exists
         if file_path.exists():
@@ -222,7 +226,11 @@ class EvidenceGenerator:
         """
         # Generate slug from title
         slug = self._slugify(title)
-        file_path = self.config.pages_dir / f"{slug}.md"
+
+        # Evidence expects: pages_dir/slug/+page.md
+        dashboard_dir = self.config.pages_dir / slug
+        dashboard_dir.mkdir(parents=True, exist_ok=True)
+        file_path = dashboard_dir / "+page.md"
 
         # Create backup if file exists
         if file_path.exists():
@@ -249,7 +257,48 @@ def create_dashboard(spec: DashboardSpec) -> Path:
     return generator.write_dashboard(spec)
 
 
+def fix_format_strings(markdown: str) -> str:
+    """
+    Fix common format string mistakes in Evidence markdown.
+
+    LLMs often generate Python-style format strings like fmt="$,.0f" instead of
+    Evidence keywords like fmt="usd0". This function automatically fixes them.
+    """
+    # Map of wrong format strings to correct Evidence keywords
+    replacements = [
+        # Currency formats (with $ prefix)
+        (r'fmt\s*=\s*["\']?\$[,:]*\.?0?f["\']?', 'fmt="usd0"'),
+        (r'fmt\s*=\s*["\']?\$[,:]*\.?1f["\']?', 'fmt="usd1"'),
+        (r'fmt\s*=\s*["\']?\$[,:]*\.?2f["\']?', 'fmt="usd2"'),
+        (r'fmt\s*=\s*["\']?\$\{?:?[,.]?0?f?\}?["\']?', 'fmt="usd0"'),
+        (r'fmt\s*=\s*["\']?\$\{?:?[,.]?2f?\}?["\']?', 'fmt="usd2"'),
+
+        # Number formats (no $ prefix, with commas/decimals)
+        (r'fmt\s*=\s*["\'][,:]?\.?0f["\']', 'fmt="num0"'),
+        (r'fmt\s*=\s*["\'][,:]?\.?1f["\']', 'fmt="num1"'),
+        (r'fmt\s*=\s*["\'][,:]?\.?2f["\']', 'fmt="num2"'),
+        (r'fmt\s*=\s*["\']\{?:?[,.]?0?f?\}?["\']', 'fmt="num0"'),
+
+        # Percentage formats
+        (r'fmt\s*=\s*["\']?\.?0?%["\']?', 'fmt="pct0"'),
+        (r'fmt\s*=\s*["\']?\.?1%["\']?', 'fmt="pct1"'),
+        (r'fmt\s*=\s*["\']?\.?2%["\']?', 'fmt="pct2"'),
+
+        # Generic wrong patterns with 'f' suffix
+        (r'fmt\s*=\s*["\'][^"\']*\.0f["\']', 'fmt="num0"'),
+        (r'fmt\s*=\s*["\'][^"\']*\.2f["\']', 'fmt="num2"'),
+    ]
+
+    for pattern, replacement in replacements:
+        markdown = re.sub(pattern, replacement, markdown, flags=re.IGNORECASE)
+
+    return markdown
+
+
 def create_dashboard_from_markdown(markdown: str, title: str) -> Path:
     """Convenience function to create a dashboard from raw markdown."""
+    # Fix common format string issues before writing
+    markdown = fix_format_strings(markdown)
+
     generator = EvidenceGenerator()
     return generator.create_dashboard_from_llm_output(markdown, title)

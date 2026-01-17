@@ -48,6 +48,14 @@ critical_issues:
         - "User asked for line chart but got bar chart"
         - "Wrong visualization for the data"
 
+    - name: "Formatting errors"
+      examples:
+        - "Numbers showing wrong format like '$,1290507.0f' with 'f' at the end"
+        - "Format strings not rendering properly (visible 'f' suffix)"
+        - "Currency showing as '$,123456.0f' instead of '$123,456'"
+        - "Comma in wrong position (before the first digit)"
+        - "Decimal places showing '.0f' instead of proper rounding"
+
 # Suggestions - these are optional improvements, presented to user
 suggestions:
   description: "Nice-to-have improvements that aren't required"
@@ -90,6 +98,13 @@ validation_prompt: |
      - Broken visualizations (charts not rendering, error messages displayed)
      - Missing required elements (user asked for X but it's not there)
      - Incorrect chart type (user asked for line chart but got bar chart)
+     - NUMBER FORMATTING ERRORS (IMPORTANT - check carefully!):
+       * Numbers ending with 'f' like "$,1290507.0f" - the 'f' should NOT be visible
+       * Commas in wrong position like "$,123" instead of "$123"
+       * Format codes visible in the output (any letter suffix like 'f', 'd', etc.)
+       * This is a CRITICAL issue that must be fixed
+
+     NOTE: Gray boxes showing "X records with Y properties" are NORMAL Evidence behavior - ignore these.
 
   4. SUGGESTIONS: List optional improvements that would be nice-to-have but aren't required:
      - Additional features (add trend lines, add comparisons)

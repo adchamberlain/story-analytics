@@ -15,8 +15,9 @@ from .generator import create_dashboard_from_markdown
 from .llm.base import LLMResponse, Message
 from .llm.claude import get_provider
 from .parser import DashboardParser, ParsedDashboard
-from .qa import DashboardQA, QAResult
+from .qa import DashboardQA, QAResult, run_qa_with_auto_fix
 from .schema import get_schema_context
+from .sql_validator import validate_dashboard_sql, ValidationReport
 
 
 class ConversationPhase(Enum):
@@ -24,8 +25,6 @@ class ConversationPhase(Enum):
 
     INTENT = "intent"  # Determine create vs edit
     CONTEXT = "context"  # What decision should this help make?
-    DATA_DISCOVERY = "data_discovery"  # What tables/columns?
-    METRIC_DEFINITION = "metric_definition"  # How to calculate?
     GENERATION = "generation"  # Generate the dashboard
     REFINEMENT = "refinement"  # Iterate on feedback
 
@@ -233,12 +232,48 @@ Use the snowflake_saas source for all queries."""
         markdown = response.content
 
         # Clean up markdown (remove code fences if LLM wrapped it)
-        if markdown.startswith("```markdown"):
-            markdown = markdown[len("```markdown") :].strip()
-        if markdown.startswith("```"):
-            markdown = markdown[3:].strip()
-        if markdown.endswith("```"):
-            markdown = markdown[:-3].strip()
+        markdown = self._clean_markdown(markdown)
+
+        # SQL Pre-validation: Test queries against DuckDB before writing
+        max_sql_fix_attempts = 3
+        sql_fix_attempts = 0
+
+        while sql_fix_attempts < max_sql_fix_attempts:
+            validation = validate_dashboard_sql(markdown)
+
+            if validation.valid:
+                break  # All SQL is valid, proceed
+
+            sql_fix_attempts += 1
+
+            if sql_fix_attempts >= max_sql_fix_attempts:
+                # Max attempts reached, proceed anyway (QA will catch it)
+                break
+
+            # Ask LLM to fix the SQL errors
+            fix_prompt = f"""The dashboard has SQL errors that must be fixed before it can be created.
+
+{validation.format_errors()}
+
+IMPORTANT REMINDERS:
+- Evidence uses DuckDB, NOT Snowflake SQL
+- NEVER use TO_CHAR, TO_VARCHAR, NVL, IFF - these don't exist in DuckDB
+- Use STRFTIME() for date formatting, COALESCE() for null handling
+- Use CASE WHEN instead of IFF()
+
+Please regenerate the COMPLETE dashboard markdown with ALL SQL errors fixed.
+Output ONLY the corrected markdown, starting with # Title."""
+
+            self.state.messages.append(Message(role="user", content=fix_prompt))
+
+            response = self.llm.generate(
+                messages=self.state.messages,
+                system_prompt=self.get_system_prompt(),
+                temperature=0.2,  # Even lower temperature for fixes
+                max_tokens=4096,
+            )
+
+            markdown = self._clean_markdown(response.content)
 
         self.state.generated_markdown = markdown
 
@@ -257,52 +292,72 @@ Use the snowflake_saas source for all queries."""
             self.state.created_file = file_path
             self.state.phase = ConversationPhase.REFINEMENT
 
-            url = f"{self.config.dev_url}/{file_path.stem}"
+            # file_path is pages_dir/slug/+page.md, so slug is the parent dir name
+            slug = file_path.parent.name
+            url = f"{self.config.dev_url}/{slug}"
 
             # Run QA validation with auto-fix loop (if enabled)
             qa_result = None
-            auto_fixed = False
-            all_fixed_issues = []
+            qa_run = None
+            auto_fix_attempted = False
+            successfully_fixed = []
 
-            if self.config_loader.is_qa_enabled():
+            if self.config_loader.is_qa_enabled() and self.state.original_request:
                 max_fix_attempts = self.config_loader.get_max_auto_fix_attempts()
                 should_auto_fix = self.config_loader.should_auto_fix_critical()
 
-                for attempt in range(max_fix_attempts + 1):
-                    qa_result = self._run_qa_validation(file_path.stem)
+                if should_auto_fix:
+                    # Use standalone QA function with auto-fix
+                    qa_run = run_qa_with_auto_fix(
+                        dashboard_slug=slug,
+                        file_path=file_path,
+                        original_request=self.state.original_request,
+                        max_fix_attempts=max_fix_attempts,
+                        schema_context=self.get_schema_context(),
+                    )
+                    qa_result = qa_run.final_result
+                    auto_fix_attempted = qa_run.auto_fix_attempted
+                    successfully_fixed = qa_run.issues_fixed
 
-                    if qa_result is None:
-                        break
+                    # Update state with fixed markdown if auto-fix was applied
+                    if auto_fix_attempted:
+                        self.state.generated_markdown = file_path.read_text()
+                else:
+                    # Just validate without auto-fix
+                    qa_result = self._run_qa_validation(slug)
 
-                    if qa_result.needs_auto_fix and should_auto_fix and attempt < max_fix_attempts:
-                        # Auto-fix critical issues
-                        all_fixed_issues.extend(qa_result.critical_issues)
-                        fixed_markdown = self._auto_fix_issues(qa_result.critical_issues)
-                        file_path.write_text(fixed_markdown)
-                        self.state.generated_markdown = fixed_markdown
-                        auto_fixed = True
-                        # Loop continues to re-run QA
-                    else:
-                        # No critical issues or max attempts reached
-                        break
+            # Check if dashboard is still broken after all attempts
+            dashboard_is_broken = qa_result and qa_result.critical_issues
 
-            # Build result message
-            result = f"""✓ Dashboard created: {file_path.name}
+            # Build result message based on dashboard status
+            if dashboard_is_broken:
+                result = f"""⚠️ Dashboard created but has issues: {slug}
 
 View it at: {url}
 
 Here's what I created:
 {self._summarize_markdown(self.state.generated_markdown)}
 """
-            if auto_fixed:
-                result += f"\n🔧 Auto-fixed {len(all_fixed_issues)} critical issue(s):\n"
-                for issue in all_fixed_issues:
-                    result += f"  • {issue}\n"
+            else:
+                result = f"""✓ Dashboard created: {slug}
+
+View it at: {url}
+
+Here's what I created:
+{self._summarize_markdown(self.state.generated_markdown)}
+"""
 
             if qa_result:
-                result += self._format_qa_result(qa_result, auto_fixed=auto_fixed)
+                result += self._format_qa_result(
+                    qa_result,
+                    auto_fix_attempted=auto_fix_attempted,
+                    fixed_issues=successfully_fixed
+                )
 
-            if qa_result and qa_result.suggestions:
+            # Different prompts based on status
+            if dashboard_is_broken:
+                result += "\nPlease tell me how to fix these issues, or describe what you want to see."
+            elif qa_result and qa_result.suggestions:
                 result += "\nWould you like me to implement any of these suggestions? Or tell me what else to change."
             else:
                 result += "\nWhat would you like to change?"
@@ -315,24 +370,29 @@ Here's what I created:
 
     def _handle_refinement_phase(self, user_input: str) -> str:
         """Handle refinement requests after initial generation."""
-        lower_input = user_input.lower()
+        lower_input = user_input.lower().strip()
 
         # Check if user wants to create a NEW dashboard (not edit current one)
         if any(
             phrase in lower_input
-            for phrase in ["create a new", "new dashboard", "different dashboard", "another dashboard", "start over"]
-        ):
+            for phrase in ["create a new", "new dashboard", "different dashboard", "another dashboard", "start over", "new"]
+        ) or lower_input == "new":
             self.reset()
             self.state.intent = "create"
             self.state.phase = ConversationPhase.CONTEXT
-            return self._handle_conversation_phase(user_input)
+            response = "Starting a new dashboard. What would you like to create?"
+            self.state.messages.append(Message(role="assistant", content=response))
+            return response
 
-        # Check if done
+        # Check if done/quit/exit
         if any(
             phrase in lower_input
-            for phrase in ["looks good", "done", "perfect", "that's all", "no changes"]
-        ):
-            return f"Great! Your dashboard is ready at: {self.config.dev_url}/{self.state.created_file.stem}\n\nType 'new' to create another dashboard, or 'quit' to exit."
+            for phrase in ["looks good", "done", "perfect", "that's all", "no changes", "quit", "exit"]
+        ) or lower_input in ["done", "quit", "exit"]:
+            slug = self.state.created_file.parent.name if self.state.created_file else "dashboard"
+            response = f"Great! Your dashboard is ready at: {self.config.dev_url}/{slug}\n\nClick '+ New' in the top right to create another dashboard."
+            self.state.messages.append(Message(role="assistant", content=response))
+            return response
 
         # Process refinement request
         if self.state.generated_markdown and self.state.created_file:
@@ -368,9 +428,10 @@ Generate the complete updated markdown. Output ONLY the markdown, nothing else."
             self.state.created_file.write_text(new_markdown.strip())
             self.state.generated_markdown = new_markdown
 
-            result = f"""✓ Dashboard updated: {self.state.created_file.name}
+            slug = self.state.created_file.parent.name
+            result = f"""✓ Dashboard updated: {slug}
 
-Refresh {self.config.dev_url}/{self.state.created_file.stem} to see changes.
+Refresh {self.config.dev_url}/{slug} to see changes.
 
 What else would you like to change?"""
 
@@ -402,6 +463,16 @@ What else would you like to change?"""
                 lines.append(f"- {count} {comp}(s)")
 
         return "\n".join(lines) if lines else "- Dashboard content generated"
+
+    def _clean_markdown(self, markdown: str) -> str:
+        """Clean up markdown by removing code fences if LLM wrapped it."""
+        if markdown.startswith("```markdown"):
+            markdown = markdown[len("```markdown"):].strip()
+        if markdown.startswith("```"):
+            markdown = markdown[3:].strip()
+        if markdown.endswith("```"):
+            markdown = markdown[:-3].strip()
+        return markdown
 
     def _run_qa_validation(self, dashboard_slug: str) -> QAResult | None:
         """
@@ -469,21 +540,42 @@ What else would you like to change?"""
 
         return new_markdown.strip()
 
-    def _format_qa_result(self, result: QAResult, auto_fixed: bool = False) -> str:
-        """Format QA result for display to user."""
-        if auto_fixed:
+    def _format_qa_result(self, result: QAResult, auto_fix_attempted: bool = False, fixed_issues: list[str] = None) -> str:
+        """Format QA result for display to user.
+
+        Args:
+            result: The final QA result after any auto-fix attempts
+            auto_fix_attempted: Whether auto-fix was attempted
+            fixed_issues: List of issues that were successfully fixed (no longer in result.critical_issues)
+        """
+        fixed_issues = fixed_issues or []
+
+        # Determine final status based on whether there are STILL critical issues
+        if result.critical_issues:
+            # Dashboard is still broken - be honest about it
+            status = "✗ QA FAILED - Dashboard has critical issues"
+        elif auto_fix_attempted and fixed_issues:
+            # Auto-fix worked - all issues resolved
             status = "✓ QA PASSED (after auto-fix)"
+        elif result.passed:
+            status = "✓ QA PASSED"
         else:
-            status = "✓ QA PASSED" if result.passed else "✗ QA NEEDS ATTENTION"
+            status = "✗ QA NEEDS ATTENTION"
 
         output = f"\n--- QA Validation ---\n{status}\n"
 
         if result.summary:
             output += f"Summary: {result.summary}\n"
 
-        # Don't show critical issues if we auto-fixed (they're resolved)
-        if result.critical_issues and not auto_fixed:
-            output += "\nCritical issues (will auto-fix):\n"
+        # Show what was successfully fixed
+        if fixed_issues:
+            output += f"\n🔧 Auto-fixed {len(fixed_issues)} issue(s):\n"
+            for issue in fixed_issues:
+                output += f"  ✓ {issue}\n"
+
+        # Show remaining critical issues that need human intervention
+        if result.critical_issues:
+            output += "\n⚠️ Remaining critical issues (need your input):\n"
             for issue in result.critical_issues:
                 output += f"  • {issue}\n"
 

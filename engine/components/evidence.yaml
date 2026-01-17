@@ -70,8 +70,20 @@ components:
       - value: "Column name for the value to display"
     optional_props:
       - title: "Label for the metric"
+      - fmt: "Format keyword (NOT a format string!)"
+    notes:
+      - "ALWAYS use fmt prop for proper formatting"
+      - "fmt MUST be one of these EXACT keywords (no quotes needed in value):"
+      - "  - usd0 = currency, no decimals ($1,234)"
+      - "  - usd = currency with decimals ($1,234.56)"
+      - "  - num0 = number, no decimals (1,234)"
+      - "  - num2 = number, 2 decimals (1,234.56)"
+      - "  - pct0 = percentage, no decimals (12%)"
+      - "  - pct1 = percentage, 1 decimal (12.3%)"
+      - "WRONG: fmt=\"$,.0f\" fmt=\"${:,.0f}\" - these will show 'f' in output!"
+      - "RIGHT: fmt=\"usd0\" - this is a keyword, not a format string"
     example: |
-      <BigValue data={query_name} value="total_revenue" title="Total Revenue" />
+      <BigValue data={query_name} value="total_revenue" title="Total Revenue" fmt="usd0" />
 
   Dropdown:
     description: "Filter dropdown"
@@ -91,3 +103,9 @@ common_mistakes:
     correct: "Use y={[\"col1\", \"col2\"]} array syntax"
   - mistake: "Missing curly braces around data reference"
     correct: "Always use data={query_name}, not data=\"query_name\""
+  - mistake: "Using Python/C format strings like '${:,.0f}', '{:.2f}', '$,.0f', etc."
+    correct: "NEVER use format strings with 'f' suffix. Use Evidence fmt prop: fmt=\"usd0\" for currency, fmt=\"num2\" for numbers"
+  - mistake: "Numbers showing as '$,1290507.0f' with 'f' at the end"
+    correct: "This happens when using wrong format strings. Use fmt=\"usd0\" NOT fmt=\"$,.0f\""
+  - mistake: "Setting fmt to a Python-style format string"
+    correct: "Evidence fmt values are simple keywords: usd, usd0, usd2, num0, num2, pct, pct1, pct2 - NOT format codes"

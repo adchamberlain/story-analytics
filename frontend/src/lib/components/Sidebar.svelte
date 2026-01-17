@@ -1,0 +1,251 @@
+<script lang="ts">
+	import { onMount } from 'svelte';
+	import { user } from '../stores/auth';
+	import { dashboards, loadDashboards } from '../stores/dashboards';
+	import {
+		conversationList,
+		currentSessionId,
+		loadConversationList,
+		switchConversation,
+		startNewConversation,
+		deleteConversation,
+		renameConversation
+	} from '../stores/conversation';
+	import { logout } from '../api';
+
+	export let currentPath: string = '/app';
+
+	let showDashboards = true;
+	let showConversations = true;
+	let editingId: number | null = null;
+	let editingTitle = '';
+
+	onMount(() => {
+		loadDashboards();
+		loadConversationList();
+	});
+
+	function handleLogout() {
+		logout();
+	}
+
+	function toggleDashboards() {
+		showDashboards = !showDashboards;
+	}
+
+	function toggleConversations() {
+		showConversations = !showConversations;
+	}
+
+	async function handleSwitchConversation(sessionId: number) {
+		await switchConversation(sessionId);
+	}
+
+	async function handleNewConversation() {
+		await startNewConversation();
+	}
+
+	async function handleDeleteConversation(event: Event, sessionId: number) {
+		event.stopPropagation();
+		if (confirm('Delete this conversation?')) {
+			await deleteConversation(sessionId);
+		}
+	}
+
+	function startEditing(event: Event, sessionId: number, currentTitle: string | null) {
+		event.stopPropagation();
+		editingId = sessionId;
+		editingTitle = currentTitle || '';
+	}
+
+	async function saveEdit(sessionId: number) {
+		if (editingTitle.trim()) {
+			await renameConversation(sessionId, editingTitle.trim());
+		}
+		editingId = null;
+		editingTitle = '';
+	}
+
+	function cancelEdit() {
+		editingId = null;
+		editingTitle = '';
+	}
+
+	function handleEditKeydown(event: KeyboardEvent, sessionId: number) {
+		if (event.key === 'Enter') {
+			saveEdit(sessionId);
+		} else if (event.key === 'Escape') {
+			cancelEdit();
+		}
+	}
+
+	function formatDate(dateStr: string): string {
+		const date = new Date(dateStr);
+		const now = new Date();
+		const diffMs = now.getTime() - date.getTime();
+		const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+		if (diffDays === 0) return 'Today';
+		if (diffDays === 1) return 'Yesterday';
+		if (diffDays < 7) return `${diffDays} days ago`;
+		return date.toLocaleDateString();
+	}
+
+	const navItems = [
+		{ path: '/app', label: 'Chat', icon: '>' },
+		{ path: '/app/dashboards', label: 'Dashboards', icon: '#' },
+		{ path: '/app/settings', label: 'Settings', icon: '*' }
+	];
+</script>
+
+<aside class="w-64 h-full bg-terminal-surface border-r border-terminal-border flex flex-col">
+	<!-- Logo -->
+	<div class="p-4 border-b border-terminal-border">
+		<h1 class="text-terminal-green font-bold text-lg">Story Analytics</h1>
+		<p class="text-terminal-dim text-xs mt-1">Dashboard creation via AI</p>
+	</div>
+
+	<!-- Navigation -->
+	<nav class="flex-1 p-4">
+		<ul class="space-y-1">
+			{#each navItems as item}
+				<li>
+					<a
+						href={item.path}
+						class="flex items-center gap-2 px-3 py-2 rounded transition-colors
+                           {currentPath === item.path
+							? 'bg-terminal-border text-terminal-green'
+							: 'text-terminal-text hover:bg-terminal-border'}"
+					>
+						<span class="text-terminal-amber">{item.icon}</span>
+						<span>{item.label}</span>
+					</a>
+				</li>
+			{/each}
+		</ul>
+
+		<!-- Conversations list -->
+		<div class="mt-6">
+			<div class="flex items-center justify-between mb-2">
+				<button
+					on:click={toggleConversations}
+					class="flex items-center gap-2 text-terminal-dim text-sm hover:text-terminal-text transition-colors"
+				>
+					<span class="transform transition-transform {showConversations ? 'rotate-90' : ''}"
+						>{'>'}</span
+					>
+					<span>Conversations</span>
+				</button>
+				<button
+					on:click={handleNewConversation}
+					class="text-terminal-green hover:text-terminal-text text-sm transition-colors"
+					title="New conversation"
+				>
+					+
+				</button>
+			</div>
+
+			{#if showConversations}
+				<ul class="ml-4 space-y-1 max-h-48 overflow-y-auto">
+					{#if $conversationList.length === 0}
+						<li class="text-terminal-dim text-xs py-1">No conversations yet</li>
+					{:else}
+						{#each $conversationList as conv}
+							<li class="group flex items-center justify-between">
+								{#if editingId === conv.id}
+									<input
+										type="text"
+										bind:value={editingTitle}
+										on:keydown={(e) => handleEditKeydown(e, conv.id)}
+										on:blur={() => saveEdit(conv.id)}
+										class="text-sm py-0.5 px-1 flex-1 bg-terminal-bg border border-terminal-green rounded text-terminal-text outline-none"
+										autofocus
+									/>
+								{:else}
+									<button
+										on:click={() => handleSwitchConversation(conv.id)}
+										on:dblclick={(e) => startEditing(e, conv.id, conv.title)}
+										class="text-sm truncate py-1 flex-1 text-left transition-colors
+	                                        {$currentSessionId === conv.id
+											? 'text-terminal-green'
+											: 'text-terminal-dim hover:text-terminal-text'}"
+										title="Double-click to rename"
+									>
+										{conv.title || 'New conversation'}
+									</button>
+									<button
+										on:click={(e) => handleDeleteConversation(e, conv.id)}
+										class="text-terminal-dim hover:text-terminal-red text-xs opacity-0 group-hover:opacity-100 transition-opacity px-1"
+										title="Delete conversation"
+									>
+										×
+									</button>
+								{/if}
+							</li>
+						{/each}
+					{/if}
+				</ul>
+			{/if}
+		</div>
+
+		<!-- Dashboard list -->
+		<div class="mt-6">
+			<button
+				on:click={toggleDashboards}
+				class="flex items-center gap-2 text-terminal-dim text-sm hover:text-terminal-text transition-colors w-full"
+			>
+				<span class="transform transition-transform {showDashboards ? 'rotate-90' : ''}"
+					>{'>'}</span
+				>
+				<span>Recent Dashboards</span>
+			</button>
+
+			{#if showDashboards}
+				<ul class="mt-2 ml-4 space-y-1">
+					{#if $dashboards.length === 0}
+						<li class="text-terminal-dim text-xs py-1">No dashboards yet</li>
+					{:else}
+						{#each $dashboards.slice(0, 5) as dashboard}
+							<li>
+								<a
+									href={dashboard.url}
+									target="_blank"
+									rel="noopener noreferrer"
+									class="text-sm text-terminal-dim hover:text-terminal-green truncate block py-1"
+									title={dashboard.title}
+								>
+									{dashboard.title}
+								</a>
+							</li>
+						{/each}
+						{#if $dashboards.length > 5}
+							<li>
+								<a href="/app/dashboards" class="text-xs text-terminal-amber hover:underline">
+									View all ({$dashboards.length})
+								</a>
+							</li>
+						{/if}
+					{/if}
+				</ul>
+			{/if}
+		</div>
+	</nav>
+
+	<!-- User info -->
+	<div class="p-4 border-t border-terminal-border">
+		{#if $user}
+			<div class="flex items-center justify-between">
+				<div class="truncate">
+					<p class="text-terminal-text text-sm truncate">{$user.name}</p>
+					<p class="text-terminal-dim text-xs truncate">{$user.email}</p>
+				</div>
+				<button
+					on:click={handleLogout}
+					class="text-terminal-red hover:text-red-400 text-sm transition-colors whitespace-nowrap"
+				>
+					Log out
+				</button>
+			</div>
+		{/if}
+	</div>
+</aside>
