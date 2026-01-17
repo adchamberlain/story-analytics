@@ -69,7 +69,7 @@ def send_magic_link_email(
                 padding: 32px;
             }}
             h1 {{
-                color: #22c55e;
+                color: #7c9eff;
                 font-size: 24px;
                 margin-top: 0;
             }}
@@ -80,8 +80,8 @@ def send_magic_link_email(
             .button {{
                 display: inline-block;
                 background-color: transparent;
-                color: #22c55e;
-                border: 1px solid #22c55e;
+                color: #7c9eff;
+                border: 1px solid #7c9eff;
                 padding: 12px 24px;
                 text-decoration: none;
                 font-family: inherit;
@@ -89,7 +89,7 @@ def send_magic_link_email(
                 margin: 20px 0;
             }}
             .button:hover {{
-                background-color: #22c55e;
+                background-color: #7c9eff;
                 color: #0a0a0a;
             }}
             .footer {{
