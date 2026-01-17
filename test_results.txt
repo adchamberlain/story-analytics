@@ -1,0 +1,146 @@
+Template Test Results - 2026-01-17 15:11:57
+======================================================================
+
+Schema loaded (3129 chars)
+
+
+======================================================================
+Category: SaaS / Subscriptions (saas)
+======================================================================
+
+--- MRR Dashboard (mrr-dashboard) ---
+Prompt: Create a dashboard showing MRR trends over the last 12 months, MRR by plan type, and net MRR changes...
+  Requirements extracted: MRR Performance Dashboard
+    Metrics: 4
+    Visualizations: 4
+    Tables: ['snowflake_saas.subscriptions']
+  FULLY FEASIBLE
+  Status: PASS
+
+--- Churn Analysis (churn-analysis) ---
+Prompt: Create a churn analysis dashboard showing monthly churn rate, churned customers over time, and churn...
+  Requirements extracted: Customer Churn Analysis Dashboard
+    Metrics: 3
+    Visualizations: 5
+    Tables: ['snowflake_saas.subscriptions', 'snowflake_saas.customers']
+  FULLY FEASIBLE
+  Status: PASS
+
+--- Subscription Metrics (subscription-metrics) ---
+Prompt: Create a dashboard showing active subscriptions, subscription growth rate, average revenue per user ...
+  Requirements extracted: Subscription Analytics Dashboard
+    Metrics: 4
+    Visualizations: 5
+    Tables: ['snowflake_saas.subscriptions']
+  FULLY FEASIBLE
+  Status: PASS
+
+--- Trial Conversion (trial-conversion) ---
+Prompt: Create a dashboard showing trial signups over time, trial to paid conversion rate, average time to c...
+  Requirements extracted: Trial Conversion Analytics Dashboard
+    Metrics: 4
+    Visualizations: 6
+    Tables: ['snowflake_saas.customers', 'snowflake_saas.subscriptions']
+  PARTIALLY FEASIBLE
+    Can build: ['Trial Signups: Can count customers with Free plan tier from customers table', 'LineChart: Trial Signups Over Time - Can show Free plan signups by month using signup_date', 'BarChart: Conversion Rate by Region - Can calculate using region from customers table']
+    Cannot build: ['Trial to Paid Conversion Rate: Cannot determine who upgraded from Free to paid - no subscription history/changes tracked', 'Average Time to Conversion: Cannot calculate conversion timing - no upgrade date or subscription change history', 'Total Conversions: Cannot count conversions without upgrade tracking']
+    Explanation: The schema only shows current subscription state (plan_tier in customers and subscriptions tables) but lacks historical subscription changes. We can see who currently has Free vs paid plans, but cannot track upgrades/conversions over time since there's no subscription change history or upgrade timestamps.
+    Alternative: Build a 'Current Subscription Analysis Dashboard' instead, showing: 1) Current plan distribution by region/industry, 2) Free vs paid customer breakdown, 3) MRR analysis by customer segments, 4) Customer acquisition trends by plan tier. This would provide valuable insights about the current customer base composition without requiring conversion tracking data.
+  Status: PARTIAL
+
+======================================================================
+Category: E-commerce / Retail (ecommerce)
+======================================================================
+
+--- Sales Dashboard (sales-dashboard) ---
+Prompt: Create a sales dashboard showing total sales, orders over time, average order value, and top selling...
+  Requirements extracted: Sales Performance Dashboard
+    Metrics: 3
+    Visualizations: 6
+    Tables: ['snowflake_saas.invoices', 'snowflake_saas.customers']
+  FULLY FEASIBLE
+  Status: PASS
+
+--- Product Performance (product-performance) ---
+Prompt: Create a product performance dashboard showing sales by product category, top products by revenue, p...
+  Requirements extracted: Product Performance Dashboard
+    Metrics: 4
+    Visualizations: 5
+    Tables: ['snowflake_saas.invoices', 'snowflake_saas.customers', 'snowflake_saas.subscriptions']
+  FULLY FEASIBLE
+  Status: PASS
+
+--- Cart Analytics (cart-analytics) ---
+Prompt: Create a cart analytics dashboard showing cart abandonment rate over time, average cart value, check...
+  Requirements extracted: Cart Analytics Dashboard
+    Metrics: 4
+    Visualizations: 4
+    Tables: ['snowflake_saas.events', 'snowflake_saas.users']
+  PARTIALLY FEASIBLE
+    Can build: ['Total Cart Sessions (if we interpret as event counts)', 'BarChart: Common Exit Points (showing event types from events table)', 'DataTable: Cart Performance Details (basic event analysis by time)']
+    Cannot build: ['Cart Abandonment Rate - No cart-specific events (add_to_cart, checkout_started, purchase_completed) in EVENT_TYPE samples', 'Average Cart Value - No cart value, item price, or monetary transaction data in any table', 'Checkout Conversion Rate - No checkout or purchase completion events identified']
+    Explanation: The database schema lacks e-commerce/cart-specific data. The events table contains generic events (login, feature_used, invite_sent, export_data, settings_changed) but no cart, checkout, or purchase events. There are no monetary values associated with user actions, no product/item data, and no transaction completion tracking.
+    Alternative: Build a 'User Engagement Dashboard' instead using available data: track feature usage patterns, login frequency, user activity trends over time, and event type distribution. This would show user behavior patterns and engagement metrics using the existing event types and user activity data.
+  Status: PARTIAL
+
+--- Customer LTV (customer-ltv) ---
+Prompt: Create a customer LTV dashboard showing customer lifetime value distribution, LTV by acquisition cha...
+  Requirements extracted: Customer Lifetime Value (LTV) Dashboard
+    Metrics: 6
+    Visualizations: 6
+    Tables: ['snowflake_saas.customers', 'snowflake_saas.invoices', 'snowflake_saas.subscriptions']
+  PARTIALLY FEASIBLE
+    Can build: ['Customer Count - can count distinct customers from customers table', 'Average LTV by Industry - can calculate using invoices.amount grouped by customers.industry', 'LTV by Plan Tier - can calculate using invoices.amount grouped by customers.plan_tier or subscriptions.plan_tier']
+    Cannot build: ["Repeat Purchase Rate - requires ability to identify 'purchases' but invoices table doesn't clearly represent individual purchases (could be recurring billing)", "Customer Retention Rate - requires definition of 'active' customers and churn_date exists in subscriptions but may not represent true customer activity", 'LTV Distribution by Range - while LTV can be calculated, creating meaningful ranges requires business context not available in schema']
+    Explanation: The schema provides good foundation for basic LTV calculations using customers and invoices tables, but lacks clear definitions of customer activity, purchases vs billing cycles, and retention metrics. The invoices table appears to be billing-focused rather than transaction-focused.
+    Alternative: Build a 'Customer Revenue Analysis Dashboard' focusing on: total revenue per customer, average revenue by industry/plan tier, customer signup trends, billing amounts by customer segments, and basic cohort revenue groupings. This would provide valuable insights while working within the available data constraints.
+  Status: PARTIAL
+
+======================================================================
+Category: General Business (general)
+======================================================================
+
+--- Revenue Trends (revenue-trends) ---
+Prompt: Create a dashboard showing revenue trends over the last 12 months with month-over-month comparison a...
+  Requirements extracted: Revenue Trends Dashboard
+    Metrics: 4
+    Visualizations: 4
+    Tables: ['snowflake_saas.invoices']
+  FULLY FEASIBLE
+  Status: PASS
+
+--- Customer Growth (customer-growth) ---
+Prompt: Create a dashboard showing new customers over time, total customer count, customer growth rate, and ...
+  Requirements extracted: Customer Acquisition & Growth Dashboard
+    Metrics: 5
+    Visualizations: 5
+    Tables: ['snowflake_saas.customers']
+  FULLY FEASIBLE
+  Status: PASS
+
+--- Top Performers (top-performers) ---
+Prompt: Create a dashboard showing top 10 items by revenue, top customers by spend, and performance by categ...
+  Requirements extracted: Revenue Performance Dashboard
+    Metrics: 4
+    Visualizations: 4
+    Tables: ['snowflake_saas.invoices', 'snowflake_saas.customers']
+  FULLY FEASIBLE
+  Status: PASS
+
+--- Time Series Analysis (time-series) ---
+Prompt: Create a time series dashboard showing key metrics over the last 12 months with trend lines, seasona...
+  Requirements extracted: Key Metrics Time Series Dashboard
+    Metrics: 5
+    Visualizations: 5
+    Tables: ['snowflake_saas.invoices', 'snowflake_saas.customers', 'snowflake_saas.subscriptions', 'snowflake_saas.users', 'snowflake_saas.events']
+  FULLY FEASIBLE
+  Status: PASS
+
+======================================================================
+SUMMARY
+======================================================================
+Total templates: 12
+Fully feasible (PASS): 9
+Partially feasible (PARTIAL): 3
+Not feasible (FAIL): 0
+Success rate: 75.0%
