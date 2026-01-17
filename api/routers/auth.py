@@ -195,6 +195,14 @@ async def update_preferences(
             )
         current_user.preferred_provider = preferences.preferred_provider
 
+    if preferences.business_type:
+        if preferences.business_type not in ["saas", "ecommerce", "general"]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid business type. Must be one of: saas, ecommerce, general",
+            )
+        current_user.business_type = preferences.business_type
+
     db.commit()
     db.refresh(current_user)
 

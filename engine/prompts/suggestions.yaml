@@ -1,0 +1,17 @@
+# Input placeholder suggestions
+# These rotate in the input field to give users ideas
+
+suggestions:
+  - "Show me monthly revenue trends"
+  - "Create a customer growth dashboard"
+  - "Analyze sales by product category"
+  - "Build a churn analysis dashboard"
+  - "Track subscription metrics over time"
+  - "Show top customers by spend"
+  - "Create an MRR trends dashboard"
+  - "Analyze order patterns by day of week"
+  - "Show conversion rates by channel"
+  - "Build a cohort retention analysis"
+
+# How often to rotate (milliseconds)
+rotation_interval: 5000

@@ -1,11 +1,38 @@
 <script lang="ts">
-	import { createEventDispatcher } from 'svelte';
+	import { createEventDispatcher, onMount, onDestroy } from 'svelte';
+	import {
+		currentSuggestion,
+		loadSuggestions,
+		startRotation,
+		stopRotation
+	} from '../stores/suggestions';
 
-	export let placeholder = 'Type a message...';
+	export let placeholder: string | undefined = undefined;
 	export let disabled = false;
+	export let prefill = '';
 
 	const dispatch = createEventDispatcher();
 	let value = '';
+
+	// Watch for prefill changes and update value
+	$: if (prefill) {
+		value = prefill;
+		prefill = '';
+	}
+
+	// Computed placeholder - use provided or rotating suggestion
+	$: displayPlaceholder = placeholder || $currentSuggestion;
+
+	onMount(() => {
+		loadSuggestions();
+		if (!placeholder) {
+			startRotation();
+		}
+	});
+
+	onDestroy(() => {
+		stopRotation();
+	});
 
 	function handleKeydown(event: KeyboardEvent) {
 		if (event.key === 'Enter' && !event.shiftKey && value.trim()) {
@@ -29,7 +56,7 @@
 		type="text"
 		bind:value
 		on:keydown={handleKeydown}
-		{placeholder}
+		placeholder={displayPlaceholder}
 		{disabled}
 		class="flex-1 bg-transparent text-terminal-text placeholder-terminal-dim outline-none font-mono"
 	/>

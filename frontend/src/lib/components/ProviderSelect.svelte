@@ -37,7 +37,7 @@
 		error = '';
 
 		try {
-			const updatedUser = await updatePreferences(newProvider);
+			const updatedUser = await updatePreferences({ preferred_provider: newProvider });
 			user.set(updatedUser);
 			// selectedProvider will be updated by the reactive statement
 		} catch (e) {

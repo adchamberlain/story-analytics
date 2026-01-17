@@ -1,0 +1,88 @@
+# Dashboard templates organized by business category
+# Templates are intentionally general - the feasibility checker validates
+# against the user's actual schema and provides alternatives when needed.
+
+categories:
+  - id: saas
+    name: "SaaS / Subscriptions"
+    description: "Templates for subscription-based businesses"
+    templates:
+      - id: mrr-dashboard
+        name: "MRR Dashboard"
+        icon: "$"
+        description: "Monthly recurring revenue trends and growth"
+        prompt: "Create a dashboard showing MRR trends over time, MRR by plan type, and net MRR changes"
+
+      - id: churn-analysis
+        name: "Churn Analysis"
+        icon: "!"
+        description: "Customer churn rates and retention metrics"
+        prompt: "Create a churn analysis dashboard showing monthly churn rate, churned customers over time, and churn breakdown by customer segments"
+
+      - id: subscription-metrics
+        name: "Subscription Metrics"
+        icon: "#"
+        description: "Key subscription health indicators"
+        prompt: "Create a dashboard showing active subscriptions, subscription growth, average revenue per user (ARPU), and subscription distribution by plan"
+
+      - id: trial-conversion
+        name: "Trial Conversion"
+        icon: ">"
+        description: "Trial to paid conversion funnel"
+        prompt: "Create a dashboard showing trial signups over time, trial to paid conversion rate, and conversion trends"
+
+  - id: ecommerce
+    name: "E-commerce / Retail"
+    description: "Templates for online and retail businesses"
+    templates:
+      - id: sales-dashboard
+        name: "Sales Dashboard"
+        icon: "$"
+        description: "Sales performance and order metrics"
+        prompt: "Create a sales dashboard showing total sales over time, average order value, and top selling items"
+
+      - id: product-performance
+        name: "Product Performance"
+        icon: "*"
+        description: "Product analytics and insights"
+        prompt: "Create a product performance dashboard showing sales by product or category, top products by revenue, and product trends"
+
+      - id: customer-analytics
+        name: "Customer Analytics"
+        icon: "+"
+        description: "Customer behavior and engagement"
+        prompt: "Create a customer analytics dashboard showing customer activity, engagement metrics, and customer distribution by segment"
+
+      - id: customer-ltv
+        name: "Customer LTV"
+        icon: "@"
+        description: "Customer lifetime value analysis"
+        prompt: "Create a customer LTV dashboard showing revenue per customer, customer value by segment, and revenue distribution"
+
+  - id: general
+    name: "General Business"
+    description: "Universal templates for any business type"
+    templates:
+      - id: revenue-trends
+        name: "Revenue Trends"
+        icon: "$"
+        description: "Track revenue over time"
+        prompt: "Create a dashboard showing revenue trends over time with comparisons"
+
+      - id: customer-growth
+        name: "Customer Growth"
+        icon: "+"
+        description: "Customer acquisition and growth metrics"
+        prompt: "Create a dashboard showing new customers over time, total customer count, and customer distribution by available segments"
+
+      - id: top-performers
+        name: "Top Performers"
+        icon: "*"
+        description: "Top items, customers, or segments"
+        prompt: "Create a dashboard showing top performers - top customers by revenue, top categories or segments"
+
+      - id: time-series
+        name: "Time Series Analysis"
+        icon: "~"
+        description: "Trend analysis over time"
+        prompt: "Create a time series dashboard showing key metrics over time with trend analysis"

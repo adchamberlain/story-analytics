@@ -3,7 +3,7 @@
  */
 
 import { writable, get } from 'svelte/store';
-import type { Message, ConversationSummary } from '../types';
+import type { Message, ConversationSummary, ClarifyingOption } from '../types';
 import {
 	sendMessage as apiSendMessage,
 	getConversation,
@@ -13,14 +13,19 @@ import {
 	renameConversation as apiRenameConversation
 } from '../api';
 
+// Extended message type with clarifying options
+export interface ExtendedMessage extends Message {
+	clarifying_options?: ClarifyingOption[] | null;
+}
+
 // Current session ID
 export const currentSessionId = writable<number | null>(null);
 
 // Current session title
 export const currentTitle = writable<string | null>(null);
 
-// Messages store
-export const messages = writable<Message[]>([]);
+// Messages store (with clarifying options)
+export const messages = writable<ExtendedMessage[]>([]);
 
 // Current phase
 export const phase = writable<string>('intent');
@@ -95,8 +100,15 @@ export async function sendMessage(content: string): Promise<string> {
 			currentTitle.set(response.title);
 		}
 
-		// Add assistant response
-		messages.update((msgs) => [...msgs, { role: 'assistant', content: response.response }]);
+		// Add assistant response with clarifying options
+		messages.update((msgs) => [
+			...msgs,
+			{
+				role: 'assistant',
+				content: response.response,
+				clarifying_options: response.clarifying_options
+			}
+		]);
 
 		// Update phase
 		phase.set(response.phase);

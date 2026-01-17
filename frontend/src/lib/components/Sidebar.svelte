@@ -11,19 +11,26 @@
 		deleteConversation,
 		renameConversation
 	} from '../stores/conversation';
+	import { tables, loadSchema } from '../stores/schema';
 	import { logout } from '../api';
 
 	export let currentPath: string = '/app';
 
 	let showDashboards = true;
 	let showConversations = true;
+	let showData = false;
 	let editingId: number | null = null;
 	let editingTitle = '';
 
 	onMount(() => {
 		loadDashboards();
 		loadConversationList();
+		loadSchema();
 	});
+
+	function toggleData() {
+		showData = !showData;
+	}
 
 	function handleLogout() {
 		logout();
@@ -227,6 +234,52 @@
 								</a>
 							</li>
 						{/if}
+					{/if}
+				</ul>
+			{/if}
+		</div>
+
+		<!-- Available Data -->
+		<div class="mt-6">
+			<button
+				on:click={toggleData}
+				class="flex items-center gap-2 text-terminal-dim text-sm hover:text-terminal-text transition-colors w-full"
+			>
+				<span class="transform transition-transform {showData ? 'rotate-90' : ''}"
+					>{'>'}</span
+				>
+				<span>Available Data</span>
+			</button>
+
+			{#if showData}
+				<ul class="mt-2 ml-4 space-y-1 max-h-48 overflow-y-auto">
+					{#if $tables.length === 0}
+						<li class="text-terminal-dim text-xs py-1">No tables found</li>
+					{:else}
+						{#each $tables as table}
+							<li class="group">
+								<details class="text-sm">
+									<summary class="text-terminal-dim hover:text-terminal-text cursor-pointer py-1 list-none flex items-center gap-1">
+										<span class="text-terminal-amber text-xs">+</span>
+										<span class="truncate">{table.name}</span>
+										<span class="text-terminal-dim text-xs">({table.columns.length})</span>
+									</summary>
+									<ul class="ml-4 text-xs text-terminal-dim space-y-0.5 pb-1">
+										{#each table.columns.slice(0, 8) as column}
+											<li class="truncate" title="{column.name}: {column.type}">
+												<span class="text-terminal-text">{column.name}</span>
+												<span class="text-terminal-dim ml-1">{column.type}</span>
+											</li>
+										{/each}
+										{#if table.columns.length > 8}
+											<li class="text-terminal-dim italic">
+												+{table.columns.length - 8} more columns
+											</li>
+										{/if}
+									</ul>
+								</details>
+							</li>
+						{/each}
 					{/if}
 				</ul>
 			{/if}

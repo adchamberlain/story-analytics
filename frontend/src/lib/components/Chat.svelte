@@ -3,6 +3,7 @@
 	import { goto } from '$app/navigation';
 	import Message from './Message.svelte';
 	import TerminalInput from './TerminalInput.svelte';
+	import TemplateCard from './TemplateCard.svelte';
 	import { getDashboard, type Dashboard } from '../api';
 	import {
 		messages,
@@ -17,6 +18,8 @@
 		startNewConversation,
 		renameConversation
 	} from '../stores/conversation';
+	import { templates, templatesLoading, loadTemplates } from '../stores/templates';
+	import { tables, schemaLoading, loadSchema } from '../stores/schema';
 
 	export let editSlug: string | null = null;
 
@@ -24,10 +27,13 @@
 	let isEditingTitle = false;
 	let editingTitle = '';
 	let editingDashboard: Dashboard | null = null;
+	let pendingInput = '';
 
 	onMount(async () => {
 		loadConversation();
 		loadConversationList();
+		loadTemplates();
+		loadSchema();
 
 		// If editing a dashboard, load its info
 		if (editSlug) {
@@ -38,6 +44,18 @@
 			}
 		}
 	});
+
+	function handleTemplateSelect(event: CustomEvent<{ prompt: string }>) {
+		pendingInput = event.detail.prompt;
+	}
+
+	function handleTableClick(tableName: string) {
+		pendingInput = `Create a dashboard using the ${tableName} table`;
+	}
+
+	function handleOptionSelect(event: CustomEvent<{ value: string }>) {
+		pendingInput = event.detail.value;
+	}
 
 	function clearEditMode() {
 		editingDashboard = null;
@@ -146,28 +164,72 @@
 	<!-- Messages -->
 	<div bind:this={messagesContainer} class="flex-1 overflow-y-auto px-4 py-4 space-y-2">
 		{#if $messages.length === 0}
-			<div class="text-terminal-dim text-center py-8">
+			<div class="text-terminal-dim py-8">
 				{#if editingDashboard}
-					<p class="mb-2 text-terminal-text">Editing: <span class="text-terminal-accent">{editingDashboard.title}</span></p>
-					<p class="text-sm mb-4">
-						Describe what changes you'd like to make to this dashboard.
-					</p>
-					<div class="text-xs text-terminal-dim space-y-1">
-						<p>Examples:</p>
-						<p class="italic">"Add a filter for date range"</p>
-						<p class="italic">"Change the chart to show monthly trends"</p>
-						<p class="italic">"Add a second chart showing revenue by region"</p>
+					<div class="text-center">
+						<p class="mb-2 text-terminal-text">Editing: <span class="text-terminal-accent">{editingDashboard.title}</span></p>
+						<p class="text-sm mb-4">
+							Describe what changes you'd like to make to this dashboard.
+						</p>
+						<div class="text-xs text-terminal-dim space-y-1">
+							<p>Examples:</p>
+							<p class="italic">"Add a filter for date range"</p>
+							<p class="italic">"Change the chart to show monthly trends"</p>
+							<p class="italic">"Add a second chart showing revenue by region"</p>
+						</div>
 					</div>
 				{:else}
-					<p class="mb-2">Welcome to Story Analytics</p>
-					<p class="text-sm">
-						Tell me what kind of dashboard you'd like to create, and I'll help you build it.
-					</p>
+					<div class="text-center mb-6">
+						<p class="mb-2">Welcome to Story Analytics</p>
+						<p class="text-sm">
+							Tell me what kind of dashboard you'd like to create, or choose a template below.
+						</p>
+					</div>
+
+					<!-- Available Data Chips -->
+					{#if $tables.length > 0}
+						<div class="mb-6">
+							<p class="text-terminal-dim text-xs mb-2 text-center">Available data:</p>
+							<div class="flex flex-wrap justify-center gap-2">
+								{#each $tables.slice(0, 6) as table}
+									<button
+										type="button"
+										on:click={() => handleTableClick(table.name)}
+										class="px-2 py-1 text-xs bg-terminal-surface border border-terminal-border rounded
+                                               hover:border-terminal-accent hover:text-terminal-accent transition-colors"
+									>
+										{table.name}
+									</button>
+								{/each}
+								{#if $tables.length > 6}
+									<span class="px-2 py-1 text-xs text-terminal-dim">
+										+{$tables.length - 6} more
+									</span>
+								{/if}
+							</div>
+						</div>
+					{/if}
+
+					<!-- Template Cards -->
+					{#if $templates.length > 0}
+						<div>
+							<p class="text-terminal-dim text-xs mb-3 text-center">Quick start templates:</p>
+							<div class="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-2xl mx-auto">
+								{#each $templates.slice(0, 4) as template}
+									<TemplateCard {template} on:select={handleTemplateSelect} />
+								{/each}
+							</div>
+						</div>
+					{:else if $templatesLoading}
+						<div class="text-center text-terminal-dim text-sm">
+							Loading templates...
+						</div>
+					{/if}
 				{/if}
 			</div>
 		{:else}
 			{#each $messages as message}
-				<Message {message} />
+				<Message {message} on:optionSelect={handleOptionSelect} />
 			{/each}
 		{/if}
 
@@ -193,7 +255,8 @@
 			disabled={$conversationLoading}
 			placeholder={editingDashboard
 				? "Describe what changes you'd like to make..."
-				: 'Describe the dashboard you want to create...'}
+				: undefined}
+			bind:prefill={pendingInput}
 		/>
 	</div>
 </div>

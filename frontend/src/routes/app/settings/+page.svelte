@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { user } from '$lib/stores/auth';
 	import ProviderSelect from '$lib/components/ProviderSelect.svelte';
+	import BusinessTypeSelect from '$lib/components/BusinessTypeSelect.svelte';
 </script>
 
 <div class="h-full overflow-y-auto p-6">
@@ -34,6 +35,15 @@
 		<section class="terminal-window p-4">
 			<h2 class="text-terminal-amber font-bold mb-4">AI Provider</h2>
 			<ProviderSelect />
+		</section>
+
+		<!-- Business Type -->
+		<section class="terminal-window p-4">
+			<h2 class="text-terminal-amber font-bold mb-4">Business Type</h2>
+			<p class="text-terminal-dim text-sm mb-3">
+				Choose your business type to see relevant dashboard templates
+			</p>
+			<BusinessTypeSelect />
 		</section>
 
 		<!-- API Keys Info -->

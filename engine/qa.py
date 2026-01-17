@@ -1,13 +1,14 @@
 """
 QA module for dashboard validation.
 
-Uses Playwright to capture screenshots and Claude's vision to verify
+Uses Playwright to capture screenshots and LLM vision capabilities to verify
 dashboards match the original request.
 """
 
 import asyncio
 import base64
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 
 from playwright.async_api import async_playwright, TimeoutError as PlaywrightTimeout
@@ -196,8 +197,16 @@ class DashboardQA:
         """
         print(f"[QA] Capturing screenshot of /{dashboard_slug}...")
 
+        # Create debug screenshot directory
+        screenshots_dir = Path(__file__).parent.parent / "qa_screenshots"
+        screenshots_dir.mkdir(exist_ok=True)
+
+        # Generate filename with timestamp
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        screenshot_path = screenshots_dir / f"{dashboard_slug}_{timestamp}.png"
+
         # Capture screenshot (sync wrapper handles async internally)
-        screenshot = self.screenshotter.capture(dashboard_slug)
+        screenshot = self.screenshotter.capture(dashboard_slug, save_path=screenshot_path)
 
         if not screenshot.success:
             print(f"[QA] Screenshot failed: {screenshot.error}")
@@ -208,12 +217,13 @@ class DashboardQA:
                 suggestions=["Ensure the Evidence dev server is running"],
             )
 
-        print(f"[QA] Screenshot captured, sending to Claude vision for validation...")
+        print(f"[QA] Screenshot saved to: {screenshot_path}")
+        print(f"[QA] Sending to {self.llm.name} vision for validation...")
 
         # Build the validation prompt
         prompt = self._build_validation_prompt(original_request, expected_components)
 
-        # Send to Claude with vision
+        # Send to LLM with vision
         response = self.llm.generate_with_image(
             prompt=prompt,
             image_base64=screenshot.image_base64,
@@ -231,7 +241,7 @@ class DashboardQA:
         original_request: str,
         expected_components: list[str] | None,
     ) -> str:
-        """Build the validation prompt for Claude using config-driven template."""
+        """Build the validation prompt using config-driven template."""
         # Get the prompt from config
         prompt = self.config_loader.get_qa_validation_prompt(original_request)
 
@@ -246,7 +256,7 @@ class DashboardQA:
         return prompt
 
     def _parse_validation_response(self, response: str) -> QAResult:
-        """Parse Claude's validation response into a QAResult."""
+        """Parse the LLM validation response into a QAResult."""
         lines = response.strip().split("\n")
 
         result_says_pass = False
@@ -284,7 +294,7 @@ class DashboardQA:
         if critical_issues:
             passed = False  # Can't pass if there are critical issues
 
-        # Check summary for failure indicators (e.g., Claude says "broken" in summary)
+        # Check summary for failure indicators (e.g., LLM says "broken" in summary)
         failure_keywords = [
             "broken", "error", "failed", "failing", "not working",
             "cannot", "can't", "unable", "no data", "missing",
