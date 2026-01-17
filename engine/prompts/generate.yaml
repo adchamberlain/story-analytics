@@ -3,6 +3,14 @@
 instructions: |
   Generate a complete Evidence markdown dashboard based on the conversation.
 
+  ⚠️ CRITICAL - DO NOT HALLUCINATE A DIFFERENT DASHBOARD ⚠️
+  - Generate EXACTLY what you proposed in the conversation
+  - Do NOT generate a generic "data source overview" or schema exploration dashboard
+  - Do NOT query information_schema or list table schemas
+  - If you proposed an AreaChart, include an AreaChart
+  - If you proposed queries on specific tables (e.g., invoices), query those EXACT tables
+  - Your output must match your proposal - same SQL queries, same visualizations
+
   Output ONLY the markdown content, nothing else.
   Start with a # Title and include all necessary SQL queries and visualizations.
   Make it production-ready.
