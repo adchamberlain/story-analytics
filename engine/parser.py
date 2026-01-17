@@ -230,21 +230,55 @@ class DashboardParser:
         return sections
 
     def list_dashboards(self) -> list[Path]:
-        """List all dashboard files in the pages directory."""
+        """
+        List all dashboard files in the pages directory.
+
+        Dashboards are in subdirectories: pages/dashboard-name/+page.md
+        We exclude the root +page.md (Evidence home) and system directories.
+        """
         pages_dir = self.config.pages_dir
-        return sorted(pages_dir.glob("*.md"))
+
+        # System directories to exclude (Evidence internals)
+        excluded_dirs = {
+            "api",           # Evidence API routes
+            "settings",      # Evidence settings
+            "explore",       # Evidence explore page
+        }
+
+        dashboards = []
+
+        # Look for +page.md files in subdirectories
+        for subdir in sorted(pages_dir.iterdir()):
+            # Skip non-directories and excluded system dirs
+            if not subdir.is_dir():
+                continue
+            if subdir.name in excluded_dirs:
+                continue
+            if subdir.name.startswith("."):
+                continue
+
+            # Check for +page.md in this subdirectory
+            page_file = subdir / "+page.md"
+            if page_file.exists():
+                dashboards.append(page_file)
+
+        return dashboards
 
     def get_dashboard_summaries(self) -> list[dict[str, Any]]:
         """Get summaries of all dashboards."""
         summaries = []
 
         for file_path in self.list_dashboards():
+            # Use the parent directory name as the slug/identifier
+            slug = file_path.parent.name
+
             try:
                 parsed = self.parse_file(file_path)
                 summaries.append(
                     {
-                        "file": file_path.name,
-                        "title": parsed.title or file_path.stem,
+                        "file": slug,  # Use directory name, not +page.md
+                        "slug": slug,
+                        "title": parsed.title or slug.replace("-", " ").title(),
                         "queries": len(parsed.queries),
                         "components": len(parsed.components),
                     }
@@ -252,8 +286,9 @@ class DashboardParser:
             except Exception as e:
                 summaries.append(
                     {
-                        "file": file_path.name,
-                        "title": file_path.stem,
+                        "file": slug,
+                        "slug": slug,
+                        "title": slug.replace("-", " ").title(),
                         "error": str(e),
                     }
                 )
