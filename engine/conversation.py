@@ -98,6 +98,42 @@ class ConversationManager:
             self._schema_context = get_schema_context()
         return self._schema_context
 
+    def get_full_user_request(self) -> str:
+        """
+        Build a comprehensive user request from all user messages.
+
+        This is used for QA validation to ensure we capture the full intent,
+        not just the first message which might be vague like "create a dashboard".
+        """
+        # Collect all substantive user messages (exclude simple confirmations)
+        simple_phrases = {"create", "generate", "build it", "looks good", "yes", "ok", "okay"}
+        user_messages = []
+
+        for msg in self.state.messages:
+            if msg.role == "user":
+                content = msg.content.strip().lower()
+                # Skip simple confirmation messages and generation prompts
+                if content not in simple_phrases and not content.startswith("based on our conversation"):
+                    # Skip internal prompts we add
+                    if not any(phrase in content for phrase in [
+                        "generate the exact dashboard",
+                        "critical error:",
+                        "sql errors that must be fixed",
+                    ]):
+                        user_messages.append(msg.content)
+
+        # Return the most detailed message, or combine if multiple substantive ones
+        if not user_messages:
+            return self.state.original_request or ""
+
+        # Filter to substantive messages (more than a few words)
+        substantive = [m for m in user_messages if len(m.split()) > 5]
+        if substantive:
+            # Return the longest/most detailed one
+            return max(substantive, key=len)
+
+        return self.state.original_request or user_messages[0] if user_messages else ""
+
     def get_system_prompt(self) -> str:
         """Get the appropriate system prompt for current phase."""
         # Build base prompt from config
@@ -200,6 +236,15 @@ class ConversationManager:
         ) or lower_input == "create":
             self.state.phase = ConversationPhase.GENERATION
             return self._generate_dashboard()
+
+        # Update original_request if user provides more detailed info
+        # (the original_request should capture what the user actually wants, not just "create a dashboard")
+        if len(user_input.split()) > 5 and not self.state.original_request:
+            self.state.original_request = user_input
+        elif len(user_input.split()) > 10:
+            # If user provides a longer, more detailed request, update it
+            # This helps when user refines their request during conversation
+            self.state.original_request = user_input
 
         # Regular conversation - send to LLM
         response = self.llm.generate(
@@ -306,7 +351,10 @@ class ConversationManager:
             auto_fix_attempted = False
             successfully_fixed = []
 
-            if self.config_loader.is_qa_enabled() and self.state.original_request:
+            # Use the full user request for better QA context
+            qa_request = self.get_full_user_request()
+
+            if self.config_loader.is_qa_enabled() and qa_request:
                 max_fix_attempts = self.config_loader.get_max_auto_fix_attempts()
                 should_auto_fix = self.config_loader.should_auto_fix_critical()
 
@@ -314,7 +362,7 @@ class ConversationManager:
                     qa_run = run_qa_with_auto_fix(
                         dashboard_slug=slug,
                         file_path=file_path,
-                        original_request=self.state.original_request,
+                        original_request=qa_request,
                         max_fix_attempts=max_fix_attempts,
                         schema_context=self.get_schema_context(),
                         provider_name=self._provider_name,
@@ -362,15 +410,40 @@ Here's what I created:
                 result += "\nWhat would you like to change?"
 
         except Exception as e:
-            result = f"Error creating dashboard: {e}\n\nHere's the markdown I generated:\n\n{markdown[:500]}..."
+            result = f"Error creating dashboard: {e}\n\nHere's the markdown I generated:\n{markdown[:500]}..."
 
         self.state.messages.append(Message(role="assistant", content=result))
         return result
 
     def _generate_dashboard_monolithic(self) -> str:
         """Generate dashboard using the original monolithic approach."""
-        # Ask LLM to generate complete dashboard
-        generation_prompt = """Based on our conversation, generate a complete Evidence markdown dashboard.
+        # Extract the proposal from the last assistant message
+        proposal = ""
+        for msg in reversed(self.state.messages):
+            if msg.role == "assistant" and ("```sql" in msg.content or "SQL QUERIES" in msg.content.upper()):
+                proposal = msg.content
+                break
+
+        # Ask LLM to generate complete dashboard, anchored to the proposal
+        if proposal:
+            generation_prompt = f"""Generate the EXACT dashboard you proposed. Do NOT deviate from the proposal.
+
+YOUR PROPOSAL:
+{proposal}
+
+CRITICAL INSTRUCTIONS:
+- Implement EXACTLY what you proposed above - same SQL queries, same visualizations
+- Do NOT generate a generic "data source overview" or schema exploration dashboard
+- Do NOT query information_schema or list table schemas
+- Generate ONLY what the user requested and what you proposed
+
+Output ONLY the markdown content, starting with # Title.
+Use the snowflake_saas source for all queries."""
+        else:
+            generation_prompt = """Based on our conversation, generate a complete Evidence markdown dashboard.
+
+CRITICAL: Do NOT generate a generic "data source overview" or schema exploration dashboard.
+Generate ONLY what the user specifically requested.
 
 Output ONLY the markdown content, starting with # Title.
 Include all necessary SQL queries and visualizations.
@@ -390,6 +463,52 @@ Use the snowflake_saas source for all queries."""
 
         # Clean up markdown (remove code fences if LLM wrapped it)
         markdown = self._clean_markdown(markdown)
+
+        # Validate that generation matches the proposal (prevent hallucinated dashboards)
+        if proposal:
+            max_proposal_fix_attempts = 2
+            for attempt in range(max_proposal_fix_attempts):
+                proposal_issues = self._validate_generation_matches_proposal(markdown, proposal)
+                if not proposal_issues:
+                    break  # Generation matches proposal
+
+                print(f"[VALIDATION] Generation doesn't match proposal (attempt {attempt + 1}/{max_proposal_fix_attempts})")
+                for issue in proposal_issues:
+                    print(f"[VALIDATION]   - {issue}")
+
+                if attempt >= max_proposal_fix_attempts - 1:
+                    print("[VALIDATION] Max attempts reached, proceeding with current output")
+                    break
+
+                # Ask LLM to regenerate following the proposal
+                regen_prompt = f"""CRITICAL ERROR: Your generated dashboard does NOT match your proposal.
+
+Issues found:
+{chr(10).join(f'- {issue}' for issue in proposal_issues)}
+
+You MUST regenerate the dashboard to match EXACTLY what you proposed:
+
+YOUR PROPOSAL:
+{proposal}
+
+IMPORTANT:
+- Generate the EXACT visualizations you proposed (e.g., if you proposed an AreaChart, include an AreaChart)
+- Query the EXACT tables you proposed (e.g., snowflake_saas.invoices)
+- Do NOT generate a generic "data source overview" or schema explorer
+- Do NOT query information_schema
+
+Output ONLY the corrected markdown, starting with # Title."""
+
+                self.state.messages.append(Message(role="user", content=regen_prompt))
+
+                response = self.llm.generate(
+                    messages=self.state.messages,
+                    system_prompt=self.get_system_prompt(),
+                    temperature=0.2,
+                    max_tokens=4096,
+                )
+
+                markdown = self._clean_markdown(response.content)
 
         # SQL Pre-validation: Test queries against DuckDB before writing
         max_sql_fix_attempts = 3
@@ -563,6 +682,53 @@ What else would you like to change?"""
             markdown = markdown[:-3].strip()
         return markdown
 
+    def _validate_generation_matches_proposal(self, markdown: str, proposal: str) -> list[str]:
+        """
+        Validate that generated markdown matches the proposal.
+
+        Returns a list of issues found (empty if validation passes).
+        """
+        issues = []
+
+        # Check for generic "data source overview" dashboards (the main bug we're fixing)
+        bad_patterns = [
+            "data source overview",
+            "data sources overview",
+            "available tables",
+            "table schemas",
+            "information_schema",
+        ]
+        markdown_lower = markdown.lower()
+        for pattern in bad_patterns:
+            if pattern in markdown_lower:
+                issues.append(f"Generated dashboard contains '{pattern}' - this looks like a generic schema explorer, not the requested dashboard")
+
+        # Extract expected chart types from proposal
+        proposal_lower = proposal.lower()
+        expected_charts = []
+        if "areachart" in proposal_lower:
+            expected_charts.append("AreaChart")
+        if "barchart" in proposal_lower:
+            expected_charts.append("BarChart")
+        if "linechart" in proposal_lower:
+            expected_charts.append("LineChart")
+
+        # Check that expected chart types are present in output
+        for chart in expected_charts:
+            if f"<{chart}" not in markdown:
+                issues.append(f"Proposal included {chart} but generated markdown does not contain it")
+
+        # Extract key table names from proposal SQL and check they're in output
+        import re
+        proposal_tables = set(re.findall(r'FROM\s+(\w+\.\w+)', proposal, re.IGNORECASE))
+        if proposal_tables:
+            output_tables = set(re.findall(r'FROM\s+(\w+\.\w+)', markdown, re.IGNORECASE))
+            missing_tables = proposal_tables - output_tables
+            if missing_tables:
+                issues.append(f"Proposal queried tables {missing_tables} but they're missing from generated output")
+
+        return issues
+
     def _run_qa_validation(self, dashboard_slug: str) -> QAResult | None:
         """
         Run QA validation on a generated dashboard.
@@ -573,14 +739,15 @@ What else would you like to change?"""
         Returns:
             QAResult object, or None if QA couldn't run.
         """
-        if not self.state.original_request:
+        qa_request = self.get_full_user_request()
+        if not qa_request:
             return None
 
         try:
             qa = DashboardQA(provider_name=self._provider_name)
             return qa.validate(
                 dashboard_slug=dashboard_slug,
-                original_request=self.state.original_request,
+                original_request=qa_request,
             )
         except Exception as e:
             # Return a failed result with the error

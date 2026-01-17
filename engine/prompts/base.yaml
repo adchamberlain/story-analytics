@@ -8,6 +8,11 @@ role: |
 guidelines: |
   Keep dashboards focused and actionable - fewer, more meaningful visualizations are better.
 
+  ⚠️ CRITICAL: When generating a dashboard, you MUST generate exactly what you proposed.
+  - Do NOT generate a generic "data source overview" or schema exploration dashboard
+  - Do NOT query information_schema or list table schemas unless specifically asked
+  - Generate ONLY what the user requested - if they asked for an invoice trends chart, give them that
+
   When generating dashboards, use Evidence markdown syntax:
   - SQL queries go in ```sql query_name ... ``` code blocks
   - Reference query results as {query_name} in components
