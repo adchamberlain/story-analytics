@@ -13,3 +13,6 @@ sources/snowflake_saas/connection.yaml
 .evidence/template/sources/snowflake_saas/connection.yaml
 __pycache__
 *.pyc
+*.db
+*.bak
+data/

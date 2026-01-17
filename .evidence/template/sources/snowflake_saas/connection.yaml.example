@@ -2,7 +2,7 @@
 name: snowflake_saas
 type: snowflake
 options:
-  account: YOUR_ACCOUNT_IDENTIFIER
+  account: abebbgm-jxb85658
   username: YOUR_USERNAME
   password: YOUR_PASSWORD
   database: ANALYTICS_POC
