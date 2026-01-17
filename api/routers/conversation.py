@@ -31,13 +31,13 @@ router = APIRouter(prefix="/conversation", tags=["conversation"])
 settings = get_settings()
 
 
-def generate_conversation_title(user_message: str, assistant_response: str) -> str:
+def generate_conversation_title(user_message: str, assistant_response: str, provider_name: str | None = None) -> str:
     """Use LLM to generate a short, descriptive title for the conversation."""
     try:
         from engine.llm.claude import get_provider
         from engine.llm.base import Message
 
-        llm = get_provider()
+        llm = get_provider(provider_name)
 
         prompt = f"""Generate a very short title (3-6 words max) for this conversation.
 The title should be descriptive and easy to search for later.
@@ -166,8 +166,8 @@ async def send_message(
         # Import engine components
         from engine.conversation import ConversationManager
 
-        # Create conversation manager and restore state
-        manager = ConversationManager()
+        # Create conversation manager with user's preferred provider and restore state
+        manager = ConversationManager(provider_name=current_user.preferred_provider)
         restore_manager_state(manager, session, db)
 
         # Track if this is the first message
@@ -182,7 +182,7 @@ async def send_message(
 
         # Generate title using LLM after first exchange
         if is_first_message and not session.title:
-            session.title = generate_conversation_title(request.message, response_text)
+            session.title = generate_conversation_title(request.message, response_text, current_user.preferred_provider)
             db.commit()
 
         # Check if a dashboard was created

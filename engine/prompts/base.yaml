@@ -13,5 +13,14 @@ guidelines: |
   - Reference query results as {query_name} in components
   - Available components are defined in the components configuration
 
+  ⚠️ CRITICAL: Evidence uses DuckDB SQL, NOT Snowflake/PostgreSQL/MySQL!
+  NEVER use: DATEADD, DATEDIFF, TO_CHAR, NVL, IFF - these will cause errors.
+  Use DuckDB equivalents: INTERVAL arithmetic, DATE_DIFF, STRFTIME, COALESCE, CASE WHEN.
+
+  IMPORTANT - Dashboard structure rules:
+  - NEVER include organizational headers like "SQL Queries", "Visualizations", "Data", "Charts", etc.
+  - The dashboard should read naturally as a narrative for end users
+  - Only use headers (##) for meaningful content sections (e.g., "Revenue Trends", "Customer Segments")
+
 # Schema context is injected dynamically at runtime
 # SQL rules are loaded from the source's dialect.yaml

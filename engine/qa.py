@@ -169,12 +169,13 @@ class DashboardScreenshot:
 class DashboardQA:
     """Validates dashboards using vision analysis."""
 
-    def __init__(self):
-        from .llm.claude import ClaudeProvider
+    def __init__(self, provider_name: str | None = None):
+        from .llm.claude import get_provider
         from .config_loader import get_config_loader
-        self.llm = ClaudeProvider()
+        self.llm = get_provider(provider_name)
         self.screenshotter = DashboardScreenshot()
         self.config_loader = get_config_loader()
+        print(f"[QA] Using provider: {self.llm.name}")
 
     def validate(
         self,
@@ -193,16 +194,21 @@ class DashboardQA:
         Returns:
             QAResult with validation results
         """
+        print(f"[QA] Capturing screenshot of /{dashboard_slug}...")
+
         # Capture screenshot (sync wrapper handles async internally)
         screenshot = self.screenshotter.capture(dashboard_slug)
 
         if not screenshot.success:
+            print(f"[QA] Screenshot failed: {screenshot.error}")
             return QAResult(
                 passed=False,
                 summary=f"Could not capture screenshot: {screenshot.error}",
                 critical_issues=[screenshot.error],
                 suggestions=["Ensure the Evidence dev server is running"],
             )
+
+        print(f"[QA] Screenshot captured, sending to Claude vision for validation...")
 
         # Build the validation prompt
         prompt = self._build_validation_prompt(original_request, expected_components)
@@ -215,7 +221,10 @@ class DashboardQA:
         )
 
         # Parse the response
-        return self._parse_validation_response(response.content)
+        result = self._parse_validation_response(response.content)
+        print(f"[QA] Validation complete: {'PASSED' if result.passed else 'FAILED'} - {result.summary[:100]}...")
+
+        return result
 
     def _build_validation_prompt(
         self,
@@ -309,6 +318,7 @@ def auto_fix_dashboard(
     file_path: Path,
     critical_issues: list[str],
     schema_context: str | None = None,
+    provider_name: str | None = None,
 ) -> str:
     """
     Standalone function to auto-fix critical issues in a dashboard.
@@ -320,6 +330,7 @@ def auto_fix_dashboard(
         file_path: Path to the dashboard markdown file
         critical_issues: List of critical issues to fix
         schema_context: Optional database schema context for better fixes
+        provider_name: Optional LLM provider name (uses config default if not specified)
 
     Returns:
         Updated markdown content
@@ -329,7 +340,7 @@ def auto_fix_dashboard(
     from .schema import get_schema_context
 
     config_loader = get_config_loader()
-    llm = get_provider()
+    llm = get_provider(provider_name)
 
     # Read current content
     current_content = file_path.read_text()
@@ -395,6 +406,7 @@ def run_qa_with_auto_fix(
     original_request: str,
     max_fix_attempts: int = 2,
     schema_context: str | None = None,
+    provider_name: str | None = None,
 ) -> QARunResult:
     """
     Run QA validation with automatic fix attempts.
@@ -410,17 +422,19 @@ def run_qa_with_auto_fix(
         original_request: Original user request for validation context
         max_fix_attempts: Maximum number of auto-fix attempts
         schema_context: Optional database schema context
+        provider_name: Optional LLM provider name (uses config default if not specified)
 
     Returns:
         QARunResult with complete run information
     """
-    qa = DashboardQA()
+    qa = DashboardQA(provider_name=provider_name)
     initial_result = None
     final_result = None
     auto_fix_attempted = False
     attempted_fixes = []
 
     for attempt in range(max_fix_attempts + 1):
+        print(f"[QA] Running validation (attempt {attempt + 1}/{max_fix_attempts + 1})...")
         result = qa.validate(dashboard_slug, original_request)
 
         if initial_result is None:
@@ -430,17 +444,24 @@ def run_qa_with_auto_fix(
 
         if result.needs_auto_fix and attempt < max_fix_attempts:
             # Attempt auto-fix
+            print(f"[QA] Auto-fixing {len(result.critical_issues)} critical issue(s)...")
             attempted_fixes.extend(result.critical_issues)
             fixed_markdown = auto_fix_dashboard(
                 file_path=file_path,
                 critical_issues=result.critical_issues,
                 schema_context=schema_context,
+                provider_name=provider_name,
             )
             file_path.write_text(fixed_markdown)
             auto_fix_attempted = True
+            print(f"[QA] Auto-fix applied, re-validating...")
             # Continue loop to re-validate
         else:
             # No issues or max attempts reached
+            if result.passed:
+                print(f"[QA] Dashboard passed validation!")
+            else:
+                print(f"[QA] Validation complete with {len(result.critical_issues)} remaining issue(s)")
             break
 
     # Determine which issues were actually fixed

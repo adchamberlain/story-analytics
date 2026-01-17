@@ -50,14 +50,16 @@ class ConversationState:
 class ConversationManager:
     """Manages the conversation flow for dashboard creation/editing."""
 
-    def __init__(self):
+    def __init__(self, provider_name: str | None = None):
         self.config = get_config()
         self.config_loader = get_config_loader()
-        self.llm = get_provider()
+        self.llm = get_provider(provider_name)
+        self._provider_name = provider_name  # Store for QA to use the same provider
         self.parser = DashboardParser()
         self.state = ConversationState()
         self._schema_context: str | None = None
         self._default_source = "snowflake_saas"  # TODO: make configurable
+        print(f"[LLM] Using provider: {self.llm.name}, model: {self.llm.model}")
 
     def reset(self):
         """Reset conversation state."""
@@ -242,12 +244,17 @@ Use the snowflake_saas source for all queries."""
             validation = validate_dashboard_sql(markdown)
 
             if validation.valid:
+                print(f"[SQL] All queries valid after {sql_fix_attempts} fix attempt(s)")
                 break  # All SQL is valid, proceed
 
             sql_fix_attempts += 1
+            print(f"[SQL] Validation failed (attempt {sql_fix_attempts}/{max_sql_fix_attempts}): {validation.error_count} error(s)")
+            for err in validation.errors:
+                print(f"[SQL]   - {err.query_name}: {err.error[:100]}...")
 
             if sql_fix_attempts >= max_sql_fix_attempts:
                 # Max attempts reached, proceed anyway (QA will catch it)
+                print(f"[SQL] Max fix attempts reached, proceeding with errors")
                 break
 
             # Ask LLM to fix the SQL errors
@@ -255,11 +262,17 @@ Use the snowflake_saas source for all queries."""
 
 {validation.format_errors()}
 
-IMPORTANT REMINDERS:
-- Evidence uses DuckDB, NOT Snowflake SQL
-- NEVER use TO_CHAR, TO_VARCHAR, NVL, IFF - these don't exist in DuckDB
-- Use STRFTIME() for date formatting, COALESCE() for null handling
-- Use CASE WHEN instead of IFF()
+⚠️ CRITICAL - Evidence uses DuckDB, NOT Snowflake/PostgreSQL/MySQL!
+FORBIDDEN FUNCTIONS (will cause errors):
+- DATEADD() → Use: date_column + INTERVAL '12 months' or CURRENT_DATE - INTERVAL '30 days'
+- DATEDIFF() → Use: DATE_DIFF('day', date1, date2)
+- TO_CHAR() → Use: STRFTIME(date_column, '%Y-%m')
+- NVL() → Use: COALESCE(column, default)
+- IFF() → Use: CASE WHEN condition THEN x ELSE y END
+
+CORRECT DATE FILTERING:
+- Last 12 months: WHERE signup_date >= CURRENT_DATE - INTERVAL '12 months'
+- Last 30 days: WHERE created_at >= CURRENT_DATE - INTERVAL '30 days'
 
 Please regenerate the COMPLETE dashboard markdown with ALL SQL errors fixed.
 Output ONLY the corrected markdown, starting with # Title."""
@@ -314,6 +327,7 @@ Output ONLY the corrected markdown, starting with # Title."""
                         original_request=self.state.original_request,
                         max_fix_attempts=max_fix_attempts,
                         schema_context=self.get_schema_context(),
+                        provider_name=self._provider_name,
                     )
                     qa_result = qa_run.final_result
                     auto_fix_attempted = qa_run.auto_fix_attempted
@@ -488,7 +502,7 @@ What else would you like to change?"""
             return None
 
         try:
-            qa = DashboardQA()
+            qa = DashboardQA(provider_name=self._provider_name)
             return qa.validate(
                 dashboard_slug=dashboard_slug,
                 original_request=self.state.original_request,

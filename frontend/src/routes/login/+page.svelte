@@ -38,12 +38,15 @@
 		</div>
 
 		<div class="p-6">
-			<h1 class="text-terminal-green font-bold text-xl mb-2">Story Analytics</h1>
+			<h1 class="text-terminal-accent font-bold text-2xl tracking-widest mb-1">
+				STORY<span class="inline-block w-2 h-5 bg-terminal-accent ml-1 align-middle cursor-blink"></span>
+			</h1>
+			<p class="text-terminal-dim text-sm mb-4">AI-native analytics.</p>
 
 			{#if emailSent}
 				<!-- Success state -->
 				<div class="py-8 text-center">
-					<div class="text-terminal-green text-4xl mb-4">✓</div>
+					<div class="text-terminal-accent text-4xl mb-4">✓</div>
 					<p class="text-terminal-text mb-2">Check your email!</p>
 					<p class="text-terminal-dim text-sm mb-6">
 						We sent a sign-in link to<br />
@@ -74,7 +77,7 @@
 							bind:value={email}
 							required
 							class="w-full bg-terminal-bg border border-terminal-border rounded px-3 py-2
-                               text-terminal-text focus:border-terminal-green"
+                               text-terminal-text focus:border-terminal-accent"
 							placeholder="you@example.com"
 						/>
 					</div>

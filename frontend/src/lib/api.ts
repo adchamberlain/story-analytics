@@ -194,6 +194,30 @@ export async function syncDashboards(): Promise<{ synced: number }> {
 	return handleResponse<{ synced: number }>(response);
 }
 
+export interface DashboardContent {
+	slug: string;
+	title: string;
+	content: string;
+	url: string;
+}
+
+export async function getDashboardContent(slug: string): Promise<DashboardContent> {
+	const response = await fetchWithAuth(`/dashboards/${slug}/content`);
+	return handleResponse<DashboardContent>(response);
+}
+
+export async function updateDashboardContent(
+	slug: string,
+	content: string,
+	title?: string
+): Promise<DashboardContent> {
+	const response = await fetchWithAuth(`/dashboards/${slug}/content`, {
+		method: 'PUT',
+		body: JSON.stringify({ content, title })
+	});
+	return handleResponse<DashboardContent>(response);
+}
+
 // Provider endpoints
 
 export async function getProviders(): Promise<ProvidersResponse> {

@@ -70,6 +70,6 @@ async def list_providers():
         "providers": [
             {"id": "claude", "name": "Claude (Anthropic)", "models": ["claude-sonnet-4-20250514"]},
             {"id": "openai", "name": "OpenAI", "models": ["gpt-4o", "gpt-4-turbo"]},
-            {"id": "gemini", "name": "Gemini (Google)", "models": ["gemini-1.5-pro", "gemini-1.5-flash"]},
+            {"id": "gemini", "name": "Gemini (Google)", "models": ["gemini-2.0-flash", "gemini-2.5-pro"]},
         ]
     }

@@ -29,7 +29,9 @@
 		const target = event.target as HTMLSelectElement;
 		const newProvider = target.value;
 
-		if (newProvider === selectedProvider) return;
+		// Compare against the user's stored preference, not the local state
+		// (bind:value updates selectedProvider before this handler runs)
+		if ($user && newProvider === $user.preferred_provider) return;
 
 		loading = true;
 		error = '';
@@ -37,7 +39,7 @@
 		try {
 			const updatedUser = await updatePreferences(newProvider);
 			user.set(updatedUser);
-			selectedProvider = newProvider;
+			// selectedProvider will be updated by the reactive statement
 		} catch (e) {
 			error = e instanceof Error ? e.message : 'Failed to update preference';
 			// Revert selection
@@ -54,11 +56,11 @@
 	<label for="provider" class="block text-terminal-dim text-sm">LLM Provider</label>
 	<select
 		id="provider"
-		bind:value={selectedProvider}
+		value={selectedProvider}
 		on:change={handleChange}
 		disabled={loading}
 		class="w-full bg-terminal-surface border border-terminal-border text-terminal-text
-               px-3 py-2 rounded font-mono text-sm focus:border-terminal-green focus:outline-none
+               px-3 py-2 rounded font-mono text-sm focus:border-terminal-accent focus:outline-none
                disabled:opacity-50"
 	>
 		{#each providers as provider}

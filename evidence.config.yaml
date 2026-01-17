@@ -1,58 +1,58 @@
-# Datawrapper-inspired theme
+# Story Analytics brand theme
 appearance:
   default: light
   switcher: false  # Keep it simple - light mode only
 
 theme:
-  # Datawrapper-style color palette: muted, intentional, limited
+  # Story brand color palette
   colorPalettes:
     default:
       light:
-        - "#1d81a2"  # Primary blue (Datawrapper signature)
-        - "#6cc0e0"  # Light blue
-        - "#f2a83b"  # Warm accent
-        - "#e15759"  # Alert red
-        - "#59a14f"  # Success green
-        - "#9c755f"  # Brown/neutral
+        - "#7c9eff"  # Primary brand blue
+        - "#9fb8ff"  # Light blue
+        - "#f59e0b"  # Amber accent
+        - "#ef4444"  # Alert red
+        - "#22c55e"  # Success green
+        - "#8b5cf6"  # Purple
       dark:
-        - "#1d81a2"
-        - "#6cc0e0"
-        - "#f2a83b"
-        - "#e15759"
-        - "#59a14f"
-        - "#9c755f"
+        - "#7c9eff"
+        - "#9fb8ff"
+        - "#f59e0b"
+        - "#ef4444"
+        - "#22c55e"
+        - "#8b5cf6"
 
   colorScales:
     default:
       light:
-        - "#e8f4f8"  # Very light blue
-        - "#1d81a2"  # Primary blue
+        - "#e8f0ff"  # Very light blue
+        - "#7c9eff"  # Primary brand blue
       dark:
-        - "#e8f4f8"
-        - "#1d81a2"
+        - "#e8f0ff"
+        - "#7c9eff"
 
   colors:
     primary:
-      light: "#1d81a2"  # Datawrapper blue
-      dark: "#1d81a2"
+      light: "#7c9eff"  # Story brand blue
+      dark: "#7c9eff"
     accent:
-      light: "#f2a83b"  # Warm orange
-      dark: "#f2a83b"
+      light: "#f59e0b"  # Amber
+      dark: "#f59e0b"
     base:
       light: "#ffffff"
       dark: "#1a1a1a"
     info:
-      light: "#1d81a2"
-      dark: "#6cc0e0"
+      light: "#7c9eff"
+      dark: "#9fb8ff"
     positive:
-      light: "#59a14f"
-      dark: "#59a14f"
+      light: "#22c55e"
+      dark: "#22c55e"
     warning:
-      light: "#f2a83b"
-      dark: "#f2a83b"
+      light: "#f59e0b"
+      dark: "#f59e0b"
     negative:
-      light: "#e15759"
-      dark: "#e15759"
+      light: "#ef4444"
+      dark: "#ef4444"
 
 plugins:
   components:

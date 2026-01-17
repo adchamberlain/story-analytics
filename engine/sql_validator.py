@@ -134,6 +134,9 @@ class SQLValidator:
         """
         conn = self._get_connection()
 
+        # Strip trailing semicolons - they cause issues when wrapping in subqueries
+        query = query.strip().rstrip(';').strip()
+
         try:
             # Use EXPLAIN to validate without actually running the full query
             # This catches syntax and reference errors without processing all data

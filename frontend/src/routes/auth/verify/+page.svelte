@@ -50,8 +50,8 @@
 				</div>
 			{:else if status === 'success'}
 				<div class="py-8">
-					<div class="text-terminal-green text-4xl mb-4">✓</div>
-					<p class="text-terminal-green font-bold mb-2">You're in!</p>
+					<div class="text-terminal-accent text-4xl mb-4">✓</div>
+					<p class="text-terminal-accent font-bold mb-2">You're in!</p>
 					<p class="text-terminal-dim text-sm">Redirecting to dashboard...</p>
 				</div>
 			{:else}
@@ -73,7 +73,7 @@
 		width: 32px;
 		height: 32px;
 		border: 3px solid var(--terminal-border, #222);
-		border-top-color: var(--terminal-green, #22c55e);
+		border-top-color: var(--terminal-accent, #7c9eff);
 		border-radius: 50%;
 		animation: spin 1s linear infinite;
 	}

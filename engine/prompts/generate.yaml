@@ -7,4 +7,22 @@ instructions: |
   Start with a # Title and include all necessary SQL queries and visualizations.
   Make it production-ready.
 
-  Make sure all SQL queries follow the dialect rules for the data source.
+  ⚠️ CRITICAL SQL REQUIREMENTS - READ CAREFULLY ⚠️
+  Evidence uses DuckDB, NOT Snowflake/PostgreSQL/MySQL. You MUST use DuckDB syntax:
+
+  FORBIDDEN FUNCTIONS (will cause errors):
+  - DATEADD() → Use: date_column + INTERVAL '12 months' or date_column >= CURRENT_DATE - INTERVAL '12 months'
+  - DATEDIFF() → Use: DATE_DIFF('day', date1, date2)
+  - TO_CHAR() → Use: STRFTIME(date_column, '%Y-%m')
+  - NVL() → Use: COALESCE(column, default)
+  - IFF() → Use: CASE WHEN condition THEN x ELSE y END
+
+  CORRECT DATE FILTERING EXAMPLES:
+  - Last 12 months: WHERE date_column >= CURRENT_DATE - INTERVAL '12 months'
+  - Last 30 days: WHERE date_column >= CURRENT_DATE - INTERVAL '30 days'
+  - Specific year: WHERE YEAR(date_column) = 2025
+
+  CRITICAL FORMATTING RULES:
+  - Do NOT include headers like "SQL Queries", "Visualizations", "Data", or "Charts"
+  - The dashboard should flow as a natural narrative for the end user
+  - Only use ## headers for meaningful content sections (e.g., "Monthly Trends", "Top Performers")

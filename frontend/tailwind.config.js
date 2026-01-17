@@ -10,11 +10,11 @@ export default {
 					border: '#222222',
 					text: '#e0e0e0',
 					dim: '#666666',
-					green: '#22c55e',
-					'green-bright': '#4ade80',
+					accent: '#7c9eff',
+					'accent-bright': '#9fb8ff',
+					'accent-dim': '#4a6eb3',
 					amber: '#f59e0b',
-					red: '#ef4444',
-					blue: '#3b82f6'
+					red: '#ef4444'
 				}
 			},
 			fontFamily: {
