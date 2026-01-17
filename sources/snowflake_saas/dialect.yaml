@@ -1,7 +1,10 @@
 # SQL dialect rules for Snowflake via Evidence
 # These rules help the LLM generate valid SQL for this data source
+#
+# IMPORTANT: Although data comes from Snowflake, Evidence executes queries
+# locally using DuckDB. You MUST use DuckDB-compatible SQL syntax.
 
-dialect: snowflake
+dialect: duckdb  # Evidence uses DuckDB locally, NOT Snowflake SQL
 source_name: snowflake_saas
 
 # How to reference tables in queries
@@ -37,19 +40,67 @@ date_functions:
       syntax: "date_column >= '2025-01-01'"
       description: "Simple date comparisons with string literals"
 
+    - name: STRFTIME
+      syntax: "STRFTIME(date_column, '%Y-%m')"
+      description: "Format date as string (DuckDB equivalent of TO_CHAR)"
+      example: "STRFTIME(signup_date, '%Y-%m') as month_str"
+
+    - name: DATE_DIFF
+      syntax: "DATE_DIFF('day', date1, date2)"
+      description: "Calculate difference between dates"
+      example: "DATE_DIFF('day', signup_date, CURRENT_DATE) as days_since_signup"
+
+    - name: CURRENT_DATE
+      syntax: "CURRENT_DATE"
+      description: "Current date"
+
+    - name: "Date arithmetic"
+      syntax: "date_column + INTERVAL '1 month'"
+      description: "Add/subtract intervals from dates"
+      example: "WHERE signup_date >= CURRENT_DATE - INTERVAL '30 days'"
+
   # Functions to NEVER use (cause errors in Evidence/DuckDB)
+  # CRITICAL: These Snowflake functions do NOT work in DuckDB
   forbidden:
+    - name: TO_CHAR
+      reason: "Snowflake function - does NOT exist in DuckDB"
+      alternative: "Use STRFTIME(date_column, '%Y-%m') or CAST(column AS VARCHAR)"
+
+    - name: TO_VARCHAR
+      reason: "Snowflake function - does NOT exist in DuckDB"
+      alternative: "Use CAST(column AS VARCHAR)"
+
+    - name: TO_DATE
+      reason: "Snowflake function - does NOT exist in DuckDB"
+      alternative: "Use CAST(column AS DATE) or date_column::DATE"
+
+    - name: TO_TIMESTAMP
+      reason: "Snowflake function - does NOT exist in DuckDB"
+      alternative: "Use CAST(column AS TIMESTAMP)"
+
     - name: DATEADD
-      reason: "Not supported in Evidence's DuckDB layer"
-      alternative: "Use simple date comparisons or DATE_TRUNC"
+      reason: "Snowflake function - does NOT exist in DuckDB"
+      alternative: "Use date_column + INTERVAL '1 month' or simple date comparisons"
+
+    - name: DATEDIFF
+      reason: "Snowflake syntax differs from DuckDB"
+      alternative: "Use DATE_DIFF('day', date1, date2) or (date2 - date1)"
 
     - name: DATE_SUB
-      reason: "Not supported in Evidence's DuckDB layer"
-      alternative: "Use simple date comparisons"
+      reason: "Not supported in DuckDB"
+      alternative: "Use date_column - INTERVAL '1 day'"
 
-    - name: INTERVAL
-      reason: "Syntax varies and often fails"
-      alternative: "Use explicit date strings"
+    - name: NVL
+      reason: "Snowflake function - does NOT exist in DuckDB"
+      alternative: "Use COALESCE(column, default_value)"
+
+    - name: IFF
+      reason: "Snowflake function - does NOT exist in DuckDB"
+      alternative: "Use CASE WHEN condition THEN x ELSE y END"
+
+    - name: ZEROIFNULL
+      reason: "Snowflake function - does NOT exist in DuckDB"
+      alternative: "Use COALESCE(column, 0)"
 
 # Aggregation functions
 aggregation:
@@ -71,7 +122,12 @@ string_functions:
 
 # General SQL rules
 general_rules:
+  - "CRITICAL: Use DuckDB SQL syntax, NOT Snowflake syntax"
+  - "NEVER use Snowflake-specific functions (TO_CHAR, TO_VARCHAR, NVL, IFF, etc.)"
   - "Always use explicit column aliases with AS keyword"
   - "Use single quotes for string literals"
   - "Column names are case-insensitive but preserve case in output"
   - "Use GROUP BY with all non-aggregated columns"
+  - "For date formatting, use STRFTIME() not TO_CHAR()"
+  - "For null handling, use COALESCE() not NVL()"
+  - "For conditionals, use CASE WHEN not IFF()"

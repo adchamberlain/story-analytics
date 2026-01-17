@@ -148,12 +148,34 @@ class ClaudeProvider(LLMProvider):
         )
 
 
-def get_provider() -> LLMProvider:
-    """Factory function to get the configured LLM provider."""
+def get_provider(provider_name: str | None = None) -> LLMProvider:
+    """
+    Factory function to get an LLM provider.
+
+    Args:
+        provider_name: Optional provider name. If not provided, uses config default.
+                      Valid values: "claude", "openai", "gemini"
+
+    Returns:
+        An instance of the requested LLM provider.
+    """
     config = get_config()
-    provider_name = config.llm_provider
+
+    if provider_name is None:
+        provider_name = config.llm_provider
 
     if provider_name == "claude":
         return ClaudeProvider()
+    elif provider_name == "openai":
+        from .openai_provider import OpenAIProvider
+
+        return OpenAIProvider()
+    elif provider_name == "gemini":
+        from .gemini_provider import GeminiProvider
+
+        return GeminiProvider()
     else:
-        raise ValueError(f"Unknown LLM provider: {provider_name}")
+        raise ValueError(
+            f"Unknown LLM provider: {provider_name}. "
+            f"Valid options: claude, openai, gemini"
+        )

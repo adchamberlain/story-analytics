@@ -7,5 +7,5 @@ snowflake:
   connection_file: sources/snowflake_saas/connection.yaml
 
 evidence:
-  pages_dir: pages/
+  pages_dir: .evidence/template/src/pages/
   dev_url: http://localhost:3000

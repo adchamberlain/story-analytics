@@ -1,0 +1,266 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Global styles */
+:root {
+	--terminal-bg: #0a0a0a;
+	--terminal-surface: #111111;
+	--terminal-border: #222222;
+	--terminal-text: #e0e0e0;
+	--terminal-dim: #666666;
+	--terminal-green: #22c55e;
+	--terminal-amber: #f59e0b;
+}
+
+* {
+	box-sizing: border-box;
+}
+
+html,
+body {
+	height: 100%;
+	margin: 0;
+	padding: 0;
+	font-family: 'JetBrains Mono', monospace;
+	background-color: var(--terminal-bg);
+	color: var(--terminal-text);
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+	width: 8px;
+	height: 8px;
+}
+
+::-webkit-scrollbar-track {
+	background: var(--terminal-bg);
+}
+
+::-webkit-scrollbar-thumb {
+	background: var(--terminal-border);
+	border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+	background: var(--terminal-dim);
+}
+
+/* Terminal cursor blink */
+.cursor-blink {
+	animation: blink 1s step-end infinite;
+}
+
+@keyframes blink {
+	0%,
+	100% {
+		opacity: 1;
+	}
+	50% {
+		opacity: 0;
+	}
+}
+
+/* Scanline effect (subtle) */
+.scanlines::before {
+	content: '';
+	position: absolute;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	background: repeating-linear-gradient(
+		0deg,
+		rgba(0, 0, 0, 0.1),
+		rgba(0, 0, 0, 0.1) 1px,
+		transparent 1px,
+		transparent 2px
+	);
+	pointer-events: none;
+	z-index: 1000;
+}
+
+/* Terminal input styling */
+input,
+textarea {
+	font-family: 'JetBrains Mono', monospace;
+	background-color: transparent;
+	border: none;
+	color: var(--terminal-text);
+	outline: none;
+}
+
+input:focus,
+textarea:focus {
+	outline: none;
+}
+
+/* Button styles */
+.btn-terminal {
+	@apply px-4 py-2 font-mono text-sm border transition-colors duration-150;
+}
+
+.btn-terminal-primary {
+	@apply border-terminal-green text-terminal-green hover:bg-terminal-green hover:text-terminal-bg;
+}
+
+.btn-terminal-secondary {
+	@apply border-terminal-dim text-terminal-dim hover:border-terminal-text hover:text-terminal-text;
+}
+
+.btn-terminal-danger {
+	@apply border-terminal-red text-terminal-red hover:bg-terminal-red hover:text-terminal-bg;
+}
+
+/* Link styles */
+a {
+	color: var(--terminal-green);
+	text-decoration: none;
+}
+
+a:hover {
+	text-decoration: underline;
+}
+
+/* Code block styling */
+pre,
+code {
+	font-family: 'JetBrains Mono', monospace;
+	background-color: var(--terminal-surface);
+	border: 1px solid var(--terminal-border);
+	border-radius: 4px;
+}
+
+pre {
+	padding: 1rem;
+	overflow-x: auto;
+}
+
+code {
+	padding: 0.125rem 0.25rem;
+}
+
+/* Terminal window chrome */
+.terminal-window {
+	background-color: var(--terminal-surface);
+	border: 1px solid var(--terminal-border);
+	border-radius: 8px;
+	overflow: hidden;
+}
+
+.terminal-header {
+	background-color: var(--terminal-bg);
+	padding: 0.5rem 1rem;
+	border-bottom: 1px solid var(--terminal-border);
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+}
+
+.terminal-dot {
+	width: 12px;
+	height: 12px;
+	border-radius: 50%;
+}
+
+.terminal-dot-red {
+	background-color: #ff5f56;
+}
+
+.terminal-dot-yellow {
+	background-color: #ffbd2e;
+}
+
+.terminal-dot-green {
+	background-color: #27c93f;
+}
+
+/* Markdown content styling */
+.markdown-content h1,
+.markdown-content h2,
+.markdown-content h3 {
+	color: var(--terminal-green);
+	margin-top: 1.5rem;
+	margin-bottom: 0.5rem;
+}
+
+.markdown-content p {
+	margin-bottom: 1rem;
+}
+
+.markdown-content ul,
+.markdown-content ol {
+	margin-left: 1.5rem;
+	margin-bottom: 1rem;
+}
+
+.markdown-content li {
+	margin-bottom: 0.25rem;
+}
+
+/* Input field styling */
+.input-terminal {
+	@apply bg-terminal-bg border border-terminal-border rounded px-3 py-2 text-terminal-text font-mono;
+	@apply focus:border-terminal-green focus:ring-1 focus:ring-terminal-green/30 focus:outline-none;
+	@apply disabled:opacity-50 disabled:cursor-not-allowed;
+	@apply placeholder:text-terminal-dim;
+}
+
+/* Select styling */
+select {
+	@apply bg-terminal-surface border border-terminal-border rounded px-3 py-2 text-terminal-text font-mono;
+	@apply focus:border-terminal-green focus:outline-none;
+	@apply disabled:opacity-50;
+	cursor: pointer;
+}
+
+select option {
+	background-color: var(--terminal-surface);
+	color: var(--terminal-text);
+}
+
+/* Glow effects */
+.glow-green {
+	text-shadow: 0 0 10px rgba(34, 197, 94, 0.5), 0 0 20px rgba(34, 197, 94, 0.3);
+}
+
+.glow-amber {
+	text-shadow: 0 0 10px rgba(245, 158, 11, 0.5), 0 0 20px rgba(245, 158, 11, 0.3);
+}
+
+/* Loading spinner */
+.loading-spinner {
+	width: 20px;
+	height: 20px;
+	border: 2px solid var(--terminal-border);
+	border-top-color: var(--terminal-green);
+	border-radius: 50%;
+	animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+	to {
+		transform: rotate(360deg);
+	}
+}
+
+/* Focus visible for keyboard navigation */
+:focus-visible {
+	outline: 2px solid var(--terminal-green);
+	outline-offset: 2px;
+}
+
+/* Selection styling */
+::selection {
+	background-color: rgba(34, 197, 94, 0.3);
+	color: var(--terminal-text);
+}
+
+/* Smooth transitions */
+* {
+	transition-property: background-color, border-color, color, fill, stroke;
+	transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+	transition-duration: 150ms;
+}

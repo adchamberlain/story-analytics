@@ -1,0 +1,23 @@
+# Evidence Dashboard Server Dockerfile
+FROM node:20-slim
+
+WORKDIR /app
+
+# Copy package files
+COPY package.json package-lock.json* ./
+COPY evidence.config.yaml ./
+
+# Install dependencies
+RUN npm install
+
+# Copy Evidence template
+COPY .evidence/template ./.evidence/template
+
+# Create directories
+RUN mkdir -p pages sources
+
+# Expose port
+EXPOSE 3000
+
+# Run Evidence dev server
+CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
