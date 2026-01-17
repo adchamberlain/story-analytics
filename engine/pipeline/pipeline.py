@@ -239,11 +239,17 @@ class DashboardPipeline:
                     markdown=markdown,
                 )
 
-            # Post-assembly validation failed - Layout agent likely rewrote SQL
+            # Post-assembly validation failed - Layout agent likely rewrote SQL or has reference errors
             if self.config.verbose:
-                print(f"[Pipeline]   Post-assembly validation FAILED: {validation.error_count} error(s)")
-                for err in validation.errors:
-                    print(f"[Pipeline]     - {err.query_name}: {err.error[:80]}...")
+                if validation.error_count > 0:
+                    print(f"[Pipeline]   Post-assembly validation FAILED: {validation.error_count} SQL error(s)")
+                    for err in validation.errors:
+                        print(f"[Pipeline]     - {err.query_name}: {err.error[:80]}...")
+                if validation.reference_mismatches:
+                    print(f"[Pipeline]   Post-assembly validation FAILED: {len(validation.reference_mismatches)} reference error(s)")
+                    for mismatch in validation.reference_mismatches:
+                        suggestion = f" (try '{mismatch.suggestion}')" if mismatch.suggestion else ""
+                        print(f"[Pipeline]     - <{mismatch.component_type}> references undefined '{mismatch.referenced_name}'{suggestion}")
 
             # Diagnose and decide what to do
             diagnosis = self._diagnose_post_assembly_failure(validation, queries)
@@ -322,8 +328,25 @@ class DashboardPipeline:
         Diagnose why post-assembly validation failed.
 
         This compares the validated queries with what's in the markdown
-        to determine if the Layout Agent rewrote the SQL.
+        to determine if the Layout Agent rewrote the SQL or used wrong references.
         """
+        # Check for reference mismatches (component references undefined query)
+        # This is a layout agent issue - it used a query name that doesn't exist
+        if validation.reference_mismatches:
+            return FailureDiagnosis(
+                failure_type=FailureType.POST_ASSEMBLY_SQL_ERROR,
+                error_message="Layout agent used undefined query references in components",
+                suggested_action="Regenerate layout with correct query references",
+                context={
+                    "reference_errors": [
+                        f"<{m.component_type}> references '{m.referenced_name}' but should use '{m.suggestion}'"
+                        if m.suggestion else f"<{m.component_type}> references undefined '{m.referenced_name}'"
+                        for m in validation.reference_mismatches
+                    ],
+                    "defined_queries": validation.reference_mismatches[0].defined_queries if validation.reference_mismatches else [],
+                },
+            )
+
         # Check if the errors are syntax errors (Layout Agent rewrote SQL)
         syntax_error_keywords = [
             "syntax error", "parser error", "no such function",
@@ -367,7 +390,7 @@ class DashboardPipeline:
             print("[Orchestrator] Attempting to fix layout SQL...")
 
         # Build a more forceful prompt
-        fix_prompt = f"""The dashboard you generated has SQL errors because you modified the validated SQL.
+        fix_prompt = f"""The dashboard you generated has errors that must be fixed.
 
 ERRORS FOUND:
 {validation.format_errors()}
@@ -377,12 +400,17 @@ YOU MUST USE THE EXACT SQL FROM THE VALIDATED QUERIES:
 {queries.to_prompt_context()}
 
 CRITICAL INSTRUCTIONS:
-- Copy the SQL EXACTLY as shown above - character for character
-- Do NOT use DATE(DATE('now'), ...) - that's SQLite syntax, not DuckDB
-- Do NOT rewrite, optimize, or "improve" the SQL in any way
-- The SQL has already been validated and works - just use it exactly
+1. Copy the SQL EXACTLY as shown above - character for character
+2. In components, use data={{query_name}} where query_name EXACTLY matches the name after ```sql
+   - If the query is ```sql active_subscriptions, use data={{active_subscriptions}}
+   - Do NOT use different names like total_active_subscriptions or subscription_count
+3. Do NOT use DATE(DATE('now'), ...) - that's SQLite syntax, not DuckDB
+4. Do NOT rewrite, optimize, or "improve" the SQL in any way
+5. The SQL has already been validated and works - just use it exactly
 
-Regenerate the dashboard markdown using the EXACT SQL from above.
+IMPORTANT: The query name in ```sql query_name MUST MATCH the data={{query_name}} in components!
+
+Regenerate the dashboard markdown using the EXACT SQL and query names from above.
 Output ONLY the markdown, starting with # {spec.title}
 """
 

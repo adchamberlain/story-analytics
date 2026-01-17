@@ -76,11 +76,16 @@ class LayoutAgent:
 
 {queries.to_prompt_context()}
 
-IMPORTANT:
-- Use the SQL queries EXACTLY as provided (they have been validated)
-- Create a clean, professional layout
-- Focus on the business question: {spec.business_question}
-- Output ONLY the markdown, starting with # {spec.title}
+CRITICAL REQUIREMENTS:
+1. Use the SQL queries EXACTLY as provided (they have been validated)
+2. The query name in ```sql query_name MUST EXACTLY MATCH data={{query_name}} in components
+   - Example: ```sql active_subs means you must use data={{active_subs}}
+   - DO NOT rename queries or use different names in components
+3. Create a clean, professional layout
+4. Focus on the business question: {spec.business_question}
+5. Output ONLY the markdown, starting with # {spec.title}
+
+IMPORTANT: If a query is named "monthly_revenue", the component MUST use data={{monthly_revenue}}, not data={{revenue}} or data={{monthly_revenue_data}}.
 """
 
         messages = [Message(role="user", content=request)]

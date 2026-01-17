@@ -1,0 +1,58 @@
+Full Pipeline Test - churn-analysis
+Time: 2026-01-17 15:16:18
+======================================================================
+Template: Churn Analysis
+Prompt: Create a churn analysis dashboard showing monthly churn rate, churned customers over time, and churn by customer segment
+
+Success: True
+
+Generated Markdown (5424 chars):
+----------------------------------------
+# Customer Churn Analysis Dashboard
+
+This dashboard provides insights into customer churn patterns across different segments and time periods, helping the Customer Success team and leadership identify at-risk customer groups and track churn trends over the past 12 months.
+
+```sql overall_churn_rate
+SELECT 
+  COUNT(CASE WHEN s.churn_date IS NOT NULL AND s.churn_date >= CURRENT_DATE - INTERVAL '12 months' THEN s.customer_id END) as churned_customers,
+  COUNT(s.customer_id) as total_customers,
+  ROUND((COUNT(CASE WHEN s.churn_date IS NOT NULL AND s.churn_date >= CURRENT_DATE - INTERVAL '12 months' THEN s.customer_id END)::FLOAT / NULLIF(COUNT(s.customer_id), 0)) * 100, 2) as overall_churn_rate_percent
+FROM snowflake_saas.subscriptions s
+WHERE s.start_date <= CURRENT_DATE
+```
+
+<BigValue data={overall_churn_rate} value="overall_churn_rate_percent" title="Overall Churn Rate (%)" />
+
+## Churn Trends Over Time
+
+```sql monthly_churn_rate_trend
+WITH monthly_stats AS (
+  SELECT 
+    DATE_TRUNC('month', s.churn_date) as churn_month,
+    COUNT(CASE WHEN s.churn_date IS NOT NULL THEN s.customer_id END) as churned_customers,
+    COUNT(s.customer_id) as total_customers
+  FROM snowflake_saas.subscriptions s
+  WHERE s.start_date <= CURRENT_DATE - INTERVAL '12 months'
+    AND (s.churn_date IS NULL OR s.churn_date >= CURRENT_DATE - INTERVAL '12 months')
+  GROUP BY DATE_TRUNC('month', s.churn_date)
+)
+SELECT 
+  churn_month,
+  churned_customers,
+  total_customers,
+  ROUND((churned_customers::FLOAT / NULLIF(total_customers, 0)) * 100, 2) as churn_rate_percent
+FROM monthly_stats
+WHERE churn_month IS NOT NULL
+ORDER BY churn_month
+```
+
+<LineChart data={monthly_churn_rate_trend} x="churn_month" y="churn_rate_percent" title="Monthly Churn Rate Trend (%)" />
+
+```sql churned_customers_over_time
+SELECT 
+  DATE_TRUNC('month', s.churn_date) as churn_month,
+  COUNT(s.customer_id) as churned_customers
+FROM snowflake_saas.subscriptions s
+WHERE s.churn_date IS NOT NULL
+  AND s.churn_date >= CURRENT_DATE
+... (truncated, total 5424 chars)

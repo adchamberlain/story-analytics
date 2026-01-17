@@ -24,29 +24,58 @@ class SQLValidationResult:
 
 
 @dataclass
+class QueryReferenceMismatch:
+    """A mismatch between a component reference and defined queries."""
+
+    referenced_name: str
+    component_type: str
+    defined_queries: list[str]
+    suggestion: str | None = None
+
+
+@dataclass
 class ValidationReport:
     """Complete validation report for a dashboard."""
 
     valid: bool
     results: list[SQLValidationResult]
     error_count: int
+    reference_mismatches: list[QueryReferenceMismatch] | None = None
 
     @property
     def errors(self) -> list[SQLValidationResult]:
         """Get only the failed validations."""
         return [r for r in self.results if not r.valid]
 
+    @property
+    def has_reference_errors(self) -> bool:
+        """Check if there are query reference mismatches."""
+        return bool(self.reference_mismatches)
+
     def format_errors(self) -> str:
         """Format errors for display or LLM consumption."""
-        if not self.errors:
+        lines = []
+
+        if self.errors:
+            lines.append(f"Found {self.error_count} SQL error(s):\n")
+            for i, err in enumerate(self.errors, 1):
+                lines.append(f"{i}. Query '{err.query_name}':")
+                lines.append(f"   Error: {err.error}")
+                lines.append(f"   SQL: {err.query[:200]}..." if len(err.query) > 200 else f"   SQL: {err.query}")
+                lines.append("")
+
+        if self.reference_mismatches:
+            lines.append(f"Found {len(self.reference_mismatches)} query reference error(s):\n")
+            for i, mismatch in enumerate(self.reference_mismatches, 1):
+                lines.append(f"{i}. Component <{mismatch.component_type}> references '{mismatch.referenced_name}' but this query is not defined.")
+                lines.append(f"   Defined queries: {', '.join(mismatch.defined_queries)}")
+                if mismatch.suggestion:
+                    lines.append(f"   Suggestion: Use '{mismatch.suggestion}' instead")
+                lines.append("")
+
+        if not lines:
             return "All queries valid."
 
-        lines = [f"Found {self.error_count} SQL error(s):\n"]
-        for i, err in enumerate(self.errors, 1):
-            lines.append(f"{i}. Query '{err.query_name}':")
-            lines.append(f"   Error: {err.error}")
-            lines.append(f"   SQL: {err.query[:200]}..." if len(err.query) > 200 else f"   SQL: {err.query}")
-            lines.append("")
         return "\n".join(lines)
 
 
@@ -194,9 +223,95 @@ class SQLValidator:
 
         return queries
 
+    def extract_data_references(self, markdown: str) -> list[tuple[str, str]]:
+        """
+        Extract data references from Evidence components.
+
+        Args:
+            markdown: The dashboard markdown content
+
+        Returns:
+            List of (component_type, referenced_query_name) tuples
+        """
+        references = []
+
+        # Pattern to match data={query_name} in components
+        # e.g., <BarChart data={monthly_revenue} ...>
+        # Also handles data={query_name.column} for column references
+        component_pattern = r"<(\w+)[^>]*\bdata=\{(\w+)(?:\.\w+)?\}[^>]*>"
+        matches = re.findall(component_pattern, markdown, re.IGNORECASE)
+
+        for component_type, query_name in matches:
+            references.append((component_type, query_name))
+
+        return references
+
+    def validate_references(self, markdown: str) -> list[QueryReferenceMismatch]:
+        """
+        Validate that all data references in components match defined queries.
+
+        Args:
+            markdown: The dashboard markdown content
+
+        Returns:
+            List of QueryReferenceMismatch for any undefined references
+        """
+        # Get defined query names
+        queries = self.extract_queries_from_markdown(markdown)
+        defined_names = {name for name, _ in queries}
+
+        # Get data references
+        references = self.extract_data_references(markdown)
+
+        mismatches = []
+        seen = set()  # Avoid duplicate errors for same reference
+
+        for component_type, referenced_name in references:
+            if referenced_name not in defined_names and referenced_name not in seen:
+                seen.add(referenced_name)
+
+                # Try to suggest a similar query name
+                suggestion = self._find_similar_query(referenced_name, defined_names)
+
+                mismatches.append(QueryReferenceMismatch(
+                    referenced_name=referenced_name,
+                    component_type=component_type,
+                    defined_queries=list(defined_names),
+                    suggestion=suggestion,
+                ))
+
+        return mismatches
+
+    def _find_similar_query(self, target: str, candidates: set[str]) -> str | None:
+        """Find a similar query name from candidates."""
+        target_lower = target.lower()
+
+        # First try exact substring match
+        for candidate in candidates:
+            if target_lower in candidate.lower() or candidate.lower() in target_lower:
+                return candidate
+
+        # Try common word overlap
+        target_words = set(target_lower.replace('_', ' ').split())
+        best_match = None
+        best_overlap = 0
+
+        for candidate in candidates:
+            candidate_words = set(candidate.lower().replace('_', ' ').split())
+            overlap = len(target_words & candidate_words)
+            if overlap > best_overlap:
+                best_overlap = overlap
+                best_match = candidate
+
+        return best_match if best_overlap > 0 else None
+
     def validate_markdown(self, markdown: str) -> ValidationReport:
         """
         Validate all SQL queries in a dashboard markdown file.
+
+        This validates:
+        1. SQL syntax and execution against DuckDB
+        2. Query name references (components must reference defined queries)
 
         Args:
             markdown: The dashboard markdown content
@@ -207,7 +322,14 @@ class SQLValidator:
         queries = self.extract_queries_from_markdown(markdown)
 
         if not queries:
-            return ValidationReport(valid=True, results=[], error_count=0)
+            # Still check for reference mismatches (component referencing non-existent query)
+            reference_mismatches = self.validate_references(markdown)
+            return ValidationReport(
+                valid=len(reference_mismatches) == 0,
+                results=[],
+                error_count=0,
+                reference_mismatches=reference_mismatches if reference_mismatches else None,
+            )
 
         results = []
         for query_name, query_sql in queries:
@@ -216,10 +338,17 @@ class SQLValidator:
 
         error_count = sum(1 for r in results if not r.valid)
 
+        # Also validate that component references match query names
+        reference_mismatches = self.validate_references(markdown)
+
+        # Dashboard is only valid if SQL is valid AND references are valid
+        is_valid = error_count == 0 and len(reference_mismatches) == 0
+
         return ValidationReport(
-            valid=error_count == 0,
+            valid=is_valid,
             results=results,
             error_count=error_count,
+            reference_mismatches=reference_mismatches if reference_mismatches else None,
         )
 
     def close(self):
