@@ -2,6 +2,13 @@
 Conversation manager for dashboard creation and editing.
 
 Orchestrates the multi-phase conversation flow between user and LLM.
+
+Supports two generation modes:
+- "monolithic": Original single-prompt approach (default for backwards compatibility)
+- "pipeline": Decomposed three-stage pipeline (requirements -> SQL -> layout)
+
+The pipeline mode breaks dashboard creation into focused stages, giving each
+agent specialized prompts and reducing "guardrail creep".
 """
 
 from dataclasses import dataclass, field
@@ -15,6 +22,7 @@ from .generator import create_dashboard_from_markdown
 from .llm.base import LLMResponse, Message
 from .llm.claude import get_provider
 from .parser import DashboardParser, ParsedDashboard
+from .pipeline import DashboardPipeline, PipelineConfig
 from .qa import DashboardQA, QAResult, run_qa_with_auto_fix
 from .schema import get_schema_context
 from .sql_validator import validate_dashboard_sql, ValidationReport
@@ -42,6 +50,10 @@ class ConversationState:
     created_file: Path | None = None
     original_request: str | None = None  # Store original request for QA
 
+    # Pipeline mode state
+    dashboard_spec: Any | None = None  # DashboardSpec from pipeline
+    validated_queries: Any | None = None  # ValidatedQueries from pipeline
+
 
 # System prompts are now loaded from YAML config files
 # See engine/prompts/ directory for customizable prompt templates
@@ -50,7 +62,11 @@ class ConversationState:
 class ConversationManager:
     """Manages the conversation flow for dashboard creation/editing."""
 
-    def __init__(self, provider_name: str | None = None):
+    def __init__(
+        self,
+        provider_name: str | None = None,
+        generation_mode: str = "pipeline",  # "monolithic" or "pipeline"
+    ):
         self.config = get_config()
         self.config_loader = get_config_loader()
         self.llm = get_provider(provider_name)
@@ -59,7 +75,18 @@ class ConversationManager:
         self.state = ConversationState()
         self._schema_context: str | None = None
         self._default_source = "snowflake_saas"  # TODO: make configurable
+        self._generation_mode = generation_mode
+
+        # Initialize pipeline if using pipeline mode
+        self._pipeline: DashboardPipeline | None = None
+        if generation_mode == "pipeline":
+            self._pipeline = DashboardPipeline(PipelineConfig(
+                provider_name=provider_name,
+                verbose=True,
+            ))
+
         print(f"[LLM] Using provider: {self.llm.name}, model: {self.llm.model}")
+        print(f"[Mode] Generation mode: {generation_mode}")
 
     def reset(self):
         """Reset conversation state."""
@@ -214,6 +241,134 @@ class ConversationManager:
 
     def _generate_dashboard(self) -> str:
         """Generate the actual dashboard markdown."""
+        # Use pipeline mode if enabled
+        if self._generation_mode == "pipeline" and self._pipeline:
+            return self._generate_dashboard_pipeline()
+
+        # Otherwise use monolithic mode
+        return self._generate_dashboard_monolithic()
+
+    def _generate_dashboard_pipeline(self) -> str:
+        """Generate dashboard using the decomposed pipeline."""
+        # Get the original request from conversation
+        user_request = self.state.original_request or ""
+
+        # If no original request, try to extract from messages
+        if not user_request:
+            for msg in self.state.messages:
+                if msg.role == "user":
+                    user_request = msg.content
+                    break
+
+        print(f"[Pipeline] Starting generation for: {user_request[:100]}...")
+
+        # Run the pipeline
+        result = self._pipeline.run(user_request)
+
+        if not result.success:
+            error_msg = f"Pipeline failed: {result.error}"
+            print(f"[Pipeline] {error_msg}")
+            self.state.messages.append(Message(role="assistant", content=error_msg))
+            return error_msg
+
+        # Store pipeline results in state
+        self.state.dashboard_spec = result.dashboard_spec
+        self.state.validated_queries = result.validated_queries
+        markdown = result.markdown
+
+        self.state.generated_markdown = markdown
+
+        # Extract title for filename
+        title_match = markdown.split("\n")[0]
+        if title_match.startswith("#"):
+            title = title_match.lstrip("#").strip()
+        else:
+            title = result.dashboard_spec.title if result.dashboard_spec else "generated-dashboard"
+
+        self.state.dashboard_title = title
+
+        # Write the dashboard and run QA (same as monolithic)
+        return self._finalize_dashboard(markdown, title)
+
+    def _finalize_dashboard(self, markdown: str, title: str) -> str:
+        """Write dashboard to file and run QA validation."""
+        try:
+            file_path = create_dashboard_from_markdown(markdown, title)
+            self.state.created_file = file_path
+            self.state.phase = ConversationPhase.REFINEMENT
+
+            slug = file_path.parent.name
+            url = f"{self.config.dev_url}/{slug}"
+
+            # Run QA validation with auto-fix loop (if enabled)
+            qa_result = None
+            qa_run = None
+            auto_fix_attempted = False
+            successfully_fixed = []
+
+            if self.config_loader.is_qa_enabled() and self.state.original_request:
+                max_fix_attempts = self.config_loader.get_max_auto_fix_attempts()
+                should_auto_fix = self.config_loader.should_auto_fix_critical()
+
+                if should_auto_fix:
+                    qa_run = run_qa_with_auto_fix(
+                        dashboard_slug=slug,
+                        file_path=file_path,
+                        original_request=self.state.original_request,
+                        max_fix_attempts=max_fix_attempts,
+                        schema_context=self.get_schema_context(),
+                        provider_name=self._provider_name,
+                    )
+                    qa_result = qa_run.final_result
+                    auto_fix_attempted = qa_run.auto_fix_attempted
+                    successfully_fixed = qa_run.issues_fixed
+
+                    if auto_fix_attempted:
+                        self.state.generated_markdown = file_path.read_text()
+                else:
+                    qa_result = self._run_qa_validation(slug)
+
+            dashboard_is_broken = qa_result and qa_result.critical_issues
+
+            if dashboard_is_broken:
+                result = f"""⚠️ Dashboard created but has issues: {slug}
+
+View it at: {url}
+
+Here's what I created:
+{self._summarize_markdown(self.state.generated_markdown)}
+"""
+            else:
+                result = f"""✓ Dashboard created: {slug}
+
+View it at: {url}
+
+Here's what I created:
+{self._summarize_markdown(self.state.generated_markdown)}
+"""
+
+            if qa_result:
+                result += self._format_qa_result(
+                    qa_result,
+                    auto_fix_attempted=auto_fix_attempted,
+                    fixed_issues=successfully_fixed
+                )
+
+            if dashboard_is_broken:
+                result += "\nPlease tell me how to fix these issues, or describe what you want to see."
+            elif qa_result and qa_result.suggestions:
+                result += "\nWould you like me to implement any of these suggestions? Or tell me what else to change."
+            else:
+                result += "\nWhat would you like to change?"
+
+        except Exception as e:
+            result = f"Error creating dashboard: {e}\n\nHere's the markdown I generated:\n\n{markdown[:500]}..."
+
+        self.state.messages.append(Message(role="assistant", content=result))
+        return result
+
+    def _generate_dashboard_monolithic(self) -> str:
+        """Generate dashboard using the original monolithic approach."""
         # Ask LLM to generate complete dashboard
         generation_prompt = """Based on our conversation, generate a complete Evidence markdown dashboard.
 
@@ -299,88 +454,8 @@ Output ONLY the corrected markdown, starting with # Title."""
 
         self.state.dashboard_title = title
 
-        # Write the dashboard
-        try:
-            file_path = create_dashboard_from_markdown(markdown, title)
-            self.state.created_file = file_path
-            self.state.phase = ConversationPhase.REFINEMENT
-
-            # file_path is pages_dir/slug/+page.md, so slug is the parent dir name
-            slug = file_path.parent.name
-            url = f"{self.config.dev_url}/{slug}"
-
-            # Run QA validation with auto-fix loop (if enabled)
-            qa_result = None
-            qa_run = None
-            auto_fix_attempted = False
-            successfully_fixed = []
-
-            if self.config_loader.is_qa_enabled() and self.state.original_request:
-                max_fix_attempts = self.config_loader.get_max_auto_fix_attempts()
-                should_auto_fix = self.config_loader.should_auto_fix_critical()
-
-                if should_auto_fix:
-                    # Use standalone QA function with auto-fix
-                    qa_run = run_qa_with_auto_fix(
-                        dashboard_slug=slug,
-                        file_path=file_path,
-                        original_request=self.state.original_request,
-                        max_fix_attempts=max_fix_attempts,
-                        schema_context=self.get_schema_context(),
-                        provider_name=self._provider_name,
-                    )
-                    qa_result = qa_run.final_result
-                    auto_fix_attempted = qa_run.auto_fix_attempted
-                    successfully_fixed = qa_run.issues_fixed
-
-                    # Update state with fixed markdown if auto-fix was applied
-                    if auto_fix_attempted:
-                        self.state.generated_markdown = file_path.read_text()
-                else:
-                    # Just validate without auto-fix
-                    qa_result = self._run_qa_validation(slug)
-
-            # Check if dashboard is still broken after all attempts
-            dashboard_is_broken = qa_result and qa_result.critical_issues
-
-            # Build result message based on dashboard status
-            if dashboard_is_broken:
-                result = f"""⚠️ Dashboard created but has issues: {slug}
-
-View it at: {url}
-
-Here's what I created:
-{self._summarize_markdown(self.state.generated_markdown)}
-"""
-            else:
-                result = f"""✓ Dashboard created: {slug}
-
-View it at: {url}
-
-Here's what I created:
-{self._summarize_markdown(self.state.generated_markdown)}
-"""
-
-            if qa_result:
-                result += self._format_qa_result(
-                    qa_result,
-                    auto_fix_attempted=auto_fix_attempted,
-                    fixed_issues=successfully_fixed
-                )
-
-            # Different prompts based on status
-            if dashboard_is_broken:
-                result += "\nPlease tell me how to fix these issues, or describe what you want to see."
-            elif qa_result and qa_result.suggestions:
-                result += "\nWould you like me to implement any of these suggestions? Or tell me what else to change."
-            else:
-                result += "\nWhat would you like to change?"
-
-        except Exception as e:
-            result = f"Error creating dashboard: {e}\n\nHere's the markdown I generated:\n\n{markdown[:500]}..."
-
-        self.state.messages.append(Message(role="assistant", content=result))
-        return result
+        # Use shared finalization logic
+        return self._finalize_dashboard(markdown, title)
 
     def _handle_refinement_phase(self, user_input: str) -> str:
         """Handle refinement requests after initial generation."""
@@ -620,6 +695,15 @@ What else would you like to change?"""
         return f"Dashboard '{dashboard_name}' not found. Please try again."
 
 
-def create_conversation() -> ConversationManager:
-    """Create a new conversation manager."""
-    return ConversationManager()
+def create_conversation(generation_mode: str = "pipeline") -> ConversationManager:
+    """
+    Create a new conversation manager.
+
+    Args:
+        generation_mode: "pipeline" (default) for decomposed generation,
+                        "monolithic" for original single-prompt approach.
+
+    Returns:
+        A new ConversationManager instance.
+    """
+    return ConversationManager(generation_mode=generation_mode)
