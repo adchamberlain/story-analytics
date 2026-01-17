@@ -12,6 +12,7 @@ import {
 	deleteConversation as apiDeleteConversation,
 	renameConversation as apiRenameConversation
 } from '../api';
+import { loadDashboards } from './dashboards';
 
 // Extended message type with clarifying options
 export interface ExtendedMessage extends Message {
@@ -119,6 +120,8 @@ export async function sendMessage(content: string): Promise<string> {
 				url: response.dashboard_url,
 				created: true
 			});
+			// Refresh dashboard list in sidebar
+			loadDashboards();
 		}
 
 		// Refresh conversation list to get updated titles
