@@ -95,13 +95,13 @@ nav a:hover {
     opacity: 0.9;
 }
 
-/* Blinking cursor */
+/* Blinking cursors - dual cursor design symbolizing human + AI collaboration */
 .cursor {
     display: inline-block;
     width: 0.6em;
     height: 1.1em;
     background-color: var(--terminal-accent);
-    margin-left: 0.1em;
+    margin-left: 0.15em;
     vertical-align: text-bottom;
     animation: blink 1s step-end infinite;
 }
