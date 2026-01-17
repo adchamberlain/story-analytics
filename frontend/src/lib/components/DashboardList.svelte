@@ -1,27 +1,12 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { dashboards, dashboardsLoading, loadDashboards, deleteDashboard, syncDashboards } from '../stores/dashboards';
+	import { dashboards, dashboardsLoading, loadDashboards, deleteDashboard } from '../stores/dashboards';
 
-	let syncing = false;
 	let deleteConfirm: string | null = null;
 
 	onMount(() => {
 		loadDashboards();
 	});
-
-	async function handleSync() {
-		syncing = true;
-		try {
-			const count = await syncDashboards();
-			if (count > 0) {
-				alert(`Synced ${count} dashboard(s) from filesystem`);
-			}
-		} catch (e) {
-			alert('Failed to sync dashboards');
-		} finally {
-			syncing = false;
-		}
-	}
 
 	async function handleDelete(slug: string) {
 		if (deleteConfirm !== slug) {
@@ -53,14 +38,7 @@
 <div class="space-y-4">
 	<!-- Header -->
 	<div class="flex items-center justify-between">
-		<h2 class="text-terminal-green font-bold text-lg">Dashboards</h2>
-		<button
-			on:click={handleSync}
-			disabled={syncing}
-			class="btn-terminal btn-terminal-secondary text-xs"
-		>
-			{syncing ? 'Syncing...' : 'Sync from files'}
-		</button>
+		<h2 class="text-terminal-accent font-bold text-lg">Dashboards</h2>
 	</div>
 
 	<!-- List -->
@@ -83,7 +61,7 @@
 								href={dashboard.url}
 								target="_blank"
 								rel="noopener noreferrer"
-								class="text-terminal-green hover:underline font-medium truncate block"
+								class="text-terminal-accent hover:underline font-medium truncate block"
 							>
 								{dashboard.title}
 							</a>
@@ -93,15 +71,30 @@
 							</p>
 						</div>
 
-						<div class="flex items-center gap-2 shrink-0">
+						<div class="flex items-center gap-3 shrink-0">
 							<a
 								href={dashboard.url}
 								target="_blank"
 								rel="noopener noreferrer"
-								class="text-terminal-dim hover:text-terminal-green text-sm"
+								class="text-terminal-dim hover:text-terminal-text text-sm"
 							>
 								Open
 							</a>
+							<span class="text-terminal-border">|</span>
+							<a
+								href="/app?edit={dashboard.slug}"
+								class="text-terminal-accent hover:text-terminal-accent-bright text-sm font-medium"
+							>
+								Edit with AI
+							</a>
+							<a
+								href="/app/dashboards/edit/{dashboard.slug}"
+								class="text-terminal-dim hover:text-terminal-text text-sm"
+								title="Edit markdown directly"
+							>
+								Edit manually
+							</a>
+							<span class="text-terminal-border">|</span>
 
 							{#if deleteConfirm === dashboard.slug}
 								<button

@@ -16,9 +16,9 @@ from .base import LLMProvider, LLMResponse, Message
 class GeminiProvider(LLMProvider):
     """Google Gemini API provider using the official Google AI SDK."""
 
-    # Default models
-    DEFAULT_MODEL = "gemini-1.5-pro"
-    VISION_MODEL = "gemini-1.5-pro"  # Also supports vision
+    # Default models (updated Jan 2026 - gemini-1.5 models are deprecated)
+    DEFAULT_MODEL = "gemini-2.0-flash"
+    VISION_MODEL = "gemini-2.0-flash"  # Also supports vision
 
     # Rate limit retry settings
     MAX_RETRIES = 3
@@ -34,19 +34,21 @@ class GeminiProvider(LLMProvider):
         """
         config = get_config()
 
-        # Try multiple environment variable names for API key
+        # Get API key - prefer explicit, then env var
+        # Only use config.llm_api_key if the config provider is gemini
         self._api_key = api_key
         if not self._api_key:
-            # Check config first, then fall back to common env var names
+            # First try environment variables (most reliable for multi-provider setups)
+            self._api_key = os.environ.get("GOOGLE_API_KEY") or os.environ.get(
+                "GEMINI_API_KEY"
+            )
+
+        if not self._api_key and config.llm_provider == "gemini":
+            # Fall back to config only if gemini is the configured provider
             try:
                 self._api_key = config.llm_api_key
             except ValueError:
                 pass
-
-        if not self._api_key:
-            self._api_key = os.environ.get("GOOGLE_API_KEY") or os.environ.get(
-                "GEMINI_API_KEY"
-            )
 
         if not self._api_key:
             raise ValueError(

@@ -1,7 +1,9 @@
 <script lang="ts">
 	import { onMount, afterUpdate } from 'svelte';
+	import { goto } from '$app/navigation';
 	import Message from './Message.svelte';
 	import TerminalInput from './TerminalInput.svelte';
+	import { getDashboard, type Dashboard } from '../api';
 	import {
 		messages,
 		phase,
@@ -16,14 +18,31 @@
 		renameConversation
 	} from '../stores/conversation';
 
+	export let editSlug: string | null = null;
+
 	let messagesContainer: HTMLDivElement;
 	let isEditingTitle = false;
 	let editingTitle = '';
+	let editingDashboard: Dashboard | null = null;
 
-	onMount(() => {
+	onMount(async () => {
 		loadConversation();
 		loadConversationList();
+
+		// If editing a dashboard, load its info
+		if (editSlug) {
+			try {
+				editingDashboard = await getDashboard(editSlug);
+			} catch (e) {
+				console.error('Failed to load dashboard for editing:', e);
+			}
+		}
 	});
+
+	function clearEditMode() {
+		editingDashboard = null;
+		goto('/app', { replaceState: true });
+	}
 
 	function startEditingTitle() {
 		isEditingTitle = true;
@@ -86,12 +105,12 @@
 					bind:value={editingTitle}
 					on:keydown={handleTitleKeydown}
 					on:blur={saveTitle}
-					class="text-terminal-green font-bold bg-terminal-bg border border-terminal-green rounded px-2 py-0.5 outline-none"
+					class="text-terminal-accent font-bold bg-terminal-bg border border-terminal-accent rounded px-2 py-0.5 outline-none"
 					autofocus
 				/>
 			{:else}
 				<h2
-					class="text-terminal-green font-bold truncate cursor-pointer hover:underline"
+					class="text-terminal-accent font-bold text-lg truncate cursor-pointer hover:underline"
 					on:dblclick={startEditingTitle}
 					title="Double-click to rename"
 				>
@@ -108,14 +127,43 @@
 		</button>
 	</div>
 
+	<!-- Edit Mode Banner -->
+	{#if editingDashboard}
+		<div class="px-4 py-3 bg-terminal-accent/10 border-b border-terminal-accent/30 flex items-center justify-between">
+			<div>
+				<span class="text-terminal-accent font-medium">Editing:</span>
+				<span class="text-terminal-text ml-2">{editingDashboard.title}</span>
+			</div>
+			<button
+				on:click={clearEditMode}
+				class="text-terminal-dim hover:text-terminal-text text-sm"
+			>
+				Cancel edit
+			</button>
+		</div>
+	{/if}
+
 	<!-- Messages -->
 	<div bind:this={messagesContainer} class="flex-1 overflow-y-auto px-4 py-4 space-y-2">
 		{#if $messages.length === 0}
 			<div class="text-terminal-dim text-center py-8">
-				<p class="mb-2">Welcome to Story Analytics</p>
-				<p class="text-sm">
-					Tell me what kind of dashboard you'd like to create, and I'll help you build it.
-				</p>
+				{#if editingDashboard}
+					<p class="mb-2 text-terminal-text">Editing: <span class="text-terminal-accent">{editingDashboard.title}</span></p>
+					<p class="text-sm mb-4">
+						Describe what changes you'd like to make to this dashboard.
+					</p>
+					<div class="text-xs text-terminal-dim space-y-1">
+						<p>Examples:</p>
+						<p class="italic">"Add a filter for date range"</p>
+						<p class="italic">"Change the chart to show monthly trends"</p>
+						<p class="italic">"Add a second chart showing revenue by region"</p>
+					</div>
+				{:else}
+					<p class="mb-2">Welcome to Story Analytics</p>
+					<p class="text-sm">
+						Tell me what kind of dashboard you'd like to create, and I'll help you build it.
+					</p>
+				{/if}
 			</div>
 		{:else}
 			{#each $messages as message}
@@ -124,8 +172,8 @@
 		{/if}
 
 		{#if $lastDashboard?.created}
-			<div class="mt-4 p-4 bg-terminal-surface border border-terminal-green rounded">
-				<p class="text-terminal-green mb-2">Dashboard created!</p>
+			<div class="mt-4 p-4 bg-terminal-surface border border-terminal-accent rounded">
+				<p class="text-terminal-accent mb-2">Dashboard created!</p>
 				<a
 					href={$lastDashboard.url}
 					target="_blank"
@@ -143,7 +191,9 @@
 		<TerminalInput
 			on:submit={handleSubmit}
 			disabled={$conversationLoading}
-			placeholder="Describe the dashboard you want to create..."
+			placeholder={editingDashboard
+				? "Describe what changes you'd like to make..."
+				: 'Describe the dashboard you want to create...'}
 		/>
 	</div>
 </div>

@@ -20,10 +20,10 @@
 	$: renderedContent = message.role === 'assistant' ? marked(message.content) : message.content;
 </script>
 
-<div class="py-3 {message.role === 'user' ? 'border-l-2 border-terminal-green pl-4' : 'pl-4'}">
+<div class="py-3 {message.role === 'user' ? 'border-l-2 border-terminal-accent pl-4' : 'pl-4'}">
 	<div class="flex items-start gap-3">
 		{#if message.role === 'user'}
-			<span class="text-terminal-green font-bold shrink-0">{'>'}</span>
+			<span class="text-terminal-accent font-bold shrink-0">{'>'}</span>
 		{:else}
 			<span class="text-terminal-amber font-bold shrink-0">$</span>
 		{/if}

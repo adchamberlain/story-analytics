@@ -24,7 +24,7 @@
 </script>
 
 <div class="flex items-center gap-2 bg-terminal-surface border border-terminal-border rounded px-4 py-3">
-	<span class="text-terminal-green font-bold">{'>'}</span>
+	<span class="text-terminal-accent font-bold">{'>'}</span>
 	<input
 		type="text"
 		bind:value
@@ -36,7 +36,7 @@
 	<button
 		on:click={handleSubmit}
 		disabled={disabled || !value.trim()}
-		class="text-terminal-green hover:text-terminal-green-bright disabled:text-terminal-dim disabled:cursor-not-allowed transition-colors"
+		class="text-terminal-accent hover:text-terminal-accent-bright disabled:text-terminal-dim disabled:cursor-not-allowed transition-colors"
 	>
 		<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
 			<path

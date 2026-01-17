@@ -4,7 +4,7 @@
 </script>
 
 <div class="h-full overflow-y-auto p-6">
-	<h1 class="text-terminal-green font-bold text-xl mb-6">Settings</h1>
+	<h2 class="text-terminal-accent font-bold text-lg mb-6">Settings</h2>
 
 	<div class="max-w-md space-y-8">
 		<!-- Account Info -->
@@ -43,9 +43,9 @@
 				API keys are configured via environment variables on the server:
 			</p>
 			<ul class="text-terminal-dim text-sm space-y-1">
-				<li><code class="text-terminal-green">ANTHROPIC_API_KEY</code> - Claude</li>
-				<li><code class="text-terminal-green">OPENAI_API_KEY</code> - OpenAI</li>
-				<li><code class="text-terminal-green">GOOGLE_API_KEY</code> - Gemini</li>
+				<li><code class="text-terminal-accent">ANTHROPIC_API_KEY</code> - Claude</li>
+				<li><code class="text-terminal-accent">OPENAI_API_KEY</code> - OpenAI</li>
+				<li><code class="text-terminal-accent">GOOGLE_API_KEY</code> - Gemini</li>
 			</ul>
 		</section>
 
@@ -56,7 +56,7 @@
 				Connected to Snowflake (ANALYTICS_POC.SAAS_DEMO)
 			</p>
 			<p class="text-terminal-dim text-xs mt-2">
-				Configure connection in <code class="text-terminal-green">sources/snowflake_saas/connection.yaml</code>
+				Configure connection in <code class="text-terminal-accent">sources/snowflake_saas/connection.yaml</code>
 			</p>
 		</section>
 	</div>

@@ -13,7 +13,22 @@ from ..database import get_db
 from ..dependencies import get_current_user
 from ..models.dashboard import Dashboard
 from ..models.user import User
+from pydantic import BaseModel
 from ..schemas.dashboard import DashboardListResponse, DashboardResponse
+
+
+class DashboardContentResponse(BaseModel):
+    """Schema for dashboard content response."""
+    slug: str
+    title: str
+    content: str
+    url: str
+
+
+class DashboardContentUpdate(BaseModel):
+    """Schema for updating dashboard content."""
+    content: str
+    title: str | None = None
 
 router = APIRouter(prefix="/dashboards", tags=["dashboards"])
 settings = get_settings()
@@ -71,6 +86,99 @@ async def get_dashboard(
         )
 
     return dashboard_to_response(dashboard)
+
+
+@router.get("/{slug}/content", response_model=DashboardContentResponse)
+async def get_dashboard_content(
+    slug: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Get the raw markdown content of a dashboard."""
+    dashboard = (
+        db.query(Dashboard)
+        .filter(Dashboard.user_id == current_user.id, Dashboard.slug == slug)
+        .first()
+    )
+
+    if not dashboard:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Dashboard not found",
+        )
+
+    file_path = Path(dashboard.file_path)
+    if not file_path.exists():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Dashboard file not found",
+        )
+
+    try:
+        content = file_path.read_text()
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to read dashboard file: {str(e)}",
+        )
+
+    return DashboardContentResponse(
+        slug=dashboard.slug,
+        title=dashboard.title,
+        content=content,
+        url=f"{settings.evidence_base_url}/{dashboard.slug}",
+    )
+
+
+@router.put("/{slug}/content", response_model=DashboardContentResponse)
+async def update_dashboard_content(
+    slug: str,
+    update: DashboardContentUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Update the markdown content of a dashboard."""
+    dashboard = (
+        db.query(Dashboard)
+        .filter(Dashboard.user_id == current_user.id, Dashboard.slug == slug)
+        .first()
+    )
+
+    if not dashboard:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Dashboard not found",
+        )
+
+    file_path = Path(dashboard.file_path)
+
+    try:
+        # Ensure parent directory exists
+        file_path.parent.mkdir(parents=True, exist_ok=True)
+        # Write content
+        file_path.write_text(update.content)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to write dashboard file: {str(e)}",
+        )
+
+    # Update title if provided
+    if update.title:
+        dashboard.title = update.title
+
+    # Update timestamp
+    from datetime import datetime
+    dashboard.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(dashboard)
+
+    return DashboardContentResponse(
+        slug=dashboard.slug,
+        title=dashboard.title,
+        content=update.content,
+        url=f"{settings.evidence_base_url}/{dashboard.slug}",
+    )
 
 
 @router.delete("/{slug}")
