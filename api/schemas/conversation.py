@@ -15,6 +15,13 @@ class MessageRequest(BaseModel):
     session_id: int | None = None  # Optional: send to specific session
 
 
+class ClarifyingOption(BaseModel):
+    """Schema for a clarifying question option."""
+
+    label: str
+    value: str
+
+
 class MessageResponse(BaseModel):
     """Schema for message response."""
 
@@ -24,6 +31,7 @@ class MessageResponse(BaseModel):
     title: str | None = None
     dashboard_url: str | None = None
     dashboard_created: bool = False
+    clarifying_options: list[ClarifyingOption] | None = None
 
 
 class ConversationMessage(BaseModel):

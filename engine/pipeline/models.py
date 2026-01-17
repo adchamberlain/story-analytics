@@ -5,8 +5,13 @@ These models define the structured handoff between pipeline stages,
 ensuring clear contracts and reducing information loss.
 """
 
+from __future__ import annotations
 from dataclasses import dataclass, field
 from enum import Enum
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .feasibility_checker import FeasibilityResult
 
 
 class VisualizationType(Enum):
@@ -70,6 +75,9 @@ class DashboardSpec:
 
     # Original user request (for context)
     original_request: str = ""
+
+    # Feasibility check result (set by pipeline)
+    feasibility_result: FeasibilityResult | None = None
 
     def to_prompt_context(self) -> str:
         """Format the spec for inclusion in an LLM prompt."""
@@ -182,6 +190,9 @@ class PipelineResult:
     validated_queries: ValidatedQueries | None = None
     markdown: str | None = None
     error: str | None = None
+
+    # Feasibility check result (for partial feasibility or failure explanation)
+    feasibility_result: FeasibilityResult | None = None
 
     # Debugging info
     requirements_response: str | None = None

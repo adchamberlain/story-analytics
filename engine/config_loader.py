@@ -25,6 +25,9 @@ class ConfigLoader:
         self._components_cache: dict | None = None
         self._qa_rules_cache: dict | None = None
         self._dialect_cache: dict[str, dict] = {}
+        self._templates_cache: dict | None = None
+        self._suggestions_cache: dict | None = None
+        self._clarifying_cache: dict | None = None
 
     def _load_yaml(self, path: Path) -> dict:
         """Load a YAML file."""
@@ -215,6 +218,100 @@ class ConfigLoader:
         """Check if critical issues should be auto-fixed."""
         rules = self.get_qa_rules()
         return rules.get("critical_issues", {}).get("auto_fix", True)
+
+    # --- Templates ---
+
+    def get_templates(self) -> dict:
+        """Load the dashboard templates configuration."""
+        if self._templates_cache is None:
+            path = self.engine_dir / "templates" / "dashboards.yaml"
+            self._templates_cache = self._load_yaml(path)
+        return self._templates_cache
+
+    def get_templates_by_category(self, category: str | None = None) -> list[dict]:
+        """
+        Get templates, optionally filtered by category.
+
+        Args:
+            category: Category ID (saas, ecommerce, general) or None for all
+
+        Returns:
+            List of template dicts with category info
+        """
+        templates_config = self.get_templates()
+        categories = templates_config.get("categories", [])
+
+        result = []
+        for cat in categories:
+            if category is None or cat.get("id") == category:
+                for template in cat.get("templates", []):
+                    result.append(
+                        {
+                            **template,
+                            "category_id": cat.get("id"),
+                            "category_name": cat.get("name"),
+                        }
+                    )
+
+        return result
+
+    def get_template_categories(self) -> list[dict]:
+        """Get list of template categories."""
+        templates_config = self.get_templates()
+        categories = templates_config.get("categories", [])
+        return [
+            {"id": cat.get("id"), "name": cat.get("name"), "description": cat.get("description")}
+            for cat in categories
+        ]
+
+    # --- Suggestions ---
+
+    def get_suggestions(self) -> dict:
+        """Load the input suggestions configuration."""
+        if self._suggestions_cache is None:
+            path = self.engine_dir / "prompts" / "suggestions.yaml"
+            self._suggestions_cache = self._load_yaml(path)
+        return self._suggestions_cache
+
+    def get_suggestion_list(self) -> list[str]:
+        """Get the list of input placeholder suggestions."""
+        config = self.get_suggestions()
+        return config.get("suggestions", [])
+
+    def get_suggestion_rotation_interval(self) -> int:
+        """Get the suggestion rotation interval in milliseconds."""
+        config = self.get_suggestions()
+        return config.get("rotation_interval", 5000)
+
+    # --- Clarifying Questions ---
+
+    def get_clarifying_config(self) -> dict:
+        """Load the clarifying questions configuration."""
+        if self._clarifying_cache is None:
+            path = self.engine_dir / "prompts" / "clarifying.yaml"
+            self._clarifying_cache = self._load_yaml(path)
+        return self._clarifying_cache
+
+    def is_clarifying_enabled(self) -> bool:
+        """Check if clarifying questions are enabled."""
+        config = self.get_clarifying_config()
+        return config.get("enabled", True)
+
+    def get_clarifying_phases(self) -> list[str]:
+        """Get the phases where clarifying questions are allowed."""
+        config = self.get_clarifying_config()
+        return config.get("phases", ["intent", "context"])
+
+    def get_vague_threshold(self) -> int:
+        """Get the word count threshold for considering input vague."""
+        config = self.get_clarifying_config()
+        return config.get("vague_threshold", 10)
+
+    def get_clarifying_prompt(self) -> str:
+        """Get the clarifying question prompt for the LLM."""
+        config = self.get_clarifying_config()
+        template = config.get("prompt", "")
+        return template.format(vague_threshold=self.get_vague_threshold())
 
 
 # Global instance

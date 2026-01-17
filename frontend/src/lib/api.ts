@@ -9,7 +9,12 @@ import type {
 	MessageResponse,
 	Dashboard,
 	DashboardList,
-	ProvidersResponse
+	ProvidersResponse,
+	TemplatesResponse,
+	CategoriesResponse,
+	SchemaInfo,
+	SuggestionsResponse,
+	BusinessType
 } from './types';
 
 const API_BASE = 'http://localhost:8000/api';
@@ -114,10 +119,15 @@ export async function getMe(): Promise<User> {
 	return handleResponse<User>(response);
 }
 
-export async function updatePreferences(preferred_provider: string): Promise<User> {
+export interface UserPreferencesUpdate {
+	preferred_provider?: string;
+	business_type?: BusinessType;
+}
+
+export async function updatePreferences(preferences: UserPreferencesUpdate): Promise<User> {
 	const response = await fetchWithAuth('/auth/preferences', {
 		method: 'PUT',
-		body: JSON.stringify({ preferred_provider })
+		body: JSON.stringify(preferences)
 	});
 	return handleResponse<User>(response);
 }
@@ -230,4 +240,34 @@ export async function getProviders(): Promise<ProvidersResponse> {
  */
 export function isAuthenticated(): boolean {
 	return !!getToken();
+}
+
+// Template endpoints
+
+export async function getTemplates(category?: string): Promise<TemplatesResponse> {
+	const url = category ? `/templates?category=${encodeURIComponent(category)}` : '/templates';
+	const response = await fetchWithAuth(url);
+	return handleResponse<TemplatesResponse>(response);
+}
+
+export async function getAllTemplates(): Promise<TemplatesResponse> {
+	const response = await fetchWithAuth('/templates/all');
+	return handleResponse<TemplatesResponse>(response);
+}
+
+export async function getTemplateCategories(): Promise<CategoriesResponse> {
+	const response = await fetchWithAuth('/templates/categories');
+	return handleResponse<CategoriesResponse>(response);
+}
+
+export async function getSuggestions(): Promise<SuggestionsResponse> {
+	const response = await fetchWithAuth('/templates/suggestions');
+	return handleResponse<SuggestionsResponse>(response);
+}
+
+// Schema endpoints
+
+export async function getSourceSchema(sourceName: string): Promise<SchemaInfo> {
+	const response = await fetchWithAuth(`/sources/${encodeURIComponent(sourceName)}/schema`);
+	return handleResponse<SchemaInfo>(response);
 }

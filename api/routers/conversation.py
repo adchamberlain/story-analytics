@@ -19,6 +19,7 @@ from ..models.dashboard import Dashboard
 from ..models.session import ConversationSession
 from ..models.user import User
 from ..schemas.conversation import (
+    ClarifyingOption,
     ConversationListResponse,
     ConversationMessage,
     ConversationSessionResponse,
@@ -173,8 +174,10 @@ async def send_message(
         # Track if this is the first message
         is_first_message = len(session.messages) == 0
 
-        # Process the message (returns response string, modifies manager.state in place)
-        response_text = manager.process_message(request.message)
+        # Process the message (returns ConversationResult, modifies manager.state in place)
+        result = manager.process_message(request.message)
+        response_text = result.response
+        clarifying_options = result.clarifying_options
 
         # Save updated state back to database
         save_manager_state(manager, session)
@@ -226,6 +229,14 @@ async def send_message(
                 session.title = title
                 db.commit()
 
+        # Convert clarifying options to API schema format
+        api_clarifying_options = None
+        if clarifying_options:
+            api_clarifying_options = [
+                ClarifyingOption(label=opt.label, value=opt.value)
+                for opt in clarifying_options
+            ]
+
         return MessageResponse(
             response=response_text,
             phase=session.phase,
@@ -233,6 +244,7 @@ async def send_message(
             title=session.title,
             dashboard_url=dashboard_url,
             dashboard_created=dashboard_created,
+            clarifying_options=api_clarifying_options,
         )
 
     except ImportError as e:

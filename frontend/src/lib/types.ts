@@ -7,8 +7,11 @@ export interface User {
 	email: string;
 	name: string;
 	preferred_provider: string;
+	business_type: BusinessType;
 	created_at: string;
 }
+
+export type BusinessType = 'saas' | 'ecommerce' | 'general';
 
 export interface Token {
 	access_token: string;
@@ -44,6 +47,12 @@ export interface ConversationListResponse {
 	conversations: ConversationSummary[];
 }
 
+// Clarifying question types
+export interface ClarifyingOption {
+	label: string;
+	value: string;
+}
+
 export interface MessageResponse {
 	response: string;
 	phase: string;
@@ -51,6 +60,7 @@ export interface MessageResponse {
 	title: string | null;
 	dashboard_url: string | null;
 	dashboard_created: boolean;
+	clarifying_options: ClarifyingOption[] | null;
 }
 
 export interface Dashboard {
@@ -80,4 +90,55 @@ export interface ProvidersResponse {
 
 export interface ApiError {
 	detail: string;
+}
+
+// Template types
+export interface Template {
+	id: string;
+	name: string;
+	icon: string;
+	description: string;
+	prompt: string;
+	category_id: string;
+	category_name: string;
+}
+
+export interface TemplatesResponse {
+	templates: Template[];
+	total: number;
+}
+
+export interface TemplateCategory {
+	id: string;
+	name: string;
+	description: string | null;
+}
+
+export interface CategoriesResponse {
+	categories: TemplateCategory[];
+}
+
+// Schema types
+export interface ColumnInfo {
+	name: string;
+	type: string;
+	nullable: boolean;
+}
+
+export interface TableInfo {
+	name: string;
+	columns: ColumnInfo[];
+}
+
+export interface SchemaInfo {
+	source: string;
+	database: string;
+	schema: string;
+	tables: TableInfo[];
+}
+
+// Suggestions types
+export interface SuggestionsResponse {
+	suggestions: string[];
+	rotation_interval: number;
 }

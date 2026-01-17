@@ -2,30 +2,24 @@
 Conversation manager for dashboard creation and editing.
 
 Orchestrates the multi-phase conversation flow between user and LLM.
-
-Supports two generation modes:
-- "monolithic": Original single-prompt approach (default for backwards compatibility)
-- "pipeline": Decomposed three-stage pipeline (requirements -> SQL -> layout)
-
-The pipeline mode breaks dashboard creation into focused stages, giving each
-agent specialized prompts and reducing "guardrail creep".
+Uses the pipeline architecture with intelligent orchestration for
+dashboard generation.
 """
 
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from .config import get_config
 from .config_loader import get_config_loader
 from .generator import create_dashboard_from_markdown
-from .llm.base import LLMResponse, Message
+from .llm.base import Message
 from .llm.claude import get_provider
-from .parser import DashboardParser, ParsedDashboard
+from .parser import DashboardParser
 from .pipeline import DashboardPipeline, PipelineConfig
 from .qa import DashboardQA, QAResult, run_qa_with_auto_fix
 from .schema import get_schema_context
-from .sql_validator import validate_dashboard_sql, ValidationReport
 
 
 class ConversationPhase(Enum):
@@ -35,6 +29,22 @@ class ConversationPhase(Enum):
     CONTEXT = "context"  # What decision should this help make?
     GENERATION = "generation"  # Generate the dashboard
     REFINEMENT = "refinement"  # Iterate on feedback
+
+
+@dataclass
+class ClarifyingOption:
+    """A single clarifying question option."""
+
+    label: str
+    value: str
+
+
+@dataclass
+class ConversationResult:
+    """Result from processing a message."""
+
+    response: str
+    clarifying_options: list[ClarifyingOption] | None = None
 
 
 @dataclass
@@ -55,18 +65,10 @@ class ConversationState:
     validated_queries: Any | None = None  # ValidatedQueries from pipeline
 
 
-# System prompts are now loaded from YAML config files
-# See engine/prompts/ directory for customizable prompt templates
-
-
 class ConversationManager:
     """Manages the conversation flow for dashboard creation/editing."""
 
-    def __init__(
-        self,
-        provider_name: str | None = None,
-        generation_mode: str = "pipeline",  # "monolithic" or "pipeline"
-    ):
+    def __init__(self, provider_name: str | None = None):
         self.config = get_config()
         self.config_loader = get_config_loader()
         self.llm = get_provider(provider_name)
@@ -75,18 +77,15 @@ class ConversationManager:
         self.state = ConversationState()
         self._schema_context: str | None = None
         self._default_source = "snowflake_saas"  # TODO: make configurable
-        self._generation_mode = generation_mode
 
-        # Initialize pipeline if using pipeline mode
-        self._pipeline: DashboardPipeline | None = None
-        if generation_mode == "pipeline":
-            self._pipeline = DashboardPipeline(PipelineConfig(
-                provider_name=provider_name,
-                verbose=True,
-            ))
+        # Initialize the pipeline with orchestration
+        self._pipeline = DashboardPipeline(PipelineConfig(
+            provider_name=provider_name,
+            verbose=True,
+        ))
 
         print(f"[LLM] Using provider: {self.llm.name}, model: {self.llm.model}")
-        print(f"[Mode] Generation mode: {generation_mode}")
+        print(f"[Mode] Generation mode: pipeline")
 
     def reset(self):
         """Reset conversation state."""
@@ -97,6 +96,68 @@ class ConversationManager:
         if self._schema_context is None:
             self._schema_context = get_schema_context()
         return self._schema_context
+
+    def _is_vague_input(self, user_input: str) -> bool:
+        """Check if the user input is vague (below word threshold)."""
+        if not self.config_loader.is_clarifying_enabled():
+            return False
+
+        threshold = self.config_loader.get_vague_threshold()
+        word_count = len(user_input.split())
+        return word_count < threshold
+
+    def _should_ask_clarifying(self) -> bool:
+        """Check if we're in a phase where clarifying questions are allowed."""
+        if not self.config_loader.is_clarifying_enabled():
+            return False
+
+        allowed_phases = self.config_loader.get_clarifying_phases()
+        return self.state.phase.value in allowed_phases
+
+    def _parse_clarifying_options(self, response: str) -> tuple[str, list[ClarifyingOption] | None]:
+        """
+        Parse clarifying question and options from LLM response.
+
+        Expected format:
+        [CLARIFYING_QUESTION]
+        Question text here?
+        [OPTIONS]
+        - Option 1
+        - Option 2
+        [/CLARIFYING_QUESTION]
+
+        Returns:
+            Tuple of (cleaned response, list of options or None)
+        """
+        import re
+
+        # Check if response contains clarifying question markup
+        pattern = r'\[CLARIFYING_QUESTION\](.*?)\[OPTIONS\](.*?)\[/CLARIFYING_QUESTION\]'
+        match = re.search(pattern, response, re.DOTALL)
+
+        if not match:
+            return response, None
+
+        question_text = match.group(1).strip()
+        options_text = match.group(2).strip()
+
+        # Parse options (lines starting with -)
+        options = []
+        for line in options_text.split('\n'):
+            line = line.strip()
+            if line.startswith('- '):
+                option_text = line[2:].strip()
+                if option_text:
+                    options.append(ClarifyingOption(
+                        label=option_text,
+                        value=option_text
+                    ))
+
+        # Clean the response - remove the markup and keep the question
+        cleaned_response = response[:match.start()] + question_text + response[match.end():]
+        cleaned_response = cleaned_response.strip()
+
+        return cleaned_response, options if options else None
 
     def get_full_user_request(self) -> str:
         """
@@ -134,7 +195,7 @@ class ConversationManager:
 
         return self.state.original_request or user_messages[0] if user_messages else ""
 
-    def get_system_prompt(self) -> str:
+    def get_system_prompt(self, include_clarifying: bool = False) -> str:
         """Get the appropriate system prompt for current phase."""
         # Build base prompt from config
         base_prompt = self.config_loader.get_base_prompt()
@@ -152,6 +213,11 @@ class ConversationManager:
         components_prompt = self.config_loader.get_components_prompt()
         base_prompt += f"\n\n{components_prompt}"
 
+        # Add clarifying question instructions if needed
+        if include_clarifying and self._should_ask_clarifying():
+            clarifying_prompt = self.config_loader.get_clarifying_prompt()
+            base_prompt += f"\n\n{clarifying_prompt}"
+
         # Add phase-specific prompt
         if self.state.intent == "edit" and self.state.target_dashboard:
             # Load dashboard content for edit mode
@@ -167,7 +233,7 @@ class ConversationManager:
 
         return base_prompt + "\n\n" + self.config_loader.get_create_prompt()
 
-    def process_message(self, user_input: str) -> str:
+    def process_message(self, user_input: str) -> ConversationResult:
         """
         Process a user message and return the assistant's response.
 
@@ -175,20 +241,28 @@ class ConversationManager:
             user_input: The user's message.
 
         Returns:
-            The assistant's response.
+            ConversationResult with response and optional clarifying options.
         """
         # Add user message to history
         self.state.messages.append(Message(role="user", content=user_input))
 
         # Handle based on current phase
         if self.state.phase == ConversationPhase.INTENT:
-            return self._handle_intent_phase(user_input)
+            response = self._handle_intent_phase(user_input)
         elif self.state.phase == ConversationPhase.GENERATION:
-            return self._handle_generation_phase(user_input)
+            response = self._handle_generation_phase(user_input)
         elif self.state.phase == ConversationPhase.REFINEMENT:
-            return self._handle_refinement_phase(user_input)
+            response = self._handle_refinement_phase(user_input)
         else:
-            return self._handle_conversation_phase(user_input)
+            response = self._handle_conversation_phase(user_input)
+
+        # Parse any clarifying options from the response
+        cleaned_response, clarifying_options = self._parse_clarifying_options(response)
+
+        return ConversationResult(
+            response=cleaned_response,
+            clarifying_options=clarifying_options
+        )
 
     def _handle_intent_phase(self, user_input: str) -> str:
         """Determine if user wants to create or edit."""
@@ -238,18 +312,19 @@ class ConversationManager:
             return self._generate_dashboard()
 
         # Update original_request if user provides more detailed info
-        # (the original_request should capture what the user actually wants, not just "create a dashboard")
         if len(user_input.split()) > 5 and not self.state.original_request:
             self.state.original_request = user_input
         elif len(user_input.split()) > 10:
             # If user provides a longer, more detailed request, update it
-            # This helps when user refines their request during conversation
             self.state.original_request = user_input
+
+        # Determine if we should include clarifying question instructions
+        include_clarifying = self._is_vague_input(user_input) and self._should_ask_clarifying()
 
         # Regular conversation - send to LLM
         response = self.llm.generate(
             messages=self.state.messages,
-            system_prompt=self.get_system_prompt(),
+            system_prompt=self.get_system_prompt(include_clarifying=include_clarifying),
             temperature=0.7,
         )
 
@@ -285,16 +360,7 @@ class ConversationManager:
         return self._generate_dashboard()
 
     def _generate_dashboard(self) -> str:
-        """Generate the actual dashboard markdown."""
-        # Use pipeline mode if enabled
-        if self._generation_mode == "pipeline" and self._pipeline:
-            return self._generate_dashboard_pipeline()
-
-        # Otherwise use monolithic mode
-        return self._generate_dashboard_monolithic()
-
-    def _generate_dashboard_pipeline(self) -> str:
-        """Generate dashboard using the decomposed pipeline."""
+        """Generate the dashboard using the pipeline with orchestration."""
         # Get the original request from conversation
         user_request = self.state.original_request or ""
 
@@ -307,12 +373,21 @@ class ConversationManager:
 
         print(f"[Pipeline] Starting generation for: {user_request[:100]}...")
 
-        # Run the pipeline
+        # Run the pipeline (includes orchestration and validation)
         result = self._pipeline.run(user_request)
 
         if not result.success:
-            error_msg = f"Pipeline failed: {result.error}"
-            print(f"[Pipeline] {error_msg}")
+            # Check if this is a feasibility issue
+            if result.feasibility_result and not result.feasibility_result.feasible:
+                error_msg = self._format_infeasibility_message(result.feasibility_result)
+            elif result.feasibility_result and not result.feasibility_result.fully_feasible:
+                # Partially feasible - pipeline still failed for other reasons
+                error_msg = f"Pipeline failed: {result.error}\n\n"
+                error_msg += self._format_partial_feasibility_message(result.feasibility_result)
+            else:
+                error_msg = f"Pipeline failed: {result.error}"
+
+            print(f"[Pipeline] {error_msg[:200]}...")
             self.state.messages.append(Message(role="assistant", content=error_msg))
             return error_msg
 
@@ -332,7 +407,7 @@ class ConversationManager:
 
         self.state.dashboard_title = title
 
-        # Write the dashboard and run QA (same as monolithic)
+        # Write the dashboard and run QA
         return self._finalize_dashboard(markdown, title)
 
     def _finalize_dashboard(self, markdown: str, title: str) -> str:
@@ -414,167 +489,6 @@ Here's what I created:
 
         self.state.messages.append(Message(role="assistant", content=result))
         return result
-
-    def _generate_dashboard_monolithic(self) -> str:
-        """Generate dashboard using the original monolithic approach."""
-        # Extract the proposal from the last assistant message
-        proposal = ""
-        for msg in reversed(self.state.messages):
-            if msg.role == "assistant" and ("```sql" in msg.content or "SQL QUERIES" in msg.content.upper()):
-                proposal = msg.content
-                break
-
-        # Ask LLM to generate complete dashboard, anchored to the proposal
-        if proposal:
-            generation_prompt = f"""Generate the EXACT dashboard you proposed. Do NOT deviate from the proposal.
-
-YOUR PROPOSAL:
-{proposal}
-
-CRITICAL INSTRUCTIONS:
-- Implement EXACTLY what you proposed above - same SQL queries, same visualizations
-- Do NOT generate a generic "data source overview" or schema exploration dashboard
-- Do NOT query information_schema or list table schemas
-- Generate ONLY what the user requested and what you proposed
-
-Output ONLY the markdown content, starting with # Title.
-Use the snowflake_saas source for all queries."""
-        else:
-            generation_prompt = """Based on our conversation, generate a complete Evidence markdown dashboard.
-
-CRITICAL: Do NOT generate a generic "data source overview" or schema exploration dashboard.
-Generate ONLY what the user specifically requested.
-
-Output ONLY the markdown content, starting with # Title.
-Include all necessary SQL queries and visualizations.
-Make sure all SQL queries reference the correct table names from the schema.
-Use the snowflake_saas source for all queries."""
-
-        self.state.messages.append(Message(role="user", content=generation_prompt))
-
-        response = self.llm.generate(
-            messages=self.state.messages,
-            system_prompt=self.get_system_prompt(),
-            temperature=0.3,  # Lower temperature for more consistent output
-            max_tokens=4096,
-        )
-
-        markdown = response.content
-
-        # Clean up markdown (remove code fences if LLM wrapped it)
-        markdown = self._clean_markdown(markdown)
-
-        # Validate that generation matches the proposal (prevent hallucinated dashboards)
-        if proposal:
-            max_proposal_fix_attempts = 2
-            for attempt in range(max_proposal_fix_attempts):
-                proposal_issues = self._validate_generation_matches_proposal(markdown, proposal)
-                if not proposal_issues:
-                    break  # Generation matches proposal
-
-                print(f"[VALIDATION] Generation doesn't match proposal (attempt {attempt + 1}/{max_proposal_fix_attempts})")
-                for issue in proposal_issues:
-                    print(f"[VALIDATION]   - {issue}")
-
-                if attempt >= max_proposal_fix_attempts - 1:
-                    print("[VALIDATION] Max attempts reached, proceeding with current output")
-                    break
-
-                # Ask LLM to regenerate following the proposal
-                regen_prompt = f"""CRITICAL ERROR: Your generated dashboard does NOT match your proposal.
-
-Issues found:
-{chr(10).join(f'- {issue}' for issue in proposal_issues)}
-
-You MUST regenerate the dashboard to match EXACTLY what you proposed:
-
-YOUR PROPOSAL:
-{proposal}
-
-IMPORTANT:
-- Generate the EXACT visualizations you proposed (e.g., if you proposed an AreaChart, include an AreaChart)
-- Query the EXACT tables you proposed (e.g., snowflake_saas.invoices)
-- Do NOT generate a generic "data source overview" or schema explorer
-- Do NOT query information_schema
-
-Output ONLY the corrected markdown, starting with # Title."""
-
-                self.state.messages.append(Message(role="user", content=regen_prompt))
-
-                response = self.llm.generate(
-                    messages=self.state.messages,
-                    system_prompt=self.get_system_prompt(),
-                    temperature=0.2,
-                    max_tokens=4096,
-                )
-
-                markdown = self._clean_markdown(response.content)
-
-        # SQL Pre-validation: Test queries against DuckDB before writing
-        max_sql_fix_attempts = 3
-        sql_fix_attempts = 0
-
-        while sql_fix_attempts < max_sql_fix_attempts:
-            validation = validate_dashboard_sql(markdown)
-
-            if validation.valid:
-                print(f"[SQL] All queries valid after {sql_fix_attempts} fix attempt(s)")
-                break  # All SQL is valid, proceed
-
-            sql_fix_attempts += 1
-            print(f"[SQL] Validation failed (attempt {sql_fix_attempts}/{max_sql_fix_attempts}): {validation.error_count} error(s)")
-            for err in validation.errors:
-                print(f"[SQL]   - {err.query_name}: {err.error[:100]}...")
-
-            if sql_fix_attempts >= max_sql_fix_attempts:
-                # Max attempts reached, proceed anyway (QA will catch it)
-                print(f"[SQL] Max fix attempts reached, proceeding with errors")
-                break
-
-            # Ask LLM to fix the SQL errors
-            fix_prompt = f"""The dashboard has SQL errors that must be fixed before it can be created.
-
-{validation.format_errors()}
-
-⚠️ CRITICAL - Evidence uses DuckDB, NOT Snowflake/PostgreSQL/MySQL!
-FORBIDDEN FUNCTIONS (will cause errors):
-- DATEADD() → Use: date_column + INTERVAL '12 months' or CURRENT_DATE - INTERVAL '30 days'
-- DATEDIFF() → Use: DATE_DIFF('day', date1, date2)
-- TO_CHAR() → Use: STRFTIME(date_column, '%Y-%m')
-- NVL() → Use: COALESCE(column, default)
-- IFF() → Use: CASE WHEN condition THEN x ELSE y END
-
-CORRECT DATE FILTERING:
-- Last 12 months: WHERE signup_date >= CURRENT_DATE - INTERVAL '12 months'
-- Last 30 days: WHERE created_at >= CURRENT_DATE - INTERVAL '30 days'
-
-Please regenerate the COMPLETE dashboard markdown with ALL SQL errors fixed.
-Output ONLY the corrected markdown, starting with # Title."""
-
-            self.state.messages.append(Message(role="user", content=fix_prompt))
-
-            response = self.llm.generate(
-                messages=self.state.messages,
-                system_prompt=self.get_system_prompt(),
-                temperature=0.2,  # Even lower temperature for fixes
-                max_tokens=4096,
-            )
-
-            markdown = self._clean_markdown(response.content)
-
-        self.state.generated_markdown = markdown
-
-        # Extract title for filename
-        title_match = markdown.split("\n")[0]
-        if title_match.startswith("#"):
-            title = title_match.lstrip("#").strip()
-        else:
-            title = "generated-dashboard"
-
-        self.state.dashboard_title = title
-
-        # Use shared finalization logic
-        return self._finalize_dashboard(markdown, title)
 
     def _handle_refinement_phase(self, user_input: str) -> str:
         """Handle refinement requests after initial generation."""
@@ -672,63 +586,6 @@ What else would you like to change?"""
 
         return "\n".join(lines) if lines else "- Dashboard content generated"
 
-    def _clean_markdown(self, markdown: str) -> str:
-        """Clean up markdown by removing code fences if LLM wrapped it."""
-        if markdown.startswith("```markdown"):
-            markdown = markdown[len("```markdown"):].strip()
-        if markdown.startswith("```"):
-            markdown = markdown[3:].strip()
-        if markdown.endswith("```"):
-            markdown = markdown[:-3].strip()
-        return markdown
-
-    def _validate_generation_matches_proposal(self, markdown: str, proposal: str) -> list[str]:
-        """
-        Validate that generated markdown matches the proposal.
-
-        Returns a list of issues found (empty if validation passes).
-        """
-        issues = []
-
-        # Check for generic "data source overview" dashboards (the main bug we're fixing)
-        bad_patterns = [
-            "data source overview",
-            "data sources overview",
-            "available tables",
-            "table schemas",
-            "information_schema",
-        ]
-        markdown_lower = markdown.lower()
-        for pattern in bad_patterns:
-            if pattern in markdown_lower:
-                issues.append(f"Generated dashboard contains '{pattern}' - this looks like a generic schema explorer, not the requested dashboard")
-
-        # Extract expected chart types from proposal
-        proposal_lower = proposal.lower()
-        expected_charts = []
-        if "areachart" in proposal_lower:
-            expected_charts.append("AreaChart")
-        if "barchart" in proposal_lower:
-            expected_charts.append("BarChart")
-        if "linechart" in proposal_lower:
-            expected_charts.append("LineChart")
-
-        # Check that expected chart types are present in output
-        for chart in expected_charts:
-            if f"<{chart}" not in markdown:
-                issues.append(f"Proposal included {chart} but generated markdown does not contain it")
-
-        # Extract key table names from proposal SQL and check they're in output
-        import re
-        proposal_tables = set(re.findall(r'FROM\s+(\w+\.\w+)', proposal, re.IGNORECASE))
-        if proposal_tables:
-            output_tables = set(re.findall(r'FROM\s+(\w+\.\w+)', markdown, re.IGNORECASE))
-            missing_tables = proposal_tables - output_tables
-            if missing_tables:
-                issues.append(f"Proposal queried tables {missing_tables} but they're missing from generated output")
-
-        return issues
-
     def _run_qa_validation(self, dashboard_slug: str) -> QAResult | None:
         """
         Run QA validation on a generated dashboard.
@@ -757,44 +614,6 @@ What else would you like to change?"""
                 critical_issues=[],
                 suggestions=[],
             )
-
-    def _auto_fix_issues(self, critical_issues: list[str]) -> str:
-        """
-        Automatically fix critical issues in the dashboard.
-
-        Args:
-            critical_issues: List of critical issues to fix.
-
-        Returns:
-            Updated markdown content.
-        """
-        current_content = self.state.created_file.read_text()
-
-        # Get fix prompt from config
-        fix_prompt = self.config_loader.get_qa_auto_fix_prompt(
-            issues=critical_issues,
-            current_content=current_content
-        )
-
-        self.state.messages.append(Message(role="user", content=fix_prompt))
-
-        response = self.llm.generate(
-            messages=self.state.messages,
-            system_prompt=self.get_system_prompt(),
-            temperature=0.3,
-        )
-
-        new_markdown = response.content
-
-        # Clean up markdown fences
-        if new_markdown.startswith("```markdown"):
-            new_markdown = new_markdown[len("```markdown"):].strip()
-        if new_markdown.startswith("```"):
-            new_markdown = new_markdown.split("\n", 1)[1] if "\n" in new_markdown else new_markdown[3:]
-        if new_markdown.endswith("```"):
-            new_markdown = new_markdown.rsplit("```", 1)[0]
-
-        return new_markdown.strip()
 
     def _format_qa_result(self, result: QAResult, auto_fix_attempted: bool = False, fixed_issues: list[str] = None) -> str:
         """Format QA result for display to user.
@@ -842,6 +661,46 @@ What else would you like to change?"""
 
         return output
 
+    def _format_infeasibility_message(self, feasibility) -> str:
+        """Format a user-friendly message when the request is not feasible."""
+        msg = "⚠️ **Cannot build this dashboard**\n\n"
+        msg += f"{feasibility.explanation}\n\n"
+
+        if feasibility.infeasible_parts:
+            msg += "**What's missing:**\n"
+            for part in feasibility.infeasible_parts[:5]:
+                msg += f"  • {part}\n"
+            msg += "\n"
+
+        if feasibility.suggested_alternative:
+            msg += f"**What I can build instead:**\n{feasibility.suggested_alternative}\n\n"
+            msg += "Would you like me to build the alternative dashboard, or would you like to describe something else?"
+        else:
+            msg += "Please describe a different dashboard that works with your available data."
+
+        return msg
+
+    def _format_partial_feasibility_message(self, feasibility) -> str:
+        """Format a message about partial feasibility."""
+        msg = "**Note about your data:**\n\n"
+
+        if feasibility.feasible_parts:
+            msg += "✓ **Can build:**\n"
+            for part in feasibility.feasible_parts[:3]:
+                msg += f"  • {part}\n"
+            msg += "\n"
+
+        if feasibility.infeasible_parts:
+            msg += "✗ **Cannot build (data not available):**\n"
+            for part in feasibility.infeasible_parts[:3]:
+                msg += f"  • {part}\n"
+            msg += "\n"
+
+        if feasibility.suggested_alternative:
+            msg += f"**Suggestion:** {feasibility.suggested_alternative}"
+
+        return msg
+
     def select_dashboard_for_edit(self, dashboard_name: str) -> str:
         """Select a dashboard for editing."""
         dashboards = self.parser.list_dashboards()
@@ -862,15 +721,11 @@ What else would you like to change?"""
         return f"Dashboard '{dashboard_name}' not found. Please try again."
 
 
-def create_conversation(generation_mode: str = "pipeline") -> ConversationManager:
+def create_conversation() -> ConversationManager:
     """
     Create a new conversation manager.
-
-    Args:
-        generation_mode: "pipeline" (default) for decomposed generation,
-                        "monolithic" for original single-prompt approach.
 
     Returns:
         A new ConversationManager instance.
     """
-    return ConversationManager(generation_mode=generation_mode)
+    return ConversationManager()

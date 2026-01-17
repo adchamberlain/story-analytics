@@ -29,6 +29,7 @@ class UserResponse(BaseModel):
     email: str
     name: str
     preferred_provider: str
+    business_type: str
     created_at: datetime
 
     class Config:
@@ -39,6 +40,7 @@ class UserPreferences(BaseModel):
     """Schema for updating user preferences."""
 
     preferred_provider: str | None = None
+    business_type: str | None = None
 
 
 class Token(BaseModel):

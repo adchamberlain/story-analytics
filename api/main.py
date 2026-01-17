@@ -13,7 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .config import get_settings
 from .database import create_tables
-from .routers import auth_router, conversation_router, dashboards_router
+from .routers import auth_router, conversation_router, dashboards_router, templates_router
 from .routers.sources import router as sources_router
 
 settings = get_settings()
@@ -39,6 +39,7 @@ app.include_router(auth_router, prefix="/api")
 app.include_router(conversation_router, prefix="/api")
 app.include_router(dashboards_router, prefix="/api")
 app.include_router(sources_router, prefix="/api")
+app.include_router(templates_router, prefix="/api")
 
 
 @app.on_event("startup")
