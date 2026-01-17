@@ -1,37 +1,37 @@
 # Subscription Overview Dashboard
 
-This dashboard provides an overview of subscription growth and revenue, broken down by plan tier and time period. It helps Sales, Marketing, and Finance teams understand key subscription metrics.
+A high-level overview of subscription metrics, including active subscriptions, MRR, ARPU, and subscription trends.
 
-```sql total_active_subscriptions
-SELECT COUNT(SUBSCRIPTION_ID) AS total_active_subscriptions FROM snowflake_saas.subscriptions WHERE CHURN_DATE IS NULL
+```sql active_subscriptions
+SELECT COUNT(SUBSCRIPTION_ID) AS active_subscriptions FROM snowflake_saas.subscriptions WHERE CHURN_DATE IS NULL
 ```
 
-<BigValue data={total_active_subscriptions} value="total_active_subscriptions" title="Total Active Subscriptions" fmt="num0" />
+<BigValue data={active_subscriptions} value="active_subscriptions" title="Active Subscriptions" fmt="num0" />
 
-## Subscription Growth Trends
+```sql monthly_recurring_revenue
+SELECT SUM(MRR) AS total_mrr FROM snowflake_saas.subscriptions WHERE CHURN_DATE IS NULL
+```
+
+<BigValue data={monthly_recurring_revenue} value="total_mrr" title="Monthly Recurring Revenue" fmt="usd0" />
+
+```sql average_revenue_per_user
+SELECT AVG(MRR) AS arpu FROM snowflake_saas.subscriptions WHERE CHURN_DATE IS NULL
+```
+
+<BigValue data={average_revenue_per_user} value="arpu" title="Average Revenue Per User" fmt="usd" />
+
+## Subscription Trends
 
 ```sql new_subscriptions_by_month
-SELECT STRFTIME(START_DATE, '%Y-%m') AS month, COUNT(SUBSCRIPTION_ID) AS new_subscriptions FROM snowflake_saas.subscriptions WHERE START_DATE >= DATE(DATE('now'), '-12 months') GROUP BY month ORDER BY month
+SELECT STRFTIME(START_DATE, '%Y-%m') AS subscription_month, COUNT(SUBSCRIPTION_ID) AS new_subscriptions FROM snowflake_saas.subscriptions GROUP BY subscription_month ORDER BY subscription_month
 ```
 
-<LineChart data={new_subscriptions_by_month} x="month" y="new_subscriptions" title="New Subscriptions Over Time" />
+<LineChart data={new_subscriptions_by_month} x="subscription_month" y="new_subscriptions" title="New Subscriptions by Month" />
 
-```sql mrr_trend_by_month
-SELECT STRFTIME(START_DATE, '%Y-%m') AS month, SUM(MRR) AS total_mrr FROM snowflake_saas.subscriptions WHERE START_DATE >= DATE(DATE('now'), '-12 months') AND CHURN_DATE IS NULL GROUP BY month ORDER BY month
-```
+## Subscription Distribution
 
-<LineChart data={mrr_trend_by_month} x="month" y="total_mrr" title="Monthly Recurring Revenue (MRR) Trend" />
-
-## Revenue and Subscription Breakdown
-
-```sql arpu_by_plan_tier
-SELECT PLAN_TIER, AVG(MRR) AS average_revenue_per_user FROM snowflake_saas.subscriptions WHERE CHURN_DATE IS NULL GROUP BY PLAN_TIER ORDER BY average_revenue_per_user DESC
-```
-
-<BarChart data={arpu_by_plan_tier} x="plan_tier" y="average_revenue_per_user" title="Average Revenue Per User (ARPU) by Plan Tier" />
-
-```sql subscription_distribution_by_plan_tier
+```sql subscription_distribution_by_plan
 SELECT PLAN_TIER, COUNT(SUBSCRIPTION_ID) AS subscription_count FROM snowflake_saas.subscriptions GROUP BY PLAN_TIER ORDER BY subscription_count DESC
 ```
 
-<BarChart data={subscription_distribution_by_plan_tier} x="plan_tier" y="subscription_count" title="Subscription Distribution by Plan Tier" />
+<BarChart data={subscription_distribution_by_plan} x="plan_tier" y="subscription_count" title="Subscription Distribution by Plan" />
