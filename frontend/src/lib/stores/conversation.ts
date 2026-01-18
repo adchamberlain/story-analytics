@@ -3,7 +3,7 @@
  */
 
 import { writable, get } from 'svelte/store';
-import type { Message, ConversationSummary, ClarifyingOption, ActionButton } from '../types';
+import type { Message, ConversationSummary, ClarifyingOption, ActionButton, QAResult } from '../types';
 import {
 	sendMessage as apiSendMessage,
 	getConversation,
@@ -14,10 +14,12 @@ import {
 } from '../api';
 import { loadDashboards } from './dashboards';
 
-// Extended message type with clarifying options and action buttons
+// Extended message type with clarifying options, action buttons, and QA result
 export interface ExtendedMessage extends Message {
 	clarifying_options?: ClarifyingOption[] | null;
 	action_buttons?: ActionButton[] | null;
+	qa_result?: QAResult | null;
+	error_context?: string | null;
 }
 
 // Current session ID
@@ -35,8 +37,14 @@ export const phase = writable<string>('intent');
 // Loading state
 export const conversationLoading = writable<boolean>(false);
 
-// Last created dashboard
-export const lastDashboard = writable<{ url: string; created: boolean } | null>(null);
+// Last created dashboard with QA results
+export interface LastDashboardInfo {
+	url: string;
+	slug: string | null;
+	created: boolean;
+	qa_result: QAResult | null;
+}
+export const lastDashboard = writable<LastDashboardInfo | null>(null);
 
 // List of all conversations
 export const conversationList = writable<ConversationSummary[]>([]);
@@ -107,25 +115,29 @@ export async function sendMessage(content: string): Promise<string> {
 			currentTitle.set(response.title);
 		}
 
-		// Add assistant response with clarifying options and action buttons
+		// Add assistant response with clarifying options, action buttons, and QA result
 		messages.update((msgs) => [
 			...msgs,
 			{
 				role: 'assistant',
 				content: response.response,
 				clarifying_options: response.clarifying_options,
-				action_buttons: response.action_buttons
+				action_buttons: response.action_buttons,
+				qa_result: response.qa_result,
+				error_context: response.error_context
 			}
 		]);
 
 		// Update phase
 		phase.set(response.phase);
 
-		// Track dashboard creation
+		// Track dashboard creation with QA results
 		if (response.dashboard_created && response.dashboard_url) {
 			lastDashboard.set({
 				url: response.dashboard_url,
-				created: true
+				slug: response.dashboard_slug,
+				created: true,
+				qa_result: response.qa_result
 			});
 			// Refresh dashboard list in sidebar
 			loadDashboards();

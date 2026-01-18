@@ -27,6 +27,7 @@ from ..schemas.conversation import (
     ConversationSummary,
     MessageRequest,
     MessageResponse,
+    QAResultResponse,
 )
 
 router = APIRouter(prefix="/conversation", tags=["conversation"])
@@ -168,8 +169,11 @@ async def send_message(
         # Import engine components
         from engine.conversation import ConversationManager
 
-        # Create conversation manager with user's preferred provider and restore state
-        manager = ConversationManager(provider_name=current_user.preferred_provider)
+        # Create conversation manager with user's preferred provider and source, then restore state
+        manager = ConversationManager(
+            provider_name=current_user.preferred_provider,
+            source_name=current_user.preferred_source,
+        )
         restore_manager_state(manager, session, db)
 
         # Track if this is the first message
@@ -246,15 +250,44 @@ async def send_message(
                 for btn in result.action_buttons
             ]
 
+        # Convert QA result to API schema format
+        api_qa_result = None
+        if result.qa_result:
+            # Build screenshot URL if path exists
+            screenshot_url = None
+            if result.qa_result.screenshot_path:
+                # Extract filename from path for the screenshot endpoint
+                from pathlib import Path
+                screenshot_filename = Path(result.qa_result.screenshot_path).name
+                screenshot_url = f"/api/dashboards/screenshots/{screenshot_filename}"
+
+            api_qa_result = QAResultResponse(
+                passed=result.qa_result.passed,
+                summary=result.qa_result.summary,
+                critical_issues=result.qa_result.critical_issues,
+                suggestions=result.qa_result.suggestions,
+                screenshot_url=screenshot_url,
+                auto_fixed=result.qa_result.auto_fixed,
+                issues_fixed=result.qa_result.issues_fixed,
+            )
+
+        # Get dashboard slug if created
+        dashboard_slug = None
+        if manager.state.created_file:
+            dashboard_slug = manager.state.created_file.parent.name
+
         return MessageResponse(
             response=response_text,
             phase=session.phase,
             session_id=session.id,
             title=session.title,
             dashboard_url=dashboard_url,
+            dashboard_slug=dashboard_slug,
             dashboard_created=dashboard_created,
             clarifying_options=api_clarifying_options,
             action_buttons=api_action_buttons,
+            qa_result=api_qa_result,
+            error_context=result.error_context,
         )
 
     except ImportError as e:

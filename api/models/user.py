@@ -20,6 +20,7 @@ class User(Base):
     password_hash = Column(String, nullable=True)  # Nullable for passwordless auth
     name = Column(String, nullable=False)
     preferred_provider = Column(String, default="claude")
+    preferred_source = Column(String, default="snowflake_saas")  # Data source to use
     business_type = Column(String, default="general")  # saas, ecommerce, or general
     created_at = Column(DateTime, default=datetime.utcnow)
 

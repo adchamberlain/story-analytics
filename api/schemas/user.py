@@ -29,6 +29,7 @@ class UserResponse(BaseModel):
     email: str
     name: str
     preferred_provider: str
+    preferred_source: str
     business_type: str
     created_at: datetime
 
@@ -40,6 +41,7 @@ class UserPreferences(BaseModel):
     """Schema for updating user preferences."""
 
     preferred_provider: str | None = None
+    preferred_source: str | None = None
     business_type: str | None = None
 
 
