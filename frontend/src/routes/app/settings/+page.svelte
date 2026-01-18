@@ -2,6 +2,7 @@
 	import { user } from '$lib/stores/auth';
 	import ProviderSelect from '$lib/components/ProviderSelect.svelte';
 	import BusinessTypeSelect from '$lib/components/BusinessTypeSelect.svelte';
+	import SourceSelect from '$lib/components/SourceSelect.svelte';
 </script>
 
 <div class="h-full overflow-y-auto p-6">
@@ -62,11 +63,12 @@
 		<!-- Data Source -->
 		<section class="terminal-window p-4">
 			<h2 class="text-terminal-amber font-bold mb-4">Data Source</h2>
-			<p class="text-terminal-dim text-sm">
-				Connected to Snowflake (ANALYTICS_POC.SAAS_DEMO)
+			<p class="text-terminal-dim text-sm mb-3">
+				Select the data source for dashboard queries
 			</p>
-			<p class="text-terminal-dim text-xs mt-2">
-				Configure connection in <code class="text-terminal-accent">sources/snowflake_saas/connection.yaml</code>
+			<SourceSelect />
+			<p class="text-terminal-dim text-xs mt-3">
+				To add a new source, create a connection file at <code class="text-terminal-accent">sources/&lt;name&gt;/connection.yaml</code>
 			</p>
 		</section>
 	</div>

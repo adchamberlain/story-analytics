@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from ..config import get_settings
@@ -15,6 +16,9 @@ from ..models.dashboard import Dashboard
 from ..models.user import User
 from pydantic import BaseModel
 from ..schemas.dashboard import DashboardListResponse, DashboardResponse
+
+# Screenshots directory (relative to project root)
+SCREENSHOTS_DIR = Path(__file__).parent.parent.parent / "qa_screenshots"
 
 
 class DashboardContentResponse(BaseModel):
@@ -257,3 +261,36 @@ async def sync_dashboards(
     db.commit()
 
     return {"message": f"Synced {synced} dashboards", "synced": synced}
+
+
+@router.get("/screenshots/{filename}")
+async def get_screenshot(
+    filename: str,
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Serve a QA screenshot image.
+
+    The screenshot filename contains the dashboard slug, so we can verify
+    the user has access to the associated dashboard.
+    """
+    # Validate filename to prevent path traversal
+    if ".." in filename or "/" in filename or "\\" in filename:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid filename",
+        )
+
+    screenshot_path = SCREENSHOTS_DIR / filename
+
+    if not screenshot_path.exists():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Screenshot not found",
+        )
+
+    return FileResponse(
+        screenshot_path,
+        media_type="image/png",
+        filename=filename,
+    )

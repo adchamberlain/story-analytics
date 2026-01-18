@@ -2,9 +2,9 @@
  * Authentication store.
  */
 
-import { writable, derived } from 'svelte/store';
+import { writable, derived, get } from 'svelte/store';
 import type { User } from '../types';
-import { getMe } from '../api';
+import { getMe, updatePreferences, type UserPreferencesUpdate } from '../api';
 
 // User store
 export const user = writable<User | null>(null);
@@ -52,4 +52,16 @@ export function setUser(userData: User): void {
  */
 export function clearUser(): void {
 	user.set(null);
+}
+
+/**
+ * Update a user preference.
+ */
+export async function updateUserPreference(
+	key: keyof UserPreferencesUpdate,
+	value: string
+): Promise<void> {
+	const preferences: UserPreferencesUpdate = { [key]: value };
+	const updatedUser = await updatePreferences(preferences);
+	user.set(updatedUser);
 }

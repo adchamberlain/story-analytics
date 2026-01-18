@@ -49,12 +49,27 @@ class ActionButton:
 
 
 @dataclass
+class QAResultData:
+    """QA validation result data for API response."""
+
+    passed: bool
+    summary: str
+    critical_issues: list[str]
+    suggestions: list[str]
+    screenshot_path: str | None = None
+    auto_fixed: bool = False
+    issues_fixed: list[str] = field(default_factory=list)
+
+
+@dataclass
 class ConversationResult:
     """Result from processing a message."""
 
     response: str
     clarifying_options: list[ClarifyingOption] | None = None
     action_buttons: list[ActionButton] | None = None
+    qa_result: QAResultData | None = None
+    error_context: str | None = None  # For error recovery
 
 
 @dataclass
@@ -74,11 +89,19 @@ class ConversationState:
     dashboard_spec: Any | None = None  # DashboardSpec from pipeline
     validated_queries: Any | None = None  # ValidatedQueries from pipeline
 
+    # QA result tracking
+    last_qa_result: QAResultData | None = None
+    last_screenshot_path: str | None = None
+
+    # Error tracking for recovery
+    last_error: str | None = None
+    can_retry: bool = False
+
 
 class ConversationManager:
     """Manages the conversation flow for dashboard creation/editing."""
 
-    def __init__(self, provider_name: str | None = None):
+    def __init__(self, provider_name: str | None = None, source_name: str | None = None):
         self.config = get_config()
         self.config_loader = get_config_loader()
         self.llm = get_provider(provider_name)
@@ -86,7 +109,7 @@ class ConversationManager:
         self.parser = DashboardParser()
         self.state = ConversationState()
         self._schema_context: str | None = None
-        self._default_source = "snowflake_saas"  # TODO: make configurable
+        self._default_source = source_name or "snowflake_saas"
 
         # Initialize the pipeline with orchestration
         self._pipeline = DashboardPipeline(PipelineConfig(
@@ -264,11 +287,15 @@ class ConversationManager:
         # Track message count before processing for button logic
         pre_message_count = len(self.state.messages)
 
+        # Initialize result variables
+        qa_result = None
+        error_context = None
+
         # Handle based on current phase
         if self.state.phase == ConversationPhase.INTENT:
             response = self._handle_intent_phase(user_input)
         elif self.state.phase == ConversationPhase.GENERATION:
-            response = self._handle_generation_phase(user_input)
+            response, qa_result, error_context = self._handle_generation_phase(user_input)
         elif self.state.phase == ConversationPhase.REFINEMENT:
             response = self._handle_refinement_phase(user_input)
         else:
@@ -277,13 +304,21 @@ class ConversationManager:
         # Parse any clarifying options from the response
         cleaned_response, clarifying_options = self._parse_clarifying_options(response)
 
-        # Determine action buttons based on resulting phase
-        action_buttons = self._get_action_buttons_for_phase(pre_message_count)
+        # Determine action buttons based on resulting phase and error state
+        if error_context:
+            action_buttons = [
+                ActionButton(id="retry", label="Try Again", style="primary"),
+                ActionButton(id="simplify", label="Simplify Request", style="secondary"),
+            ]
+        else:
+            action_buttons = self._get_action_buttons_for_phase(pre_message_count)
 
         return ConversationResult(
             response=cleaned_response,
             clarifying_options=clarifying_options,
             action_buttons=action_buttons,
+            qa_result=qa_result,
+            error_context=error_context,
         )
 
     def _get_action_buttons_for_phase(self, pre_message_count: int) -> list[ActionButton] | None:
@@ -337,15 +372,69 @@ class ConversationManager:
         elif action_id == "generate_now" or action_id == "generate":
             # Skip to GENERATION phase
             self.state.phase = ConversationPhase.GENERATION
-            response = self._generate_dashboard()
+            response, qa_result, error_context = self._generate_dashboard()
             cleaned_response, clarifying_options = self._parse_clarifying_options(response)
-            # After generation, we're in REFINEMENT phase
+
+            # If there was an error, show error recovery buttons
+            if error_context:
+                return ConversationResult(
+                    response=cleaned_response,
+                    clarifying_options=clarifying_options,
+                    action_buttons=[
+                        ActionButton(id="retry", label="Try Again", style="primary"),
+                        ActionButton(id="simplify", label="Simplify Request", style="secondary"),
+                    ],
+                    error_context=error_context,
+                )
+
+            # After successful generation, we're in REFINEMENT phase
             return ConversationResult(
                 response=cleaned_response,
                 clarifying_options=clarifying_options,
                 action_buttons=[
                     ActionButton(id="done", label="Done", style="primary"),
                     ActionButton(id="modify", label="Modify", style="secondary"),
+                ],
+                qa_result=qa_result,
+            )
+
+        elif action_id == "retry":
+            # Retry the last generation
+            self.state.phase = ConversationPhase.GENERATION
+            response, qa_result, error_context = self._generate_dashboard()
+            cleaned_response, clarifying_options = self._parse_clarifying_options(response)
+
+            if error_context:
+                return ConversationResult(
+                    response=cleaned_response,
+                    clarifying_options=clarifying_options,
+                    action_buttons=[
+                        ActionButton(id="retry", label="Try Again", style="primary"),
+                        ActionButton(id="simplify", label="Simplify Request", style="secondary"),
+                    ],
+                    error_context=error_context,
+                )
+
+            return ConversationResult(
+                response=cleaned_response,
+                clarifying_options=clarifying_options,
+                action_buttons=[
+                    ActionButton(id="done", label="Done", style="primary"),
+                    ActionButton(id="modify", label="Modify", style="secondary"),
+                ],
+                qa_result=qa_result,
+            )
+
+        elif action_id == "simplify":
+            # Go back to context phase to simplify the request
+            self.state.phase = ConversationPhase.CONTEXT
+            response = "Let's simplify your request. What's the single most important metric or visualization you need? We can start with that and add more later."
+            self.state.messages.append(Message(role="assistant", content=response))
+            return ConversationResult(
+                response=response,
+                action_buttons=[
+                    ActionButton(id="generate", label="Generate", style="primary"),
+                    ActionButton(id="modify_plan", label="Modify Plan", style="secondary"),
                 ],
             )
 
@@ -467,12 +556,20 @@ class ConversationManager:
         self.state.messages.append(Message(role="assistant", content=content))
         return content
 
-    def _handle_generation_phase(self, user_input: str) -> str:
-        """Generate the dashboard."""
+    def _handle_generation_phase(self, user_input: str) -> tuple[str, QAResultData | None, str | None]:
+        """Generate the dashboard.
+
+        Returns:
+            Tuple of (response_text, qa_result, error_context)
+        """
         return self._generate_dashboard()
 
-    def _generate_dashboard(self) -> str:
-        """Generate the dashboard using the pipeline with orchestration."""
+    def _generate_dashboard(self) -> tuple[str, QAResultData | None, str | None]:
+        """Generate the dashboard using the pipeline with orchestration.
+
+        Returns:
+            Tuple of (response_text, qa_result, error_context)
+        """
         # Get the original request from conversation
         user_request = self.state.original_request or ""
 
@@ -492,16 +589,24 @@ class ConversationManager:
             # Check if this is a feasibility issue
             if result.feasibility_result and not result.feasibility_result.feasible:
                 error_msg = self._format_infeasibility_message(result.feasibility_result)
+                error_context = "infeasible"
             elif result.feasibility_result and not result.feasibility_result.fully_feasible:
                 # Partially feasible - pipeline still failed for other reasons
                 error_msg = f"Pipeline failed: {result.error}\n\n"
                 error_msg += self._format_partial_feasibility_message(result.feasibility_result)
+                error_context = "partial_feasibility"
             else:
                 error_msg = f"Pipeline failed: {result.error}"
+                error_context = "pipeline_error"
 
             print(f"[Pipeline] {error_msg[:200]}...")
             self.state.messages.append(Message(role="assistant", content=error_msg))
-            return error_msg
+
+            # Store error for retry capability
+            self.state.last_error = error_msg
+            self.state.can_retry = True
+
+            return error_msg, None, error_context
 
         # Store pipeline results in state
         self.state.dashboard_spec = result.dashboard_spec
@@ -520,10 +625,17 @@ class ConversationManager:
         self.state.dashboard_title = title
 
         # Write the dashboard and run QA
-        return self._finalize_dashboard(markdown, title)
+        response, qa_result = self._finalize_dashboard(markdown, title)
+        return response, qa_result, None
 
-    def _finalize_dashboard(self, markdown: str, title: str) -> str:
-        """Write dashboard to file and run QA validation."""
+    def _finalize_dashboard(self, markdown: str, title: str) -> tuple[str, QAResultData | None]:
+        """Write dashboard to file and run QA validation.
+
+        Returns:
+            Tuple of (response_text, qa_result_data)
+        """
+        qa_result_data = None
+
         try:
             file_path = create_dashboard_from_markdown(markdown, title)
             self.state.created_file = file_path
@@ -537,6 +649,7 @@ class ConversationManager:
             qa_run = None
             auto_fix_attempted = False
             successfully_fixed = []
+            screenshot_path = None
 
             # Use the full user request for better QA context
             qa_request = self.get_full_user_request()
@@ -562,6 +675,31 @@ class ConversationManager:
                         self.state.generated_markdown = file_path.read_text()
                 else:
                     qa_result = self._run_qa_validation(slug)
+
+            # Find the screenshot path (most recent for this slug)
+            screenshots_dir = Path(__file__).parent.parent / "qa_screenshots"
+            if screenshots_dir.exists():
+                screenshots = sorted(
+                    screenshots_dir.glob(f"{slug}_*.png"),
+                    key=lambda p: p.stat().st_mtime,
+                    reverse=True
+                )
+                if screenshots:
+                    screenshot_path = str(screenshots[0])
+
+            # Store QA result in state for API access
+            if qa_result:
+                qa_result_data = QAResultData(
+                    passed=qa_result.passed,
+                    summary=qa_result.summary,
+                    critical_issues=qa_result.critical_issues,
+                    suggestions=qa_result.suggestions,
+                    screenshot_path=screenshot_path,
+                    auto_fixed=auto_fix_attempted,
+                    issues_fixed=successfully_fixed,
+                )
+                self.state.last_qa_result = qa_result_data
+                self.state.last_screenshot_path = screenshot_path
 
             dashboard_is_broken = qa_result and qa_result.critical_issues
 
@@ -596,11 +734,17 @@ Here's what I created:
             else:
                 result += "\nWhat would you like to change?"
 
+            # Clear error state on success
+            self.state.last_error = None
+            self.state.can_retry = False
+
         except Exception as e:
             result = f"Error creating dashboard: {e}\n\nHere's the markdown I generated:\n{markdown[:500]}..."
+            self.state.last_error = str(e)
+            self.state.can_retry = True
 
         self.state.messages.append(Message(role="assistant", content=result))
-        return result
+        return result, qa_result_data
 
     def _handle_refinement_phase(self, user_input: str) -> str:
         """Handle refinement requests after initial generation.

@@ -195,6 +195,17 @@ async def update_preferences(
             )
         current_user.preferred_provider = preferences.preferred_provider
 
+    if preferences.preferred_source:
+        # Validate that the source exists
+        from pathlib import Path
+        source_dir = Path("sources") / preferences.preferred_source
+        if not source_dir.exists():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Source '{preferences.preferred_source}' not found",
+            )
+        current_user.preferred_source = preferences.preferred_source
+
     if preferences.business_type:
         if preferences.business_type not in ["saas", "ecommerce", "general"]:
             raise HTTPException(

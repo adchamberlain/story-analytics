@@ -30,6 +30,18 @@ class ActionButton(BaseModel):
     style: str = "secondary"  # "primary" or "secondary"
 
 
+class QAResultResponse(BaseModel):
+    """Schema for QA validation result."""
+
+    passed: bool
+    summary: str
+    critical_issues: list[str] = []
+    suggestions: list[str] = []
+    screenshot_url: str | None = None
+    auto_fixed: bool = False
+    issues_fixed: list[str] = []
+
+
 class MessageResponse(BaseModel):
     """Schema for message response."""
 
@@ -38,9 +50,12 @@ class MessageResponse(BaseModel):
     session_id: int
     title: str | None = None
     dashboard_url: str | None = None
+    dashboard_slug: str | None = None
     dashboard_created: bool = False
     clarifying_options: list[ClarifyingOption] | None = None
     action_buttons: list[ActionButton] | None = None
+    qa_result: QAResultResponse | None = None
+    error_context: str | None = None  # For error recovery - explains what went wrong
 
 
 class ConversationMessage(BaseModel):

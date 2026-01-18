@@ -4,6 +4,7 @@
 	import Message from './Message.svelte';
 	import TerminalInput from './TerminalInput.svelte';
 	import TemplateCard from './TemplateCard.svelte';
+	import QAResultPanel from './QAResultPanel.svelte';
 	import { getDashboard, type Dashboard } from '../api';
 	import {
 		messages,
@@ -230,15 +231,42 @@
 
 		{#if $lastDashboard?.created}
 			<div class="mt-4 p-4 bg-terminal-surface border border-terminal-accent rounded">
-				<p class="text-terminal-accent mb-2">Dashboard created!</p>
+				<div class="flex items-center justify-between mb-3">
+					<p class="text-terminal-accent font-medium">Dashboard created!</p>
+					<div class="flex gap-2">
+						<a
+							href={$lastDashboard.url}
+							target="_blank"
+							rel="noopener noreferrer"
+							class="px-3 py-1.5 text-xs font-medium rounded transition-colors
+								bg-terminal-accent text-terminal-bg hover:bg-terminal-accent/80"
+						>
+							Open Preview
+						</a>
+						{#if $lastDashboard.slug}
+							<a
+								href="/app/dashboards/edit/{$lastDashboard.slug}"
+								class="px-3 py-1.5 text-xs font-medium rounded transition-colors
+									bg-terminal-surface border border-terminal-border hover:border-terminal-accent hover:text-terminal-accent"
+							>
+								Edit Code
+							</a>
+						{/if}
+					</div>
+				</div>
 				<a
 					href={$lastDashboard.url}
 					target="_blank"
 					rel="noopener noreferrer"
-					class="text-terminal-amber hover:underline"
+					class="text-terminal-amber hover:underline text-sm"
 				>
 					{$lastDashboard.url}
 				</a>
+
+				<!-- QA Results Panel -->
+				{#if $lastDashboard.qa_result}
+					<QAResultPanel qaResult={$lastDashboard.qa_result} />
+				{/if}
 			</div>
 		{/if}
 	</div>
