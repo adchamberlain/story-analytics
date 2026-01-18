@@ -22,6 +22,14 @@ class ClarifyingOption(BaseModel):
     value: str
 
 
+class ActionButton(BaseModel):
+    """Schema for an action button for phase transitions."""
+
+    id: str
+    label: str
+    style: str = "secondary"  # "primary" or "secondary"
+
+
 class MessageResponse(BaseModel):
     """Schema for message response."""
 
@@ -32,6 +40,7 @@ class MessageResponse(BaseModel):
     dashboard_url: str | None = None
     dashboard_created: bool = False
     clarifying_options: list[ClarifyingOption] | None = None
+    action_buttons: list[ActionButton] | None = None
 
 
 class ConversationMessage(BaseModel):

@@ -11,6 +11,7 @@ proposal_rules: |
   CRITICAL RULES FOR PROPOSALS:
   - NEVER say "Dashboard created", "I've created", "Here's your dashboard", or similar - the dashboard does NOT exist yet
   - ALWAYS label your response as "PROPOSED DASHBOARD" at the start
+  - Do NOT tell the user to type anything - they will use buttons to proceed
 
   YOU MUST ALWAYS SHOW THE SQL QUERIES. This is required, not optional.
 
@@ -26,7 +27,4 @@ proposal_rules: |
 
   3. VISUALIZATIONS - Describe what charts/tables will display the data
 
-  ALWAYS end with EXACTLY this line:
-  "→ Type 'create' to generate this dashboard, or tell me what you'd like to change."
-
-  The dashboard is NOT created until the user explicitly types 'create'. You are only showing a PROPOSAL.
+  The dashboard is NOT created until the user clicks Generate. You are only showing a PROPOSAL.

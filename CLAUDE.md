@@ -1,5 +1,20 @@
 # Claude Code Project Instructions
 
+## Design Philosophy: AI-Native
+
+This app is intentionally AI-native. **Never use naive string/keyword matching** for intent detection or control flow. This includes:
+- No regex or substring checks to detect user intent (e.g., `if "edit" in user_input`)
+- No phrase lists to trigger actions (e.g., `["generate", "build it", "create"]`)
+- No word count heuristics to determine input quality
+
+Instead, always use:
+1. **Explicit UI affordances** (buttons, modes) when user intent must be unambiguous
+2. **LLM understanding** when natural language interpretation is genuinely needed
+
+This is a rethinking of how analytics tools work—the LLM is the core, not a bolted-on feature.
+
+**What works well:** The action button system for phase transitions (Generate/Modify Plan, Done/Modify) tested very well. Users click buttons to advance phases rather than typing magic words.
+
 ## Project Overview
 Story Analytics is a dashboard creation tool that combines:
 - **Evidence** (npm-based BI framework) for rendering dashboards

@@ -53,6 +53,13 @@ export interface ClarifyingOption {
 	value: string;
 }
 
+// Action button types for phase transitions
+export interface ActionButton {
+	id: string;
+	label: string;
+	style: 'primary' | 'secondary';
+}
+
 export interface MessageResponse {
 	response: string;
 	phase: string;
@@ -61,6 +68,7 @@ export interface MessageResponse {
 	dashboard_url: string | null;
 	dashboard_created: boolean;
 	clarifying_options: ClarifyingOption[] | null;
+	action_buttons: ActionButton[] | null;
 }
 
 export interface Dashboard {

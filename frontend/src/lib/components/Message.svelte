@@ -7,6 +7,7 @@
 
 	const dispatch = createEventDispatcher<{
 		optionSelect: { value: string };
+		actionClick: { id: string };
 	}>();
 
 	// Configure marked for terminal-friendly output with links opening in new tabs
@@ -26,6 +27,10 @@
 
 	function handleOptionClick(value: string) {
 		dispatch('optionSelect', { value });
+	}
+
+	function handleActionClick(id: string) {
+		dispatch('actionClick', { id });
 	}
 </script>
 
@@ -57,6 +62,24 @@
                                        transition-colors cursor-pointer"
 							>
 								{option.label}
+							</button>
+						{/each}
+					</div>
+				{/if}
+
+				<!-- Action Buttons -->
+				{#if message.action_buttons && message.action_buttons.length > 0}
+					<div class="mt-4 flex flex-wrap gap-2">
+						{#each message.action_buttons as button}
+							<button
+								type="button"
+								on:click={() => handleActionClick(button.id)}
+								class="px-4 py-2 text-sm font-medium rounded transition-colors cursor-pointer
+									{button.style === 'primary'
+									? 'bg-terminal-accent text-terminal-bg hover:bg-terminal-accent/80'
+									: 'bg-terminal-surface border border-terminal-border hover:border-terminal-accent hover:text-terminal-accent'}"
+							>
+								{button.label}
 							</button>
 						{/each}
 					</div>

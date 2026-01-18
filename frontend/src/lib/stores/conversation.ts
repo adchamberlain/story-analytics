@@ -3,7 +3,7 @@
  */
 
 import { writable, get } from 'svelte/store';
-import type { Message, ConversationSummary, ClarifyingOption } from '../types';
+import type { Message, ConversationSummary, ClarifyingOption, ActionButton } from '../types';
 import {
 	sendMessage as apiSendMessage,
 	getConversation,
@@ -14,9 +14,10 @@ import {
 } from '../api';
 import { loadDashboards } from './dashboards';
 
-// Extended message type with clarifying options
+// Extended message type with clarifying options and action buttons
 export interface ExtendedMessage extends Message {
 	clarifying_options?: ClarifyingOption[] | null;
+	action_buttons?: ActionButton[] | null;
 }
 
 // Current session ID
@@ -87,9 +88,14 @@ export async function sendMessage(content: string): Promise<string> {
 	conversationLoading.set(true);
 	lastDashboard.set(null);
 
+	// Check if this is an action (button click) - don't show in chat
+	const isAction = content.startsWith('__action:');
+
 	try {
-		// Add user message immediately
-		messages.update((msgs) => [...msgs, { role: 'user', content }]);
+		// Add user message immediately (unless it's an action)
+		if (!isAction) {
+			messages.update((msgs) => [...msgs, { role: 'user', content }]);
+		}
 
 		// Send to API with current session ID
 		const sessionId = get(currentSessionId);
@@ -101,13 +107,14 @@ export async function sendMessage(content: string): Promise<string> {
 			currentTitle.set(response.title);
 		}
 
-		// Add assistant response with clarifying options
+		// Add assistant response with clarifying options and action buttons
 		messages.update((msgs) => [
 			...msgs,
 			{
 				role: 'assistant',
 				content: response.response,
-				clarifying_options: response.clarifying_options
+				clarifying_options: response.clarifying_options,
+				action_buttons: response.action_buttons
 			}
 		]);
 

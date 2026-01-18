@@ -19,6 +19,7 @@ from ..models.dashboard import Dashboard
 from ..models.session import ConversationSession
 from ..models.user import User
 from ..schemas.conversation import (
+    ActionButton,
     ClarifyingOption,
     ConversationListResponse,
     ConversationMessage,
@@ -237,6 +238,14 @@ async def send_message(
                 for opt in clarifying_options
             ]
 
+        # Convert action buttons to API schema format
+        api_action_buttons = None
+        if result.action_buttons:
+            api_action_buttons = [
+                ActionButton(id=btn.id, label=btn.label, style=btn.style)
+                for btn in result.action_buttons
+            ]
+
         return MessageResponse(
             response=response_text,
             phase=session.phase,
@@ -245,6 +254,7 @@ async def send_message(
             dashboard_url=dashboard_url,
             dashboard_created=dashboard_created,
             clarifying_options=api_clarifying_options,
+            action_buttons=api_action_buttons,
         )
 
     except ImportError as e:
