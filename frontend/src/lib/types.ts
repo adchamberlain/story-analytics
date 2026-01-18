@@ -7,8 +7,18 @@ export interface User {
 	email: string;
 	name: string;
 	preferred_provider: string;
+	preferred_source: string;
 	business_type: BusinessType;
 	created_at: string;
+}
+
+// Data source types
+export interface SourceInfo {
+	name: string;
+	type: string;
+	connected: boolean;
+	database: string | null;
+	schema_name: string | null;
 }
 
 export type BusinessType = 'saas' | 'ecommerce' | 'general';
@@ -60,15 +70,29 @@ export interface ActionButton {
 	style: 'primary' | 'secondary';
 }
 
+// QA validation result
+export interface QAResult {
+	passed: boolean;
+	summary: string;
+	critical_issues: string[];
+	suggestions: string[];
+	screenshot_url: string | null;
+	auto_fixed: boolean;
+	issues_fixed: string[];
+}
+
 export interface MessageResponse {
 	response: string;
 	phase: string;
 	session_id: number;
 	title: string | null;
 	dashboard_url: string | null;
+	dashboard_slug: string | null;
 	dashboard_created: boolean;
 	clarifying_options: ClarifyingOption[] | null;
 	action_buttons: ActionButton[] | null;
+	qa_result: QAResult | null;
+	error_context: string | null;
 }
 
 export interface Dashboard {

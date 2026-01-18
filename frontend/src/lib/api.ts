@@ -14,7 +14,8 @@ import type {
 	CategoriesResponse,
 	SchemaInfo,
 	SuggestionsResponse,
-	BusinessType
+	BusinessType,
+	SourceInfo
 } from './types';
 
 const API_BASE = 'http://localhost:8000/api';
@@ -121,6 +122,7 @@ export async function getMe(): Promise<User> {
 
 export interface UserPreferencesUpdate {
 	preferred_provider?: string;
+	preferred_source?: string;
 	business_type?: BusinessType;
 }
 
@@ -265,7 +267,12 @@ export async function getSuggestions(): Promise<SuggestionsResponse> {
 	return handleResponse<SuggestionsResponse>(response);
 }
 
-// Schema endpoints
+// Source endpoints
+
+export async function getSources(): Promise<SourceInfo[]> {
+	const response = await fetchWithAuth('/sources');
+	return handleResponse<SourceInfo[]>(response);
+}
 
 export async function getSourceSchema(sourceName: string): Promise<SchemaInfo> {
 	const response = await fetchWithAuth(`/sources/${encodeURIComponent(sourceName)}/schema`);
