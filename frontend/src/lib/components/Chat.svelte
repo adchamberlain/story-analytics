@@ -57,6 +57,11 @@
 		pendingInput = event.detail.value;
 	}
 
+	async function handleActionClick(event: CustomEvent<{ id: string }>) {
+		// Send action with special prefix to backend
+		await sendMessage(`__action:${event.detail.id}`);
+	}
+
 	function clearEditMode() {
 		editingDashboard = null;
 		goto('/app', { replaceState: true });
@@ -181,9 +186,27 @@
 				{:else}
 					<div class="text-center mb-6">
 						<p class="mb-2">Welcome to Story Analytics</p>
-						<p class="text-sm">
-							Tell me what kind of dashboard you'd like to create, or choose a template below.
+						<p class="text-sm mb-4">
+							What would you like to do?
 						</p>
+						<div class="flex justify-center gap-3">
+							<button
+								type="button"
+								on:click={() => handleActionClick({ detail: { id: 'create_new' } })}
+								class="px-4 py-2 text-sm font-medium rounded transition-colors
+									bg-terminal-accent text-terminal-bg hover:bg-terminal-accent/80"
+							>
+								Create New Dashboard
+							</button>
+							<button
+								type="button"
+								on:click={() => handleActionClick({ detail: { id: 'edit_existing' } })}
+								class="px-4 py-2 text-sm font-medium rounded transition-colors
+									bg-terminal-surface border border-terminal-border hover:border-terminal-accent hover:text-terminal-accent"
+							>
+								Edit Existing
+							</button>
+						</div>
 					</div>
 
 					<!-- Available Data Chips -->
@@ -229,7 +252,7 @@
 			</div>
 		{:else}
 			{#each $messages as message}
-				<Message {message} on:optionSelect={handleOptionSelect} />
+				<Message {message} on:optionSelect={handleOptionSelect} on:actionClick={handleActionClick} />
 			{/each}
 		{/if}
 

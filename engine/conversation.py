@@ -40,11 +40,21 @@ class ClarifyingOption:
 
 
 @dataclass
+class ActionButton:
+    """An action button for phase transitions."""
+
+    id: str  # "generate", "modify", "done", "plan"
+    label: str  # "Generate Dashboard", "Modify", "Done"
+    style: str = "secondary"  # "primary" or "secondary" (for styling)
+
+
+@dataclass
 class ConversationResult:
     """Result from processing a message."""
 
     response: str
     clarifying_options: list[ClarifyingOption] | None = None
+    action_buttons: list[ActionButton] | None = None
 
 
 @dataclass
@@ -243,8 +253,16 @@ class ConversationManager:
         Returns:
             ConversationResult with response and optional clarifying options.
         """
+        # Check for action button click (special prefix)
+        if user_input.startswith("__action:"):
+            action_id = user_input[9:]  # Strip "__action:" prefix
+            return self._handle_action(action_id)
+
         # Add user message to history
         self.state.messages.append(Message(role="user", content=user_input))
+
+        # Track message count before processing for button logic
+        pre_message_count = len(self.state.messages)
 
         # Handle based on current phase
         if self.state.phase == ConversationPhase.INTENT:
@@ -259,66 +277,177 @@ class ConversationManager:
         # Parse any clarifying options from the response
         cleaned_response, clarifying_options = self._parse_clarifying_options(response)
 
+        # Determine action buttons based on resulting phase
+        action_buttons = self._get_action_buttons_for_phase(pre_message_count)
+
         return ConversationResult(
             response=cleaned_response,
-            clarifying_options=clarifying_options
+            clarifying_options=clarifying_options,
+            action_buttons=action_buttons,
         )
 
-    def _handle_intent_phase(self, user_input: str) -> str:
-        """Determine if user wants to create or edit."""
-        lower_input = user_input.lower()
+    def _get_action_buttons_for_phase(self, pre_message_count: int) -> list[ActionButton] | None:
+        """Get appropriate action buttons based on current phase and conversation state."""
+        # GENERATION phase: no buttons needed (auto-advances)
+        if self.state.phase == ConversationPhase.GENERATION:
+            return None
 
-        # Check for edit intent - must be explicit edit phrases, not just the word appearing anywhere
-        # e.g., "edit the dashboard" or "modify my report" but NOT "show MRR changes"
-        edit_phrases = [
-            "edit ", "edit the", "edit my", "edit this",
-            "modify ", "modify the", "modify my", "modify this",
-            "update ", "update the", "update my", "update this",
-            "change the", "change my", "change this",
-            "fix the", "fix my", "fix this",
-        ]
-        if any(phrase in lower_input for phrase in edit_phrases):
+        # REFINEMENT phase: [Done, Modify]
+        if self.state.phase == ConversationPhase.REFINEMENT:
+            return [
+                ActionButton(id="done", label="Done", style="primary"),
+                ActionButton(id="modify", label="Modify", style="secondary"),
+            ]
+
+        # CONTEXT phase: always show Generate/Modify Plan
+        # User knows when they're ready to generate
+        if self.state.phase == ConversationPhase.CONTEXT:
+            return [
+                ActionButton(id="generate", label="Generate", style="primary"),
+                ActionButton(id="modify_plan", label="Modify Plan", style="secondary"),
+            ]
+
+        # INTENT phase or other: no buttons yet
+        return None
+
+    def _handle_action(self, action_id: str) -> ConversationResult:
+        """
+        Handle an action button click.
+
+        Args:
+            action_id: The ID of the clicked action button.
+
+        Returns:
+            ConversationResult with response and optional new action buttons.
+        """
+        action_id = action_id.lower().strip()
+
+        if action_id == "plan":
+            # Stay in CONTEXT phase for more planning
+            response = "Great, let's plan out your dashboard. What specific metrics or visualizations would you like to include?"
+            self.state.messages.append(Message(role="assistant", content=response))
+            return ConversationResult(
+                response=response,
+                action_buttons=[
+                    ActionButton(id="generate", label="Generate", style="primary"),
+                    ActionButton(id="modify_plan", label="Modify Plan", style="secondary"),
+                ],
+            )
+
+        elif action_id == "generate_now" or action_id == "generate":
+            # Skip to GENERATION phase
+            self.state.phase = ConversationPhase.GENERATION
+            response = self._generate_dashboard()
+            cleaned_response, clarifying_options = self._parse_clarifying_options(response)
+            # After generation, we're in REFINEMENT phase
+            return ConversationResult(
+                response=cleaned_response,
+                clarifying_options=clarifying_options,
+                action_buttons=[
+                    ActionButton(id="done", label="Done", style="primary"),
+                    ActionButton(id="modify", label="Modify", style="secondary"),
+                ],
+            )
+
+        elif action_id == "modify_plan":
+            # Stay in CONTEXT for modifications
+            response = "What would you like to change or add to the plan?"
+            self.state.messages.append(Message(role="assistant", content=response))
+            return ConversationResult(
+                response=response,
+                action_buttons=[
+                    ActionButton(id="generate", label="Generate", style="primary"),
+                    ActionButton(id="modify_plan", label="Modify Plan", style="secondary"),
+                ],
+            )
+
+        elif action_id == "done":
+            # Conversation complete
+            slug = self.state.created_file.parent.name if self.state.created_file else "dashboard"
+            response = f"Great! Your dashboard is ready at: {self.config.dev_url}/{slug}\n\nClick '+ New' in the top right to create another dashboard."
+            self.state.messages.append(Message(role="assistant", content=response))
+            return ConversationResult(
+                response=response,
+                action_buttons=None,  # No more buttons
+            )
+
+        elif action_id == "modify":
+            # Stay in REFINEMENT for modifications
+            response = "What would you like to change about the dashboard?"
+            self.state.messages.append(Message(role="assistant", content=response))
+            return ConversationResult(
+                response=response,
+                action_buttons=[
+                    ActionButton(id="done", label="Done", style="primary"),
+                    ActionButton(id="modify", label="Modify", style="secondary"),
+                ],
+            )
+
+        elif action_id == "create_new":
+            # User explicitly chose to create a new dashboard
+            self.state.intent = "create"
+            self.state.phase = ConversationPhase.CONTEXT
+            response = "What kind of dashboard would you like to create? Describe what business decisions it should help you make."
+            self.state.messages.append(Message(role="assistant", content=response))
+            return ConversationResult(
+                response=response,
+                action_buttons=[
+                    ActionButton(id="generate", label="Generate", style="primary"),
+                    ActionButton(id="plan", label="Plan More", style="secondary"),
+                ],
+            )
+
+        elif action_id == "edit_existing":
+            # User explicitly chose to edit an existing dashboard
             self.state.intent = "edit"
             dashboards = self.parser.get_dashboard_summaries()
 
             if not dashboards:
+                # No dashboards to edit, redirect to create
                 self.state.intent = "create"
                 self.state.phase = ConversationPhase.CONTEXT
-                response = "No existing dashboards found. Let's create a new one!\n\nWhat kind of dashboard would you like to create? What decisions should it help you make?"
-            else:
-                # List available dashboards
-                dash_list = "\n".join(
-                    f"  - {d['title']} ({d['file']})" for d in dashboards
+                response = "No existing dashboards found. Let's create a new one!\n\nWhat kind of dashboard would you like to create?"
+                self.state.messages.append(Message(role="assistant", content=response))
+                return ConversationResult(
+                    response=response,
+                    action_buttons=[
+                        ActionButton(id="generate", label="Generate", style="primary"),
+                        ActionButton(id="plan", label="Plan More", style="secondary"),
+                    ],
                 )
-                response = f"Which dashboard would you like to edit?\n\n{dash_list}"
 
+            # List available dashboards
+            dash_list = "\n".join(
+                f"  - {d['title']} ({d['file']})" for d in dashboards
+            )
+            response = f"Which dashboard would you like to edit?\n\n{dash_list}\n\nType the name of the dashboard you want to edit."
             self.state.messages.append(Message(role="assistant", content=response))
-            return response
+            return ConversationResult(
+                response=response,
+                action_buttons=None,  # User needs to type dashboard name
+            )
 
-        # Check for explicit create intent or treat as create by default
+        else:
+            # Unknown action, treat as regular message
+            return self.process_message(action_id)
+
+    def _handle_intent_phase(self, user_input: str) -> str:
+        """Handle first message - treat as create intent.
+
+        Note: Create vs edit intent is now handled via explicit UI buttons.
+        Any text input in the intent phase is treated as describing what
+        dashboard the user wants to create.
+        """
+        # Treat all text input as create intent
         self.state.intent = "create"
         self.state.phase = ConversationPhase.CONTEXT
         self.state.original_request = user_input  # Save for QA
 
-        # If the message contains dashboard topic, pass it to LLM
-        if len(user_input.split()) > 3:  # More than just "create dashboard"
-            return self._handle_conversation_phase(user_input)
-
-        response = "Great! Let's create a new dashboard.\n\nWhat kind of dashboard would you like to create? What business decisions should it help you make?"
-        self.state.messages.append(Message(role="assistant", content=response))
-        return response
+        # Pass to conversation phase to process with LLM
+        return self._handle_conversation_phase(user_input)
 
     def _handle_conversation_phase(self, user_input: str) -> str:
         """Handle general conversation with LLM."""
-        # Check if user wants to generate
-        lower_input = user_input.lower().strip()
-        if any(
-            phrase in lower_input
-            for phrase in ["generate", "create it", "build it", "looks good", "that's it", "let's do it", "do it"]
-        ) or lower_input == "create":
-            self.state.phase = ConversationPhase.GENERATION
-            return self._generate_dashboard()
-
         # Update original_request if user provides more detailed info
         if len(user_input.split()) > 5 and not self.state.original_request:
             self.state.original_request = user_input
@@ -337,30 +466,7 @@ class ConversationManager:
         )
 
         content = response.content
-
-        # Post-process: if response contains code blocks (a proposal), ensure proper messaging
-        if "```sql" in content or "<BarChart" in content or "<LineChart" in content:
-            content = self._fix_proposal_messaging(content)
-
         self.state.messages.append(Message(role="assistant", content=content))
-        return content
-
-    def _fix_proposal_messaging(self, content: str) -> str:
-        """Ensure proposal responses have correct messaging."""
-        # Remove misleading phrases
-        misleading = [
-            "DASHBOARD CREATED", "Dashboard created", "dashboard created",
-            "I've created", "I have created", "is now live", "is live",
-            "Your dashboard is ready", "Here's your dashboard",
-        ]
-        for phrase in misleading:
-            content = content.replace(phrase, "PROPOSED DASHBOARD")
-
-        # Ensure call-to-action is present
-        call_to_action = "\n\n→ Type 'create' to generate this dashboard, or tell me what you'd like to change."
-        if "Type 'create'" not in content:
-            content = content.rstrip() + call_to_action
-
         return content
 
     def _handle_generation_phase(self, user_input: str) -> str:
@@ -499,38 +605,11 @@ Here's what I created:
         return result
 
     def _handle_refinement_phase(self, user_input: str) -> str:
-        """Handle refinement requests after initial generation."""
-        lower_input = user_input.lower().strip()
+        """Handle refinement requests after initial generation.
 
-        # Check if user wants to create a NEW dashboard (not edit current one)
-        # Must be explicit phrases - not just "new" anywhere (e.g., "remove New MRR")
-        new_dashboard_phrases = [
-            "create a new",
-            "new dashboard",
-            "different dashboard",
-            "another dashboard",
-            "start over",
-            "start fresh",
-            "begin again",
-        ]
-        if any(phrase in lower_input for phrase in new_dashboard_phrases) or lower_input == "new":
-            self.reset()
-            self.state.intent = "create"
-            self.state.phase = ConversationPhase.CONTEXT
-            response = "Starting a new dashboard. What would you like to create?"
-            self.state.messages.append(Message(role="assistant", content=response))
-            return response
-
-        # Check if done/quit/exit
-        if any(
-            phrase in lower_input
-            for phrase in ["looks good", "done", "perfect", "that's all", "no changes", "quit", "exit"]
-        ) or lower_input in ["done", "quit", "exit"]:
-            slug = self.state.created_file.parent.name if self.state.created_file else "dashboard"
-            response = f"Great! Your dashboard is ready at: {self.config.dev_url}/{slug}\n\nClick '+ New' in the top right to create another dashboard."
-            self.state.messages.append(Message(role="assistant", content=response))
-            return response
-
+        Note: Phase transitions (done, new dashboard) are handled via action buttons.
+        This method only processes actual refinement requests.
+        """
         # Process refinement request
         if self.state.generated_markdown and self.state.created_file:
             # Include current markdown in context
