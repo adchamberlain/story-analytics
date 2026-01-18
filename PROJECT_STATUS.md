@@ -2,6 +2,15 @@
 
 Conversational AI dashboard builder using Evidence.dev + Claude/OpenAI/Gemini.
 
+## Design Philosophy: AI-Native
+
+Story is intentionally AI-native. We avoid naive string/keyword matching for control flow:
+- No regex or substring checks to detect user intent
+- No phrase lists to trigger actions
+- Instead: **explicit UI affordances** (buttons) for unambiguous intent, **LLM understanding** for natural language interpretation
+
+See `CLAUDE.md` for development guidelines.
+
 ## What's Built
 
 ### 1. Web Application
@@ -34,7 +43,8 @@ Conversational AI dashboard builder using Evidence.dev + Claude/OpenAI/Gemini.
 - **State management**: Svelte stores for auth, conversations, messages
 
 ### 2. LLM Conversation Engine (`engine/`)
-- **Conversation flow**: Intent → Generation → Refinement
+- **Conversation flow**: Intent → Context → Generation → Refinement
+- **Button-driven phase transitions**: Explicit actions instead of language parsing
 - **Multi-provider support**: Claude, OpenAI, Gemini (user-selectable)
 - **Features**:
   - Create dashboards via natural language
@@ -43,6 +53,13 @@ Conversational AI dashboard builder using Evidence.dev + Claude/OpenAI/Gemini.
   - SQL pre-validation against DuckDB
   - Automatic format string fixing
   - LLM-generated conversation titles
+
+**Action Buttons by Phase:**
+| Phase | Buttons | Purpose |
+|-------|---------|---------|
+| Landing | Create New / Edit Existing | Choose intent |
+| Context | Generate / Modify Plan | Build or refine plan |
+| Refinement | Done / Modify | Complete or iterate |
 
 **Key files:**
 - `engine/conversation.py` - Conversation state machine
@@ -180,12 +197,13 @@ qa_history
 7. **Gemini API key**: Fixed to prioritize GOOGLE_API_KEY env var
 8. **SQL validation**: Fixed trailing semicolon issue in subqueries
 9. **Provider race condition**: Fixed ProviderSelect binding issue
+10. **Fragile language parsing**: Replaced with explicit action buttons (no more "edit" in "net MRR changes" triggering edit mode)
 
 ## What's Next
 
 - [ ] Scheduled QA monitoring for all dashboards
 - [ ] More chart types and layouts
-- [ ] Dashboard templates
+- [x] Dashboard templates (quick-start templates available)
 - [ ] Multi-user permissions
 - [ ] Dashboard sharing/embedding
 - [ ] Production deployment
