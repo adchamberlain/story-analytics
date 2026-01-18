@@ -4,6 +4,7 @@
 	import type { ExtendedMessage } from '../stores/conversation';
 
 	export let message: ExtendedMessage;
+	export let disabled: boolean = false;
 
 	const dispatch = createEventDispatcher<{
 		optionSelect: { value: string };
@@ -74,10 +75,14 @@
 							<button
 								type="button"
 								on:click={() => handleActionClick(button.id)}
-								class="px-4 py-2 text-sm font-medium rounded transition-colors cursor-pointer
+								{disabled}
+								class="px-4 py-2 text-sm font-medium rounded transition-colors
+									{disabled
+									? 'opacity-50 cursor-not-allowed'
+									: 'cursor-pointer'}
 									{button.style === 'primary'
-									? 'bg-terminal-accent text-terminal-bg hover:bg-terminal-accent/80'
-									: 'bg-terminal-surface border border-terminal-border hover:border-terminal-accent hover:text-terminal-accent'}"
+									? 'bg-terminal-accent text-terminal-bg' + (disabled ? '' : ' hover:bg-terminal-accent/80')
+									: 'bg-terminal-surface border border-terminal-border' + (disabled ? '' : ' hover:border-terminal-accent hover:text-terminal-accent')}"
 							>
 								{button.label}
 							</button>

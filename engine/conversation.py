@@ -385,16 +385,14 @@ class ConversationManager:
 
         elif action_id == "create_new":
             # User explicitly chose to create a new dashboard
+            # Don't show buttons yet - user needs to describe what they want first
             self.state.intent = "create"
             self.state.phase = ConversationPhase.CONTEXT
             response = "What kind of dashboard would you like to create? Describe what business decisions it should help you make."
             self.state.messages.append(Message(role="assistant", content=response))
             return ConversationResult(
                 response=response,
-                action_buttons=[
-                    ActionButton(id="generate", label="Generate", style="primary"),
-                    ActionButton(id="plan", label="Plan More", style="secondary"),
-                ],
+                action_buttons=None,  # No buttons until user provides input
             )
 
         elif action_id == "edit_existing":
