@@ -18,8 +18,7 @@
 		startNewConversation,
 		renameConversation
 	} from '../stores/conversation';
-	import { templates, templatesLoading, loadTemplates } from '../stores/templates';
-	import { tables, schemaLoading, loadSchema } from '../stores/schema';
+	import { templates, loadTemplates } from '../stores/templates';
 
 	export let editSlug: string | null = null;
 
@@ -29,11 +28,16 @@
 	let editingDashboard: Dashboard | null = null;
 	let pendingInput = '';
 
+	// Show templates when awaiting user's first description in CONTEXT phase
+	$: showTemplates = $phase === 'context'
+		&& $messages.length === 1
+		&& $messages[0]?.role === 'assistant'
+		&& !$messages[0]?.action_buttons;
+
 	onMount(async () => {
 		loadConversation();
 		loadConversationList();
 		loadTemplates();
-		loadSchema();
 
 		// If editing a dashboard, load its info
 		if (editSlug) {
@@ -45,16 +49,12 @@
 		}
 	});
 
-	function handleTemplateSelect(event: CustomEvent<{ prompt: string }>) {
-		pendingInput = event.detail.prompt;
-	}
-
-	function handleTableClick(tableName: string) {
-		pendingInput = `Create a dashboard using the ${tableName} table`;
-	}
-
 	function handleOptionSelect(event: CustomEvent<{ value: string }>) {
 		pendingInput = event.detail.value;
+	}
+
+	function handleTemplateSelect(event: CustomEvent<{ prompt: string }>) {
+		pendingInput = event.detail.prompt;
 	}
 
 	async function handleActionClick(event: CustomEvent<{ id: string }>) {
@@ -184,16 +184,16 @@
 						</div>
 					</div>
 				{:else}
-					<div class="text-center mb-6">
+					<div class="text-center">
 						<p class="mb-2">Welcome to Story Analytics</p>
-						<p class="text-sm mb-4">
+						<p class="text-sm text-terminal-dim mb-6">
 							What would you like to do?
 						</p>
 						<div class="flex justify-center gap-3">
 							<button
 								type="button"
 								on:click={() => handleActionClick({ detail: { id: 'create_new' } })}
-								class="px-4 py-2 text-sm font-medium rounded transition-colors
+								class="px-5 py-2.5 text-sm font-medium rounded transition-colors
 									bg-terminal-accent text-terminal-bg hover:bg-terminal-accent/80"
 							>
 								Create New Dashboard
@@ -201,59 +201,31 @@
 							<button
 								type="button"
 								on:click={() => handleActionClick({ detail: { id: 'edit_existing' } })}
-								class="px-4 py-2 text-sm font-medium rounded transition-colors
+								class="px-5 py-2.5 text-sm font-medium rounded transition-colors
 									bg-terminal-surface border border-terminal-border hover:border-terminal-accent hover:text-terminal-accent"
 							>
 								Edit Existing
 							</button>
 						</div>
 					</div>
-
-					<!-- Available Data Chips -->
-					{#if $tables.length > 0}
-						<div class="mb-6">
-							<p class="text-terminal-dim text-xs mb-2 text-center">Available data:</p>
-							<div class="flex flex-wrap justify-center gap-2">
-								{#each $tables.slice(0, 6) as table}
-									<button
-										type="button"
-										on:click={() => handleTableClick(table.name)}
-										class="px-2 py-1 text-xs bg-terminal-surface border border-terminal-border rounded
-                                               hover:border-terminal-accent hover:text-terminal-accent transition-colors"
-									>
-										{table.name}
-									</button>
-								{/each}
-								{#if $tables.length > 6}
-									<span class="px-2 py-1 text-xs text-terminal-dim">
-										+{$tables.length - 6} more
-									</span>
-								{/if}
-							</div>
-						</div>
-					{/if}
-
-					<!-- Template Cards -->
-					{#if $templates.length > 0}
-						<div>
-							<p class="text-terminal-dim text-xs mb-3 text-center">Quick start templates:</p>
-							<div class="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-2xl mx-auto">
-								{#each $templates.slice(0, 4) as template}
-									<TemplateCard {template} on:select={handleTemplateSelect} />
-								{/each}
-							</div>
-						</div>
-					{:else if $templatesLoading}
-						<div class="text-center text-terminal-dim text-sm">
-							Loading templates...
-						</div>
-					{/if}
 				{/if}
 			</div>
 		{:else}
 			{#each $messages as message}
-				<Message {message} on:optionSelect={handleOptionSelect} on:actionClick={handleActionClick} />
+				<Message {message} disabled={$conversationLoading} on:optionSelect={handleOptionSelect} on:actionClick={handleActionClick} />
 			{/each}
+
+			<!-- Show templates when awaiting user's first input -->
+			{#if showTemplates && $templates.length > 0}
+				<div class="mt-6 pl-4">
+					<p class="text-terminal-dim text-xs mb-3">Or choose a quick start template:</p>
+					<div class="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-2xl">
+						{#each $templates.slice(0, 4) as template}
+							<TemplateCard {template} on:select={handleTemplateSelect} />
+						{/each}
+					</div>
+				</div>
+			{/if}
 		{/if}
 
 		{#if $lastDashboard?.created}
