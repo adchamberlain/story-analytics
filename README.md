@@ -13,6 +13,7 @@ Built on [Evidence.dev](https://evidence.dev) for rendering. Choose Claude, Open
 ## Features
 
 - **Natural language to dashboard** - Describe what you want, Story builds it
+- **Button-driven workflow** - Explicit actions (Generate, Modify, Done) instead of magic words
 - **Choose your AI** - Claude, OpenAI, or Gemini
 - **Automatic SQL generation** - No need to write queries manually
 - **QA validation** - Screenshots and validates dashboards automatically
@@ -58,14 +59,17 @@ python -m engine
 
 ## Usage
 
-Once running, simply describe what you want:
+1. Click **Create New Dashboard** or **Edit Existing**
+2. Describe what you want, or choose a quick-start template
+3. Click **Generate** when ready, or **Modify Plan** to refine
+4. After generation, click **Done** or **Modify** to iterate
 
-- "Create a customer churn dashboard"
-- "Show me revenue trends by region"
+Example prompts:
+- "Show me MRR trends and churn rates"
 - "I need a dashboard tracking user signups over time"
-- "Edit the sales dashboard to add a monthly breakdown"
+- "Revenue by region with monthly breakdown"
 
-Story will gather context, understand your data, and generate the dashboard.
+Story will understand your data and generate the dashboard.
 
 ## LLM Providers
 
