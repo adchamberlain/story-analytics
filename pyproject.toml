@@ -1,0 +1,32 @@
+[project]
+name = "story-analytics"
+version = "0.1.0"
+description = "AI-native dashboard creation tool"
+requires-python = ">=3.10"
+
+[tool.pytest.ini_options]
+testpaths = ["engine/tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short"
+markers = [
+    "unit: Fast tests with no external dependencies",
+    "integration: Tests that use mocked LLM responses",
+    "e2e: End-to-end tests with live LLM calls (slow, expensive)",
+    "slow: Tests that take more than 5 seconds",
+]
+filterwarnings = [
+    "ignore::DeprecationWarning",
+]
+
+[tool.coverage.run]
+source = ["engine", "api"]
+omit = ["*/tests/*", "*/__pycache__/*"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+]
