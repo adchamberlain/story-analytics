@@ -20,6 +20,21 @@ Story Analytics is a dashboard creation tool that combines:
 - **Evidence** (npm-based BI framework) for rendering dashboards
 - **Python conversation engine** for creating dashboards via natural language
 
+## Environment Setup (IMPORTANT for Remote/Mobile Sessions)
+
+The `.env` file contains credentials and is gitignored. **At the start of any session**, check if `.env` exists:
+
+```bash
+test -f .env && echo "exists" || echo "missing"
+```
+
+If `.env` is missing, ask the user to provide credentials for the following required variables:
+- `ANTHROPIC_API_KEY`
+- `SNOWFLAKE_USERNAME`
+- `SNOWFLAKE_PASSWORD`
+
+Then create `.env` based on `.env.example` with the provided values. The conversation engine will not work without these credentials.
+
 ## Setup Steps (Run These When Starting Development)
 
 When the user wants to develop or test, run these commands:
@@ -50,7 +65,7 @@ When the user wants to develop or test, run these commands:
    ```bash
    python -m engine
    ```
-   Requires `ANTHROPIC_API_KEY` environment variable.
+   Credentials are loaded from `.env` file (see Environment Setup above).
 
 ## QA Validation Feature
 
@@ -65,13 +80,14 @@ This runs automatically after each dashboard is created.
 ## Snowflake Connection
 
 The Snowflake connection file is at `sources/snowflake_saas/connection.yaml` (gitignored).
+Credentials use `${VAR}` syntax to load from `.env` file.
 
 Account identifier: `abebbgm-jxb85658`
 Database: `ANALYTICS_POC`
 Warehouse: `COMPUTE_WH`
 Schema: `SAAS_DEMO`
 
-If the connection file is missing, copy from `connection.yaml.example` and add credentials.
+If connection issues occur, ensure `SNOWFLAKE_USERNAME` and `SNOWFLAKE_PASSWORD` are set in `.env`.
 
 ## Configuration-Driven Architecture
 
