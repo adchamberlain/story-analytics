@@ -1,10 +1,12 @@
 # Copy this file to connection.yaml and fill in your credentials
+# Option 1: Hardcode credentials here (local development only)
+# Option 2: Use ${ENV_VAR} syntax to load from .env file (recommended for portability)
 name: snowflake_saas
 type: snowflake
 options:
   account: abebbgm-jxb85658
-  username: YOUR_USERNAME
-  password: YOUR_PASSWORD
+  username: ${SNOWFLAKE_USERNAME}
+  password: ${SNOWFLAKE_PASSWORD}
   database: ANALYTICS_POC
   warehouse: COMPUTE_WH
   schema: SAAS_DEMO
