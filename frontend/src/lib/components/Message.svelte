@@ -72,17 +72,19 @@
 				{#if message.action_buttons && message.action_buttons.length > 0}
 					<div class="mt-4 flex flex-wrap gap-2">
 						{#each message.action_buttons as button}
+							{@const isViewDashboard = button.id.startsWith('view_dashboard:')}
+							{@const buttonDisabled = disabled && !isViewDashboard}
 							<button
 								type="button"
 								on:click={() => handleActionClick(button.id)}
-								{disabled}
+								disabled={buttonDisabled}
 								class="px-4 py-2 text-sm font-medium rounded transition-colors
-									{disabled
+									{buttonDisabled
 									? 'opacity-50 cursor-not-allowed'
 									: 'cursor-pointer'}
 									{button.style === 'primary'
-									? 'bg-terminal-accent text-terminal-bg' + (disabled ? '' : ' hover:bg-terminal-accent/80')
-									: 'bg-terminal-surface border border-terminal-border' + (disabled ? '' : ' hover:border-terminal-accent hover:text-terminal-accent')}"
+									? 'bg-terminal-accent text-terminal-bg' + (buttonDisabled ? '' : ' hover:bg-terminal-accent/80')
+									: 'bg-terminal-surface border border-terminal-border' + (buttonDisabled ? '' : ' hover:border-terminal-accent hover:text-terminal-accent')}"
 							>
 								{button.label}
 							</button>

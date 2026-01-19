@@ -2,10 +2,15 @@
 Conversation router for chat interactions.
 """
 
+import asyncio
+import json
 import sys
 from pathlib import Path
+from queue import Queue, Empty
+from threading import Thread
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -302,6 +307,194 @@ async def send_message(
         )
 
 
+@router.post("/message/stream")
+async def send_message_stream(
+    request: MessageRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Send a message and stream progress updates via Server-Sent Events.
+
+    This endpoint streams progress events during dashboard generation,
+    then sends the final response. Events are formatted as SSE.
+
+    Event types:
+    - progress: Progress updates during generation
+    - complete: Final response with full message data
+    - error: Error occurred during processing
+    """
+    session = get_or_create_session(db, current_user, request.session_id)
+
+    if request.session_id and not session:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Conversation not found",
+        )
+
+    # Queue to collect progress events from the background thread
+    progress_queue: Queue = Queue()
+    result_holder = {"result": None, "error": None}
+
+    def process_message_with_progress():
+        """Process message in a background thread, emitting progress to queue."""
+        try:
+            from engine.conversation import ConversationManager
+            from engine.progress import ProgressEmitter, ProgressEvent
+
+            # Create progress emitter that pushes to queue
+            emitter = ProgressEmitter()
+            emitter.add_callback(lambda event: progress_queue.put(("progress", event)))
+
+            # Create conversation manager with progress emitter
+            manager = ConversationManager(
+                provider_name=current_user.preferred_provider,
+                source_name=current_user.preferred_source,
+                progress_emitter=emitter,
+            )
+            restore_manager_state(manager, session, db)
+
+            # Track if this is the first message
+            is_first_message = len(session.messages) == 0
+
+            # Process the message
+            result = manager.process_message(request.message)
+
+            # Save state
+            save_manager_state(manager, session)
+            db.commit()
+
+            # Generate title if first message
+            if is_first_message and not session.title:
+                session.title = generate_conversation_title(
+                    request.message, result.response, current_user.preferred_provider
+                )
+                db.commit()
+
+            # Build response data (same as non-streaming endpoint)
+            dashboard_url = None
+            dashboard_created = False
+            dashboard_slug = None
+
+            if manager.state.created_file:
+                slug = manager.state.created_file.parent.name
+                dashboard_url = f"{settings.evidence_base_url}/{slug}"
+                dashboard_created = True
+                dashboard_slug = slug
+
+                # Save dashboard
+                title = manager.state.dashboard_title or slug
+                existing_dashboard = (
+                    db.query(Dashboard)
+                    .filter(Dashboard.user_id == current_user.id, Dashboard.slug == slug)
+                    .first()
+                )
+                if not existing_dashboard:
+                    dashboard = Dashboard(
+                        user_id=current_user.id,
+                        slug=slug,
+                        title=title,
+                        file_path=str(manager.state.created_file),
+                        original_request=manager.state.original_request,
+                    )
+                    db.add(dashboard)
+                    db.commit()
+                    db.refresh(dashboard)
+                else:
+                    if not existing_dashboard.original_request and manager.state.original_request:
+                        existing_dashboard.original_request = manager.state.original_request
+                        db.commit()
+                    dashboard = existing_dashboard
+                    session.dashboard_id = dashboard.id
+                    session.title = title
+                    db.commit()
+
+            # Build final response
+            response_data = {
+                "response": result.response,
+                "phase": session.phase,
+                "session_id": session.id,
+                "title": session.title,
+                "dashboard_url": dashboard_url,
+                "dashboard_slug": dashboard_slug,
+                "dashboard_created": dashboard_created,
+                "clarifying_options": [
+                    {"label": opt.label, "value": opt.value}
+                    for opt in (result.clarifying_options or [])
+                ],
+                "action_buttons": [
+                    {"id": btn.id, "label": btn.label, "style": btn.style}
+                    for btn in (result.action_buttons or [])
+                ] if result.action_buttons else None,
+                "qa_result": None,
+                "error_context": result.error_context,
+            }
+
+            # Add QA result if present
+            if result.qa_result:
+                screenshot_url = None
+                if result.qa_result.screenshot_path:
+                    screenshot_filename = Path(result.qa_result.screenshot_path).name
+                    screenshot_url = f"/api/dashboards/screenshots/{screenshot_filename}"
+
+                response_data["qa_result"] = {
+                    "passed": result.qa_result.passed,
+                    "summary": result.qa_result.summary,
+                    "critical_issues": result.qa_result.critical_issues,
+                    "suggestions": result.qa_result.suggestions,
+                    "screenshot_url": screenshot_url,
+                    "auto_fixed": result.qa_result.auto_fixed,
+                    "issues_fixed": result.qa_result.issues_fixed,
+                }
+
+            result_holder["result"] = response_data
+
+        except Exception as e:
+            result_holder["error"] = str(e)
+
+        # Signal completion
+        progress_queue.put(("done", None))
+
+    async def event_generator():
+        """Generate SSE events from the progress queue."""
+        # Start processing in background thread
+        thread = Thread(target=process_message_with_progress)
+        thread.start()
+
+        try:
+            while True:
+                # Check queue with timeout
+                try:
+                    event_type, event_data = await asyncio.get_event_loop().run_in_executor(
+                        None, lambda: progress_queue.get(timeout=0.1)
+                    )
+                except Empty:
+                    continue
+
+                if event_type == "done":
+                    # Send final result or error
+                    if result_holder["error"]:
+                        yield f"event: error\ndata: {json.dumps({'error': result_holder['error']})}\n\n"
+                    else:
+                        yield f"event: complete\ndata: {json.dumps(result_holder['result'])}\n\n"
+                    break
+                elif event_type == "progress":
+                    yield f"event: progress\ndata: {json.dumps(event_data.to_dict())}\n\n"
+
+        finally:
+            thread.join(timeout=1.0)
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
 @router.get("/list", response_model=ConversationListResponse)
 async def list_conversations(
     current_user: User = Depends(get_current_user),
@@ -390,6 +583,21 @@ async def new_conversation(
     db: Session = Depends(get_db),
 ):
     """Start a new conversation session."""
+    # Delete any empty conversations for this user (no messages or only system messages)
+    empty_sessions = (
+        db.query(ConversationSession)
+        .filter(ConversationSession.user_id == current_user.id)
+        .all()
+    )
+    for sess in empty_sessions:
+        # Check if session has no user messages
+        has_user_message = any(
+            m.get("role") == "user" for m in (sess.messages or [])
+        )
+        if not has_user_message:
+            db.delete(sess)
+    db.commit()
+
     # Create new session
     session = ConversationSession(user_id=current_user.id, messages=[], phase="intent")
     db.add(session)

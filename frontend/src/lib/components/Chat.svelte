@@ -5,11 +5,13 @@
 	import TerminalInput from './TerminalInput.svelte';
 	import TemplateCard from './TemplateCard.svelte';
 	import QAResultPanel from './QAResultPanel.svelte';
+	import ProgressSteps from './ProgressSteps.svelte';
 	import { getDashboard, type Dashboard } from '../api';
 	import {
 		messages,
 		phase,
 		conversationLoading,
+		conversationComplete,
 		lastDashboard,
 		currentTitle,
 		currentSessionId,
@@ -20,6 +22,7 @@
 		renameConversation
 	} from '../stores/conversation';
 	import { templates, loadTemplates } from '../stores/templates';
+	import { justLoggedIn, clearJustLoggedIn } from '../stores/auth';
 
 	export let editSlug: string | null = null;
 
@@ -35,8 +38,20 @@
 		&& $messages[0]?.role === 'assistant'
 		&& !$messages[0]?.action_buttons;
 
+	// Show rotating suggestions only in early context phase (before user has described their dashboard)
+	$: showSuggestions = !editingDashboard
+		&& $phase === 'context'
+		&& $messages.length <= 2;
+
 	onMount(async () => {
-		loadConversation();
+		// If user just logged in, start with a fresh conversation
+		if ($justLoggedIn) {
+			clearJustLoggedIn();
+			await startNewConversation();
+		} else {
+			await loadConversation();
+		}
+
 		loadConversationList();
 		loadTemplates();
 
@@ -59,8 +74,17 @@
 	}
 
 	async function handleActionClick(event: CustomEvent<{ id: string }>) {
+		const actionId = event.detail.id;
+
+		// Handle view_dashboard action specially - open URL in new tab
+		if (actionId.startsWith('view_dashboard:')) {
+			const url = actionId.slice('view_dashboard:'.length);
+			window.open(url, '_blank');
+			return;
+		}
+
 		// Send action with special prefix to backend
-		await sendMessage(`__action:${event.detail.id}`);
+		await sendMessage(`__action:${actionId}`);
 	}
 
 	function clearEditMode() {
@@ -113,7 +137,8 @@
 			intent: 'Starting',
 			context: 'Understanding context',
 			generation: 'Generating dashboard',
-			refinement: 'Refining'
+			refinement: 'Refining',
+			complete: 'Complete'
 		};
 		return labels[p] || p;
 	}
@@ -213,7 +238,7 @@
 			</div>
 		{:else}
 			{#each $messages as message}
-				<Message {message} disabled={$conversationLoading} on:optionSelect={handleOptionSelect} on:actionClick={handleActionClick} />
+				<Message {message} disabled={$conversationLoading || $conversationComplete} on:optionSelect={handleOptionSelect} on:actionClick={handleActionClick} />
 			{/each}
 
 			<!-- Show templates when awaiting user's first input -->
@@ -271,6 +296,9 @@
 		{/if}
 	</div>
 
+	<!-- Progress Steps (shown during streaming generation) -->
+	<ProgressSteps />
+
 	<!-- Input -->
 	<div class="px-4 py-4 border-t border-terminal-border">
 		<TerminalInput
@@ -280,6 +308,7 @@
 				? "Describe what changes you'd like to make..."
 				: undefined}
 			bind:prefill={pendingInput}
+			{showSuggestions}
 		/>
 	</div>
 </div>

@@ -15,6 +15,15 @@ from enum import Enum
 
 from ..schema import get_schema_context
 from ..sql_validator import validate_dashboard_sql, SQLValidator
+from ..progress import (
+    ProgressEmitter,
+    ProgressStatus,
+    STEP_REQUIREMENTS,
+    STEP_FEASIBILITY,
+    STEP_SQL,
+    STEP_LAYOUT,
+    STEP_VALIDATION,
+)
 from .models import DashboardSpec, PipelineResult, ValidatedQueries
 from .requirements_agent import RequirementsAgent
 from .sql_agent import SQLAgent
@@ -42,6 +51,7 @@ class PipelineConfig:
     max_orchestrator_loops: int = 3  # Total orchestrator retry loops
     check_feasibility: bool = True  # Check if data exists before generating
     verbose: bool = True
+    progress_emitter: ProgressEmitter | None = None  # Optional progress callback
 
 
 @dataclass
@@ -90,6 +100,17 @@ class DashboardPipeline:
             self._schema_context = get_schema_context()
         return self._schema_context
 
+    def _emit_progress(
+        self,
+        step: str,
+        status: ProgressStatus,
+        message: str,
+        details: str | None = None
+    ):
+        """Emit a progress event if an emitter is configured."""
+        if self.config.progress_emitter:
+            self.config.progress_emitter.emit(step, status, message, details)
+
     def run(self, user_request: str) -> PipelineResult:
         """
         Run the full dashboard generation pipeline with orchestration.
@@ -125,6 +146,11 @@ class DashboardPipeline:
             if spec is None:
                 if self.config.verbose:
                     print("[Pipeline] Stage 1: Extracting requirements...")
+                self._emit_progress(
+                    STEP_REQUIREMENTS,
+                    ProgressStatus.IN_PROGRESS,
+                    "Analyzing your request..."
+                )
 
                 try:
                     spec = self.requirements_agent.extract_spec(user_request, schema)
@@ -132,7 +158,19 @@ class DashboardPipeline:
                         print(f"[Pipeline]   Title: {spec.title}")
                         print(f"[Pipeline]   Metrics: {len(spec.metrics)}")
                         print(f"[Pipeline]   Visualizations: {len(spec.visualizations)}")
+                    self._emit_progress(
+                        STEP_REQUIREMENTS,
+                        ProgressStatus.COMPLETED,
+                        "Requirements extracted",
+                        f"{len(spec.metrics)} metrics, {len(spec.visualizations)} visualizations"
+                    )
                 except Exception as e:
+                    self._emit_progress(
+                        STEP_REQUIREMENTS,
+                        ProgressStatus.FAILED,
+                        "Failed to extract requirements",
+                        str(e)
+                    )
                     return PipelineResult(
                         success=False,
                         error=f"Requirements extraction failed: {e}",
@@ -142,6 +180,11 @@ class DashboardPipeline:
                 if self.config.check_feasibility and orchestrator_attempts == 1:
                     if self.config.verbose:
                         print("[Pipeline] Stage 1.5: Checking data feasibility...")
+                    self._emit_progress(
+                        STEP_FEASIBILITY,
+                        ProgressStatus.IN_PROGRESS,
+                        "Checking data availability..."
+                    )
 
                     try:
                         feasibility = self.feasibility_checker.check(spec, schema)
@@ -150,6 +193,12 @@ class DashboardPipeline:
                             # Completely infeasible - return early with explanation
                             if self.config.verbose:
                                 print("[Pipeline]   NOT FEASIBLE - no data available for this request")
+                            self._emit_progress(
+                                STEP_FEASIBILITY,
+                                ProgressStatus.FAILED,
+                                "Required data not available",
+                                feasibility.explanation
+                            )
                             return PipelineResult(
                                 success=False,
                                 dashboard_spec=spec,
@@ -165,18 +214,39 @@ class DashboardPipeline:
                                 print(f"[Pipeline]     Cannot build: {', '.join(feasibility.infeasible_parts[:3])}")
                             # Store feasibility result for later reporting
                             spec.feasibility_result = feasibility
+                            self._emit_progress(
+                                STEP_FEASIBILITY,
+                                ProgressStatus.COMPLETED,
+                                "Partially feasible",
+                                f"Can build {len(feasibility.feasible_parts)} of {len(feasibility.feasible_parts) + len(feasibility.infeasible_parts)} items"
+                            )
                         else:
                             if self.config.verbose:
                                 print("[Pipeline]   Fully feasible!")
+                            self._emit_progress(
+                                STEP_FEASIBILITY,
+                                ProgressStatus.COMPLETED,
+                                "Data available"
+                            )
 
                     except Exception as e:
                         if self.config.verbose:
                             print(f"[Pipeline]   Feasibility check failed (continuing anyway): {e}")
+                        self._emit_progress(
+                            STEP_FEASIBILITY,
+                            ProgressStatus.COMPLETED,
+                            "Feasibility check skipped"
+                        )
 
             # Stage 2: Generate and validate SQL (only if not already done)
             if queries is None or not queries.all_valid:
                 if self.config.verbose:
                     print("[Pipeline] Stage 2: Generating SQL queries...")
+                self._emit_progress(
+                    STEP_SQL,
+                    ProgressStatus.IN_PROGRESS,
+                    "Generating SQL queries..."
+                )
 
                 try:
                     queries = self.sql_agent.generate_queries(spec, schema)
@@ -194,11 +264,29 @@ class DashboardPipeline:
                         )
                         if self.config.verbose:
                             print(f"[Orchestrator] {diagnosis.suggested_action}")
+                        self._emit_progress(
+                            STEP_SQL,
+                            ProgressStatus.IN_PROGRESS,
+                            "Retrying SQL generation..."
+                        )
                         # Reset queries to retry
                         queries = None
                         continue
 
+                    self._emit_progress(
+                        STEP_SQL,
+                        ProgressStatus.COMPLETED,
+                        "SQL queries validated",
+                        f"{len(queries.queries)} queries"
+                    )
+
                 except Exception as e:
+                    self._emit_progress(
+                        STEP_SQL,
+                        ProgressStatus.FAILED,
+                        "SQL generation failed",
+                        str(e)
+                    )
                     return PipelineResult(
                         success=False,
                         dashboard_spec=spec,
@@ -208,12 +296,28 @@ class DashboardPipeline:
             # Stage 3: Assemble layout
             if self.config.verbose:
                 print("[Pipeline] Stage 3: Assembling dashboard layout...")
+            self._emit_progress(
+                STEP_LAYOUT,
+                ProgressStatus.IN_PROGRESS,
+                "Building dashboard layout..."
+            )
 
             try:
                 markdown = self.layout_agent.assemble_dashboard(spec, queries)
                 if self.config.verbose:
                     print(f"[Pipeline]   Markdown length: {len(markdown)} chars")
+                self._emit_progress(
+                    STEP_LAYOUT,
+                    ProgressStatus.COMPLETED,
+                    "Layout assembled"
+                )
             except Exception as e:
+                self._emit_progress(
+                    STEP_LAYOUT,
+                    ProgressStatus.FAILED,
+                    "Layout assembly failed",
+                    str(e)
+                )
                 return PipelineResult(
                     success=False,
                     dashboard_spec=spec,
@@ -224,6 +328,11 @@ class DashboardPipeline:
             # Stage 4: Post-assembly SQL validation
             if self.config.verbose:
                 print("[Pipeline] Stage 4: Validating assembled SQL...")
+            self._emit_progress(
+                STEP_VALIDATION,
+                ProgressStatus.IN_PROGRESS,
+                "Validating dashboard..."
+            )
 
             validation = validate_dashboard_sql(markdown)
 
@@ -231,6 +340,11 @@ class DashboardPipeline:
                 if self.config.verbose:
                     print("[Pipeline]   All SQL valid in final markdown!")
                     print("[Pipeline] Complete!")
+                self._emit_progress(
+                    STEP_VALIDATION,
+                    ProgressStatus.COMPLETED,
+                    "Dashboard validated"
+                )
 
                 return PipelineResult(
                     success=True,

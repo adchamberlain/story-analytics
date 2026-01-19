@@ -18,6 +18,13 @@ from .llm.base import Message
 from .llm.claude import get_provider
 from .parser import DashboardParser
 from .pipeline import DashboardPipeline, PipelineConfig
+from .progress import (
+    ProgressEmitter,
+    ProgressStatus,
+    STEP_WRITING,
+    STEP_QA,
+    STEP_COMPLETE,
+)
 from .qa import DashboardQA, QAResult, run_qa_with_auto_fix
 from .schema import get_schema_context
 
@@ -29,6 +36,7 @@ class ConversationPhase(Enum):
     CONTEXT = "context"  # What decision should this help make?
     GENERATION = "generation"  # Generate the dashboard
     REFINEMENT = "refinement"  # Iterate on feedback
+    COMPLETE = "complete"  # Dashboard finished, user clicked Done
 
 
 @dataclass
@@ -101,7 +109,12 @@ class ConversationState:
 class ConversationManager:
     """Manages the conversation flow for dashboard creation/editing."""
 
-    def __init__(self, provider_name: str | None = None, source_name: str | None = None):
+    def __init__(
+        self,
+        provider_name: str | None = None,
+        source_name: str | None = None,
+        progress_emitter: ProgressEmitter | None = None
+    ):
         self.config = get_config()
         self.config_loader = get_config_loader()
         self.llm = get_provider(provider_name)
@@ -110,15 +123,28 @@ class ConversationManager:
         self.state = ConversationState()
         self._schema_context: str | None = None
         self._default_source = source_name or "snowflake_saas"
+        self._progress_emitter = progress_emitter
 
         # Initialize the pipeline with orchestration
         self._pipeline = DashboardPipeline(PipelineConfig(
             provider_name=provider_name,
             verbose=True,
+            progress_emitter=progress_emitter,
         ))
 
         print(f"[LLM] Using provider: {self.llm.name}, model: {self.llm.model}")
         print(f"[Mode] Generation mode: pipeline")
+
+    def _emit_progress(
+        self,
+        step: str,
+        status: ProgressStatus,
+        message: str,
+        details: str | None = None
+    ):
+        """Emit a progress event if an emitter is configured."""
+        if self._progress_emitter:
+            self._progress_emitter.emit(step, status, message, details)
 
     def reset(self):
         """Reset conversation state."""
@@ -452,12 +478,16 @@ class ConversationManager:
 
         elif action_id == "done":
             # Conversation complete
+            self.state.phase = ConversationPhase.COMPLETE
             slug = self.state.created_file.parent.name if self.state.created_file else "dashboard"
-            response = f"Great! Your dashboard is ready at: {self.config.dev_url}/{slug}\n\nClick '+ New' in the top right to create another dashboard."
+            url = f"{self.config.dev_url}/{slug}"
+            response = "Great! Your dashboard is ready."
             self.state.messages.append(Message(role="assistant", content=response))
             return ConversationResult(
                 response=response,
-                action_buttons=None,  # No more buttons
+                action_buttons=[
+                    ActionButton(id=f"view_dashboard:{url}", label="View Dashboard", style="primary"),
+                ],
             )
 
         elif action_id == "modify":
@@ -637,12 +667,25 @@ class ConversationManager:
         qa_result_data = None
 
         try:
+            self._emit_progress(
+                STEP_WRITING,
+                ProgressStatus.IN_PROGRESS,
+                "Writing dashboard file..."
+            )
+
             file_path = create_dashboard_from_markdown(markdown, title)
             self.state.created_file = file_path
             self.state.phase = ConversationPhase.REFINEMENT
 
             slug = file_path.parent.name
             url = f"{self.config.dev_url}/{slug}"
+
+            self._emit_progress(
+                STEP_WRITING,
+                ProgressStatus.COMPLETED,
+                "Dashboard file created",
+                slug
+            )
 
             # Run QA validation with auto-fix loop (if enabled)
             qa_result = None
@@ -655,6 +698,11 @@ class ConversationManager:
             qa_request = self.get_full_user_request()
 
             if self.config_loader.is_qa_enabled() and qa_request:
+                self._emit_progress(
+                    STEP_QA,
+                    ProgressStatus.IN_PROGRESS,
+                    "Running QA validation..."
+                )
                 max_fix_attempts = self.config_loader.get_max_auto_fix_attempts()
                 should_auto_fix = self.config_loader.should_auto_fix_critical()
 
@@ -675,6 +723,22 @@ class ConversationManager:
                         self.state.generated_markdown = file_path.read_text()
                 else:
                     qa_result = self._run_qa_validation(slug)
+
+                # Emit QA completion status
+                if qa_result:
+                    if qa_result.passed:
+                        self._emit_progress(
+                            STEP_QA,
+                            ProgressStatus.COMPLETED,
+                            "QA validation passed"
+                        )
+                    else:
+                        self._emit_progress(
+                            STEP_QA,
+                            ProgressStatus.COMPLETED,
+                            "QA validation complete",
+                            f"{len(qa_result.critical_issues)} issues found" if qa_result.critical_issues else None
+                        )
 
             # Find the screenshot path (most recent for this slug)
             screenshots_dir = Path(__file__).parent.parent / "qa_screenshots"
@@ -738,10 +802,24 @@ Here's what I created:
             self.state.last_error = None
             self.state.can_retry = False
 
+            # Emit final completion event
+            self._emit_progress(
+                STEP_COMPLETE,
+                ProgressStatus.COMPLETED,
+                "Dashboard ready!",
+                slug
+            )
+
         except Exception as e:
             result = f"Error creating dashboard: {e}\n\nHere's the markdown I generated:\n{markdown[:500]}..."
             self.state.last_error = str(e)
             self.state.can_retry = True
+            self._emit_progress(
+                STEP_COMPLETE,
+                ProgressStatus.FAILED,
+                "Dashboard creation failed",
+                str(e)
+            )
 
         self.state.messages.append(Message(role="assistant", content=result))
         return result, qa_result_data
