@@ -384,15 +384,12 @@ class ConversationManager:
         action_id = action_id.lower().strip()
 
         if action_id == "plan":
-            # Stay in CONTEXT phase for more planning
+            # Stay in CONTEXT phase for more planning - no buttons, wait for text input
             response = "Great, let's plan out your dashboard. What specific metrics or visualizations would you like to include?"
             self.state.messages.append(Message(role="assistant", content=response))
             return ConversationResult(
                 response=response,
-                action_buttons=[
-                    ActionButton(id="generate", label="Generate", style="primary"),
-                    ActionButton(id="modify_plan", label="Modify Plan", style="secondary"),
-                ],
+                action_buttons=None,  # Wait for user to type their planning details
             )
 
         elif action_id == "generate_now" or action_id == "generate":
@@ -452,28 +449,22 @@ class ConversationManager:
             )
 
         elif action_id == "simplify":
-            # Go back to context phase to simplify the request
+            # Go back to context phase to simplify the request - no buttons, wait for text input
             self.state.phase = ConversationPhase.CONTEXT
             response = "Let's simplify your request. What's the single most important metric or visualization you need? We can start with that and add more later."
             self.state.messages.append(Message(role="assistant", content=response))
             return ConversationResult(
                 response=response,
-                action_buttons=[
-                    ActionButton(id="generate", label="Generate", style="primary"),
-                    ActionButton(id="modify_plan", label="Modify Plan", style="secondary"),
-                ],
+                action_buttons=None,  # Wait for user to describe simplified request
             )
 
         elif action_id == "modify_plan":
-            # Stay in CONTEXT for modifications
+            # Stay in CONTEXT for modifications - no buttons, wait for text input
             response = "What would you like to change or add to the plan?"
             self.state.messages.append(Message(role="assistant", content=response))
             return ConversationResult(
                 response=response,
-                action_buttons=[
-                    ActionButton(id="generate", label="Generate", style="primary"),
-                    ActionButton(id="modify_plan", label="Modify Plan", style="secondary"),
-                ],
+                action_buttons=None,  # Wait for user to type their changes
             )
 
         elif action_id == "done":
@@ -491,15 +482,12 @@ class ConversationManager:
             )
 
         elif action_id == "modify":
-            # Stay in REFINEMENT for modifications
+            # Stay in REFINEMENT for modifications - no buttons, wait for text input
             response = "What would you like to change about the dashboard?"
             self.state.messages.append(Message(role="assistant", content=response))
             return ConversationResult(
                 response=response,
-                action_buttons=[
-                    ActionButton(id="done", label="Done", style="primary"),
-                    ActionButton(id="modify", label="Modify", style="secondary"),
-                ],
+                action_buttons=None,  # Wait for user to type their changes
             )
 
         elif action_id == "create_new":
