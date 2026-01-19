@@ -144,6 +144,120 @@ export async function sendMessage(message: string, sessionId?: number): Promise<
 	return handleResponse<MessageResponse>(response);
 }
 
+/**
+ * Progress event from SSE stream.
+ */
+export interface ProgressEvent {
+	step: string;
+	status: 'pending' | 'in_progress' | 'completed' | 'failed';
+	message: string;
+	details?: string;
+}
+
+/**
+ * Callbacks for streaming message response.
+ */
+export interface StreamCallbacks {
+	onProgress?: (event: ProgressEvent) => void;
+	onComplete?: (response: MessageResponse) => void;
+	onError?: (error: string) => void;
+}
+
+/**
+ * Send a message and receive streaming progress updates via SSE.
+ * Returns a function to abort the stream.
+ */
+export function sendMessageStream(
+	message: string,
+	sessionId: number | undefined,
+	callbacks: StreamCallbacks
+): () => void {
+	const token = getToken();
+	const abortController = new AbortController();
+
+	const fetchStream = async () => {
+		try {
+			const response = await fetch(`${API_BASE}/conversation/message/stream`, {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+					...(token ? { Authorization: `Bearer ${token}` } : {})
+				},
+				body: JSON.stringify({ message, session_id: sessionId }),
+				signal: abortController.signal
+			});
+
+			if (response.status === 401) {
+				localStorage.removeItem('token');
+				window.location.href = '/login';
+				return;
+			}
+
+			if (!response.ok) {
+				const error = await response.json().catch(() => ({ detail: 'Unknown error' }));
+				callbacks.onError?.(error.detail || `HTTP ${response.status}`);
+				return;
+			}
+
+			const reader = response.body?.getReader();
+			if (!reader) {
+				callbacks.onError?.('No response body');
+				return;
+			}
+
+			const decoder = new TextDecoder();
+			let buffer = '';
+
+			while (true) {
+				const { done, value } = await reader.read();
+				if (done) break;
+
+				buffer += decoder.decode(value, { stream: true });
+
+				// Process complete SSE events from buffer
+				const lines = buffer.split('\n');
+				buffer = lines.pop() || ''; // Keep incomplete line in buffer
+
+				let eventType = '';
+				let eventData = '';
+
+				for (const line of lines) {
+					if (line.startsWith('event: ')) {
+						eventType = line.slice(7).trim();
+					} else if (line.startsWith('data: ')) {
+						eventData = line.slice(6);
+					} else if (line === '' && eventType && eventData) {
+						// End of event, process it
+						try {
+							const data = JSON.parse(eventData);
+							if (eventType === 'progress') {
+								callbacks.onProgress?.(data as ProgressEvent);
+							} else if (eventType === 'complete') {
+								callbacks.onComplete?.(data as MessageResponse);
+							} else if (eventType === 'error') {
+								callbacks.onError?.(data.error || 'Unknown error');
+							}
+						} catch (e) {
+							console.error('Failed to parse SSE data:', e);
+						}
+						eventType = '';
+						eventData = '';
+					}
+				}
+			}
+		} catch (e) {
+			if ((e as Error).name !== 'AbortError') {
+				callbacks.onError?.((e as Error).message || 'Stream error');
+			}
+		}
+	};
+
+	fetchStream();
+
+	// Return abort function
+	return () => abortController.abort();
+}
+
 export async function listConversations(): Promise<ConversationListResponse> {
 	const response = await fetchWithAuth('/conversation/list');
 	return handleResponse<ConversationListResponse>(response);

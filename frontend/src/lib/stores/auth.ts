@@ -12,6 +12,9 @@ export const user = writable<User | null>(null);
 // Loading state
 export const authLoading = writable<boolean>(true);
 
+// Track if user just logged in (to start fresh conversation)
+export const justLoggedIn = writable<boolean>(false);
+
 // Derived: is authenticated
 export const isAuthenticated = derived(user, ($user) => $user !== null);
 
@@ -45,6 +48,14 @@ export async function initAuth(): Promise<void> {
  */
 export function setUser(userData: User): void {
 	user.set(userData);
+	justLoggedIn.set(true);
+}
+
+/**
+ * Clear the just logged in flag.
+ */
+export function clearJustLoggedIn(): void {
+	justLoggedIn.set(false);
 }
 
 /**
