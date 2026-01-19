@@ -6,6 +6,7 @@ Provides a rich terminal UI for creating and editing dashboards.
 
 import sys
 
+from dotenv import load_dotenv
 from rich.console import Console
 from rich.markdown import Markdown
 from rich.panel import Panel
@@ -147,6 +148,9 @@ def run_conversation(manager: ConversationManager):
 
 def main():
     """Main entry point for the CLI."""
+    # Load environment variables from .env file
+    load_dotenv()
+
     console.print()
     print_welcome()
 

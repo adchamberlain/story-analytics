@@ -65,7 +65,10 @@ class Config:
         return self._config.get("evidence", {}).get("dev_url", "http://localhost:3000")
 
     def get_snowflake_config(self) -> dict[str, Any]:
-        """Load and return the Snowflake connection configuration."""
+        """Load and return the Snowflake connection configuration.
+
+        Supports environment variable substitution in the YAML using ${VAR_NAME} syntax.
+        """
         conn_file = self.snowflake_connection_file
         if not conn_file.exists():
             raise FileNotFoundError(f"Snowflake connection file not found: {conn_file}")
@@ -73,7 +76,17 @@ class Config:
         with open(conn_file) as f:
             config = yaml.safe_load(f)
 
-        return config.get("options", {})
+        options = config.get("options", {})
+
+        # Expand environment variables in values
+        for key, value in options.items():
+            if isinstance(value, str) and value.startswith("${") and value.endswith("}"):
+                env_var = value[2:-1]
+                env_value = os.environ.get(env_var)
+                if env_value:
+                    options[key] = env_value
+
+        return options
 
 
 # Global config instance
