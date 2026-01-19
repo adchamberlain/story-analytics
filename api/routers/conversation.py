@@ -229,15 +229,12 @@ async def send_message(
                 # Update original_request if it wasn't set before
                 if not existing_dashboard.original_request and manager.state.original_request:
                     existing_dashboard.original_request = manager.state.original_request
-                    db.commit()
                 dashboard = existing_dashboard
 
-                # Link conversation to dashboard
-                session.dashboard_id = dashboard.id
-
-                # Update conversation title to match dashboard
-                session.title = title
-                db.commit()
+            # Always link conversation to dashboard and update title
+            session.dashboard_id = dashboard.id
+            session.title = title
+            db.commit()
 
         # Convert clarifying options to API schema format
         api_clarifying_options = None
@@ -403,11 +400,12 @@ async def send_message_stream(
                 else:
                     if not existing_dashboard.original_request and manager.state.original_request:
                         existing_dashboard.original_request = manager.state.original_request
-                        db.commit()
                     dashboard = existing_dashboard
-                    session.dashboard_id = dashboard.id
-                    session.title = title
-                    db.commit()
+
+                # Always link conversation to dashboard and update title
+                session.dashboard_id = dashboard.id
+                session.title = title
+                db.commit()
 
             # Build final response
             response_data = {

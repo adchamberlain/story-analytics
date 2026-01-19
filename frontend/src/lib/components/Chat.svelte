@@ -43,6 +43,28 @@
 		&& $phase === 'context'
 		&& $messages.length <= 2;
 
+	// Compute phase-aware loading message
+	$: loadingMessage = getLoadingMessage($phase, $messages.length);
+
+	function getLoadingMessage(currentPhase: string, messageCount: number): string {
+		switch (currentPhase) {
+			case 'intent':
+				return 'Understanding your request...';
+			case 'context':
+				// First user message creates plan, subsequent ones update it
+				if (messageCount <= 2) {
+					return 'Creating your dashboard plan...';
+				}
+				return 'Updating the plan...';
+			case 'generation':
+				return 'Generating dashboard...';
+			case 'refinement':
+				return 'Applying your changes...';
+			default:
+				return 'Processing...';
+		}
+	}
+
 	onMount(async () => {
 		// If user just logged in, start with a fresh conversation
 		if ($justLoggedIn) {
@@ -254,7 +276,7 @@
 			{/if}
 		{/if}
 
-		{#if $lastDashboard?.created}
+		{#if $lastDashboard?.created && !$conversationComplete}
 			<div class="mt-4 p-4 bg-terminal-surface border border-terminal-accent rounded">
 				<div class="flex items-center justify-between mb-3">
 					<p class="text-terminal-accent font-medium">Dashboard created!</p>
@@ -309,6 +331,7 @@
 				: undefined}
 			bind:prefill={pendingInput}
 			{showSuggestions}
+			{loadingMessage}
 		/>
 	</div>
 </div>

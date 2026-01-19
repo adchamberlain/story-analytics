@@ -11,6 +11,7 @@
 	export let disabled = false;
 	export let prefill = '';
 	export let showSuggestions = true;
+	export let loadingMessage = 'Processing...';
 
 	const dispatch = createEventDispatcher();
 	let value = '';
@@ -102,6 +103,6 @@
 {#if disabled}
 	<div class="flex items-center gap-2 mt-2 text-terminal-dim text-sm">
 		<span class="cursor-blink">_</span>
-		<span>Processing...</span>
+		<span>{loadingMessage}</span>
 	</div>
 {/if}
