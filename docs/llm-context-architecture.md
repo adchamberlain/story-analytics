@@ -1,6 +1,6 @@
 # LLM Context Architecture for Customer Onboarding
 
-> Design notes for scaling Story Analytics to new customers with their own Snowflake data.
+> Design notes for scaling Story Analytics to new customers with their own Snowflake data. These are design notes only -- none of this has been built yet. 
 
 ## Problem Statement
 

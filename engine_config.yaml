@@ -2,6 +2,7 @@ llm:
   provider: claude
   model: claude-sonnet-4-20250514
   api_key_env: ANTHROPIC_API_KEY
+  api_key: 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
 
 snowflake:
   connection_file: sources/snowflake_saas/connection.yaml

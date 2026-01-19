@@ -776,6 +776,13 @@ Generate the complete updated markdown. Output ONLY the markdown, nothing else."
 
             new_markdown = response.content
 
+            # Check if LLM returned a proposal instead of raw markdown
+            # If so, transition back to CONTEXT phase for user approval
+            if self._is_proposal_response(new_markdown):
+                self.state.phase = ConversationPhase.CONTEXT
+                self.state.messages.append(Message(role="assistant", content=new_markdown))
+                return new_markdown
+
             # Clean up
             if new_markdown.startswith("```"):
                 new_markdown = new_markdown.split("\n", 1)[1]
@@ -797,6 +804,26 @@ What else would you like to change?"""
             return result
 
         return self._handle_conversation_phase(user_input)
+
+    def _is_proposal_response(self, response: str) -> bool:
+        """Check if the LLM response is a proposal rather than raw markdown.
+
+        Proposals typically start with headers like "PROPOSED DASHBOARD" or contain
+        structured descriptions of SQL queries and visualizations rather than actual
+        Evidence markdown syntax.
+        """
+        response_upper = response.strip().upper()
+        # Check for common proposal markers
+        proposal_markers = [
+            "PROPOSED DASHBOARD",
+            "PROPOSED CHANGES",
+            "SQL QUERIES",
+            "VISUALIZATIONS",
+        ]
+        for marker in proposal_markers:
+            if marker in response_upper[:500]:  # Check first 500 chars
+                return True
+        return False
 
     def _summarize_markdown(self, markdown: str) -> str:
         """Create a brief summary of the generated markdown."""
