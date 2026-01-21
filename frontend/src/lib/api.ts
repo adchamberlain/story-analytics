@@ -15,7 +15,15 @@ import type {
 	SchemaInfo,
 	SuggestionsResponse,
 	BusinessType,
-	SourceInfo
+	SourceInfo,
+	// Chart-first architecture types
+	ChartMessageResponse,
+	Chart,
+	ChartListResponse,
+	ChartCreateResponse,
+	ComposedDashboard,
+	ComposedDashboardListResponse,
+	DashboardCreateResponse
 } from './types';
 
 const API_BASE = 'http://localhost:8000/api';
@@ -391,4 +399,151 @@ export async function getSources(): Promise<SourceInfo[]> {
 export async function getSourceSchema(sourceName: string): Promise<SchemaInfo> {
 	const response = await fetchWithAuth(`/sources/${encodeURIComponent(sourceName)}/schema`);
 	return handleResponse<SchemaInfo>(response);
+}
+
+// =============================================================================
+// Chart-First Architecture API
+// =============================================================================
+
+// Chart Conversation endpoints
+
+export async function sendChartMessage(
+	message: string,
+	sessionId?: string
+): Promise<ChartMessageResponse> {
+	const response = await fetchWithAuth('/charts/conversation/message', {
+		method: 'POST',
+		body: JSON.stringify({ message, session_id: sessionId })
+	});
+	return handleResponse<ChartMessageResponse>(response);
+}
+
+export async function newChartConversation(): Promise<ChartMessageResponse> {
+	const response = await fetchWithAuth('/charts/conversation/new', {
+		method: 'POST'
+	});
+	return handleResponse<ChartMessageResponse>(response);
+}
+
+export async function deleteChartConversation(sessionId: string): Promise<void> {
+	await fetchWithAuth(`/charts/conversation/${sessionId}`, {
+		method: 'DELETE'
+	});
+}
+
+// Chart Library endpoints
+
+export async function listCharts(params?: {
+	query?: string;
+	chart_type?: string;
+	limit?: number;
+}): Promise<ChartListResponse> {
+	const searchParams = new URLSearchParams();
+	if (params?.query) searchParams.set('query', params.query);
+	if (params?.chart_type) searchParams.set('chart_type', params.chart_type);
+	if (params?.limit) searchParams.set('limit', params.limit.toString());
+
+	const queryString = searchParams.toString();
+	const url = queryString ? `/charts/library?${queryString}` : '/charts/library';
+
+	const response = await fetchWithAuth(url);
+	return handleResponse<ChartListResponse>(response);
+}
+
+export async function getChart(chartId: string): Promise<Chart> {
+	const response = await fetchWithAuth(`/charts/library/${chartId}`);
+	return handleResponse<Chart>(response);
+}
+
+export async function deleteChart(chartId: string): Promise<void> {
+	await fetchWithAuth(`/charts/library/${chartId}`, {
+		method: 'DELETE'
+	});
+}
+
+export async function createChart(request: string): Promise<ChartCreateResponse> {
+	const response = await fetchWithAuth('/charts/library/create', {
+		method: 'POST',
+		body: JSON.stringify({ request })
+	});
+	return handleResponse<ChartCreateResponse>(response);
+}
+
+export async function getChartPreviewUrl(
+	chartId: string
+): Promise<{ chart_id: string; url: string; dashboard_slug: string }> {
+	const response = await fetchWithAuth(`/charts/library/${chartId}/preview-url`);
+	return handleResponse<{ chart_id: string; url: string; dashboard_slug: string }>(response);
+}
+
+// Dashboard Composition endpoints
+
+export async function listComposedDashboards(): Promise<ComposedDashboardListResponse> {
+	const response = await fetchWithAuth('/charts/dashboards');
+	return handleResponse<ComposedDashboardListResponse>(response);
+}
+
+export async function getComposedDashboard(dashboardId: string): Promise<ComposedDashboard> {
+	const response = await fetchWithAuth(`/charts/dashboards/${dashboardId}`);
+	return handleResponse<ComposedDashboard>(response);
+}
+
+export async function createComposedDashboard(params: {
+	title: string;
+	description?: string;
+	chart_ids?: string[];
+}): Promise<DashboardCreateResponse> {
+	const response = await fetchWithAuth('/charts/dashboards', {
+		method: 'POST',
+		body: JSON.stringify(params)
+	});
+	return handleResponse<DashboardCreateResponse>(response);
+}
+
+export async function deleteComposedDashboard(dashboardId: string): Promise<void> {
+	await fetchWithAuth(`/charts/dashboards/${dashboardId}`, {
+		method: 'DELETE'
+	});
+}
+
+export async function addChartToDashboard(
+	dashboardId: string,
+	chartId: string,
+	section?: string
+): Promise<ComposedDashboard> {
+	const response = await fetchWithAuth(`/charts/dashboards/${dashboardId}/charts`, {
+		method: 'POST',
+		body: JSON.stringify({ chart_id: chartId, section })
+	});
+	return handleResponse<ComposedDashboard>(response);
+}
+
+export async function removeChartFromDashboard(
+	dashboardId: string,
+	chartId: string
+): Promise<ComposedDashboard> {
+	const response = await fetchWithAuth(`/charts/dashboards/${dashboardId}/charts/${chartId}`, {
+		method: 'DELETE'
+	});
+	return handleResponse<ComposedDashboard>(response);
+}
+
+export async function reorderDashboardCharts(
+	dashboardId: string,
+	chartIds: string[]
+): Promise<ComposedDashboard> {
+	const response = await fetchWithAuth(`/charts/dashboards/${dashboardId}/reorder`, {
+		method: 'PUT',
+		body: JSON.stringify({ chart_ids: chartIds })
+	});
+	return handleResponse<ComposedDashboard>(response);
+}
+
+export async function publishDashboard(
+	dashboardId: string
+): Promise<{ success: boolean; url: string; embed_url: string }> {
+	const response = await fetchWithAuth(`/charts/dashboards/${dashboardId}/publish`, {
+		method: 'POST'
+	});
+	return handleResponse<{ success: boolean; url: string; embed_url: string }>(response);
 }

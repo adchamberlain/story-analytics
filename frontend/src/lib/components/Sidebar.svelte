@@ -100,6 +100,7 @@
 
 	const navItems = [
 		{ path: '/app', label: 'Chat', icon: '>' },
+		{ path: '/app/charts', label: 'Charts', icon: '~' },
 		{ path: '/app/dashboards', label: 'Dashboards', icon: '#' },
 		{ path: '/app/settings', label: 'Settings', icon: '*' }
 	];
