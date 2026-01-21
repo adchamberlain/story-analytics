@@ -28,6 +28,7 @@ class ConfigLoader:
         self._templates_cache: dict | None = None
         self._suggestions_cache: dict | None = None
         self._clarifying_cache: dict | None = None
+        self._chart_defaults_cache: dict | None = None
 
     def _load_yaml(self, path: Path) -> dict:
         """Load a YAML file."""
@@ -312,6 +313,98 @@ class ConfigLoader:
         config = self.get_clarifying_config()
         template = config.get("prompt", "")
         return template.format(vague_threshold=self.get_vague_threshold())
+
+    # --- Chart Styling Defaults ---
+
+    def get_chart_defaults(self) -> dict:
+        """Load the chart styling defaults configuration."""
+        if self._chart_defaults_cache is None:
+            path = self.engine_dir / "styles" / "chart_defaults.yaml"
+            self._chart_defaults_cache = self._load_yaml(path)
+        return self._chart_defaults_cache
+
+    def get_chart_colors(self) -> dict:
+        """Get the color palette configuration."""
+        defaults = self.get_chart_defaults()
+        return defaults.get("colors", {})
+
+    def get_series_palette(self, extended: bool = False) -> list[str]:
+        """Get the color palette for multi-series charts."""
+        colors = self.get_chart_colors()
+        if extended:
+            return colors.get("series_palette_extended", [])
+        return colors.get("series_palette", [])
+
+    def get_base_echarts_options(self) -> dict:
+        """Get the base echartsOptions that apply to all charts."""
+        defaults = self.get_chart_defaults()
+        return defaults.get("base_echarts_options", {})
+
+    def get_chart_type_defaults(self, chart_type: str) -> dict:
+        """
+        Get styling defaults for a specific chart type.
+
+        Args:
+            chart_type: One of 'line', 'bar_vertical', 'bar_horizontal',
+                       'area', 'scatter', 'histogram', 'heatmap', 'funnel', 'sankey'
+
+        Returns:
+            Dict with chart-type-specific echartsOptions
+        """
+        defaults = self.get_chart_defaults()
+        return defaults.get("chart_types", {}).get(chart_type, {})
+
+    def get_annotation_preset(self, annotation_type: str) -> dict:
+        """
+        Get annotation styling preset.
+
+        Args:
+            annotation_type: One of 'range_highlight', 'reference_line', 'point_callout'
+
+        Returns:
+            Dict with annotation configuration for echartsOptions
+        """
+        defaults = self.get_chart_defaults()
+        return defaults.get("annotations", {}).get(annotation_type, {})
+
+    def get_chart_styling_prompt(self) -> str:
+        """Get chart styling guidelines formatted for the LLM prompt."""
+        defaults = self.get_chart_defaults()
+        colors = defaults.get("colors", {})
+
+        lines = [
+            "CHART STYLING GUIDELINES:",
+            "",
+            "Color System:",
+            f"  - Primary data color: {colors.get('data', {}).get('primary', '#6366f1')}",
+            f"  - Data palette (dark to light): {', '.join(colors.get('series_palette', []))}",
+            f"  - Annotation color (amber): {colors.get('annotation', {}).get('primary', '#f59e0b')}",
+            "  - RULE: Use indigo spectrum for ALL data, amber ONLY for annotations/callouts",
+            "",
+            "Typography:",
+            f"  - Font family: {defaults.get('typography', {}).get('font_family', 'Inter, sans-serif')}",
+            "",
+            "Grid & Axes:",
+            f"  - Grid lines: {colors.get('ui', {}).get('grid_line', '#e0e7ff')} (dashed)",
+            f"  - Axis lines: {colors.get('ui', {}).get('axis_line', '#c7d2fe')}",
+            "",
+            "Bar Charts:",
+            "  - Vertical bars: rounded top corners [8, 8, 0, 0]",
+            "  - Horizontal bars: rounded right corners [0, 8, 8, 0]",
+            "  - Add subtle shadow with indigo tint",
+            "",
+            "Line Charts:",
+            "  - Use smooth: 0.3 for gentle curves",
+            "  - Add gradient area fill (indigo, fading to transparent)",
+            "  - Markers: white border, indigo fill",
+            "",
+            "Annotations (amber only):",
+            "  - markArea: very light fill rgba(245, 158, 11, 0.08), dashed border",
+            "  - markLine: dashed amber line, semi-transparent label background",
+            "  - markPoint: white circle with amber border, semi-transparent label",
+        ]
+
+        return "\n".join(lines)
 
 
 # Global instance

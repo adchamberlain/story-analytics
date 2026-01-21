@@ -34,3 +34,33 @@ instructions: |
   - Do NOT include headers like "SQL Queries", "Visualizations", "Data", or "Charts"
   - The dashboard should flow as a natural narrative for the end user
   - Only use ## headers for meaningful content sections (e.g., "Monthly Trends", "Top Performers")
+
+  CHART STYLING - Apply these defaults for professional, consistent visuals:
+
+  Color System:
+  - Primary data color: #6366f1 (indigo)
+  - Multi-series palette (dark to light): #3730a3, #6366f1, #a5b4fc
+  - RULE: Use indigo spectrum for ALL data, amber (#f59e0b) ONLY for annotations
+
+  Bar Charts:
+  - Vertical bars: rounded top corners borderRadius: [8, 8, 0, 0]
+  - Horizontal bars: rounded right corners borderRadius: [0, 8, 8, 0]
+  - Add shadow: shadowColor: 'rgba(99, 102, 241, 0.25)', shadowBlur: 8
+
+  Line Charts:
+  - Use smooth: 0.3 for gentle curves
+  - Add gradient area fill fading from rgba(99, 102, 241, 0.25) to transparent
+  - Markers: white border (#fff), indigo fill, symbolSize: 10
+
+  Grid & Axes:
+  - Grid lines: #e0e7ff with dashed type: [4, 4]
+  - Axis lines: #c7d2fe
+  - Hide y-axis line, show x-axis line
+  - Axis labels: #4b5563 (x), #9ca3af (y)
+
+  Annotations (amber only):
+  - markArea: fill rgba(245, 158, 11, 0.08), dashed border rgba(245, 158, 11, 0.4)
+  - markLine: color #f59e0b, dashed, label bg rgba(255, 251, 235, 0.75)
+  - markPoint: white circle with amber border #f59e0b, semi-transparent label
+
+  Use echartsOptions={{...}} to apply these styles to Evidence charts.

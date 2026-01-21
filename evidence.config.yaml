@@ -1,81 +1,80 @@
 # Story Analytics brand theme
-# Design: Datawrapper-minimal aesthetic with Inter typography
+# Design: Indigo data + amber accent — clean, publication-ready
 appearance:
   default: light
   switcher: false  # Keep it simple - light mode only
 
 theme:
-  # Refined color palette - harmonious with Story blue
-  # Designed for clean, publication-ready data visualization
+  # Color philosophy: Shades of indigo for all data, amber for annotations/callouts
+  # This creates visual consistency while allowing important elements to stand out
   colorPalettes:
     default:
       light:
-        - "#7c9eff"  # Story blue (primary)
-        - "#6366f1"  # Indigo (complementary)
-        - "#10b981"  # Emerald (positive)
-        - "#64748b"  # Slate (neutral)
-        - "#f43f5e"  # Rose (negative)
-        - "#8b5cf6"  # Violet (accent)
+        - "#6366f1"  # Indigo (primary)
+        - "#4338ca"  # Indigo dark
+        - "#818cf8"  # Indigo medium
+        - "#a5b4fc"  # Indigo light
+        - "#c7d2fe"  # Indigo very light
+        - "#f59e0b"  # Amber (accent - use sparingly for callouts)
       dark:
-        - "#7c9eff"
+        - "#818cf8"
         - "#6366f1"
-        - "#10b981"
-        - "#94a3b8"
-        - "#f43f5e"
-        - "#a78bfa"
+        - "#a5b4fc"
+        - "#c7d2fe"
+        - "#e0e7ff"
+        - "#fbbf24"
 
     # Categorical palette for multi-series charts
+    # Uses indigo spectrum to maintain visual cohesion
     categorical:
       light:
-        - "#7c9eff"  # Story blue
-        - "#10b981"  # Emerald
-        - "#6366f1"  # Indigo
-        - "#f59e0b"  # Amber
-        - "#ec4899"  # Pink
-        - "#14b8a6"  # Teal
-        - "#8b5cf6"  # Violet
-        - "#64748b"  # Slate
+        - "#4338ca"  # Indigo 700 (darkest)
+        - "#6366f1"  # Indigo 500
+        - "#818cf8"  # Indigo 400
+        - "#a5b4fc"  # Indigo 300
+        - "#c7d2fe"  # Indigo 200
+        - "#e0e7ff"  # Indigo 100 (lightest)
 
   colorScales:
     default:
       light:
-        - "#f0f5ff"  # Very light blue
-        - "#7c9eff"  # Story blue
+        - "#eef2ff"  # Indigo 50
+        - "#6366f1"  # Indigo 500
       dark:
-        - "#1e3a5f"
-        - "#7c9eff"
+        - "#312e81"
+        - "#818cf8"
 
     # Sequential scale for heatmaps/choropleth
     sequential:
       light:
-        - "#f0f5ff"
-        - "#c7d9ff"
-        - "#9fb8ff"
-        - "#7c9eff"
-        - "#5a7de6"
+        - "#eef2ff"  # Indigo 50
+        - "#e0e7ff"  # Indigo 100
+        - "#c7d2fe"  # Indigo 200
+        - "#a5b4fc"  # Indigo 300
+        - "#6366f1"  # Indigo 500
 
   colors:
     primary:
-      light: "#7c9eff"  # Story blue
-      dark: "#7c9eff"
-    accent:
       light: "#6366f1"  # Indigo
       dark: "#818cf8"
+    accent:
+      light: "#f59e0b"  # Amber (for annotations/highlights)
+      dark: "#fbbf24"
     base:
       light: "#ffffff"
       dark: "#0f172a"
     info:
-      light: "#7c9eff"
-      dark: "#9fb8ff"
+      light: "#6366f1"  # Indigo
+      dark: "#818cf8"
     positive:
-      light: "#10b981"  # Emerald
-      dark: "#34d399"
+      light: "#6366f1"  # Indigo (not green - stay monochromatic)
+      dark: "#818cf8"
     warning:
       light: "#f59e0b"  # Amber
       dark: "#fbbf24"
     negative:
-      light: "#f43f5e"  # Rose
-      dark: "#fb7185"
+      light: "#b45309"  # Amber dark (for negative values)
+      dark: "#f59e0b"
 
 plugins:
   components:
