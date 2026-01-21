@@ -174,3 +174,94 @@ export interface SuggestionsResponse {
 	suggestions: string[];
 	rotation_interval: number;
 }
+
+// =============================================================================
+// Chart-First Architecture Types
+// =============================================================================
+
+// Chart conversation types
+export interface ChartActionButton {
+	id: string;
+	label: string;
+	style: 'primary' | 'secondary';
+}
+
+export interface ChartMessageResponse {
+	response: string;
+	phase: string; // 'waiting' | 'generating' | 'viewing' | 'complete'
+	session_id: string;
+	chart_id: string | null;
+	chart_url: string | null;
+	chart_title: string | null;
+	action_buttons: ChartActionButton[] | null;
+	error: string | null;
+}
+
+// Chart library types
+export interface ChartConfig {
+	x: string | null;
+	y: string | string[] | null;
+	value: string | null;
+	series: string | null;
+	title: string | null;
+	extra_props: Record<string, unknown> | null;
+}
+
+export interface Chart {
+	id: string;
+	title: string;
+	description: string;
+	query_name: string;
+	sql: string;
+	chart_type: string;
+	config: ChartConfig;
+	created_at: string;
+	updated_at: string;
+	original_request: string;
+	is_valid: boolean;
+}
+
+export interface ChartListResponse {
+	charts: Chart[];
+	total: number;
+}
+
+export interface ChartCreateResponse {
+	success: boolean;
+	chart: Chart | null;
+	chart_url: string | null;
+	error: string | null;
+}
+
+// Dashboard composition types
+export interface DashboardLayoutSection {
+	title: string | null;
+	chart_ids: string[];
+}
+
+export interface DashboardLayout {
+	sections: DashboardLayoutSection[];
+}
+
+export interface ComposedDashboard {
+	id: string;
+	slug: string;
+	title: string;
+	description: string | null;
+	chart_ids: string[];
+	layout: DashboardLayout | null;
+	created_at: string;
+	updated_at: string;
+}
+
+export interface ComposedDashboardListResponse {
+	dashboards: ComposedDashboard[];
+	total: number;
+}
+
+export interface DashboardCreateResponse {
+	success: boolean;
+	dashboard: ComposedDashboard | null;
+	dashboard_url: string | null;
+	error: string | null;
+}
