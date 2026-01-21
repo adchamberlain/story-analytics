@@ -1,84 +1,48 @@
 # Brand Configuration
-# Customize your dashboard appearance by editing this file.
-# Leave fields empty to use defaults.
+# Story Analytics - Datawrapper-minimal design system
+# Design: Clean, publication-ready charts with modern typography
 
 brand:
-  # Company name (displayed in header/footer)
   name: "Story"
-
-  # Path to logo file (place in static/ folder)
-  # Recommended: SVG or PNG, max height 40px
-  logo: ""
-
-  # Favicon path (place in static/ folder)
+  logo: ""  # Add logo.svg to static/ folder
   favicon: ""
 
+# Color system - refined around Story blue
 colors:
-  # Primary brand color (buttons, links, chart accents)
-  # Default: #1d81a2 (Datawrapper blue)
-  primary: ""
+  # Primary brand color
+  primary: "#7c9eff"
 
-  # Accent color (highlights, secondary elements)
-  # Default: #f2a83b (warm orange)
-  accent: ""
+  # Accent for highlights
+  accent: "#6366f1"
 
-  # Heading text color
-  # Default: #1a1a1a
-  heading: ""
+  # Text hierarchy
+  heading: "#1e293b"    # Slate-800 - strong but not harsh
+  text: "#334155"       # Slate-700 - comfortable reading
+  muted: "#64748b"      # Slate-500 - secondary info, axis labels
 
-  # Body text color
-  # Default: #333333
-  text: ""
+  # Backgrounds
+  background: "#ffffff"
+  background_subtle: "#f8fafc"  # Slate-50 - very subtle
 
-  # Muted/secondary text
-  # Default: #666666
-  muted: ""
+  # Borders
+  border: "#e2e8f0"     # Slate-200 - soft borders
 
-  # Background color
-  # Default: #ffffff
-  background: ""
-
-  # Subtle background (cards, alternating rows)
-  # Default: #f9f9f9
-  background_subtle: ""
-
-  # Border color
-  # Default: #e5e5e5
-  border: ""
-
+# Typography - Inter for modern, clean look
 typography:
-  # Font for headings
-  # Options: "Inter" (default), "Spectral" (serif), or any Google Font name
-  heading_font: ""
+  heading_font: "Inter"
+  body_font: "Inter"
+  base_size: 1
 
-  # Font for body text
-  # Options: "Inter" (default), "Spectral", or any Google Font name
-  body_font: ""
-
-  # Base font size in rem
-  # Default: 1 (16px)
-  base_size: ""
-
-# Chart-specific customization
+# Chart-specific - Datawrapper minimal aesthetic
 charts:
-  # Color palette for chart series (list of hex colors)
-  # Leave empty to use defaults from evidence.config.yaml
+  # Use palette from evidence.config.yaml
   palette: []
 
-  # Show/hide gridlines
-  # Default: true
+  # Minimal gridlines - Datawrapper style
   show_gridlines: true
+  gridline_color: "#f1f5f9"  # Very subtle - Slate-100
 
-  # Gridline color
-  # Default: #e5e5e5
-  gridline_color: ""
-
-# Layout options
+# Layout
 layout:
-  # Maximum content width in pixels
-  # Default: 900
-  max_width: 900
-
-  # Show Evidence branding in footer
-  # Default: true
-  show_evidence_branding: true
+  max_width: 960  # Slightly wider for better chart presentation
+  show_evidence_branding: false  # Clean embedded look

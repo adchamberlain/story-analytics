@@ -1,58 +1,81 @@
 # Story Analytics brand theme
+# Design: Datawrapper-minimal aesthetic with Inter typography
 appearance:
   default: light
   switcher: false  # Keep it simple - light mode only
 
 theme:
-  # Story brand color palette
+  # Refined color palette - harmonious with Story blue
+  # Designed for clean, publication-ready data visualization
   colorPalettes:
     default:
       light:
-        - "#7c9eff"  # Primary brand blue
-        - "#9fb8ff"  # Light blue
-        - "#f59e0b"  # Amber accent
-        - "#ef4444"  # Alert red
-        - "#22c55e"  # Success green
-        - "#8b5cf6"  # Purple
+        - "#7c9eff"  # Story blue (primary)
+        - "#6366f1"  # Indigo (complementary)
+        - "#10b981"  # Emerald (positive)
+        - "#64748b"  # Slate (neutral)
+        - "#f43f5e"  # Rose (negative)
+        - "#8b5cf6"  # Violet (accent)
       dark:
         - "#7c9eff"
-        - "#9fb8ff"
-        - "#f59e0b"
-        - "#ef4444"
-        - "#22c55e"
-        - "#8b5cf6"
+        - "#6366f1"
+        - "#10b981"
+        - "#94a3b8"
+        - "#f43f5e"
+        - "#a78bfa"
+
+    # Categorical palette for multi-series charts
+    categorical:
+      light:
+        - "#7c9eff"  # Story blue
+        - "#10b981"  # Emerald
+        - "#6366f1"  # Indigo
+        - "#f59e0b"  # Amber
+        - "#ec4899"  # Pink
+        - "#14b8a6"  # Teal
+        - "#8b5cf6"  # Violet
+        - "#64748b"  # Slate
 
   colorScales:
     default:
       light:
-        - "#e8f0ff"  # Very light blue
-        - "#7c9eff"  # Primary brand blue
+        - "#f0f5ff"  # Very light blue
+        - "#7c9eff"  # Story blue
       dark:
-        - "#e8f0ff"
+        - "#1e3a5f"
         - "#7c9eff"
+
+    # Sequential scale for heatmaps/choropleth
+    sequential:
+      light:
+        - "#f0f5ff"
+        - "#c7d9ff"
+        - "#9fb8ff"
+        - "#7c9eff"
+        - "#5a7de6"
 
   colors:
     primary:
-      light: "#7c9eff"  # Story brand blue
+      light: "#7c9eff"  # Story blue
       dark: "#7c9eff"
     accent:
-      light: "#f59e0b"  # Amber
-      dark: "#f59e0b"
+      light: "#6366f1"  # Indigo
+      dark: "#818cf8"
     base:
       light: "#ffffff"
-      dark: "#1a1a1a"
+      dark: "#0f172a"
     info:
       light: "#7c9eff"
       dark: "#9fb8ff"
     positive:
-      light: "#22c55e"
-      dark: "#22c55e"
+      light: "#10b981"  # Emerald
+      dark: "#34d399"
     warning:
-      light: "#f59e0b"
-      dark: "#f59e0b"
+      light: "#f59e0b"  # Amber
+      dark: "#fbbf24"
     negative:
-      light: "#ef4444"
-      dark: "#ef4444"
+      light: "#f43f5e"  # Rose
+      dark: "#fb7185"
 
 plugins:
   components:

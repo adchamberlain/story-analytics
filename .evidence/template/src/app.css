@@ -325,3 +325,191 @@
 		widows: 2;
 	}
 }
+
+/* ============================================
+   STORY ANALYTICS - DATAWRAPPER MINIMAL THEME
+   Clean, publication-ready chart styling
+   ============================================ */
+
+/* Import Inter font */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+/* Global typography */
+:root {
+	--story-font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+	--story-heading: #1e293b;
+	--story-text: #334155;
+	--story-muted: #64748b;
+	--story-border: #e2e8f0;
+	--story-gridline: #f1f5f9;
+	--story-blue: #7c9eff;
+}
+
+/* Apply Inter font globally */
+body, .markdown {
+	font-family: var(--story-font) !important;
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+}
+
+/* Chart container styling */
+:global(.chart-container),
+:global([class*="Chart"]) {
+	font-family: var(--story-font) !important;
+}
+
+/* ECharts canvas styling - target the chart wrapper */
+:global(.echarts-for-svelte) {
+	font-family: var(--story-font) !important;
+}
+
+/* Chart titles - clean, modern hierarchy */
+:global(.chart-title),
+:global([class*="chart"] h2),
+:global([class*="chart"] h3) {
+	font-family: var(--story-font) !important;
+	font-weight: 600 !important;
+	color: var(--story-heading) !important;
+	font-size: 15px !important;
+	letter-spacing: -0.01em !important;
+	margin-bottom: 4px !important;
+}
+
+/* Chart subtitles */
+:global(.chart-subtitle),
+:global([class*="chart"] .subtitle) {
+	font-family: var(--story-font) !important;
+	font-weight: 400 !important;
+	color: var(--story-muted) !important;
+	font-size: 13px !important;
+	margin-bottom: 16px !important;
+}
+
+/* BigValue styling - Datawrapper KPI look */
+:global([class*="BigValue"]),
+:global(.big-value) {
+	font-family: var(--story-font) !important;
+}
+
+:global([class*="BigValue"] [class*="value"]),
+:global(.big-value .value) {
+	font-weight: 600 !important;
+	color: var(--story-heading) !important;
+	letter-spacing: -0.02em !important;
+}
+
+:global([class*="BigValue"] [class*="title"]),
+:global(.big-value .title) {
+	font-weight: 500 !important;
+	color: var(--story-muted) !important;
+	font-size: 12px !important;
+	text-transform: uppercase !important;
+	letter-spacing: 0.05em !important;
+}
+
+/* Data table styling - clean, minimal */
+:global(.evidence-table),
+:global([class*="DataTable"]) {
+	font-family: var(--story-font) !important;
+	font-size: 13px !important;
+}
+
+:global(.evidence-table th),
+:global([class*="DataTable"] th) {
+	font-weight: 600 !important;
+	color: var(--story-muted) !important;
+	text-transform: uppercase !important;
+	font-size: 11px !important;
+	letter-spacing: 0.05em !important;
+	border-bottom: 2px solid var(--story-border) !important;
+	padding: 12px 16px !important;
+}
+
+:global(.evidence-table td),
+:global([class*="DataTable"] td) {
+	color: var(--story-text) !important;
+	border-bottom: 1px solid var(--story-gridline) !important;
+	padding: 10px 16px !important;
+}
+
+:global(.evidence-table tr:hover td),
+:global([class*="DataTable"] tr:hover td) {
+	background-color: #f8fafc !important;
+}
+
+/* Dropdown/filter styling */
+:global(.evidence-dropdown),
+:global([class*="Dropdown"]) select {
+	font-family: var(--story-font) !important;
+	font-size: 13px !important;
+	color: var(--story-text) !important;
+	border: 1px solid var(--story-border) !important;
+	border-radius: 6px !important;
+	padding: 8px 12px !important;
+	background-color: white !important;
+}
+
+:global([class*="Dropdown"]) select:focus {
+	outline: none !important;
+	border-color: var(--story-blue) !important;
+	box-shadow: 0 0 0 3px rgba(124, 158, 255, 0.15) !important;
+}
+
+/* Page headings */
+h1.title, h1.markdown {
+	font-family: var(--story-font) !important;
+	font-weight: 700 !important;
+	color: var(--story-heading) !important;
+	letter-spacing: -0.025em !important;
+}
+
+h2.markdown {
+	font-family: var(--story-font) !important;
+	font-weight: 600 !important;
+	color: var(--story-heading) !important;
+	letter-spacing: -0.01em !important;
+}
+
+/* Paragraph text */
+p.markdown {
+	font-family: var(--story-font) !important;
+	color: var(--story-text) !important;
+	line-height: 1.6 !important;
+}
+
+/* Links - subtle underline style */
+article.markdown a.markdown {
+	color: var(--story-blue) !important;
+	text-decoration: none !important;
+	border-bottom: 1px solid rgba(124, 158, 255, 0.3) !important;
+	transition: border-color 0.15s ease !important;
+}
+
+article.markdown a.markdown:hover {
+	border-bottom-color: var(--story-blue) !important;
+}
+
+/* Card/section styling for dashboards */
+:global(.evidence-card),
+:global([class*="card"]) {
+	border: 1px solid var(--story-border) !important;
+	border-radius: 8px !important;
+	box-shadow: none !important;
+}
+
+/* Tooltip styling */
+:global(.echarts-tooltip),
+:global([class*="tooltip"]) {
+	font-family: var(--story-font) !important;
+	font-size: 12px !important;
+	border-radius: 6px !important;
+	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1) !important;
+}
+
+/* Legend styling - minimal */
+:global(.echarts-legend),
+:global([class*="legend"]) {
+	font-family: var(--story-font) !important;
+	font-size: 12px !important;
+	color: var(--story-muted) !important;
+}
