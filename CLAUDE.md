@@ -29,11 +29,17 @@ test -f .env && echo "exists" || echo "missing"
 ```
 
 If `.env` is missing, ask the user to provide credentials for the following required variables:
-- `ANTHROPIC_API_KEY`
-- `SNOWFLAKE_USERNAME`
-- `SNOWFLAKE_PASSWORD`
+- `ANTHROPIC_API_KEY` (required for conversation engine)
+- `SNOWFLAKE_USERNAME` (optional - test data is cached in repo)
+- `SNOWFLAKE_PASSWORD` (optional - test data is cached in repo)
 
-Then create `.env` based on `.env.example` with the provided values. The conversation engine will not work without these credentials.
+Then create `.env` based on `.env.example` with the provided values.
+
+### Cached Test Data
+
+Test data from Snowflake is committed to the repo at `.evidence/template/static/data/snowflake_saas/`. This allows the app to run **without Snowflake access** (e.g., Claude Code sandbox, mobile testing). The cached data includes: customers, events, invoices, subscriptions, users.
+
+To refresh the cache from Snowflake (requires credentials): `npm run sources`
 
 ## Setup Steps (Run These When Starting Development)
 
@@ -50,7 +56,7 @@ When the user wants to develop or test, run these commands:
    playwright install chromium
    ```
 
-3. **Generate source data from Snowflake**:
+3. **Generate source data from Snowflake** (optional for remote testing - cached data exists):
    ```bash
    npm run sources
    ```
