@@ -13,7 +13,7 @@ import yaml
 
 from ..llm.base import Message
 from ..llm.claude import get_provider
-from .models import DashboardSpec, MetricSpec, VisualizationSpec
+from .models import DashboardMetadata, DashboardSpec, MetricSpec, VisualizationSpec
 
 
 class RequirementsAgent:
@@ -96,6 +96,16 @@ class RequirementsAgent:
                 original_request=original_request,
             )
 
+        # Build metadata
+        metadata_data = data.get("metadata", {})
+        metadata = DashboardMetadata(
+            description=metadata_data.get("description"),
+            owner=metadata_data.get("owner"),
+            team=metadata_data.get("team"),
+            documentation_url=metadata_data.get("documentation_url"),
+            data_sources=data.get("relevant_tables", []),  # Auto-populate from tables
+        )
+
         # Build metrics
         metrics = []
         for m in data.get("metrics", []):
@@ -122,6 +132,7 @@ class RequirementsAgent:
             title=data.get("title", "Dashboard"),
             business_question=data.get("business_question", ""),
             target_audience=data.get("target_audience", ""),
+            metadata=metadata,
             metrics=metrics,
             dimensions=data.get("dimensions", []),
             visualizations=visualizations,

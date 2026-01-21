@@ -14,6 +14,36 @@ if TYPE_CHECKING:
     from .feasibility_checker import FeasibilityResult
 
 
+@dataclass
+class DashboardMetadata:
+    """
+    Metadata for dashboard governance and documentation.
+
+    This provides standardized header information that appears at the top
+    of every dashboard for context, ownership, and documentation links.
+    """
+    description: str | None = None  # 2-3 sentence purpose description
+    owner: str | None = None  # Data scientist/analyst name
+    team: str | None = None  # Product or business team
+    documentation_url: str | None = None  # Link to external docs
+    data_sources: list[str] = field(default_factory=list)  # Tables/sources used
+
+    def to_prompt_context(self) -> str:
+        """Format metadata for inclusion in an LLM prompt."""
+        lines = ["DASHBOARD METADATA", "=================="]
+        if self.description:
+            lines.append(f"Description: {self.description}")
+        if self.owner:
+            lines.append(f"Owner: {self.owner}")
+        if self.team:
+            lines.append(f"Team: {self.team}")
+        if self.documentation_url:
+            lines.append(f"Documentation: {self.documentation_url}")
+        if self.data_sources:
+            lines.append(f"Data Sources: {', '.join(self.data_sources)}")
+        return "\n".join(lines)
+
+
 class VisualizationType(Enum):
     """Types of visualizations available in Evidence."""
     LINE_CHART = "LineChart"
@@ -58,6 +88,9 @@ class DashboardSpec:
     business_question: str  # What decision does this help make?
     target_audience: str  # Who will use this dashboard?
 
+    # Dashboard metadata for governance and documentation
+    metadata: DashboardMetadata = field(default_factory=DashboardMetadata)
+
     # Metrics to calculate
     metrics: list[MetricSpec] = field(default_factory=list)
 
@@ -88,8 +121,14 @@ class DashboardSpec:
             f"Business Question: {self.business_question}",
             f"Target Audience: {self.target_audience}",
             f"",
-            f"METRICS TO CALCULATE:",
         ]
+
+        # Include metadata if present
+        if self.metadata:
+            lines.append(self.metadata.to_prompt_context())
+            lines.append("")
+
+        lines.append("METRICS TO CALCULATE:")
 
         for metric in self.metrics:
             lines.append(f"  - {metric.name}: {metric.description}")
