@@ -1,0 +1,1 @@
+[{"name":"event_id","evidenceType":"number","typeFidelity":"precise"},{"name":"user_id","evidenceType":"number","typeFidelity":"precise"},{"name":"event_type","evidenceType":"string","typeFidelity":"precise"},{"name":"event_timestamp","evidenceType":"date","typeFidelity":"precise"},{"name":"properties","evidenceType":"string","typeFidelity":"inferred"}]

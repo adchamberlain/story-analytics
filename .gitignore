@@ -9,7 +9,8 @@ static/data
 credentials.txt
 .evidence/meta
 .evidence/template/.svelte-kit
-.evidence/template/static/data
+.evidence/template/static/data/*
+!.evidence/template/static/data/snowflake_saas
 sources/snowflake_saas/connection.yaml
 .evidence/template/sources/snowflake_saas/connection.yaml
 __pycache__
