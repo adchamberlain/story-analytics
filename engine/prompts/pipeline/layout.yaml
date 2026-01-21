@@ -10,14 +10,15 @@ role: |
 
 instructions: |
   Given:
-  - A dashboard specification (title, metrics, visualizations)
+  - A dashboard specification (title, metrics, visualizations, metadata)
   - Pre-validated SQL queries (already tested and working)
 
   Create an Evidence markdown dashboard that:
-  1. Tells a clear story with the data
-  2. Uses appropriate visualizations for each metric
-  3. Flows logically from overview to details
-  4. Looks professional and uncluttered
+  1. Starts with a metadata header block for governance
+  2. Tells a clear story with the data
+  3. Uses appropriate visualizations for each metric
+  4. Flows logically from overview to details
+  5. Looks professional and uncluttered
 
 evidence_syntax: |
   EVIDENCE MARKDOWN BASICS:
@@ -46,11 +47,86 @@ evidence_syntax: |
   Multiple Y columns (array syntax):
   <LineChart data={query_name} x="month" y={["revenue", "cost"]} />
 
+metadata_header: |
+  DASHBOARD METADATA HEADER:
+
+  Every dashboard MUST start with a metadata header block immediately after the title.
+  This provides governance information including purpose, ownership, and data sources.
+
+  Include this CSS and HTML structure at the top of every dashboard:
+
+  ```
+  <style>
+  .dashboard-header {
+      background: linear-gradient(145deg, #fafbff 0%, #f0f4ff 50%, #e8edff 100%);
+      border: 1px solid #c7d2fe;
+      border-radius: 12px;
+      padding: 20px 24px;
+      margin: 0 0 28px 0;
+  }
+  .dashboard-header-title {
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #6366f1;
+      margin-bottom: 8px;
+  }
+  .dashboard-header-description {
+      font-size: 1rem;
+      color: #374151;
+      line-height: 1.5;
+      margin-bottom: 16px;
+  }
+  .dashboard-header-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 24px;
+      font-size: 0.875rem;
+      color: #64748b;
+  }
+  .dashboard-header-meta-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+  }
+  .dashboard-header-meta-label {
+      font-weight: 600;
+      color: #475569;
+  }
+  </style>
+
+  <div class="dashboard-header">
+  <div class="dashboard-header-title">About this Dashboard</div>
+  <div class="dashboard-header-description">
+  [2-3 sentence description from metadata]
+  </div>
+  <div class="dashboard-header-meta">
+  <div class="dashboard-header-meta-item">
+  <span class="dashboard-header-meta-label">Owner:</span> [owner or "Unassigned"]
+  </div>
+  <div class="dashboard-header-meta-item">
+  <span class="dashboard-header-meta-label">Team:</span> [team name]
+  </div>
+  <div class="dashboard-header-meta-item">
+  <span class="dashboard-header-meta-label">Data Sources:</span> [comma-separated list of tables]
+  </div>
+  </div>
+  </div>
+  ```
+
+  IMPORTANT:
+  - ALWAYS include the metadata header after the # Title
+  - Use the description from the dashboard specification metadata
+  - If owner is not specified, use "Unassigned"
+  - List data sources as the relevant_tables from the spec
+  - If documentation_url is provided, add a link: [View Documentation](url)
+
 layout_rules: |
   LAYOUT BEST PRACTICES:
 
   1. Start with the dashboard title as # Title
-  2. Add a brief introduction explaining the dashboard's purpose
+  2. Add the metadata header block (see metadata_header section)
   3. Lead with key metrics (BigValue components)
   4. Follow with trend visualizations
   5. End with detailed data tables if needed
@@ -64,14 +140,35 @@ layout_rules: |
 
 output_format: |
   Output the complete Evidence markdown dashboard.
-  Start with # Title and include all queries and visualizations.
+  Start with # Title, then the metadata header, then the dashboard content.
   Output ONLY the markdown, no explanations or wrapper text.
 
   Example structure:
   ```
   # Dashboard Title
 
-  Brief description of what this dashboard shows.
+  <style>
+  .dashboard-header { ... }
+  </style>
+
+  <div class="dashboard-header">
+  <div class="dashboard-header-title">About this Dashboard</div>
+  <div class="dashboard-header-description">
+  This dashboard tracks monthly revenue trends and helps identify growth opportunities.
+  Use it to monitor performance against targets and spot emerging patterns.
+  </div>
+  <div class="dashboard-header-meta">
+  <div class="dashboard-header-meta-item">
+  <span class="dashboard-header-meta-label">Owner:</span> Jane Smith
+  </div>
+  <div class="dashboard-header-meta-item">
+  <span class="dashboard-header-meta-label">Team:</span> Finance Analytics
+  </div>
+  <div class="dashboard-header-meta-item">
+  <span class="dashboard-header-meta-label">Data Sources:</span> invoices, customers
+  </div>
+  </div>
+  </div>
 
   <BigValue data={key_metric} value="total" title="Total Revenue" />
 
