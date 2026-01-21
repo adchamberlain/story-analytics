@@ -18,7 +18,13 @@ instructions: |
   3. TARGET AUDIENCE: Who will use this dashboard?
      Examples: "Sales team", "Executive leadership", "Product managers"
 
-  4. METRICS: What numbers need to be calculated?
+  4. METADATA: Dashboard governance and documentation info:
+     - description: A 2-3 sentence summary of the dashboard's purpose and what insights it provides
+     - owner: If mentioned, the data scientist/analyst who owns this dashboard (default: null)
+     - team: The business or product team this dashboard serves (infer from target_audience if not stated)
+     - documentation_url: If mentioned, a link to external documentation (default: null)
+
+  5. METRICS: What numbers need to be calculated?
      For each metric, identify:
      - Name (e.g., "Monthly Revenue")
      - Description (what it measures)
@@ -26,18 +32,18 @@ instructions: |
      - Column to aggregate (if known)
      - Any filters (e.g., "last 12 months")
 
-  5. DIMENSIONS: How should the data be sliced?
+  6. DIMENSIONS: How should the data be sliced?
      Examples: "by month", "by customer segment", "by product category"
 
-  6. VISUALIZATIONS: What charts would best show this data?
+  7. VISUALIZATIONS: What charts would best show this data?
      - LineChart: For trends over time
      - BarChart: For comparisons across categories
      - DataTable: For detailed data exploration
      - BigValue: For key metrics/KPIs
 
-  7. RELEVANT TABLES: Which tables from the schema are needed?
+  8. RELEVANT TABLES: Which tables from the schema are needed?
 
-  8. FILTERS: Any data filters mentioned?
+  9. FILTERS: Any data filters mentioned?
      Examples: "last 12 months", "active customers only", "US region"
 
 output_format: |
@@ -48,6 +54,12 @@ output_format: |
     "title": "Dashboard Title",
     "business_question": "What decision does this help make?",
     "target_audience": "Who uses this?",
+    "metadata": {
+      "description": "2-3 sentence description of the dashboard purpose and key insights",
+      "owner": "Owner name or null if not specified",
+      "team": "Team name (infer from target_audience if not stated)",
+      "documentation_url": "URL or null if not specified"
+    },
     "metrics": [
       {
         "name": "Metric Name",
@@ -77,3 +89,4 @@ output_format: |
   - Be specific about metrics and their aggregations
   - Infer reasonable defaults if the user is vague
   - Keep visualizations focused - fewer is better
+  - ALWAYS include a meaningful description in metadata - this is critical for dashboard governance
