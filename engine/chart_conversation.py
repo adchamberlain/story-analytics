@@ -316,9 +316,16 @@ Keep your response brief and friendly."""
 
         if not result.success:
             self.state.phase = ChartPhase.WAITING
+            # Log the technical error for debugging
+            print(f"[ChartConversation] Pipeline error: {result.error}")
+            # Show user-friendly message
             return ChartConversationResult(
-                response=f"I couldn't create that chart: {result.error}\n\nCould you try describing it differently?",
+                response="I couldn't create that chart. This might be because the request doesn't match our available data.\n\nTry describing a chart using business metrics like revenue, customers, subscriptions, or user signups.",
                 error=result.error,
+                action_buttons=[
+                    ChartActionButton(id="show_examples", label="Show Examples", style="primary"),
+                    ChartActionButton(id="show_data", label="What Data Is Available?", style="secondary"),
+                ],
             )
 
         # Store the chart
