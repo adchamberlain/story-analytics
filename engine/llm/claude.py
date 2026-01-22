@@ -179,3 +179,39 @@ def get_provider(provider_name: str | None = None) -> LLMProvider:
             f"Unknown LLM provider: {provider_name}. "
             f"Valid options: claude, openai, gemini"
         )
+
+
+def get_fast_provider(provider_name: str | None = None) -> LLMProvider:
+    """
+    Factory function to get a fast LLM provider for structured tasks.
+
+    Uses Haiku (or equivalent) for faster responses on tasks like
+    JSON extraction and SQL generation where speed matters more than
+    nuanced reasoning.
+
+    Args:
+        provider_name: Optional provider name. If not provided, uses config default.
+
+    Returns:
+        An instance of the fast LLM provider.
+    """
+    config = get_config()
+
+    if provider_name is None:
+        provider_name = config.llm_provider
+
+    if provider_name == "claude":
+        return ClaudeProvider(model=config.llm_fast_model)
+    elif provider_name == "openai":
+        from .openai_provider import OpenAIProvider
+        # Use GPT-4o-mini for fast OpenAI tasks
+        return OpenAIProvider(model="gpt-4o-mini")
+    elif provider_name == "gemini":
+        from .gemini_provider import GeminiProvider
+        # Use Flash for fast Gemini tasks
+        return GeminiProvider(model="gemini-2.0-flash")
+    else:
+        raise ValueError(
+            f"Unknown LLM provider: {provider_name}. "
+            f"Valid options: claude, openai, gemini"
+        )

@@ -50,6 +50,27 @@ export const currentChartUrl = writable<string | null>(null);
 export const currentChartId = writable<string | null>(null);
 export const currentChartTitle = writable<string | null>(null);
 
+// Track if there's a pending request (separate from loading UI state)
+// This prevents the request from being orphaned during navigation
+let pendingRequest: Promise<void> | null = null;
+
+// Notification for when chart completes in background
+export interface ChartNotification {
+	type: 'success' | 'error';
+	message: string;
+	chartTitle?: string;
+	chartUrl?: string;
+}
+
+export const chartNotification = writable<ChartNotification | null>(null);
+
+/**
+ * Clear the chart notification.
+ */
+export function clearChartNotification(): void {
+	chartNotification.set(null);
+}
+
 // Derived store for action buttons from last message
 export const chartActionButtons = derived(chartMessages, ($messages) => {
 	const lastAssistant = [...$messages].reverse().find((m) => m.role === 'assistant');
@@ -58,59 +79,88 @@ export const chartActionButtons = derived(chartMessages, ($messages) => {
 
 /**
  * Send a message in the chart conversation.
+ *
+ * This function is designed to be resilient to navigation - the request will
+ * complete and update stores even if the user navigates away from the chat page.
  */
 export async function sendChartMessage(content: string): Promise<void> {
 	const sessionId = get(chartSessionId);
 	chartLoading.set(true);
 
-	try {
-		// Add user message immediately (unless it's an action)
-		if (!content.startsWith('__action:')) {
-			chartMessages.update((msgs) => [...msgs, { role: 'user', content }]);
-		}
-
-		// Send to API
-		const response = await apiSendChartMessage(content, sessionId || undefined);
-
-		// Update state
-		chartSessionId.set(response.session_id);
-		chartPhase.set(response.phase);
-
-		if (response.title) {
-			chartSessionTitle.set(response.title);
-		}
-		if (response.chart_url) {
-			currentChartUrl.set(response.chart_url);
-		}
-		if (response.chart_id) {
-			currentChartId.set(response.chart_id);
-		}
-		if (response.chart_title) {
-			currentChartTitle.set(response.chart_title);
-		}
-
-		// Add assistant response
-		chartMessages.update((msgs) => [
-			...msgs,
-			{
-				role: 'assistant',
-				content: response.response,
-				chartUrl: response.chart_url || undefined,
-				chartId: response.chart_id || undefined,
-				actionButtons: response.action_buttons || undefined
-			}
-		]);
-	} catch (error) {
-		chartMessages.update((msgs) => [
-			...msgs,
-			{
-				role: 'assistant',
-				content: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`
-			}
-		]);
-	} finally {
-		chartLoading.set(false);
+	// Add user message immediately (unless it's an action)
+	if (!content.startsWith('__action:')) {
+		chartMessages.update((msgs) => [...msgs, { role: 'user', content }]);
 	}
+
+	// Create the request promise and track it
+	// This ensures the request completes even during navigation
+	const requestPromise = (async () => {
+		try {
+			// Send to API
+			const response = await apiSendChartMessage(content, sessionId || undefined);
+
+			// Update state - these updates happen even if user navigated away
+			chartSessionId.set(response.session_id);
+			chartPhase.set(response.phase);
+
+			if (response.title) {
+				chartSessionTitle.set(response.title);
+			}
+			if (response.chart_url) {
+				currentChartUrl.set(response.chart_url);
+			}
+			if (response.chart_id) {
+				currentChartId.set(response.chart_id);
+			}
+			if (response.chart_title) {
+				currentChartTitle.set(response.chart_title);
+			}
+
+			// Add assistant response
+			chartMessages.update((msgs) => [
+				...msgs,
+				{
+					role: 'assistant',
+					content: response.response,
+					chartUrl: response.chart_url || undefined,
+					chartId: response.chart_id || undefined,
+					actionButtons: response.action_buttons || undefined
+				}
+			]);
+
+			// If a chart was created, show a notification (useful if user navigated away)
+			if (response.chart_url && response.chart_title) {
+				chartNotification.set({
+					type: 'success',
+					message: 'Chart created!',
+					chartTitle: response.chart_title,
+					chartUrl: response.chart_url
+				});
+			}
+		} catch (error) {
+			// Only add error message if we haven't been reset
+			// (check if messages still exist from this conversation)
+			const currentMessages = get(chartMessages);
+			if (currentMessages.length > 0) {
+				chartMessages.update((msgs) => [
+					...msgs,
+					{
+						role: 'assistant',
+						content: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`
+					}
+				]);
+			}
+		} finally {
+			chartLoading.set(false);
+			pendingRequest = null;
+		}
+	})();
+
+	// Track the pending request
+	pendingRequest = requestPromise;
+
+	// Wait for completion
+	await requestPromise;
 }
 
 /**
@@ -144,16 +194,34 @@ export async function startNewChartConversation(): Promise<void> {
 }
 
 /**
- * Reset chart conversation state.
+ * Check if there's a chart request in progress.
  */
-export function resetChartConversation(): void {
+export function isChartRequestPending(): boolean {
+	return pendingRequest !== null || get(chartLoading);
+}
+
+/**
+ * Reset chart conversation state.
+ *
+ * If force is false (default), this will not reset if there's a pending request.
+ * Set force to true to reset regardless of pending requests.
+ */
+export function resetChartConversation(force: boolean = false): void {
+	// Don't reset if there's a pending request (unless forced)
+	if (!force && pendingRequest !== null) {
+		console.log('[Chart Store] Skipping reset - request in progress');
+		return;
+	}
+
 	chartSessionId.set(null);
 	chartSessionTitle.set(null);
 	chartMessages.set([]);
 	chartPhase.set('waiting');
+	chartLoading.set(false);
 	currentChartUrl.set(null);
 	currentChartId.set(null);
 	currentChartTitle.set(null);
+	pendingRequest = null;
 }
 
 /**
@@ -215,11 +283,19 @@ export async function loadCharts(params?: {
 
 /**
  * Delete a chart from the library.
+ *
+ * This also deletes the associated conversation on the backend,
+ * so we need to refresh the conversation list.
  */
 export async function deleteChartFromLibrary(chartId: string): Promise<void> {
 	try {
 		await apiDeleteChart(chartId);
 		charts.update((list) => list.filter((c) => c.id !== chartId));
+
+		// The backend also deletes the associated conversation,
+		// so refresh the conversation list in the sidebar
+		const { loadConversationList } = await import('./conversation');
+		await loadConversationList();
 	} catch (error) {
 		console.error('Failed to delete chart:', error);
 		throw error;

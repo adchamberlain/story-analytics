@@ -5,6 +5,7 @@
 	import { isAuthenticated } from '$lib/api';
 	import { initAuth, authLoading, user } from '$lib/stores/auth';
 	import Sidebar from '$lib/components/Sidebar.svelte';
+	import ChartNotification from '$lib/components/ChartNotification.svelte';
 
 	onMount(async () => {
 		await initAuth();
@@ -27,4 +28,6 @@
 			<slot />
 		</main>
 	</div>
+	<!-- Global notification for background chart completion -->
+	<ChartNotification />
 {/if}

@@ -23,7 +23,7 @@ from pathlib import Path
 import yaml
 
 from .llm.base import Message
-from .llm.claude import get_provider
+from .llm.claude import get_fast_provider, get_provider
 from .models import Chart, ChartConfig, ChartSpec, ChartType, FilterSpec, FilterType, ValidatedChart
 from .schema import get_schema_context
 from .sql_validator import validate_query
@@ -56,7 +56,8 @@ class ChartRequirementsAgent:
     """Extracts requirements for a single chart."""
 
     def __init__(self, provider_name: str | None = None):
-        self.llm = get_provider(provider_name)
+        # Use fast model (Haiku) for structured JSON extraction
+        self.llm = get_fast_provider(provider_name)
         self._prompt_config = self._load_prompt_config()
 
     def _load_prompt_config(self) -> dict:
@@ -155,6 +156,7 @@ class ChartRequirementsAgent:
             filters=data.get("filters", []),
             interactive_filters=interactive_filters,
             chart_type=ChartType.from_string(data.get("chart_type", "BarChart")),
+            horizontal=data.get("horizontal", False),
             relevant_tables=data.get("relevant_tables", []),
         )
 
@@ -163,6 +165,7 @@ class ChartSQLAgent:
     """Generates and validates ONE SQL query for a chart."""
 
     def __init__(self, provider_name: str | None = None, max_fix_attempts: int = 3):
+        # Use Sonnet for SQL generation - Haiku has JSON formatting issues with complex SQL
         self.llm = get_provider(provider_name)
         self.max_fix_attempts = max_fix_attempts
         self._prompt_config = self._load_prompt_config()
@@ -286,7 +289,10 @@ Please fix the query and output the corrected JSON."""
             data = json.loads(json_str)
         except json.JSONDecodeError as e:
             print(f"[ChartSQLAgent] JSON parse error: {e}")
-            return "query", "", [], []
+            # Try to repair common JSON issues
+            data = self._try_repair_json(json_str)
+            if data is None:
+                return "query", "", [], []
 
         return (
             data.get("query_name", "query"),
@@ -294,6 +300,47 @@ Please fix the query and output the corrected JSON."""
             data.get("columns", []),
             data.get("filter_queries", []),
         )
+
+    def _try_repair_json(self, json_str: str) -> dict | None:
+        """Try to repair common JSON formatting issues."""
+        # Try fixing unescaped newlines in strings
+        # This is a common issue when SQL has newlines that weren't escaped
+        try:
+            # Replace literal newlines inside strings with escaped newlines
+            # Find the "sql" field and fix newlines within it
+            fixed = re.sub(
+                r'"sql"\s*:\s*"(.*?)"(?=\s*[,}])',
+                lambda m: '"sql": "' + m.group(1).replace('\n', '\\n').replace('\r', '\\r') + '"',
+                json_str,
+                flags=re.DOTALL
+            )
+            return json.loads(fixed)
+        except (json.JSONDecodeError, Exception):
+            pass
+
+        # Try extracting just the SQL from a partially valid response
+        try:
+            sql_match = re.search(r'"sql"\s*:\s*"((?:[^"\\]|\\.)*)"|"sql"\s*:\s*`(.*?)`', json_str, re.DOTALL)
+            name_match = re.search(r'"query_name"\s*:\s*"([^"]*)"', json_str)
+            cols_match = re.search(r'"columns"\s*:\s*\[(.*?)\]', json_str)
+
+            if sql_match:
+                sql = sql_match.group(1) or sql_match.group(2) or ""
+                name = name_match.group(1) if name_match else "query"
+                cols = []
+                if cols_match:
+                    cols = [c.strip().strip('"\'') for c in cols_match.group(1).split(',') if c.strip()]
+                return {
+                    "query_name": name,
+                    "sql": sql.replace('\\n', '\n'),
+                    "columns": cols,
+                    "filter_queries": []
+                }
+        except Exception:
+            pass
+
+        print("[ChartSQLAgent] Could not repair JSON")
+        return None
 
 
 class ChartPipeline:
@@ -423,30 +470,63 @@ class ChartPipeline:
             config.title = spec.title
 
         elif spec.chart_type in (ChartType.LINE_CHART, ChartType.AREA_CHART):
-            # Time series: x is date/time, y is metric
+            # Time series: x is date/time, y is metric(s)
             if len(columns) >= 2:
                 config.x = columns[0]  # Date column
-                config.y = columns[1]  # Metric column
+                y_columns = columns[1:]
+
+                # Check if we should use dual y-axis (for metrics with different scales)
+                # Use y2 when we have exactly 2 metrics and one has "count" or "volume" in name
+                # while the other has "revenue", "amount", or "value" (different scales)
+                if len(y_columns) == 2:
+                    col_names = [c.lower() for c in y_columns]
+                    count_keywords = ["count", "volume", "number", "quantity"]
+                    value_keywords = ["revenue", "amount", "value", "total", "sum"]
+
+                    has_count = any(kw in col_names[0] or kw in col_names[1] for kw in count_keywords)
+                    has_value = any(kw in col_names[0] or kw in col_names[1] for kw in value_keywords)
+
+                    if has_count and has_value:
+                        # Use dual y-axis: put the count metric on y2
+                        if any(kw in col_names[0] for kw in count_keywords):
+                            config.y = y_columns[1]  # value metric on primary
+                            config.y2 = y_columns[0]  # count metric on secondary
+                        else:
+                            config.y = y_columns[0]  # value metric on primary
+                            config.y2 = y_columns[1]  # count metric on secondary
+                    else:
+                        # Same scale, use both on primary y-axis
+                        config.y = y_columns
+                else:
+                    config.y = y_columns if len(y_columns) > 1 else y_columns[0]
             config.title = spec.title
 
             # Apply design system defaults for line charts
             line_defaults = config_loader.get_chart_type_defaults("line")
             config.extra_props = {
                 "fillColor": "#6366f1",  # Indigo primary
+                "chartAreaHeight": 350,  # Match design system standard height
                 "echartsOptions": self._build_echarts_options(base_options, line_defaults),
             }
 
         elif spec.chart_type == ChartType.BAR_CHART:
-            # Category comparison: x is category, y is metric
+            # Category comparison: x is category, y is metric(s)
             if len(columns) >= 2:
                 config.x = columns[0]
-                config.y = columns[1]
+                # Use all remaining columns as Y-axis values for grouped bar charts
+                y_columns = columns[1:]
+                config.y = y_columns if len(y_columns) > 1 else y_columns[0]
             config.title = spec.title
 
+            # Check if horizontal bar chart was requested
+            config.horizontal = spec.horizontal
+
             # Apply design system defaults for bar charts
-            bar_defaults = config_loader.get_chart_type_defaults("bar_vertical")
+            bar_type = "bar_horizontal" if spec.horizontal else "bar_vertical"
+            bar_defaults = config_loader.get_chart_type_defaults(bar_type)
             config.extra_props = {
                 "fillColor": "#6366f1",  # Indigo primary
+                "chartAreaHeight": 350,  # Match design system standard height
                 "echartsOptions": self._build_echarts_options(base_options, bar_defaults),
             }
 
@@ -455,10 +535,12 @@ class ChartPipeline:
             config.title = spec.title
 
         else:
-            # Default: assume x/y from first two columns
+            # Default: assume x/y from columns
             if len(columns) >= 2:
                 config.x = columns[0]
-                config.y = columns[1]
+                # Use all remaining columns as Y-axis values
+                y_columns = columns[1:]
+                config.y = y_columns if len(y_columns) > 1 else y_columns[0]
             config.title = spec.title
             config.extra_props = {
                 "fillColor": "#6366f1",  # Indigo primary

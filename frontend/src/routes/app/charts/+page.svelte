@@ -5,7 +5,7 @@
 
 	import { goto } from '$app/navigation';
 	import ChartLibrary from '$lib/components/ChartLibrary.svelte';
-	import { clearChartSelection, resetChartConversation } from '$lib/stores/chart';
+	import { clearChartSelection, resetChartConversation, isChartRequestPending } from '$lib/stores/chart';
 
 	let searchQuery = '';
 	let filterType = '';
@@ -20,8 +20,10 @@
 	];
 
 	function handleCreateNew() {
-		// Reset any existing chart conversation before navigating
-		resetChartConversation();
+		// Only reset if no request is pending - otherwise preserve the conversation
+		if (!isChartRequestPending()) {
+			resetChartConversation();
+		}
 		goto('/app/charts/new');
 	}
 

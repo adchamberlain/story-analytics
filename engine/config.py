@@ -39,6 +39,11 @@ class Config:
         return self._config.get("llm", {}).get("model", "claude-sonnet-4-20250514")
 
     @property
+    def llm_fast_model(self) -> str:
+        """Get the fast LLM model for structured tasks (defaults to Haiku)."""
+        return self._config.get("llm", {}).get("fast_model", "claude-3-5-haiku-20241022")
+
+    @property
     def llm_api_key(self) -> str:
         """Get the LLM API key from environment variable."""
         env_var = self._config.get("llm", {}).get("api_key_env", "ANTHROPIC_API_KEY")
