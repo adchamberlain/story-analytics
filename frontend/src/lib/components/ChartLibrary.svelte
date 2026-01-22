@@ -110,6 +110,55 @@
 		});
 	}
 
+	function formatSQL(sql: string): string {
+		if (!sql) return '';
+
+		// Keywords that should start on a new line
+		const lineBreakKeywords = [
+			'SELECT', 'FROM', 'WHERE', 'AND', 'OR', 'JOIN',
+			'LEFT JOIN', 'RIGHT JOIN', 'INNER JOIN', 'OUTER JOIN',
+			'GROUP BY', 'ORDER BY', 'HAVING', 'LIMIT', 'OFFSET',
+			'UNION', 'INTERSECT', 'EXCEPT', 'WITH', 'ON'
+		];
+
+		let formatted = sql.trim();
+
+		// Add line breaks before keywords (case-insensitive)
+		for (const keyword of lineBreakKeywords) {
+			// Match keyword with word boundaries, case-insensitive
+			const regex = new RegExp(`\\s+(${keyword})\\s+`, 'gi');
+			formatted = formatted.replace(regex, `\n${keyword} `);
+		}
+
+		// Indent lines after SELECT until FROM
+		const lines = formatted.split('\n');
+		const result: string[] = [];
+		let inSelect = false;
+
+		for (const line of lines) {
+			const trimmed = line.trim();
+			const upper = trimmed.toUpperCase();
+
+			if (upper.startsWith('SELECT')) {
+				inSelect = true;
+				result.push(trimmed);
+			} else if (upper.startsWith('FROM') || upper.startsWith('WITH')) {
+				inSelect = false;
+				result.push(trimmed);
+			} else if (inSelect && !upper.startsWith('SELECT')) {
+				// Indent continuation of SELECT clause
+				result.push('  ' + trimmed);
+			} else if (upper.startsWith('AND') || upper.startsWith('OR') || upper.startsWith('ON')) {
+				// Indent AND/OR/ON clauses
+				result.push('  ' + trimmed);
+			} else {
+				result.push(trimmed);
+			}
+		}
+
+		return result.join('\n');
+	}
+
 	// Debounced search
 	let searchTimeout: ReturnType<typeof setTimeout>;
 	function debouncedSearch() {
@@ -246,7 +295,7 @@
 				</div>
 				<div class="preview-footer">
 					<p class="preview-description">{previewChart.description}</p>
-					<code class="preview-sql">{previewChart.sql}</code>
+					<code class="preview-sql">{formatSQL(previewChart.sql)}</code>
 				</div>
 			</div>
 		</div>
