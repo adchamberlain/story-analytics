@@ -7,7 +7,7 @@
 
 	// Extract slug from current path (e.g., "/my-dashboard" -> "my-dashboard")
 	$: slug = $page.url.pathname.split('/').filter(Boolean)[0] || '';
-	$: editorUrl = slug ? `http://localhost:5173/app/dashboards/edit/${slug}` : '';
+	$: editorUrl = slug ? `http://localhost:5173/app/charts/view/${slug}` : '';
 	$: isHomePage = $page.url.pathname === '/' || $page.url.pathname === '';
 </script>
 

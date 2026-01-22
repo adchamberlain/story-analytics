@@ -22,7 +22,7 @@ from .chart_pipeline import ChartPipeline, ChartPipelineConfig, ChartPipelineRes
 from .config import get_config
 from .dashboard_composer import create_chart_dashboard, get_composer
 from .llm.base import Message
-from .llm.claude import get_provider
+from .llm.claude import get_fast_provider
 from .models import Chart, ValidatedChart, get_chart_storage
 from .schema import get_schema_context
 
@@ -89,7 +89,8 @@ class ChartConversationManager:
         provider_name: str | None = None,
     ):
         self.config = get_config()
-        self.llm = get_provider(provider_name)
+        # Use fast model (Haiku) for intent classification and simple responses
+        self.llm = get_fast_provider(provider_name)
         self._provider_name = provider_name
         self.state = ChartConversationState()
         self.chart_storage = get_chart_storage()

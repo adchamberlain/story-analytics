@@ -104,6 +104,8 @@ class FilterSpec:
             # DateRange can use data+dates props OR start+end props
             # We'll use presetRanges for common date filtering
             props.append('presetRanges={["Last 7 Days", "Last 30 Days", "Last 90 Days", "Last 12 Months", "Year to Date", "All Time"]}')
+            # IMPORTANT: Must set a default preset to avoid Unix epoch (Jan 1, 1970)
+            props.append('defaultValue="Last 12 Months"')
             if self.default_start:
                 props.append(f'start="{self.default_start}"')
             if self.default_end:
@@ -250,6 +252,7 @@ class ChartConfig:
     # Core data binding
     x: str | None = None  # X-axis column
     y: str | list[str] | None = None  # Y-axis column(s)
+    y2: str | list[str] | None = None  # Secondary Y-axis column(s) for dual-axis charts
     value: str | None = None  # For BigValue
     series: str | None = None  # For grouping/coloring
 
@@ -283,6 +286,8 @@ class ChartConfig:
             props["x"] = self.x
         if self.y:
             props["y"] = self.y
+        if self.y2:
+            props["y2"] = self.y2
         if self.value:
             props["value"] = self.value
         if self.series:
@@ -339,6 +344,7 @@ class ChartSpec:
 
     # Visualization
     chart_type: ChartType = ChartType.BAR_CHART
+    horizontal: bool = False  # For bar charts: swap x/y axes
 
     # Tables to use (from schema)
     relevant_tables: list[str] = field(default_factory=list)

@@ -22,6 +22,18 @@ instructions: |
      - Aggregation type (SUM, COUNT, AVG, MIN, MAX, etc.)
      - If none specified, infer the most logical aggregation
 
+     IMPORTANT - "Per entity" metrics (e.g., "per customer", "per user"):
+     If the user asks for "average X per customer" or "median X per user",
+     this means TWO-LEVEL aggregation:
+       1. First aggregate X at the entity level (e.g., SUM per customer)
+       2. Then calculate AVG/MEDIAN across those entity totals
+
+     Example: "average revenue per customer" means:
+       - metric: "revenue_per_customer"
+       - aggregation: "AVG of SUM per customer" (two-level)
+
+     This is DIFFERENT from "average invoice amount" which is just AVG(amount).
+
   4. DIMENSION: How the data is sliced/grouped (optional)
      - Time-based: "by month", "by week", "by day"
      - Categorical: "by segment", "by product", "by region"
@@ -30,11 +42,18 @@ instructions: |
   5. CHART TYPE: What visualization best represents this data?
      - LineChart: Trends over time (continuous x-axis)
      - BarChart: Comparisons across categories (discrete x-axis)
+       - If user says "horizontal bar" → set horizontal: true
      - AreaChart: Trends with volume emphasis
      - DataTable: Detailed data exploration
      - BigValue: Single key metric/KPI
      - ScatterPlot: Correlation between two metrics
      - Histogram: Distribution of values
+
+  5b. HORIZONTAL BAR CHARTS:
+     If the user explicitly requests a "horizontal bar chart", set:
+       - chart_type: "BarChart"
+       - horizontal: true
+     Look for keywords: "horizontal bar", "horizontal bars", "bars horizontal"
 
   6. RELEVANT TABLES: Which tables from the schema are needed?
 
@@ -69,6 +88,7 @@ output_format: |
     "aggregation": "SUM",
     "dimension": "month",
     "chart_type": "LineChart",
+    "horizontal": false,
     "relevant_tables": ["invoices", "customers"],
     "filters": ["last 12 months"],
     "interactive_filters": [
@@ -90,6 +110,10 @@ output_format: |
   }
   ```
 
+  IMPORTANT for horizontal field:
+  - Set horizontal: true ONLY when user explicitly requests "horizontal bar chart"
+  - Default is false (vertical bars)
+
   Chart type mapping:
   - Time series, trends → "LineChart"
   - Category comparisons → "BarChart"
@@ -105,3 +129,5 @@ output_format: |
   - Keep it simple - this is ONE chart, not a dashboard
   - Only include interactive_filters if the user explicitly asks for them
   - interactive_filters is an array (can be empty [])
+  - For "per entity" metrics like "avg revenue per customer", use aggregation: "AVG_PER_ENTITY"
+    to indicate two-level aggregation is needed

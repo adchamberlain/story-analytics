@@ -41,6 +41,33 @@ instructions: |
   5. Order results logically (by date for time series, by value for comparisons)
   6. Select ONLY the columns needed for the chart (x-axis, y-axis, optional series)
 
+  IMPORTANT - "Per entity" aggregations (e.g., "per customer", "per user"):
+  When asked for metrics like "average revenue per customer" or "median spend per user",
+  you MUST use a two-level aggregation:
+
+  1. First aggregate at the entity level (e.g., total per customer)
+  2. Then aggregate across entities (e.g., AVG of customer totals)
+
+  Example for "average revenue per customer by month":
+  ```sql
+  WITH customer_monthly AS (
+    SELECT DATE_TRUNC('month', invoice_date) as month,
+           customer_id,
+           SUM(amount) as customer_total
+    FROM invoices
+    GROUP BY 1, 2
+  )
+  SELECT month,
+         AVG(customer_total) as avg_revenue_per_customer,
+         MEDIAN(customer_total) as median_revenue_per_customer
+  FROM customer_monthly
+  GROUP BY month
+  ORDER BY month
+  ```
+
+  WRONG: AVG(amount) - this gives average invoice amount, NOT average per customer
+  RIGHT: Use CTE to aggregate per customer first, then AVG across customers
+
   Query structure for different chart types:
 
   LineChart (time series):
@@ -61,12 +88,19 @@ instructions: |
   If the spec includes interactive filters, you must:
 
   1. For Dropdown/ButtonGroup filters:
-     - Create a filter_options query: SELECT DISTINCT column FROM table ORDER BY column
+     - Create a filter_options query with a SIMPLE COLUMN ALIAS:
+       SELECT DISTINCT column_name AS simple_alias FROM table ORDER BY simple_alias
+     - CRITICAL: Use a simple alias (like "year", "region", "status") NOT the SQL expression!
+       WRONG: SELECT DISTINCT EXTRACT(YEAR FROM date) as "EXTRACT(YEAR FROM date)"
+       RIGHT: SELECT DISTINCT EXTRACT(YEAR FROM date) as year
      - Add WHERE clause to main query using: WHERE column = '${inputs.filter_name}'
 
-  2. For DateRangePicker filters:
+  2. For DateRange filters:
      - Add WHERE clause: WHERE date_col >= '${inputs.filter_name.start}'
                           AND date_col <= '${inputs.filter_name.end}'
+     - IMPORTANT: Do NOT add redundant hardcoded date filters (e.g., CURRENT_DATE - INTERVAL)
+       when a DateRange filter is present. Let the DateRange filter control the date range.
+       The DateRange component defaults to "Last 12 Months" which handles this automatically.
 
   3. For TextInput filters:
      - Add WHERE clause with LIKE: WHERE column LIKE '%${inputs.filter_name}%'
@@ -96,6 +130,10 @@ output_format: |
   Column naming:
   - For x-axis data: use descriptive names like "month", "segment", "product"
   - For y-axis data: use metric names like "revenue", "customer_count", "avg_value"
+  - IMPORTANT for dual-metric charts: Include "count", "volume", or "number" in count-type columns
+    and "revenue", "amount", or "value" in value-type columns. This helps the system
+    automatically use dual y-axes when scales differ significantly.
+    Example: "total_revenue" and "invoice_count" (not "revenue" and "invoices")
 
   IMPORTANT:
   - Output ONLY the JSON, no other text
@@ -104,3 +142,6 @@ output_format: |
   - Double-check for forbidden functions before outputting
   - filter_queries is optional - only include if there are Dropdown/ButtonGroup filters
   - Use ${inputs.filter_name} syntax for filter variables (this is Evidence syntax)
+  - CRITICAL for filter_queries: The column alias in the SELECT must be SIMPLE (e.g., "year", "region")
+    This alias becomes the "value" prop in the Dropdown component.
+    Example: SELECT DISTINCT YEAR(date) AS year  →  value="year" in Dropdown

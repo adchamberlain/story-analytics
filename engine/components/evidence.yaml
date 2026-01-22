@@ -14,16 +14,34 @@ components:
     optional_props:
       - title: "Chart title"
       - subtitle: "Chart subtitle"
+      - y2: "Column name(s) for secondary y-axis (right side)"
+      - y2SeriesType: "Chart type for y2 series (line, bar, area)"
     notes:
       - "Single series: y=\"column_name\""
       - "Multiple series: y={[\"column1\", \"column2\"]} (array syntax)"
-      - "NEVER use y2, y3, etc. - these props DO NOT EXIST"
-    example: |
+      - "DUAL Y-AXIS: Use y2 for metrics with different scales (e.g., revenue vs count)"
+      - "When y and y2 have different scales, each gets its own axis"
+    example_single: |
+      <LineChart
+        data={query_name}
+        x="month"
+        y="revenue"
+        title="Monthly Revenue"
+      />
+    example_multi_series: |
       <LineChart
         data={query_name}
         x="month"
         y={["sales_2024", "sales_2025"]}
         title="Sales Comparison"
+      />
+    example_dual_axis: |
+      <LineChart
+        data={query_name}
+        x="month"
+        y="revenue"
+        y2="order_count"
+        title="Revenue vs Order Volume"
       />
 
   BarChart:
@@ -35,12 +53,25 @@ components:
     optional_props:
       - title: "Chart title"
       - subtitle: "Chart subtitle"
-    example: |
+      - swapXY: "Set to {true} for HORIZONTAL bars - categories on y-axis, values on x-axis"
+    notes:
+      - "Default orientation is VERTICAL (categories on x-axis, values on y-axis)"
+      - "For HORIZONTAL bars: use swapXY={true}"
+      - "Horizontal bars are better when category names are long or when showing rankings"
+    example_vertical: |
       <BarChart
         data={query_name}
         x="category"
         y="count"
         title="Count by Category"
+      />
+    example_horizontal: |
+      <BarChart
+        data={query_name}
+        x="category"
+        y="revenue"
+        swapXY={true}
+        title="Top Customers by Revenue"
       />
 
   AreaChart:
@@ -125,16 +156,18 @@ components:
       - start: "Manual start date (YYYY-MM-DD)"
       - end: "Manual end date (YYYY-MM-DD)"
       - presetRanges: "Array of preset options like 'Last 7 Days', 'Last 30 Days', 'Year to Date'"
-      - defaultValue: "Default preset range selection"
+      - defaultValue: "Default preset range selection - MUST be set to avoid defaulting to Jan 1, 1970"
     notes:
       - "Creates TWO variables: ${inputs.name.start} and ${inputs.name.end}"
       - "Use in WHERE: WHERE date >= '${inputs.date_range.start}' AND date <= '${inputs.date_range.end}'"
       - "Preset options: 'Last 7 Days', 'Last 30 Days', 'Last 90 Days', 'Last 3 Months', 'Last 6 Months', 'Last 12 Months', 'Month to Date', 'Year to Date', 'All Time'"
+      - "IMPORTANT: Always set defaultValue to a sensible preset (e.g., 'Last 12 Months') to avoid showing Jan 1, 1970 as the default start date"
     example: |
       <DateRange
         name="date_range"
         title="Select Date Range"
-        presetRanges={["Last 7 Days", "Last 30 Days", "Last 90 Days", "Year to Date", "All Time"]}
+        presetRanges={["Last 7 Days", "Last 30 Days", "Last 90 Days", "Last 12 Months", "Year to Date", "All Time"]}
+        defaultValue="Last 12 Months"
       />
 
       ```sql filtered_data

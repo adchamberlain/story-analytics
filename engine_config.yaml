@@ -1,6 +1,7 @@
 llm:
   provider: claude
   model: claude-sonnet-4-20250514
+  fast_model: claude-3-5-haiku-20241022  # For structured tasks (faster)
   api_key_env: ANTHROPIC_API_KEY
   api_key: REDACTED_API_KEY
 

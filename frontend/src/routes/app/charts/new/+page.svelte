@@ -6,13 +6,32 @@
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import ChartChat from '$lib/components/ChartChat.svelte';
-	import { chartPhase, chartSessionId, chartMessages, resetChartConversation, startNewChartConversation } from '$lib/stores/chart';
+	import {
+		chartPhase,
+		chartSessionId,
+		chartMessages,
+		chartLoading,
+		resetChartConversation,
+		startNewChartConversation,
+		isChartRequestPending,
+		clearChartNotification
+	} from '$lib/stores/chart';
 	import { get } from 'svelte/store';
 
-	// Start fresh only if no session was pre-loaded (e.g., from sidebar click)
+	// Start fresh only if no session was pre-loaded and no request is pending
 	onMount(() => {
+		// Clear any notification since user is now viewing the chat
+		clearChartNotification();
+
 		const currentSessionId = get(chartSessionId);
 		const currentMessages = get(chartMessages);
+		const isPending = isChartRequestPending();
+
+		// If there's a pending request, let it complete - don't reset
+		if (isPending) {
+			console.log('[New Chart Page] Request in progress, preserving state');
+			return;
+		}
 
 		// If there's no session or no messages, start fresh
 		if (!currentSessionId || currentMessages.length === 0) {
@@ -21,16 +40,18 @@
 		}
 	});
 
-	// Reset conversation when navigating away
+	// Handle back navigation - only reset if no request pending
 	function handleBack() {
-		resetChartConversation();
+		if (!isChartRequestPending()) {
+			resetChartConversation();
+		}
 		goto('/app/charts');
 	}
 
 	// Handle completion - go to library
 	$: if ($chartPhase === 'complete') {
 		setTimeout(() => {
-			resetChartConversation();
+			resetChartConversation(true); // Force reset on completion
 			goto('/app/charts');
 		}, 1000);
 	}
