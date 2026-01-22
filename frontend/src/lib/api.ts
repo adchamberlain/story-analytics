@@ -476,6 +476,21 @@ export async function getChartPreviewUrl(
 	return handleResponse<{ chart_id: string; url: string; dashboard_slug: string }>(response);
 }
 
+export interface ChartBySlugResponse {
+	type: 'chart' | 'dashboard';
+	chart_id?: string;
+	chart?: Chart;
+	dashboard_id?: string;
+	dashboard_slug: string;
+	dashboard_title?: string;
+	charts?: Chart[];
+}
+
+export async function getChartBySlug(slug: string): Promise<ChartBySlugResponse> {
+	const response = await fetchWithAuth(`/charts/by-slug/${slug}`);
+	return handleResponse<ChartBySlugResponse>(response);
+}
+
 // Dashboard Composition endpoints
 
 export async function listComposedDashboards(): Promise<ComposedDashboardListResponse> {

@@ -463,6 +463,58 @@ async def create_chart(
     )
 
 
+@router.get("/by-slug/{slug}")
+async def get_chart_by_slug(
+    slug: str,
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Get a chart by its Evidence URL slug.
+
+    This looks up the dashboard by slug and returns the chart info.
+    Used for the "View Source" functionality.
+    """
+    dashboard_storage = get_dashboard_storage()
+    dashboard = dashboard_storage.get_by_slug(slug)
+
+    if not dashboard:
+        raise HTTPException(status_code=404, detail="Page not found")
+
+    # Check if this is a single-chart dashboard (chart page)
+    if not dashboard.chart_ids or len(dashboard.chart_ids) == 0:
+        raise HTTPException(status_code=404, detail="No charts in this page")
+
+    chart_storage = get_chart_storage()
+
+    # For single-chart dashboards, return the chart
+    if len(dashboard.chart_ids) == 1:
+        chart = chart_storage.get(dashboard.chart_ids[0])
+        if not chart:
+            raise HTTPException(status_code=404, detail="Chart not found")
+
+        return {
+            "type": "chart",
+            "chart_id": chart.id,
+            "chart": _chart_to_schema(chart),
+            "dashboard_slug": dashboard.slug,
+        }
+
+    # For multi-chart dashboards, return dashboard info
+    charts = []
+    for chart_id in dashboard.chart_ids:
+        chart = chart_storage.get(chart_id)
+        if chart:
+            charts.append(_chart_to_schema(chart))
+
+    return {
+        "type": "dashboard",
+        "dashboard_id": dashboard.id,
+        "dashboard_slug": dashboard.slug,
+        "dashboard_title": dashboard.title,
+        "charts": charts,
+    }
+
+
 @router.get("/library/{chart_id}/preview-url")
 async def get_chart_preview_url(
     chart_id: str,

@@ -31,7 +31,7 @@ critical_rules: |
   - Extract year: YEAR(date_column) or EXTRACT(year FROM date_column)
 
 instructions: |
-  Given a chart specification, write ONE SQL query that provides the data.
+  Given a chart specification, write SQL queries that provide the data.
 
   Your query should:
   1. Use a descriptive name (lowercase, underscores) matching the chart purpose
@@ -57,15 +57,39 @@ instructions: |
   - Single row with the aggregated value
   - No GROUP BY needed
 
+  INTERACTIVE FILTERS:
+  If the spec includes interactive filters, you must:
+
+  1. For Dropdown/ButtonGroup filters:
+     - Create a filter_options query: SELECT DISTINCT column FROM table ORDER BY column
+     - Add WHERE clause to main query using: WHERE column = '${inputs.filter_name}'
+
+  2. For DateRangePicker filters:
+     - Add WHERE clause: WHERE date_col >= '${inputs.filter_name.start}'
+                          AND date_col <= '${inputs.filter_name.end}'
+
+  3. For TextInput filters:
+     - Add WHERE clause with LIKE: WHERE column LIKE '%${inputs.filter_name}%'
+
+  4. For Slider filters:
+     - Add WHERE clause: WHERE column >= ${inputs.filter_name}
+
 output_format: |
-  Respond with a JSON object containing ONE query:
+  Respond with a JSON object containing the queries:
 
   ```json
   {
     "query_name": "descriptive_name",
     "purpose": "What this query provides",
-    "sql": "SELECT ... FROM ... WHERE ...",
-    "columns": ["x_column", "y_column"]
+    "sql": "SELECT ... FROM ... WHERE column = '${inputs.filter_name}'",
+    "columns": ["x_column", "y_column"],
+    "filter_queries": [
+      {
+        "name": "filter_options_query_name",
+        "filter_name": "filter_name",
+        "sql": "SELECT DISTINCT column FROM table ORDER BY column"
+      }
+    ]
   }
   ```
 
@@ -78,3 +102,5 @@ output_format: |
   - The query must be complete and syntactically correct for DuckDB
   - Use exact table references from the schema (e.g., snowflake_saas.customers)
   - Double-check for forbidden functions before outputting
+  - filter_queries is optional - only include if there are Dropdown/ButtonGroup filters
+  - Use ${inputs.filter_name} syntax for filter variables (this is Evidence syntax)

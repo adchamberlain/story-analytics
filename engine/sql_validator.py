@@ -166,13 +166,19 @@ class SQLValidator:
         # Strip trailing semicolons - they cause issues when wrapping in subqueries
         query = query.strip().rstrip(';').strip()
 
+        # Replace Evidence template variables with placeholder values for validation
+        # ${inputs.filter_name} -> 'placeholder'
+        # ${inputs.date_range.start} -> '2024-01-01'
+        # ${inputs.date_range.end} -> '2024-12-31'
+        test_query = self._replace_template_variables(query)
+
         try:
             # Use EXPLAIN to validate without actually running the full query
             # This catches syntax and reference errors without processing all data
-            result = conn.execute(f"EXPLAIN {query}")
+            result = conn.execute(f"EXPLAIN {test_query}")
 
             # If EXPLAIN works, also do a quick LIMIT 1 to catch runtime errors
-            result = conn.execute(f"SELECT * FROM ({query}) AS subq LIMIT 1")
+            result = conn.execute(f"SELECT * FROM ({test_query}) AS subq LIMIT 1")
             row_count = len(result.fetchall())
 
             return SQLValidationResult(
@@ -195,6 +201,40 @@ class SQLValidator:
                 valid=False,
                 error=f"Unexpected error: {e}",
             )
+
+    def _replace_template_variables(self, query: str) -> str:
+        """
+        Replace Evidence template variables with placeholder values for validation.
+
+        Handles various template syntaxes:
+        - '${inputs.filter_name}' -> 'placeholder'
+        - '${inputs.date_range.start}' -> '2024-01-01'
+        - ${inputs.numeric_filter} -> 0
+        - Also handles $'${...}' patterns (where LLM adds extra $)
+        """
+        # First, clean up any erroneous $' patterns (LLM sometimes adds $ before quotes)
+        # $'${inputs...}' -> '${inputs...}'
+        query = re.sub(r"\$'", "'", query)
+
+        # Replace quoted date range start/end patterns first (most specific)
+        # '${inputs.date_range.start}' -> '2024-01-01'
+        query = re.sub(r"'\$\{inputs\.\w+\.start\}'", "'2024-01-01'", query)
+        query = re.sub(r"'\$\{inputs\.\w+\.end\}'", "'2024-12-31'", query)
+
+        # Replace unquoted date range patterns (add quotes)
+        # ${inputs.date_range.start} -> '2024-01-01'
+        query = re.sub(r"\$\{inputs\.\w+\.start\}", "'2024-01-01'", query)
+        query = re.sub(r"\$\{inputs\.\w+\.end\}", "'2024-12-31'", query)
+
+        # Replace quoted string filter patterns
+        # '${inputs.filter_name}' -> 'placeholder'
+        query = re.sub(r"'\$\{inputs\.\w+\}'", "'placeholder'", query)
+
+        # Replace unquoted filter patterns (might be numeric)
+        # ${inputs.filter_name} -> 0
+        query = re.sub(r"\$\{inputs\.\w+\}", "0", query)
+
+        return query
 
     def extract_queries_from_markdown(self, markdown: str) -> list[tuple[str, str]]:
         """

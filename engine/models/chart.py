@@ -18,6 +18,181 @@ from enum import Enum
 from typing import Any
 
 
+class FilterType(Enum):
+    """Types of filter/input components available in Evidence."""
+
+    DROPDOWN = "Dropdown"
+    DATE_RANGE = "DateRange"  # Evidence uses DateRange, not DateRangePicker
+    TEXT_INPUT = "TextInput"
+    BUTTON_GROUP = "ButtonGroup"
+    SLIDER = "Slider"
+
+    @classmethod
+    def from_string(cls, s: str) -> "FilterType":
+        """Convert string to FilterType, handling common variations."""
+        normalized = s.lower().replace("_", "").replace("-", "").replace(" ", "")
+        mapping = {
+            "dropdown": cls.DROPDOWN,
+            "select": cls.DROPDOWN,
+            "daterangepicker": cls.DATE_RANGE,
+            "daterange": cls.DATE_RANGE,
+            "datepicker": cls.DATE_RANGE,
+            "textinput": cls.TEXT_INPUT,
+            "text": cls.TEXT_INPUT,
+            "search": cls.TEXT_INPUT,
+            "buttongroup": cls.BUTTON_GROUP,
+            "buttons": cls.BUTTON_GROUP,
+            "slider": cls.SLIDER,
+            "range": cls.SLIDER,
+        }
+        return mapping.get(normalized, cls.DROPDOWN)
+
+
+@dataclass
+class FilterSpec:
+    """
+    Specification for a filter/input component.
+
+    Filters create input variables that can be used in SQL queries
+    via ${inputs.filter_name} syntax.
+    """
+
+    # Identity
+    name: str  # Unique filter name, becomes ${inputs.name}
+    filter_type: FilterType
+
+    # Display
+    title: str | None = None  # Label shown to user
+
+    # For Dropdown/ButtonGroup: needs a query for options
+    options_column: str | None = None  # Column to show as options
+    options_table: str | None = None  # Table to get options from
+    options_query: str | None = None  # Full SQL query for options (generated)
+    options_query_name: str | None = None  # Query name for options
+
+    # For DateRangePicker
+    date_column: str | None = None  # Column to filter on
+    default_start: str | None = None  # Default start date
+    default_end: str | None = None  # Default end date
+
+    # For Slider
+    min_value: float | None = None
+    max_value: float | None = None
+    step: float | None = None
+
+    # For all types
+    default_value: str | None = None
+
+    def to_evidence_component(self) -> str:
+        """Generate the Evidence component markup."""
+        if self.filter_type == FilterType.DROPDOWN:
+            props = [f'name="{self.name}"']
+            if self.options_query_name:
+                props.append(f"data={{{self.options_query_name}}}")
+            if self.options_column:
+                props.append(f'value="{self.options_column}"')
+            if self.title:
+                props.append(f'title="{self.title}"')
+            if self.default_value:
+                props.append(f'defaultValue="{self.default_value}"')
+            return f"<Dropdown {' '.join(props)} />"
+
+        elif self.filter_type == FilterType.DATE_RANGE:
+            props = [f'name="{self.name}"']
+            if self.title:
+                props.append(f'title="{self.title}"')
+            # DateRange can use data+dates props OR start+end props
+            # We'll use presetRanges for common date filtering
+            props.append('presetRanges={["Last 7 Days", "Last 30 Days", "Last 90 Days", "Last 12 Months", "Year to Date", "All Time"]}')
+            if self.default_start:
+                props.append(f'start="{self.default_start}"')
+            if self.default_end:
+                props.append(f'end="{self.default_end}"')
+            return f"<DateRange {' '.join(props)} />"
+
+        elif self.filter_type == FilterType.TEXT_INPUT:
+            props = [f'name="{self.name}"']
+            if self.title:
+                props.append(f'title="{self.title}"')
+            if self.default_value:
+                props.append(f'defaultValue="{self.default_value}"')
+            return f"<TextInput {' '.join(props)} />"
+
+        elif self.filter_type == FilterType.BUTTON_GROUP:
+            props = [f'name="{self.name}"']
+            if self.options_query_name:
+                props.append(f"data={{{self.options_query_name}}}")
+            if self.options_column:
+                props.append(f'value="{self.options_column}"')
+            if self.title:
+                props.append(f'title="{self.title}"')
+            if self.default_value:
+                props.append(f'defaultValue="{self.default_value}"')
+            return f"<ButtonGroup {' '.join(props)} />"
+
+        elif self.filter_type == FilterType.SLIDER:
+            props = [f'name="{self.name}"']
+            if self.min_value is not None:
+                props.append(f"min={{{self.min_value}}}")
+            if self.max_value is not None:
+                props.append(f"max={{{self.max_value}}}")
+            if self.step is not None:
+                props.append(f"step={{{self.step}}}")
+            if self.title:
+                props.append(f'title="{self.title}"')
+            if self.default_value:
+                props.append(f"defaultValue={{{self.default_value}}}")
+            return f"<Slider {' '.join(props)} />"
+
+        return ""
+
+    def get_sql_variable(self) -> str:
+        """Get the SQL variable syntax for this filter."""
+        if self.filter_type == FilterType.DATE_RANGE_PICKER:
+            # DateRangePicker creates .start and .end
+            return f"${{inputs.{self.name}.start}} / ${{inputs.{self.name}.end}}"
+        return f"${{inputs.{self.name}}}"
+
+    def to_dict(self) -> dict[str, Any]:
+        """Serialize to dictionary."""
+        return {
+            "name": self.name,
+            "filter_type": self.filter_type.value,
+            "title": self.title,
+            "options_column": self.options_column,
+            "options_table": self.options_table,
+            "options_query": self.options_query,
+            "options_query_name": self.options_query_name,
+            "date_column": self.date_column,
+            "default_start": self.default_start,
+            "default_end": self.default_end,
+            "min_value": self.min_value,
+            "max_value": self.max_value,
+            "step": self.step,
+            "default_value": self.default_value,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "FilterSpec":
+        """Deserialize from dictionary."""
+        return cls(
+            name=data.get("name", "filter"),
+            filter_type=FilterType.from_string(data.get("filter_type", "Dropdown")),
+            title=data.get("title"),
+            options_column=data.get("options_column"),
+            options_table=data.get("options_table"),
+            options_query=data.get("options_query"),
+            options_query_name=data.get("options_query_name"),
+            date_column=data.get("date_column"),
+            default_start=data.get("default_start"),
+            default_end=data.get("default_end"),
+            min_value=data.get("min_value"),
+            max_value=data.get("max_value"),
+            step=data.get("step"),
+            default_value=data.get("default_value"),
+        )
+
+
 class ChartType(Enum):
     """Types of chart visualizations available in Evidence."""
 
@@ -157,7 +332,10 @@ class ChartSpec:
     metric: str  # Primary metric to show (e.g., "revenue", "user count")
     aggregation: str | None = None  # How to aggregate (SUM, COUNT, AVG, etc.)
     dimension: str | None = None  # How to slice the data (e.g., "by month", "by customer")
-    filters: list[str] = field(default_factory=list)  # Any filters to apply
+    filters: list[str] = field(default_factory=list)  # Static filters to bake into query
+
+    # Interactive filters (user-controllable)
+    interactive_filters: list[FilterSpec] = field(default_factory=list)
 
     # Visualization
     chart_type: ChartType = ChartType.BAR_CHART
@@ -183,7 +361,11 @@ class ChartSpec:
         if self.dimension:
             lines.append(f"  Dimension: {self.dimension}")
         if self.filters:
-            lines.append(f"  Filters: {', '.join(self.filters)}")
+            lines.append(f"  Static Filters: {', '.join(self.filters)}")
+        if self.interactive_filters:
+            lines.append(f"  Interactive Filters:")
+            for f in self.interactive_filters:
+                lines.append(f"    - {f.filter_type.value}: {f.name} on {f.options_column or f.date_column}")
         if self.relevant_tables:
             lines.append(f"  Tables: {', '.join(self.relevant_tables)}")
 
@@ -211,6 +393,9 @@ class ValidatedChart:
     # Chart configuration
     config: ChartConfig = field(default_factory=ChartConfig)
 
+    # Filters (optional)
+    filters: list[FilterSpec] = field(default_factory=list)
+
     # Validation status
     validation_status: str = "valid"  # "valid", "invalid", "pending"
     validation_error: str | None = None
@@ -220,7 +405,21 @@ class ValidatedChart:
         """Generate the Evidence markdown for this chart."""
         lines = []
 
-        # SQL query block
+        # First, render filter option queries (if any)
+        for f in self.filters:
+            if f.options_query and f.options_query_name:
+                lines.append(f"```sql {f.options_query_name}")
+                lines.append(f.options_query.strip())
+                lines.append("```")
+                lines.append("")
+
+        # Render filter components (if any)
+        if self.filters:
+            for f in self.filters:
+                lines.append(f.to_evidence_component())
+            lines.append("")
+
+        # Main SQL query block
         lines.append(f"```sql {self.query_name}")
         lines.append(self.sql.strip())
         lines.append("```")
@@ -298,6 +497,9 @@ class Chart:
     chart_type: ChartType = ChartType.BAR_CHART
     config: ChartConfig = field(default_factory=ChartConfig)
 
+    # Filters (optional)
+    filters: list[FilterSpec] = field(default_factory=list)
+
     # Metadata
     created_at: datetime = field(default_factory=datetime.now)
     updated_at: datetime = field(default_factory=datetime.now)
@@ -315,7 +517,21 @@ class Chart:
         """Generate Evidence markdown for this chart."""
         lines = []
 
-        # SQL query block
+        # First, render filter option queries (if any)
+        for f in self.filters:
+            if f.options_query and f.options_query_name:
+                lines.append(f"```sql {f.options_query_name}")
+                lines.append(f.options_query.strip())
+                lines.append("```")
+                lines.append("")
+
+        # Render filter components (if any)
+        if self.filters:
+            for f in self.filters:
+                lines.append(f.to_evidence_component())
+            lines.append("")
+
+        # Main SQL query block
         lines.append(f"```sql {self.query_name}")
         lines.append(self.sql.strip())
         lines.append("```")
@@ -360,6 +576,7 @@ class Chart:
             sql=validated.sql,
             chart_type=validated.spec.chart_type,
             config=validated.config,
+            filters=validated.filters,
             original_request=validated.spec.original_request,
             conversation_id=conversation_id,
             is_valid=validated.validation_status == "valid",
@@ -383,6 +600,7 @@ class Chart:
                 "title": self.config.title,
                 "extra_props": self.config.extra_props,
             },
+            "filters": [f.to_dict() for f in self.filters],
             "created_at": self.created_at.isoformat(),
             "updated_at": self.updated_at.isoformat(),
             "created_by": self.created_by,
@@ -405,6 +623,10 @@ class Chart:
             extra_props=config_data.get("extra_props", {}),
         )
 
+        # Deserialize filters
+        filters_data = data.get("filters", [])
+        filters = [FilterSpec.from_dict(f) for f in filters_data]
+
         return cls(
             id=data.get("id", str(uuid.uuid4())),
             title=data.get("title", ""),
@@ -413,6 +635,7 @@ class Chart:
             sql=data.get("sql", ""),
             chart_type=ChartType.from_string(data.get("chart_type", "BarChart")),
             config=config,
+            filters=filters,
             created_at=datetime.fromisoformat(data["created_at"]) if "created_at" in data else datetime.now(),
             updated_at=datetime.fromisoformat(data["updated_at"]) if "updated_at" in data else datetime.now(),
             created_by=data.get("created_by"),
