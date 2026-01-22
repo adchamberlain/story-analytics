@@ -27,6 +27,7 @@ from .llm.claude import get_provider
 from .models import Chart, ChartConfig, ChartSpec, ChartType, ValidatedChart
 from .schema import get_schema_context
 from .sql_validator import validate_query
+from .config_loader import get_config_loader
 
 
 @dataclass
@@ -384,6 +385,11 @@ class ChartPipeline:
     def _build_chart_config(self, spec: ChartSpec, columns: list[str]) -> ChartConfig:
         """Build chart configuration based on spec and columns."""
         config = ChartConfig()
+        config_loader = get_config_loader()
+
+        # Get design system defaults
+        chart_defaults = config_loader.get_chart_defaults()
+        base_options = config_loader.get_base_echarts_options()
 
         # Set up based on chart type
         if spec.chart_type == ChartType.BIG_VALUE:
@@ -398,10 +404,12 @@ class ChartPipeline:
                 config.x = columns[0]  # Date column
                 config.y = columns[1]  # Metric column
             config.title = spec.title
-            # Apply design system defaults
+
+            # Apply design system defaults for line charts
+            line_defaults = config_loader.get_chart_type_defaults("line")
             config.extra_props = {
-                "fillColor": "#6366f1",  # Indigo
-                "smooth": 0.3,
+                "fillColor": "#6366f1",  # Indigo primary
+                "echartsOptions": self._build_echarts_options(base_options, line_defaults),
             }
 
         elif spec.chart_type == ChartType.BAR_CHART:
@@ -410,9 +418,12 @@ class ChartPipeline:
                 config.x = columns[0]
                 config.y = columns[1]
             config.title = spec.title
-            # Apply design system defaults
+
+            # Apply design system defaults for bar charts
+            bar_defaults = config_loader.get_chart_type_defaults("bar_vertical")
             config.extra_props = {
-                "fillColor": "#6366f1",  # Indigo
+                "fillColor": "#6366f1",  # Indigo primary
+                "echartsOptions": self._build_echarts_options(base_options, bar_defaults),
             }
 
         elif spec.chart_type == ChartType.DATA_TABLE:
@@ -425,8 +436,50 @@ class ChartPipeline:
                 config.x = columns[0]
                 config.y = columns[1]
             config.title = spec.title
+            config.extra_props = {
+                "fillColor": "#6366f1",  # Indigo primary
+            }
 
         return config
+
+    def _build_echarts_options(self, base_options: dict, type_defaults: dict) -> dict:
+        """Build echartsOptions by merging base options with type-specific defaults."""
+        options = {}
+
+        # Apply base grid and axis options
+        if "grid" in base_options:
+            options["grid"] = base_options["grid"]
+        if "xAxis" in base_options:
+            options["xAxis"] = base_options["xAxis"]
+        if "yAxis" in base_options:
+            options["yAxis"] = base_options["yAxis"]
+
+        # Apply type-specific series options
+        if type_defaults:
+            series_options = {}
+
+            # Line/area chart styling
+            if "smooth" in type_defaults:
+                series_options["smooth"] = type_defaults["smooth"]
+            if "symbolSize" in type_defaults:
+                series_options["symbolSize"] = type_defaults["symbolSize"]
+            if "lineStyle" in type_defaults:
+                series_options["lineStyle"] = type_defaults["lineStyle"]
+            if "itemStyle" in type_defaults:
+                series_options["itemStyle"] = type_defaults["itemStyle"]
+            if "areaStyle" in type_defaults:
+                series_options["areaStyle"] = type_defaults["areaStyle"]
+            if "emphasis" in type_defaults:
+                series_options["emphasis"] = type_defaults["emphasis"]
+
+            # Bar chart styling
+            if "barWidth" in type_defaults:
+                series_options["barWidth"] = type_defaults["barWidth"]
+
+            if series_options:
+                options["series"] = [series_options]
+
+        return options
 
 
 def create_chart(user_request: str, provider_name: str | None = None) -> ChartPipelineResult:

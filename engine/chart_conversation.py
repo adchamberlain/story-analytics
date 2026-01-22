@@ -24,6 +24,7 @@ from .dashboard_composer import create_chart_dashboard, get_composer
 from .llm.base import Message
 from .llm.claude import get_provider
 from .models import Chart, ValidatedChart, get_chart_storage
+from .schema import get_schema_context
 
 
 class ChartPhase(Enum):
@@ -128,7 +129,16 @@ class ChartConversationManager:
 
         # Handle based on phase
         if self.state.phase == ChartPhase.WAITING:
-            return self._handle_new_chart_request(user_input)
+            # Classify intent before assuming it's a chart request
+            intent = self._classify_intent(user_input)
+
+            if intent == "chart_request":
+                return self._handle_new_chart_request(user_input)
+            elif intent == "data_question":
+                return self._handle_data_question(user_input)
+            else:  # "unclear" or other
+                return self._handle_clarification_needed(user_input)
+
         elif self.state.phase == ChartPhase.VIEWING:
             return self._handle_refinement_request(user_input)
         else:
@@ -152,6 +162,14 @@ class ChartConversationManager:
                 response="What chart would you like to create?",
             )
 
+        elif action_id == "modify":
+            # Stay in VIEWING phase so next message triggers refinement
+            return ChartConversationResult(
+                response="What would you like to change about this chart?",
+                chart_id=self.state.current_chart_id,
+                chart_url=self.get_chart_embed_url(),
+            )
+
         elif action_id == "add_to_dashboard":
             # Future: implement dashboard selection
             return ChartConversationResult(
@@ -159,10 +177,116 @@ class ChartConversationManager:
                 chart_id=self.state.current_chart_id,
             )
 
+        elif action_id == "show_examples":
+            response = """Here are some charts you can create:
+
+**Time Series**
+- "Show me monthly revenue over the past year"
+- "User signups by week"
+
+**Comparisons**
+- "Revenue by customer segment"
+- "Top 10 customers by total spend"
+
+**KPIs**
+- "Total revenue this quarter"
+- "Average order value"
+
+Just describe what you want to see!"""
+            self.state.messages.append(Message(role="assistant", content=response))
+            return ChartConversationResult(response=response)
+
+        elif action_id == "show_data":
+            # Delegate to the data question handler
+            return self._handle_data_question("What data tables and columns are available?")
+
         else:
             return ChartConversationResult(
                 response=f"Unknown action: {action_id}",
             )
+
+    def _classify_intent(self, user_input: str) -> str:
+        """
+        Use LLM to classify user intent.
+
+        Returns one of: "chart_request", "data_question", "unclear"
+        """
+        system_prompt = """You are an intent classifier for a chart creation tool.
+
+Classify the user's message into ONE of these categories:
+
+1. "chart_request" - User wants to CREATE or SEE a specific chart/visualization
+   Examples: "Show me revenue by month", "Create a bar chart of sales", "I want to see user growth"
+
+2. "data_question" - User is asking ABOUT the data, system, or capabilities (not requesting a chart)
+   Examples: "What data do you have?", "What tables are available?", "What can you do?", "Help"
+
+3. "unclear" - Message is ambiguous, off-topic, or needs clarification
+   Examples: "Hello", "hmm", "maybe something with sales?"
+
+Respond with ONLY the category name, nothing else."""
+
+        messages = [Message(role="user", content=user_input)]
+
+        response = self.llm.generate(
+            messages=messages,
+            system_prompt=system_prompt,
+            temperature=0,
+            max_tokens=20,
+        )
+
+        intent = response.content.strip().lower().replace('"', '').replace("'", "")
+
+        # Normalize to expected values
+        if "chart" in intent or "request" in intent:
+            return "chart_request"
+        elif "data" in intent or "question" in intent:
+            return "data_question"
+        else:
+            return "unclear"
+
+    def _handle_data_question(self, user_input: str) -> ChartConversationResult:
+        """Answer a question about the available data or system capabilities."""
+        schema_context = get_schema_context()
+
+        system_prompt = f"""You are a helpful assistant for a chart creation tool.
+The user is asking about the data or system. Answer their question concisely.
+
+AVAILABLE DATA:
+{schema_context}
+
+After answering, remind them they can describe a chart they'd like to create.
+Keep your response brief and friendly."""
+
+        messages = [Message(role="user", content=user_input)]
+
+        response = self.llm.generate(
+            messages=messages,
+            system_prompt=system_prompt,
+            temperature=0.3,
+            max_tokens=500,
+        )
+
+        answer = response.content.strip()
+        self.state.messages.append(Message(role="assistant", content=answer))
+
+        return ChartConversationResult(
+            response=answer,
+        )
+
+    def _handle_clarification_needed(self, user_input: str) -> ChartConversationResult:
+        """Handle unclear input by guiding user to valid paths."""
+        response = """I'm here to help you create charts! What would you like to do?"""
+
+        self.state.messages.append(Message(role="assistant", content=response))
+
+        return ChartConversationResult(
+            response=response,
+            action_buttons=[
+                ChartActionButton(id="show_examples", label="Show Chart Examples", style="primary"),
+                ChartActionButton(id="show_data", label="What Data Is Available?", style="secondary"),
+            ],
+        )
 
     def _handle_new_chart_request(self, user_input: str) -> ChartConversationResult:
         """Handle a request for a new chart."""
@@ -215,6 +339,7 @@ What would you like to do next?"""
             chart_id=stored_chart.id,
             action_buttons=[
                 ChartActionButton(id="done", label="Done", style="primary"),
+                ChartActionButton(id="modify", label="Modify", style="secondary"),
                 ChartActionButton(id="new_chart", label="Create Another", style="secondary"),
             ],
         )
@@ -270,6 +395,7 @@ What else would you like to change?"""
             chart_id=stored_chart.id,
             action_buttons=[
                 ChartActionButton(id="done", label="Done", style="primary"),
+                ChartActionButton(id="modify", label="Modify", style="secondary"),
                 ChartActionButton(id="new_chart", label="Create Another", style="secondary"),
             ],
         )

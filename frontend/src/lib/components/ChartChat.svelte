@@ -163,6 +163,12 @@
 
 	.message.assistant {
 		align-self: flex-start;
+		max-width: 95%;
+	}
+
+	/* When message contains a chart, allow it to be even wider */
+	.message.assistant:has(.chart-preview) {
+		max-width: min(950px, calc(100vw - 3rem));
 	}
 
 	.message-content {
@@ -191,7 +197,8 @@
 
 	.chart-preview {
 		width: 100%;
-		max-width: 600px;
+		min-width: min(600px, 90vw);
+		max-width: min(900px, calc(100vw - 4rem));
 	}
 
 	.action-buttons {

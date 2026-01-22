@@ -16,7 +16,7 @@
 </script>
 
 <svelte:head>
-	<title>Compose Dashboard | Story</title>
+	<title>Build Dashboard | Story</title>
 </svelte:head>
 
 <div class="compose-page">

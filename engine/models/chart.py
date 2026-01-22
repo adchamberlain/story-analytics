@@ -10,6 +10,7 @@ Key concepts:
 
 from __future__ import annotations
 
+import json
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -237,6 +238,10 @@ class ValidatedChart:
                 prop_strings.append(f"{key}={{{str(value).lower()}}}")
             elif isinstance(value, str):
                 prop_strings.append(f'{key}="{value}"')
+            elif isinstance(value, dict):
+                # Serialize dicts (like echartsOptions) as JSON
+                json_str = json.dumps(value)
+                prop_strings.append(f"{key}={{{json_str}}}")
             elif isinstance(value, list):
                 items = ", ".join(f'"{v}"' if isinstance(v, str) else str(v) for v in value)
                 prop_strings.append(f"{key}={{[{items}]}}")
@@ -328,6 +333,10 @@ class Chart:
                 prop_strings.append(f"{key}={{{str(value).lower()}}}")
             elif isinstance(value, str):
                 prop_strings.append(f'{key}="{value}"')
+            elif isinstance(value, dict):
+                # Serialize dicts (like echartsOptions) as JSON
+                json_str = json.dumps(value)
+                prop_strings.append(f"{key}={{{json_str}}}")
             elif isinstance(value, list):
                 items = ", ".join(f'"{v}"' if isinstance(v, str) else str(v) for v in value)
                 prop_strings.append(f"{key}={{[{items}]}}")

@@ -105,6 +105,25 @@
 			return;
 		}
 
+		// Handle navigation actions - route to appropriate pages
+		if (actionId === 'create_chart') {
+			goto('/app/charts/new');
+			return;
+		}
+		if (actionId === 'find_chart') {
+			goto('/app/charts');
+			return;
+		}
+		if (actionId === 'find_dashboard') {
+			goto('/app/dashboards');
+			return;
+		}
+		if (actionId === 'create_dashboard') {
+			// Use existing create flow via backend
+			await sendMessage('__action:create_new');
+			return;
+		}
+
 		// Send action with special prefix to backend
 		await sendMessage(`__action:${actionId}`);
 	}
@@ -237,23 +256,51 @@
 						<p class="text-sm text-terminal-dim mb-6">
 							What would you like to do?
 						</p>
-						<div class="flex justify-center gap-3">
-							<button
-								type="button"
-								on:click={() => handleActionClick({ detail: { id: 'create_new' } })}
-								class="px-5 py-2.5 text-sm font-medium rounded transition-colors
-									bg-terminal-accent text-terminal-bg hover:bg-terminal-accent/80"
-							>
-								Create New Dashboard
-							</button>
-							<button
-								type="button"
-								on:click={() => handleActionClick({ detail: { id: 'edit_existing' } })}
-								class="px-5 py-2.5 text-sm font-medium rounded transition-colors
-									bg-terminal-surface border border-terminal-border hover:border-terminal-accent hover:text-terminal-accent"
-							>
-								Edit Existing
-							</button>
+						<div class="flex flex-col sm:flex-row justify-center gap-6 max-w-2xl mx-auto">
+							<!-- Charts Section -->
+							<div class="flex-1 p-4 bg-terminal-surface border border-terminal-border rounded">
+								<h3 class="text-terminal-accent font-medium mb-3">Charts</h3>
+								<div class="flex flex-col gap-2">
+									<button
+										type="button"
+										on:click={() => handleActionClick({ detail: { id: 'create_chart' } })}
+										class="px-4 py-2 text-sm font-medium rounded transition-colors
+											bg-terminal-accent text-terminal-bg hover:bg-terminal-accent/80"
+									>
+										Create New Chart
+									</button>
+									<button
+										type="button"
+										on:click={() => handleActionClick({ detail: { id: 'find_chart' } })}
+										class="px-4 py-2 text-sm font-medium rounded transition-colors
+											bg-terminal-surface border border-terminal-border hover:border-terminal-accent hover:text-terminal-accent"
+									>
+										Find / Edit Chart
+									</button>
+								</div>
+							</div>
+							<!-- Dashboards Section -->
+							<div class="flex-1 p-4 bg-terminal-surface border border-terminal-border rounded">
+								<h3 class="text-terminal-accent font-medium mb-3">Dashboards</h3>
+								<div class="flex flex-col gap-2">
+									<button
+										type="button"
+										on:click={() => handleActionClick({ detail: { id: 'create_dashboard' } })}
+										class="px-4 py-2 text-sm font-medium rounded transition-colors
+											bg-terminal-accent text-terminal-bg hover:bg-terminal-accent/80"
+									>
+										Create New Dashboard
+									</button>
+									<button
+										type="button"
+										on:click={() => handleActionClick({ detail: { id: 'find_dashboard' } })}
+										class="px-4 py-2 text-sm font-medium rounded transition-colors
+											bg-terminal-surface border border-terminal-border hover:border-terminal-accent hover:text-terminal-accent"
+									>
+										Find / Edit Dashboard
+									</button>
+								</div>
+							</div>
 						</div>
 					</div>
 				{/if}
