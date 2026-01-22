@@ -409,7 +409,7 @@ export async function getSourceSchema(sourceName: string): Promise<SchemaInfo> {
 
 export async function sendChartMessage(
 	message: string,
-	sessionId?: string
+	sessionId?: number
 ): Promise<ChartMessageResponse> {
 	const response = await fetchWithAuth('/charts/conversation/message', {
 		method: 'POST',

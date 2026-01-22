@@ -7,14 +7,14 @@ Provides:
 - Dashboard composition endpoints
 """
 
-import uuid
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session as DBSession
 
 from ..database import get_db
 from ..models.user import User
+from ..models.session import ConversationSession
 from ..schemas.chart import (
     ChartMessageRequest,
     ChartMessageResponse,
@@ -34,7 +34,7 @@ from ..schemas.chart import (
     DashboardRemoveChartRequest,
     DashboardReorderChartsRequest,
 )
-from ..security import get_current_user
+from ..dependencies import get_current_user
 
 # Import engine components
 import sys
@@ -59,23 +59,110 @@ from engine.config import get_config
 
 router = APIRouter(prefix="/charts", tags=["charts"])
 
-# In-memory session storage for chart conversations
-# In production, this would be persisted to database
-_chart_sessions: dict[str, ChartConversationManager] = {}
+# In-memory cache for active chart conversation managers
+# Key is session_id (int), value is the manager
+_chart_managers: dict[int, ChartConversationManager] = {}
 
 
-def _get_or_create_session(
-    session_id: str | None, user: User
-) -> tuple[str, ChartConversationManager]:
-    """Get existing session or create a new one."""
-    if session_id and session_id in _chart_sessions:
-        return session_id, _chart_sessions[session_id]
+def _get_or_create_chart_session(
+    db: DBSession, user: User, session_id: int | None
+) -> tuple[ConversationSession, ChartConversationManager]:
+    """Get existing chart session or create a new one."""
+    if session_id:
+        # Get existing session
+        session = (
+            db.query(ConversationSession)
+            .filter(
+                ConversationSession.id == session_id,
+                ConversationSession.user_id == user.id,
+                ConversationSession.conversation_type == "chart",
+            )
+            .first()
+        )
+        if session:
+            # Get or create manager for this session
+            if session_id in _chart_managers:
+                manager = _chart_managers[session_id]
+            else:
+                manager = ChartConversationManager(provider_name=user.preferred_provider)
+                _restore_chart_manager_state(manager, session)
+                _chart_managers[session_id] = manager
+            return session, manager
 
     # Create new session
-    new_id = str(uuid.uuid4())
+    session = ConversationSession(
+        user_id=user.id,
+        messages=[],
+        phase="waiting",
+        conversation_type="chart",
+    )
+    db.add(session)
+    db.commit()
+    db.refresh(session)
+
     manager = ChartConversationManager(provider_name=user.preferred_provider)
-    _chart_sessions[new_id] = manager
-    return new_id, manager
+    _chart_managers[session.id] = manager
+    return session, manager
+
+
+def _restore_chart_manager_state(manager: ChartConversationManager, session: ConversationSession):
+    """Restore chart manager state from database session."""
+    from engine.chart_conversation import ChartPhase
+    from engine.llm.base import Message
+
+    # Restore messages
+    manager.state.messages = [
+        Message(role=m["role"], content=m["content"]) for m in (session.messages or [])
+    ]
+
+    # Restore phase
+    try:
+        manager.state.phase = ChartPhase(session.phase)
+    except ValueError:
+        manager.state.phase = ChartPhase.WAITING
+
+    # Restore original request
+    manager.state.original_request = session.original_request
+
+
+def _save_chart_manager_state(manager: ChartConversationManager, session: ConversationSession):
+    """Save chart manager state to database session."""
+    session.messages = [
+        {"role": m.role, "content": m.content} for m in manager.state.messages
+    ]
+    session.phase = manager.state.phase.value
+    session.original_request = manager.state.original_request
+
+
+def _generate_chart_title(user_message: str, provider_name: str | None = None) -> str:
+    """Generate a short title for the chart conversation."""
+    try:
+        from engine.llm.claude import get_provider
+        from engine.llm.base import Message
+
+        llm = get_provider(provider_name)
+
+        prompt = f"""Generate a very short title (3-5 words max) for a chart creation request.
+Output ONLY the title, nothing else. No quotes, no punctuation at the end.
+
+Request: {user_message[:300]}
+
+Title:"""
+
+        response = llm.generate(
+            messages=[Message(role="user", content=prompt)],
+            max_tokens=30,
+            temperature=0.3,
+        )
+
+        title = response.content.strip().strip('"\'').strip()
+        if len(title) > 50:
+            title = title[:47] + "..."
+        return title
+    except Exception:
+        if len(user_message) <= 40:
+            return user_message
+        return user_message[:37] + "..."
 
 
 def _chart_to_schema(chart: Chart) -> ChartSchema:
@@ -137,7 +224,7 @@ def _dashboard_to_schema(dashboard: Dashboard) -> DashboardSchema:
 async def send_chart_message(
     request: ChartMessageRequest,
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
+    db: DBSession = Depends(get_db),
 ):
     """
     Send a message in a chart conversation.
@@ -147,10 +234,26 @@ async def send_chart_message(
     2. System generates it
     3. User can refine or accept
     """
-    session_id, manager = _get_or_create_session(request.session_id, current_user)
+    session, manager = _get_or_create_chart_session(db, current_user, request.session_id)
+
+    # Track if this is the first user message (for title generation)
+    is_first_message = len([m for m in (session.messages or []) if m.get("role") == "user"]) == 0
 
     try:
         result = manager.process_message(request.message)
+
+        # Save updated state to database
+        _save_chart_manager_state(manager, session)
+
+        # Update chart_id if a chart was created
+        if result.chart_id:
+            session.chart_id = result.chart_id
+
+        # Generate title after first user message (skip action messages)
+        if is_first_message and not request.message.startswith("__action:") and not session.title:
+            session.title = _generate_chart_title(request.message, current_user.preferred_provider)
+
+        db.commit()
 
         # Convert action buttons
         action_buttons = None
@@ -167,7 +270,8 @@ async def send_chart_message(
         return ChartMessageResponse(
             response=result.response,
             phase=manager.state.phase.value,
-            session_id=session_id,
+            session_id=session.id,
+            title=session.title,
             chart_id=result.chart_id,
             chart_url=result.chart_url,
             chart_title=manager.state.current_chart.spec.title
@@ -181,7 +285,8 @@ async def send_chart_message(
         return ChartMessageResponse(
             response=f"An error occurred: {str(e)}",
             phase="waiting",
-            session_id=session_id,
+            session_id=session.id,
+            title=session.title,
             error=str(e),
         )
 
@@ -189,29 +294,66 @@ async def send_chart_message(
 @router.post("/conversation/new", response_model=ChartMessageResponse)
 async def new_chart_conversation(
     current_user: User = Depends(get_current_user),
+    db: DBSession = Depends(get_db),
 ):
     """Start a new chart conversation."""
-    session_id = str(uuid.uuid4())
+    # Import cleanup function from conversation router
+    from .conversation import cleanup_old_conversations
+
+    # Cleanup old temporary conversations
+    cleanup_old_conversations(db, current_user.id)
+
+    # Create new session in database
+    session = ConversationSession(
+        user_id=current_user.id,
+        messages=[],
+        phase="waiting",
+        conversation_type="chart",
+    )
+    db.add(session)
+    db.commit()
+    db.refresh(session)
+
+    # Create manager for this session
     manager = ChartConversationManager(provider_name=current_user.preferred_provider)
-    _chart_sessions[session_id] = manager
+    _chart_managers[session.id] = manager
 
     return ChartMessageResponse(
         response="What chart would you like to create? Describe what you want to see.",
         phase="waiting",
-        session_id=session_id,
+        session_id=session.id,
+        title=None,
     )
 
 
 @router.delete("/conversation/{session_id}")
 async def delete_chart_conversation(
-    session_id: str,
+    session_id: int,
     current_user: User = Depends(get_current_user),
+    db: DBSession = Depends(get_db),
 ):
     """Delete a chart conversation session."""
-    if session_id in _chart_sessions:
-        del _chart_sessions[session_id]
-        return {"success": True}
-    raise HTTPException(status_code=404, detail="Session not found")
+    session = (
+        db.query(ConversationSession)
+        .filter(
+            ConversationSession.id == session_id,
+            ConversationSession.user_id == current_user.id,
+            ConversationSession.conversation_type == "chart",
+        )
+        .first()
+    )
+
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    # Remove from cache
+    if session_id in _chart_managers:
+        del _chart_managers[session_id]
+
+    db.delete(session)
+    db.commit()
+
+    return {"success": True}
 
 
 # =============================================================================
@@ -262,12 +404,19 @@ async def get_chart(
 async def delete_chart(
     chart_id: str,
     current_user: User = Depends(get_current_user),
+    db: DBSession = Depends(get_db),
 ):
     """Delete a chart from the library."""
     storage = get_chart_storage()
 
     if not storage.delete(chart_id):
         raise HTTPException(status_code=404, detail="Chart not found")
+
+    # Delete any linked conversations
+    db.query(ConversationSession).filter(
+        ConversationSession.chart_id == chart_id
+    ).delete()
+    db.commit()
 
     return {"success": True, "deleted_id": chart_id}
 

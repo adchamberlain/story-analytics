@@ -3,9 +3,23 @@
 	 * New Chart Page - Create a chart through conversation.
 	 */
 
+	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import ChartChat from '$lib/components/ChartChat.svelte';
-	import { chartPhase, resetChartConversation } from '$lib/stores/chart';
+	import { chartPhase, chartSessionId, chartMessages, resetChartConversation, startNewChartConversation } from '$lib/stores/chart';
+	import { get } from 'svelte/store';
+
+	// Start fresh only if no session was pre-loaded (e.g., from sidebar click)
+	onMount(() => {
+		const currentSessionId = get(chartSessionId);
+		const currentMessages = get(chartMessages);
+
+		// If there's no session or no messages, start fresh
+		if (!currentSessionId || currentMessages.length === 0) {
+			resetChartConversation();
+			startNewChartConversation();
+		}
+	});
 
 	// Reset conversation when navigating away
 	function handleBack() {

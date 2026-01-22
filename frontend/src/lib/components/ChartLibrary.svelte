@@ -28,21 +28,16 @@
 	const dispatch = createEventDispatcher();
 
 	export let selectionMode: boolean = false;
+	export let searchQuery: string = '';
+	export let filterType: string = '';
 
-	let searchQuery = '';
-	let filterType = '';
 	let previewChart: Chart | null = null;
 	let previewUrl: string | null = null;
 
-	// Chart type options
-	const chartTypes = [
-		{ value: '', label: 'All Types' },
-		{ value: 'LineChart', label: 'Line Chart' },
-		{ value: 'BarChart', label: 'Bar Chart' },
-		{ value: 'AreaChart', label: 'Area Chart' },
-		{ value: 'BigValue', label: 'KPI / Big Value' },
-		{ value: 'DataTable', label: 'Data Table' }
-	];
+	// Trigger search when searchQuery or filterType changes from parent
+	$: if (searchQuery !== undefined || filterType !== undefined) {
+		debouncedSearch();
+	}
 
 	onMount(() => {
 		loadCharts();
@@ -168,35 +163,18 @@
 </script>
 
 <div class="chart-library">
-	<!-- Header with search and filters -->
-	<div class="library-header">
-		<div class="search-bar">
-			<input
-				type="text"
-				placeholder="Search charts..."
-				bind:value={searchQuery}
-				on:input={debouncedSearch}
-			/>
-			<select bind:value={filterType} on:change={handleSearch}>
-				{#each chartTypes as type}
-					<option value={type.value}>{type.label}</option>
-				{/each}
-			</select>
+	{#if selectionMode}
+		<div class="selection-info">
+			<span>{$selectedChartIds.length} selected</span>
+			<button
+				class="create-dashboard-btn"
+				disabled={$selectedChartIds.length === 0}
+				on:click={() => dispatch('createDashboard')}
+			>
+				Create Dashboard
+			</button>
 		</div>
-
-		{#if selectionMode}
-			<div class="selection-info">
-				<span>{$selectedChartIds.length} selected</span>
-				<button
-					class="create-dashboard-btn"
-					disabled={$selectedChartIds.length === 0}
-					on:click={() => dispatch('createDashboard')}
-				>
-					Create Dashboard
-				</button>
-			</div>
-		{/if}
-	</div>
+	{/if}
 
 	<!-- Charts grid -->
 	<div class="charts-grid">
@@ -212,9 +190,8 @@
 			</div>
 		{:else if $charts.length === 0}
 			<div class="empty">
-				<span class="empty-icon">📊</span>
-				<span class="empty-text">No charts yet</span>
-				<span class="empty-hint">Create your first chart to see it here</span>
+				<span class="empty-text">No charts yet.</span>
+				<span class="empty-hint">Create your first chart to see it here.</span>
 			</div>
 		{:else}
 			{#each $charts as chart}
@@ -307,49 +284,7 @@
 		display: flex;
 		flex-direction: column;
 		height: 100%;
-		background: #0f0f1a;
-	}
-
-	.library-header {
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-		padding: 1rem;
-		border-bottom: 1px solid #2d2d44;
-		gap: 1rem;
-		flex-wrap: wrap;
-	}
-
-	.search-bar {
-		display: flex;
-		gap: 0.5rem;
-		flex: 1;
-		min-width: 250px;
-	}
-
-	.search-bar input {
-		flex: 1;
-		padding: 0.5rem 0.75rem;
-		background: #1e1e32;
-		border: 1px solid #2d2d44;
-		border-radius: 6px;
-		color: #e5e7eb;
-		font-size: 0.875rem;
-	}
-
-	.search-bar input:focus {
-		outline: none;
-		border-color: #6366f1;
-	}
-
-	.search-bar select {
-		padding: 0.5rem 0.75rem;
-		background: #1e1e32;
-		border: 1px solid #2d2d44;
-		border-radius: 6px;
-		color: #e5e7eb;
-		font-size: 0.875rem;
-		cursor: pointer;
+		background: #0a0a0a;
 	}
 
 	.selection-info {
@@ -541,11 +476,6 @@
 		border-radius: 4px;
 		color: #9ca3af;
 		cursor: pointer;
-	}
-
-	.empty-icon {
-		font-size: 3rem;
-		opacity: 0.5;
 	}
 
 	.empty-text {

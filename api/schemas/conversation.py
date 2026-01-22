@@ -72,6 +72,8 @@ class ConversationSummary(BaseModel):
     title: str | None = None
     phase: str
     message_count: int
+    conversation_type: str = "dashboard"  # "dashboard" or "chart"
+    chart_id: str | None = None  # For chart conversations
     created_at: datetime
     updated_at: datetime
 

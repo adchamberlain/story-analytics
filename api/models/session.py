@@ -24,6 +24,10 @@ class ConversationSession(Base):
     target_dashboard = Column(String, nullable=True)
     original_request = Column(String, nullable=True)
     dashboard_id = Column(Integer, ForeignKey("dashboards.id"), nullable=True)
+    # Conversation type: "dashboard" (default) or "chart"
+    conversation_type = Column(String, default="dashboard")
+    # For chart conversations, track the created chart ID
+    chart_id = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
