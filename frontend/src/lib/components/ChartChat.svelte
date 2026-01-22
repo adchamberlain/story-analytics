@@ -8,7 +8,6 @@
 	 * - Action buttons for flow control
 	 */
 
-	import { onMount } from 'svelte';
 	import ChartEmbed from './ChartEmbed.svelte';
 	import TerminalInput from './TerminalInput.svelte';
 	import {
@@ -31,12 +30,8 @@
 		}, 100);
 	}
 
-	onMount(async () => {
-		// Start a new conversation if none exists
-		if ($chartMessages.length === 0) {
-			await startNewChartConversation();
-		}
-	});
+	// Note: The parent page handles starting the conversation
+	// ChartChat just displays the conversation state
 
 	async function handleSubmit(event: CustomEvent<string>) {
 		const message = event.detail;

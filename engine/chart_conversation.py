@@ -211,18 +211,30 @@ Just describe what you want to see!"""
 
         Returns one of: "chart_request", "data_question", "unclear"
         """
-        system_prompt = """You are an intent classifier for a chart creation tool.
+        system_prompt = """You are an intent classifier for a SaaS analytics chart creation tool.
+
+This tool can ONLY create charts from SaaS business data:
+- Customers, subscriptions, invoices, revenue
+- User signups, events, activity
+- Business metrics like MRR, churn, retention
 
 Classify the user's message into ONE of these categories:
 
-1. "chart_request" - User wants to CREATE or SEE a specific chart/visualization
-   Examples: "Show me revenue by month", "Create a bar chart of sales", "I want to see user growth"
+1. "chart_request" - User wants a chart about SaaS/business metrics that this tool can provide
+   Examples: "Show me revenue by month", "Create a bar chart of sales", "User signups over time"
 
-2. "data_question" - User is asking ABOUT the data, system, or capabilities (not requesting a chart)
-   Examples: "What data do you have?", "What tables are available?", "What can you do?", "Help"
+2. "data_question" - User is asking about the available data or system capabilities
+   Examples: "What data do you have?", "What tables are available?", "Help", "What can you do?"
 
-3. "unclear" - Message is ambiguous, off-topic, or needs clarification
-   Examples: "Hello", "hmm", "maybe something with sales?"
+3. "unclear" - ANY of these:
+   - Off-topic requests (weather, sports, news, general knowledge)
+   - Greetings or small talk ("Hello", "How are you?")
+   - Vague or ambiguous ("hmm", "maybe", "something interesting")
+   - Data this tool doesn't have (weather, stocks, social media, etc.)
+
+   Examples of UNCLEAR: "What's the weather?", "Tell me a joke", "Hello", "What time is it?"
+
+IMPORTANT: If the request is about data this tool doesn't have, classify as "unclear", NOT "chart_request".
 
 Respond with ONLY the category name, nothing else."""
 

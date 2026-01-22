@@ -2,8 +2,9 @@
 	import { onMount } from 'svelte';
 	import { dashboards, dashboardsLoading, loadDashboards, deleteDashboard } from '../stores/dashboards';
 
+	export let searchQuery = '';
+
 	let deleteConfirm: string | null = null;
-	let searchQuery = '';
 
 	// Filter dashboards by search query
 	$: filteredDashboards = searchQuery
@@ -45,27 +46,13 @@
 </script>
 
 <div class="space-y-4">
-	<!-- Header -->
-	<div class="flex items-center justify-between gap-4">
-		<h2 class="text-terminal-accent font-bold text-lg">Dashboards</h2>
-		<div class="flex-1 max-w-sm">
-			<input
-				type="text"
-				placeholder="Search dashboards..."
-				bind:value={searchQuery}
-				class="w-full px-3 py-1.5 text-sm bg-terminal-surface border border-terminal-border rounded
-					focus:outline-none focus:border-terminal-accent text-terminal-text placeholder-terminal-dim"
-			/>
-		</div>
-	</div>
-
 	<!-- List -->
 	{#if $dashboardsLoading}
 		<div class="text-terminal-dim text-center py-8">Loading dashboards...</div>
 	{:else if $dashboards.length === 0}
 		<div class="text-terminal-dim text-center py-8">
-			<p>No dashboards yet.</p>
-			<p class="text-sm mt-2">Start a conversation to create your first dashboard.</p>
+			<p class="text-lg">No dashboards yet.</p>
+			<p class="text-sm mt-2 text-gray-500">Create your first dashboard to see it here.</p>
 		</div>
 	{:else if filteredDashboards.length === 0}
 		<div class="text-terminal-dim text-center py-8">

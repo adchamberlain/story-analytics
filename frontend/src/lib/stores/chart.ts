@@ -41,7 +41,8 @@ export interface ChartMessage {
 }
 
 // Conversation stores
-export const chartSessionId = writable<string | null>(null);
+export const chartSessionId = writable<number | null>(null);
+export const chartSessionTitle = writable<string | null>(null);
 export const chartMessages = writable<ChartMessage[]>([]);
 export const chartPhase = writable<string>('waiting');
 export const chartLoading = writable<boolean>(false);
@@ -63,8 +64,10 @@ export async function sendChartMessage(content: string): Promise<void> {
 	chartLoading.set(true);
 
 	try {
-		// Add user message immediately
-		chartMessages.update((msgs) => [...msgs, { role: 'user', content }]);
+		// Add user message immediately (unless it's an action)
+		if (!content.startsWith('__action:')) {
+			chartMessages.update((msgs) => [...msgs, { role: 'user', content }]);
+		}
 
 		// Send to API
 		const response = await apiSendChartMessage(content, sessionId || undefined);
@@ -73,6 +76,9 @@ export async function sendChartMessage(content: string): Promise<void> {
 		chartSessionId.set(response.session_id);
 		chartPhase.set(response.phase);
 
+		if (response.title) {
+			chartSessionTitle.set(response.title);
+		}
 		if (response.chart_url) {
 			currentChartUrl.set(response.chart_url);
 		}
@@ -118,6 +124,7 @@ export async function startNewChartConversation(): Promise<void> {
 
 		// Reset state
 		chartSessionId.set(response.session_id);
+		chartSessionTitle.set(response.title);
 		chartPhase.set(response.phase);
 		currentChartUrl.set(null);
 		currentChartId.set(null);
@@ -141,11 +148,40 @@ export async function startNewChartConversation(): Promise<void> {
  */
 export function resetChartConversation(): void {
 	chartSessionId.set(null);
+	chartSessionTitle.set(null);
 	chartMessages.set([]);
 	chartPhase.set('waiting');
 	currentChartUrl.set(null);
 	currentChartId.set(null);
 	currentChartTitle.set(null);
+}
+
+/**
+ * Load an existing chart conversation by session ID.
+ */
+export async function loadChartConversation(sessionId: number): Promise<void> {
+	chartLoading.set(true);
+
+	try {
+		// For now, we just set the session ID and let the user continue from where they left off
+		// The conversation state will be restored when they send a message
+		chartSessionId.set(sessionId);
+		chartSessionTitle.set(null);
+		chartMessages.set([
+			{
+				role: 'assistant',
+				content: 'Resuming your chart conversation. What would you like to do?'
+			}
+		]);
+		chartPhase.set('waiting');
+		currentChartUrl.set(null);
+		currentChartId.set(null);
+		currentChartTitle.set(null);
+	} catch (error) {
+		console.error('Failed to load chart conversation:', error);
+	} finally {
+		chartLoading.set(false);
+	}
 }
 
 // =============================================================================

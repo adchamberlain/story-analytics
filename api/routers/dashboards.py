@@ -13,6 +13,7 @@ from ..config import get_settings
 from ..database import get_db
 from ..dependencies import get_current_user
 from ..models.dashboard import Dashboard
+from ..models.session import ConversationSession
 from ..models.user import User
 from pydantic import BaseModel
 from ..schemas.dashboard import DashboardListResponse, DashboardResponse
@@ -208,6 +209,11 @@ async def delete_dashboard(
     file_path = Path(dashboard.file_path)
     if file_path.exists():
         os.remove(file_path)
+
+    # Delete any linked conversations
+    db.query(ConversationSession).filter(
+        ConversationSession.dashboard_id == dashboard.id
+    ).delete()
 
     # Delete from database
     db.delete(dashboard)

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { goto } from '$app/navigation';
 	import { user } from '../stores/auth';
 	import { dashboards, loadDashboards } from '../stores/dashboards';
 	import {
@@ -11,8 +12,10 @@
 		deleteConversation,
 		renameConversation
 	} from '../stores/conversation';
+	import { chartSessionId, loadChartConversation } from '../stores/chart';
 	import { tables, loadSchema } from '../stores/schema';
-	import { logout } from '../api';
+	import { logout, deleteConversation as apiDeleteConversation } from '../api';
+	import type { ConversationSummary } from '../types';
 
 	export let currentPath: string = '/app';
 
@@ -44,18 +47,32 @@
 		showConversations = !showConversations;
 	}
 
-	async function handleSwitchConversation(sessionId: number) {
-		await switchConversation(sessionId);
+	async function handleSwitchConversation(conv: ConversationSummary) {
+		if (conv.conversation_type === 'chart') {
+			// For chart conversations, navigate to the chart page and load that conversation
+			await loadChartConversation(conv.id);
+			goto('/app/charts/new');
+		} else {
+			// For dashboard conversations, use the existing behavior
+			await switchConversation(conv.id);
+			goto('/app');
+		}
 	}
 
 	async function handleNewConversation() {
 		await startNewConversation();
 	}
 
-	async function handleDeleteConversation(event: Event, sessionId: number) {
+	async function handleDeleteConversation(event: Event, conv: ConversationSummary) {
 		event.stopPropagation();
 		if (confirm('Delete this conversation?')) {
-			await deleteConversation(sessionId);
+			if (conv.conversation_type === 'chart') {
+				// For chart conversations, delete directly
+				await apiDeleteConversation(conv.id);
+				await loadConversationList();
+			} else {
+				await deleteConversation(conv.id);
+			}
 		}
 	}
 
@@ -173,18 +190,24 @@
 									/>
 								{:else}
 									<button
-										on:click={() => handleSwitchConversation(conv.id)}
+										on:click={() => handleSwitchConversation(conv)}
 										on:dblclick={(e) => startEditing(e, conv.id, conv.title)}
-										class="text-sm truncate py-1 flex-1 text-left transition-colors
-	                                        {$currentSessionId === conv.id
+										class="text-sm truncate py-1 flex-1 text-left transition-colors flex items-center gap-1
+	                                        {($currentSessionId === conv.id && conv.conversation_type === 'dashboard') ||
+												($chartSessionId === conv.id && conv.conversation_type === 'chart')
 											? 'text-terminal-accent'
 											: 'text-terminal-dim hover:text-terminal-text'}"
 										title="Double-click to rename"
 									>
-										{conv.title || 'New conversation'}
+										{#if conv.conversation_type === 'chart'}
+											<span class="text-terminal-amber text-xs" title="Chart conversation">~</span>
+										{:else}
+											<span class="text-terminal-dim text-xs">#</span>
+										{/if}
+										<span class="truncate">{conv.title || 'New conversation'}</span>
 									</button>
 									<button
-										on:click={(e) => handleDeleteConversation(e, conv.id)}
+										on:click={(e) => handleDeleteConversation(e, conv)}
 										class="text-terminal-dim hover:text-terminal-red text-xs opacity-0 group-hover:opacity-100 transition-opacity px-1"
 										title="Delete conversation"
 									>

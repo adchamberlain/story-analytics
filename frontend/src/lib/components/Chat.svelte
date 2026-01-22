@@ -21,6 +21,7 @@
 		startNewConversation,
 		renameConversation
 	} from '../stores/conversation';
+	import { resetChartConversation } from '../stores/chart';
 	import { templates, loadTemplates } from '../stores/templates';
 	import { justLoggedIn, clearJustLoggedIn } from '../stores/auth';
 
@@ -107,6 +108,7 @@
 
 		// Handle navigation actions - route to appropriate pages
 		if (actionId === 'create_chart') {
+			resetChartConversation();
 			goto('/app/charts/new');
 			return;
 		}

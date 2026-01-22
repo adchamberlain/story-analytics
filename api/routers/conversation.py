@@ -498,7 +498,7 @@ async def list_conversations(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """List all conversations for the current user."""
+    """List all conversations for the current user (both dashboard and chart)."""
     sessions = (
         db.query(ConversationSession)
         .filter(ConversationSession.user_id == current_user.id)
@@ -513,6 +513,8 @@ async def list_conversations(
                 title=s.title,
                 phase=s.phase,
                 message_count=len(s.messages) if s.messages else 0,
+                conversation_type=s.conversation_type or "dashboard",
+                chart_id=s.chart_id,
                 created_at=s.created_at,
                 updated_at=s.updated_at,
             )
@@ -575,6 +577,43 @@ async def get_conversation(
     )
 
 
+# Maximum number of temporary conversations to keep per user
+MAX_TEMP_CONVERSATIONS = 20
+
+
+def cleanup_old_conversations(db: Session, user_id: int) -> int:
+    """
+    Delete old temporary conversations beyond the limit.
+
+    Temporary conversations are those NOT linked to a dashboard or chart.
+    Keeps the 20 most recent temporary conversations.
+
+    Returns the number of deleted conversations.
+    """
+    # Get all temporary conversations (no dashboard_id and no chart_id)
+    temp_sessions = (
+        db.query(ConversationSession)
+        .filter(
+            ConversationSession.user_id == user_id,
+            ConversationSession.dashboard_id.is_(None),
+            ConversationSession.chart_id.is_(None),
+        )
+        .order_by(ConversationSession.updated_at.desc())
+        .all()
+    )
+
+    # Delete conversations beyond the limit
+    deleted_count = 0
+    if len(temp_sessions) > MAX_TEMP_CONVERSATIONS:
+        sessions_to_delete = temp_sessions[MAX_TEMP_CONVERSATIONS:]
+        for sess in sessions_to_delete:
+            db.delete(sess)
+            deleted_count += 1
+        db.commit()
+
+    return deleted_count
+
+
 @router.post("/new", response_model=ConversationSessionResponse)
 async def new_conversation(
     current_user: User = Depends(get_current_user),
@@ -595,6 +634,9 @@ async def new_conversation(
         if not has_user_message:
             db.delete(sess)
     db.commit()
+
+    # Cleanup old temporary conversations
+    cleanup_old_conversations(db, current_user.id)
 
     # Create new session
     session = ConversationSession(user_id=current_user.id, messages=[], phase="intent")

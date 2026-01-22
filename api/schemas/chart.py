@@ -16,7 +16,7 @@ class ChartMessageRequest(BaseModel):
     """Schema for sending a message in chart conversation."""
 
     message: str
-    session_id: str | None = None  # Optional: send to specific chart session
+    session_id: int | None = None  # Optional: send to specific chart session
 
 
 class ChartActionButton(BaseModel):
@@ -32,7 +32,8 @@ class ChartMessageResponse(BaseModel):
 
     response: str
     phase: str  # waiting, generating, viewing, complete
-    session_id: str
+    session_id: int
+    title: str | None = None  # Conversation title
     chart_id: str | None = None
     chart_url: str | None = None  # URL with ?embed=true
     chart_title: str | None = None

@@ -49,6 +49,8 @@ export interface ConversationSummary {
 	title: string | null;
 	phase: string;
 	message_count: number;
+	conversation_type: 'dashboard' | 'chart';
+	chart_id: string | null;
 	created_at: string;
 	updated_at: string;
 }
@@ -189,7 +191,8 @@ export interface ChartActionButton {
 export interface ChartMessageResponse {
 	response: string;
 	phase: string; // 'waiting' | 'generating' | 'viewing' | 'complete'
-	session_id: string;
+	session_id: number;
+	title: string | null; // Conversation title
 	chart_id: string | null;
 	chart_url: string | null;
 	chart_title: string | null;
