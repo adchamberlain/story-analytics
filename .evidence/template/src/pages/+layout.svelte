@@ -7,11 +7,9 @@
 
 	// Extract slug from current path (e.g., "/my-dashboard" -> "my-dashboard")
 	$: slug = $page.url.pathname.split('/').filter(Boolean)[0] || '';
-	$: editorUrl = slug ? `http://localhost:5173/app/dashboards/edit/${slug}` : '';
+	// Link to chart view page which handles both charts and dashboards
+	$: editorUrl = slug ? `http://localhost:5173/app/charts/view/${slug}` : '';
 	$: isHomePage = $page.url.pathname === '/' || $page.url.pathname === '';
-
-	// Check for embed mode via query param (?embed=true)
-	$: isEmbedMode = $page.url.searchParams.get('embed') === 'true';
 </script>
 
 <!-- Override Evidence's default title -->
@@ -19,67 +17,24 @@
 	<title>Story</title>
 </svelte:head>
 
-{#if isEmbedMode}
-	<!-- Minimal embed layout - no sidebar, header, or chrome -->
-	<div class="embed-container">
-		<slot />
-	</div>
-{:else}
-	<!-- Full layout with Evidence sidebar and header -->
-	<EvidenceDefaultLayout
-		{data}
-		title="STORY"
-		builtWithEvidence={false}
-		neverShowQueries={true}
-	>
-		<slot slot="content" />
-	</EvidenceDefaultLayout>
+<EvidenceDefaultLayout
+	{data}
+	title="STORY"
+	builtWithEvidence={false}
+	neverShowQueries={true}
+>
+	<slot slot="content" />
+</EvidenceDefaultLayout>
 
-	{#if !isHomePage && editorUrl}
-		<div class="view-source-link">
-			<a href={editorUrl} target="_blank" rel="noopener noreferrer">
-				View Source
-			</a>
-		</div>
-	{/if}
+{#if !isHomePage && editorUrl}
+	<div class="view-source-link">
+		<a href={editorUrl} target="_blank" rel="noopener noreferrer">
+			View Source
+		</a>
+	</div>
 {/if}
 
 <style>
-	/* Embed mode container - minimal chrome for iframe embedding */
-	.embed-container {
-		padding: 1.5rem;
-		max-width: 100%;
-		margin: 0 auto;
-		background: white;
-		min-height: 100vh;
-	}
-
-	/* Embed mode typography */
-	:global(.embed-container h1) {
-		font-size: 1.5rem;
-		font-weight: 600;
-		margin-bottom: 1rem;
-		color: #1f2937;
-	}
-
-	:global(.embed-container h2) {
-		font-size: 1.25rem;
-		font-weight: 500;
-		margin-top: 1.5rem;
-		margin-bottom: 0.75rem;
-		color: #374151;
-	}
-
-	/* Hide SQL query blocks in embed mode */
-	:global(.embed-container pre[class*="language-sql"]) {
-		display: none !important;
-	}
-
-	/* Ensure charts fill container in embed mode */
-	:global(.embed-container .chart-container) {
-		width: 100%;
-	}
-
 	/* Add blinking cursor after STORY title */
 	:global(header a[href="/"]) {
 		letter-spacing: 0.15em;

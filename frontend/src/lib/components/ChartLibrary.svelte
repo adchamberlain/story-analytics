@@ -565,7 +565,7 @@
 
 	.preview-sql {
 		display: block;
-		background: #0f0f1a;
+		background: #0a0a0a;
 		padding: 0.75rem;
 		border-radius: 6px;
 		font-size: 0.75rem;

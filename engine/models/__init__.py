@@ -12,6 +12,8 @@ from .chart import (
     ChartType,
     Dashboard,
     DashboardLayout,
+    FilterSpec,
+    FilterType,
     ValidatedChart,
 )
 from .storage import (
@@ -28,6 +30,8 @@ __all__ = [
     "ChartType",
     "Dashboard",
     "DashboardLayout",
+    "FilterSpec",
+    "FilterType",
     "ValidatedChart",
     "ChartStorage",
     "DashboardStorage",

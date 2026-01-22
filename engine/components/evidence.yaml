@@ -85,17 +85,121 @@ components:
     example: |
       <BigValue data={query_name} value="total_revenue" title="Total Revenue" fmt="usd0" />
 
+  # ===================
+  # Filter Components
+  # ===================
+  # These create input variables accessible via ${inputs.filter_name}
+  # Use in SQL queries: WHERE column = '${inputs.filter_name}'
+
   Dropdown:
-    description: "Filter dropdown"
+    description: "Single-select dropdown filter"
     required_props:
-      - name: "Unique filter name"
-      - data: "Query name reference"
+      - name: "Unique filter name - creates ${inputs.name} variable"
+      - data: "Query name reference for options"
       - value: "Column name for dropdown values"
     optional_props:
       - title: "Dropdown label"
       - defaultValue: "Default selected value"
+    notes:
+      - "Creates a variable: ${inputs.name}"
+      - "Needs a separate query for options (e.g., SELECT DISTINCT region FROM table)"
+      - "Use in WHERE clause: WHERE region = '${inputs.region_filter}'"
     example: |
-      <Dropdown name="region_filter" data={regions} value="region_name" title="Select Region" />
+      ```sql regions
+      SELECT DISTINCT region FROM customers ORDER BY region
+      ```
+      <Dropdown name="region_filter" data={regions} value="region" title="Select Region" />
+
+      ```sql filtered_data
+      SELECT * FROM sales WHERE region = '${inputs.region_filter}'
+      ```
+
+  DateRange:
+    description: "Date range selector with start and end dates"
+    required_props:
+      - name: "Unique filter name - creates ${inputs.name.start} and ${inputs.name.end}"
+    optional_props:
+      - title: "Label for the picker"
+      - data: "Query name for date range bounds"
+      - dates: "Column name containing dates"
+      - start: "Manual start date (YYYY-MM-DD)"
+      - end: "Manual end date (YYYY-MM-DD)"
+      - presetRanges: "Array of preset options like 'Last 7 Days', 'Last 30 Days', 'Year to Date'"
+      - defaultValue: "Default preset range selection"
+    notes:
+      - "Creates TWO variables: ${inputs.name.start} and ${inputs.name.end}"
+      - "Use in WHERE: WHERE date >= '${inputs.date_range.start}' AND date <= '${inputs.date_range.end}'"
+      - "Preset options: 'Last 7 Days', 'Last 30 Days', 'Last 90 Days', 'Last 3 Months', 'Last 6 Months', 'Last 12 Months', 'Month to Date', 'Year to Date', 'All Time'"
+    example: |
+      <DateRange
+        name="date_range"
+        title="Select Date Range"
+        presetRanges={["Last 7 Days", "Last 30 Days", "Last 90 Days", "Year to Date", "All Time"]}
+      />
+
+      ```sql filtered_data
+      SELECT * FROM sales
+      WHERE sale_date >= '${inputs.date_range.start}'
+        AND sale_date <= '${inputs.date_range.end}'
+      ```
+
+  TextInput:
+    description: "Free text input for search/filtering"
+    required_props:
+      - name: "Unique filter name - creates ${inputs.name} variable"
+    optional_props:
+      - title: "Label for the input"
+      - placeholder: "Placeholder text"
+      - defaultValue: "Default value"
+    notes:
+      - "Use with LIKE for partial matching: WHERE name LIKE '%${inputs.search}%'"
+      - "Or exact matching: WHERE id = '${inputs.search}'"
+    example: |
+      <TextInput name="search" title="Search" placeholder="Enter customer name..." />
+
+      ```sql filtered_customers
+      SELECT * FROM customers WHERE name LIKE '%${inputs.search}%'
+      ```
+
+  ButtonGroup:
+    description: "Button group for selecting from a few options"
+    required_props:
+      - name: "Unique filter name - creates ${inputs.name} variable"
+      - data: "Query name reference for options"
+      - value: "Column name for button values"
+    optional_props:
+      - title: "Label for the group"
+      - defaultValue: "Default selected value"
+    notes:
+      - "Best for 2-5 options"
+      - "More visual than Dropdown for small option sets"
+    example: |
+      ```sql time_periods
+      SELECT 'Last 7 Days' as period UNION ALL
+      SELECT 'Last 30 Days' UNION ALL
+      SELECT 'Last 90 Days'
+      ```
+      <ButtonGroup name="period" data={time_periods} value="period" title="Time Period" />
+
+  Slider:
+    description: "Numeric slider for range selection"
+    required_props:
+      - name: "Unique filter name - creates ${inputs.name} variable"
+      - min: "Minimum value"
+      - max: "Maximum value"
+    optional_props:
+      - title: "Label for the slider"
+      - step: "Step increment (default 1)"
+      - defaultValue: "Default value"
+    notes:
+      - "Good for numeric filtering like price ranges, quantities"
+      - "Use in WHERE: WHERE amount >= ${inputs.min_amount}"
+    example: |
+      <Slider name="min_revenue" min={0} max={100000} step={1000} title="Minimum Revenue" />
+
+      ```sql high_value_customers
+      SELECT * FROM customers WHERE total_revenue >= ${inputs.min_revenue}
+      ```
 
 # Common mistakes to avoid
 common_mistakes:

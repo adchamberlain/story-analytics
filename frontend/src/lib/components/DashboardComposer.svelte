@@ -262,7 +262,7 @@
 		display: flex;
 		flex-direction: column;
 		height: 100%;
-		background: #0f0f1a;
+		background: #0a0a0a;
 	}
 
 	.composer-header {

@@ -38,8 +38,25 @@ instructions: |
 
   6. RELEVANT TABLES: Which tables from the schema are needed?
 
-  7. FILTERS: Any data filters mentioned?
+  7. FILTERS: Any static data filters (baked into the query)
      Examples: "last 12 months", "active customers only", "US region"
+
+  8. INTERACTIVE FILTERS: Does the user want interactive filter controls?
+     Look for phrases like:
+     - "with a date range filter" → DateRange
+     - "with a date picker" → DateRange
+     - "with a dropdown to filter by X" → Dropdown
+     - "let me select the region" → Dropdown
+     - "filter by customer segment" → Dropdown
+     - "add a search box" → TextInput
+     - "slider to set minimum" → Slider
+
+     For each interactive filter detected, specify:
+     - filter_type: "Dropdown", "DateRange", "TextInput", "ButtonGroup", or "Slider"
+     - name: A unique name (e.g., "region_filter", "date_range")
+     - title: Display label (e.g., "Select Region")
+     - column: The column to filter on (for Dropdown/ButtonGroup, or the date column for DateRange)
+     - table: The table containing the filter values (for Dropdown/ButtonGroup)
 
 output_format: |
   Respond with a JSON object in exactly this format:
@@ -53,7 +70,23 @@ output_format: |
     "dimension": "month",
     "chart_type": "LineChart",
     "relevant_tables": ["invoices", "customers"],
-    "filters": ["last 12 months"]
+    "filters": ["last 12 months"],
+    "interactive_filters": [
+      {
+        "filter_type": "DateRange",
+        "name": "date_range",
+        "title": "Select Date Range",
+        "column": "invoice_date",
+        "table": "invoices"
+      },
+      {
+        "filter_type": "Dropdown",
+        "name": "region_filter",
+        "title": "Select Region",
+        "column": "region",
+        "table": "customers"
+      }
+    ]
   }
   ```
 
@@ -70,3 +103,5 @@ output_format: |
   - Be specific about the metric and aggregation
   - The dimension can be null if showing a single BigValue
   - Keep it simple - this is ONE chart, not a dashboard
+  - Only include interactive_filters if the user explicitly asks for them
+  - interactive_filters is an array (can be empty [])

@@ -24,7 +24,7 @@ import yaml
 
 from .llm.base import Message
 from .llm.claude import get_provider
-from .models import Chart, ChartConfig, ChartSpec, ChartType, ValidatedChart
+from .models import Chart, ChartConfig, ChartSpec, ChartType, FilterSpec, FilterType, ValidatedChart
 from .schema import get_schema_context
 from .sql_validator import validate_query
 from .config_loader import get_config_loader
@@ -132,6 +132,19 @@ class ChartRequirementsAgent:
                 metric="value",
             )
 
+        # Parse interactive filters
+        interactive_filters = []
+        for f_data in data.get("interactive_filters", []):
+            filter_spec = FilterSpec(
+                name=f_data.get("name", "filter"),
+                filter_type=FilterType.from_string(f_data.get("filter_type", "Dropdown")),
+                title=f_data.get("title"),
+                options_column=f_data.get("column"),
+                options_table=f_data.get("table"),
+                date_column=f_data.get("column"),  # For DateRangePicker
+            )
+            interactive_filters.append(filter_spec)
+
         return ChartSpec(
             title=data.get("title", "Chart"),
             description=data.get("description", ""),
@@ -140,6 +153,7 @@ class ChartRequirementsAgent:
             aggregation=data.get("aggregation"),
             dimension=data.get("dimension"),
             filters=data.get("filters", []),
+            interactive_filters=interactive_filters,
             chart_type=ChartType.from_string(data.get("chart_type", "BarChart")),
             relevant_tables=data.get("relevant_tables", []),
         )
@@ -180,20 +194,21 @@ class ChartSQLAgent:
 
     def generate_query(
         self, spec: ChartSpec, schema_context: str
-    ) -> tuple[str, str, list[str], str | None]:
+    ) -> tuple[str, str, list[str], list[dict], str | None]:
         """
-        Generate and validate ONE SQL query for a chart.
+        Generate and validate SQL queries for a chart.
 
         Args:
             spec: The chart specification
             schema_context: The database schema context
 
         Returns:
-            Tuple of (query_name, sql, columns, error_or_none)
+            Tuple of (query_name, sql, columns, filter_queries, error_or_none)
+            filter_queries is a list of dicts with {name, filter_name, sql} for filter options
         """
         system_prompt = self._build_system_prompt(schema_context)
 
-        request = f"""Generate ONE SQL query for this chart:
+        request = f"""Generate SQL queries for this chart:
 
 {spec.to_prompt_context()}
 """
@@ -208,13 +223,15 @@ class ChartSQLAgent:
             max_tokens=2048,
         )
 
-        query_name, sql, columns = self._parse_response(response.content)
+        query_name, sql, columns, filter_queries = self._parse_response(response.content)
 
-        # Validate the query
+        # Validate the main query
+        # Note: We can't fully validate queries with ${inputs...} syntax,
+        # so we do a basic syntax check
         result = validate_query(sql, query_name)
 
         if result.valid:
-            return query_name, sql, columns, None
+            return query_name, sql, columns, filter_queries, None
 
         # Try to fix the query
         attempt = 1
@@ -246,17 +263,17 @@ Please fix the query and output the corrected JSON."""
                 max_tokens=2048,
             )
 
-            query_name, sql, columns = self._parse_response(response.content)
+            query_name, sql, columns, filter_queries = self._parse_response(response.content)
             result = validate_query(sql, query_name)
 
             if result.valid:
-                return query_name, sql, columns, None
+                return query_name, sql, columns, filter_queries, None
 
             attempt += 1
 
-        return query_name, sql, columns, result.error
+        return query_name, sql, columns, filter_queries, result.error
 
-    def _parse_response(self, response: str) -> tuple[str, str, list[str]]:
+    def _parse_response(self, response: str) -> tuple[str, str, list[str], list[dict]]:
         """Parse the LLM response into query components."""
         # Extract JSON from response
         json_match = re.search(r"```(?:json)?\s*([\s\S]*?)```", response)
@@ -269,12 +286,13 @@ Please fix the query and output the corrected JSON."""
             data = json.loads(json_str)
         except json.JSONDecodeError as e:
             print(f"[ChartSQLAgent] JSON parse error: {e}")
-            return "query", "", []
+            return "query", "", [], []
 
         return (
             data.get("query_name", "query"),
             data.get("sql", ""),
             data.get("columns", []),
+            data.get("filter_queries", []),
         )
 
 
@@ -338,7 +356,7 @@ class ChartPipeline:
             print("[ChartPipeline] Stage 2: Generating SQL query...")
 
         try:
-            query_name, sql, columns, error = self.sql_agent.generate_query(spec, schema)
+            query_name, sql, columns, filter_queries, error = self.sql_agent.generate_query(spec, schema)
 
             if error:
                 return ChartPipelineResult(
@@ -350,6 +368,8 @@ class ChartPipeline:
             if self.config.verbose:
                 print(f"[ChartPipeline]   Query: {query_name}")
                 print(f"[ChartPipeline]   Columns: {columns}")
+                if filter_queries:
+                    print(f"[ChartPipeline]   Filter queries: {len(filter_queries)}")
         except Exception as e:
             return ChartPipelineResult(
                 success=False,
@@ -357,12 +377,15 @@ class ChartPipeline:
                 error=f"SQL generation failed: {e}",
             )
 
-        # Stage 3: Assemble chart (trivial)
+        # Stage 3: Assemble chart
         if self.config.verbose:
             print("[ChartPipeline] Stage 3: Assembling chart...")
 
         # Determine chart config based on type and columns
         config = self._build_chart_config(spec, columns)
+
+        # Build filter specs with generated queries
+        filters = self._build_filters(spec, filter_queries)
 
         validated_chart = ValidatedChart(
             spec=spec,
@@ -370,6 +393,7 @@ class ChartPipeline:
             sql=sql,
             columns=columns,
             config=config,
+            filters=filters,
             validation_status="valid",
         )
 
@@ -480,6 +504,40 @@ class ChartPipeline:
                 options["series"] = [series_options]
 
         return options
+
+    def _build_filters(self, spec: ChartSpec, filter_queries: list[dict]) -> list[FilterSpec]:
+        """Build filter specs from the spec's interactive_filters and generated queries."""
+        filters = []
+
+        # Create lookup for filter queries by filter_name
+        query_lookup = {fq.get("filter_name"): fq for fq in filter_queries}
+
+        for f in spec.interactive_filters:
+            # Copy the filter spec
+            filter_spec = FilterSpec(
+                name=f.name,
+                filter_type=f.filter_type,
+                title=f.title,
+                options_column=f.options_column,
+                options_table=f.options_table,
+                date_column=f.date_column,
+                default_start=f.default_start,
+                default_end=f.default_end,
+                min_value=f.min_value,
+                max_value=f.max_value,
+                step=f.step,
+                default_value=f.default_value,
+            )
+
+            # Add generated query info if available
+            if f.name in query_lookup:
+                query_info = query_lookup[f.name]
+                filter_spec.options_query = query_info.get("sql")
+                filter_spec.options_query_name = query_info.get("name")
+
+            filters.append(filter_spec)
+
+        return filters
 
 
 def create_chart(user_request: str, provider_name: str | None = None) -> ChartPipelineResult:

@@ -372,6 +372,9 @@ What would you like to do next?"""
         if not self.state.current_chart or not self.state.chart_file_path:
             return self._handle_new_chart_request(user_input)
 
+        # Store old chart SQL for comparison
+        old_sql = self.state.current_chart.sql if self.state.current_chart else None
+
         # Combine original request with refinement
         combined_request = f"{self.state.original_request}\n\nRefinement: {user_input}"
 
@@ -381,17 +384,45 @@ What would you like to do next?"""
         result = self._pipeline.run(combined_request)
 
         if not result.success:
+            response = f"I couldn't make that change. Could you try describing it differently?\n\nFor example: \"Change the time range to last 6 months\" or \"Make it a bar chart\""
+            self.state.messages.append(Message(role="assistant", content=response))
             return ChartConversationResult(
-                response=f"I couldn't make that change: {result.error}\n\nCould you try describing it differently?",
+                response=response,
                 error=result.error,
+                chart_url=self.get_chart_embed_url(),
+                chart_id=self.state.current_chart_id,
                 action_buttons=[
                     ChartActionButton(id="done", label="Keep Current", style="primary"),
                     ChartActionButton(id="new_chart", label="Start Over", style="secondary"),
                 ],
             )
 
-        # Update stored chart
+        # Check if the chart actually changed
         chart = result.chart
+        chart_changed = old_sql != chart.sql
+
+        if not chart_changed:
+            response = f"""I wasn't able to apply that change to the chart. The chart remains unchanged.
+
+Try being more specific about what you want to change:
+- "Show data from the last 3 months only"
+- "Change to a bar chart"
+- "Add a trend line"
+- "Group by month instead of day"
+
+What would you like to try?"""
+            self.state.messages.append(Message(role="assistant", content=response))
+            return ChartConversationResult(
+                response=response,
+                chart_url=self.get_chart_embed_url(),
+                chart_id=self.state.current_chart_id,
+                action_buttons=[
+                    ChartActionButton(id="done", label="Keep Current", style="primary"),
+                    ChartActionButton(id="modify", label="Try Something Else", style="secondary"),
+                ],
+            )
+
+        # Update stored chart
         stored_chart = Chart.from_validated(chart)
         stored_chart.id = self.state.current_chart_id  # Keep same ID
         self.chart_storage.save(stored_chart)
