@@ -227,16 +227,17 @@ Classify the user's message into ONE of these categories:
    Examples: "What data do you have?", "What tables are available?", "Help", "What can you do?"
 
 3. "unclear" - ANY of these:
-   - Off-topic requests (weather, sports, news, general knowledge)
+   - Off-topic requests (weather, sports, news, general knowledge, science questions)
    - Greetings or small talk ("Hello", "How are you?")
    - Vague or ambiguous ("hmm", "maybe", "something interesting")
    - Data this tool doesn't have (weather, stocks, social media, etc.)
+   - Questions that cannot be answered with business data
 
-   Examples of UNCLEAR: "What's the weather?", "Tell me a joke", "Hello", "What time is it?"
+   Examples of UNCLEAR: "What's the weather?", "Tell me a joke", "Hello", "Why is the sky blue?", "What time is it?"
 
 IMPORTANT: If the request is about data this tool doesn't have, classify as "unclear", NOT "chart_request".
 
-Respond with ONLY the category name, nothing else."""
+Respond with EXACTLY one word: chart_request, data_question, or unclear"""
 
         messages = [Message(role="user", content=user_input)]
 
@@ -249,12 +250,15 @@ Respond with ONLY the category name, nothing else."""
 
         intent = response.content.strip().lower().replace('"', '').replace("'", "")
 
-        # Normalize to expected values
-        if "chart" in intent or "request" in intent:
+        print(f"[ChartConversation] Intent classification for '{user_input[:30]}...': {intent}")
+
+        # Use exact matching for the expected values
+        if intent == "chart_request":
             return "chart_request"
-        elif "data" in intent or "question" in intent:
+        elif intent == "data_question":
             return "data_question"
         else:
+            # Default to unclear for anything else
             return "unclear"
 
     def _handle_data_question(self, user_input: str) -> ChartConversationResult:
