@@ -497,10 +497,27 @@ class ChartPipeline:
                 config.x = columns[0]  # Date column
                 y_columns = columns[1:]
 
+                # Detect if any column is a categorical "series" column (for multi-line charts)
+                # Keywords that indicate a grouping/category column, not a metric
+                series_keywords = ["type", "category", "segment", "group", "status", "event", "name", "label"]
+                series_col = None
+                metric_cols = []
+
+                for col in y_columns:
+                    col_lower = col.lower()
+                    if any(kw in col_lower for kw in series_keywords):
+                        series_col = col
+                    else:
+                        metric_cols.append(col)
+
+                # If we found a series column, use it for grouping
+                if series_col and metric_cols:
+                    config.series = series_col
+                    config.y = metric_cols[0] if len(metric_cols) == 1 else metric_cols
                 # Check if we should use dual y-axis (for metrics with different scales)
                 # Use y2 when we have exactly 2 metrics and one has "count" or "volume" in name
                 # while the other has "revenue", "amount", or "value" (different scales)
-                if len(y_columns) == 2:
+                elif len(y_columns) == 2:
                     col_names = [c.lower() for c in y_columns]
                     count_keywords = ["count", "volume", "number", "quantity"]
                     value_keywords = ["revenue", "amount", "value", "total", "sum"]

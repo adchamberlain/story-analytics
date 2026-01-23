@@ -230,6 +230,11 @@ class SQLValidator:
         # Replace dropdown column access patterns (filter_name.column_name)
         # ${inputs.year_filter.year} -> 2024
         query = re.sub(r"\$\{inputs\.\w+\.year\}", "2024", query)
+        # ${inputs.year_filter.value} -> 2024 (when filter name contains "year")
+        query = re.sub(r"\$\{inputs\.\w*year\w*\.value\}", "2024", query)
+        # ${inputs.filter_name.value} -> 'placeholder' for non-year filters
+        query = re.sub(r"'\$\{inputs\.\w+\.value\}'", "'placeholder'", query)
+        query = re.sub(r"\$\{inputs\.\w+\.value\}", "'placeholder'", query)
         # ${inputs.filter_name.column} -> 'placeholder' for non-year columns
         query = re.sub(r"'\$\{inputs\.\w+\.\w+\}'", "'placeholder'", query)
         query = re.sub(r"\$\{inputs\.\w+\.\w+\}", "'placeholder'", query)

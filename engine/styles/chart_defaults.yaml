@@ -89,6 +89,8 @@ base_echarts_options:
 # Chart-type-specific defaults
 chart_types:
   line:
+    # NOTE: No areaStyle here - line charts should be pure lines
+    # Use "area" chart type if you want filled area under the line
     smooth: 0.3
     lineStyle:
       width: 3
@@ -103,21 +105,6 @@ chart_types:
       shadowColor: "rgba(99, 102, 241, 0.4)"
       shadowBlur: 6
     symbolSize: 10
-    areaStyle:
-      # Gradient fill from top to bottom
-      color:
-        type: "linear"
-        x: 0
-        y: 0
-        x2: 0
-        y2: 1
-        colorStops:
-          - offset: 0
-            color: "rgba(99, 102, 241, 0.25)"
-          - offset: 0.5
-            color: "rgba(99, 102, 241, 0.08)"
-          - offset: 1
-            color: "rgba(99, 102, 241, 0.01)"
     emphasis:
       itemStyle:
         borderWidth: 4

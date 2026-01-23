@@ -100,11 +100,9 @@ instructions: |
      - CRITICAL: Use a simple alias (like "year", "region", "status") NOT the SQL expression!
        WRONG: SELECT DISTINCT EXTRACT(YEAR FROM date) as "EXTRACT(YEAR FROM date)"
        RIGHT: SELECT DISTINCT EXTRACT(YEAR FROM date) as year
-     - IMPORTANT: Evidence returns the FULL ROW from the dropdown query, not just a value.
-       Use ${inputs.filter_name.column_alias} to access the specific column value.
-       Example: If filter_options query has "year" column, use ${inputs.year_filter.year}
-     - Add WHERE clause to main query using: WHERE column = ${inputs.filter_name.column_alias}
-       (note: no quotes needed for numeric values like years)
+     - In the main query, use ${inputs.filter_name.value} to access the selected value.
+       Example: WHERE EXTRACT(YEAR FROM date) = ${inputs.year_filter.value}
+     - (note: no quotes needed for numeric values like years)
 
   2. For DateRange filters:
      - Add WHERE clause: WHERE date_col >= '${inputs.filter_name.start}'
@@ -126,7 +124,7 @@ output_format: |
   {
     "query_name": "descriptive_name",
     "purpose": "What this query provides",
-    "sql": "SELECT ... FROM ... WHERE column = ${inputs.filter_name.column_alias}",
+    "sql": "SELECT ... FROM ... WHERE column = ${inputs.filter_name.value}",
     "columns": ["x_column", "y_column"],
     "filter_queries": [
       {
@@ -139,8 +137,8 @@ output_format: |
   }
   ```
 
-  NOTE: For dropdown filters, use ${inputs.filter_name.column_alias} syntax because
-  Evidence returns the full row object, not just the value. Example: ${inputs.year_filter.year}
+  NOTE: For dropdown filters, use ${inputs.filter_name.value} to access the selected value.
+  Example: ${inputs.year_filter.value} returns the year number (e.g., 2025).
 
   Column naming:
   - For x-axis data: use descriptive names like "month", "segment", "product"
