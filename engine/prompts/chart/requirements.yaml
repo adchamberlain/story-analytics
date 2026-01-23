@@ -92,11 +92,15 @@ instructions: |
      - title: Display label (e.g., "Select Region")
      - column: The column to filter on (for Dropdown/ButtonGroup, or the date column for DateRange)
      - table: The table containing the filter values (for Dropdown/ButtonGroup)
-     - default_value: (For DateRange) Set based on the user's requested time period:
-       - "last 6 months" → default_value: "Last 6 Months"
-       - "last 12 months" or "past year" → default_value: "Last 12 Months"
-       - "last 30 days" → default_value: "Last 30 Days"
-       - If no time period mentioned → default_value: "Last 12 Months"
+     - default_value:
+       - For DateRange: Set based on the user's requested time period:
+         - "last 6 months" → default_value: "Last 6 Months"
+         - "last 12 months" or "past year" → default_value: "Last 12 Months"
+         - "last 30 days" → default_value: "Last 30 Days"
+         - If no time period mentioned → default_value: "Last 12 Months"
+       - For Dropdown: DO NOT set default_value. Leave it null/omit it.
+         The dropdown will automatically select the first option from the data.
+         Never use placeholder values like "Current Year" or "All" - these won't match actual data.
 
 output_format: |
   Respond with a JSON object in exactly this format:
@@ -117,7 +121,7 @@ output_format: |
   }
   ```
 
-  Example 2 - Chart WITH interactive filters (only when user explicitly requests controls):
+  Example 2 - Chart WITH DateRange filter (only when user explicitly requests controls):
   ```json
   {
     "title": "Revenue by Region",
@@ -141,6 +145,31 @@ output_format: |
     ]
   }
   ```
+
+  Example 3 - Chart WITH Dropdown filter (note: NO default_value for Dropdown):
+  ```json
+  {
+    "title": "Monthly Revenue",
+    "description": "How much revenue did we generate each month?",
+    "metric": "revenue",
+    "aggregation": "SUM",
+    "dimension": "month",
+    "chart_type": "BarChart",
+    "horizontal": false,
+    "relevant_tables": ["invoices"],
+    "filters": [],
+    "interactive_filters": [
+      {
+        "filter_type": "Dropdown",
+        "name": "year_filter",
+        "title": "Select Year",
+        "column": "year",
+        "table": "invoices"
+      }
+    ]
+  }
+  ```
+  NOTE: Dropdown filters should NOT have a default_value - the dropdown will auto-select the first option.
 
   IMPORTANT for horizontal field:
   - Set horizontal: true ONLY when user explicitly requests "horizontal bar chart"
