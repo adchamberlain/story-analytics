@@ -1,12 +1,13 @@
 """
-Google Gemini LLM provider implementation using Google Generative AI SDK.
+Google Gemini LLM provider implementation using the new Google Gen AI SDK.
 """
 
 import os
 import time
 from typing import Any
 
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 from google.api_core import exceptions as google_exceptions
 
 from ..config import get_config
@@ -14,9 +15,9 @@ from .base import LLMProvider, LLMResponse, Message
 
 
 class GeminiProvider(LLMProvider):
-    """Google Gemini API provider using the official Google AI SDK."""
+    """Google Gemini API provider using the official Google Gen AI SDK."""
 
-    # Default models (updated Jan 2026 - gemini-1.5 models are deprecated)
+    # Default models
     DEFAULT_MODEL = "gemini-2.0-flash"
     VISION_MODEL = "gemini-2.0-flash"  # Also supports vision
 
@@ -30,7 +31,7 @@ class GeminiProvider(LLMProvider):
 
         Args:
             api_key: Optional API key. If not provided, reads from GOOGLE_API_KEY env var.
-            model: Optional model name. If not provided, uses config or defaults to gemini-1.5-pro.
+            model: Optional model name. If not provided, uses config or defaults to gemini-2.0-flash.
         """
         config = get_config()
 
@@ -56,8 +57,8 @@ class GeminiProvider(LLMProvider):
                 "environment variable, or configure in engine_config.yaml"
             )
 
-        # Configure the SDK
-        genai.configure(api_key=self._api_key)
+        # Create the client with API key
+        self._client = genai.Client(api_key=self._api_key)
 
         # Get model - prefer explicit, then config (if provider is gemini), then default
         if model:
@@ -97,30 +98,30 @@ class GeminiProvider(LLMProvider):
         delay = self.RETRY_DELAY * (2**attempt)
         time.sleep(delay)
 
-    def _get_safety_settings(self) -> list[dict[str, str]]:
+    def _get_safety_settings(self) -> list[types.SafetySetting]:
         """
         Get safety settings configured to be permissive for dashboard generation.
 
         Returns:
-            List of safety setting dictionaries.
+            List of SafetySetting objects.
         """
         return [
-            {
-                "category": "HARM_CATEGORY_HARASSMENT",
-                "threshold": "BLOCK_ONLY_HIGH",
-            },
-            {
-                "category": "HARM_CATEGORY_HATE_SPEECH",
-                "threshold": "BLOCK_ONLY_HIGH",
-            },
-            {
-                "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
-                "threshold": "BLOCK_ONLY_HIGH",
-            },
-            {
-                "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
-                "threshold": "BLOCK_ONLY_HIGH",
-            },
+            types.SafetySetting(
+                category="HARM_CATEGORY_HARASSMENT",
+                threshold="BLOCK_ONLY_HIGH",
+            ),
+            types.SafetySetting(
+                category="HARM_CATEGORY_HATE_SPEECH",
+                threshold="BLOCK_ONLY_HIGH",
+            ),
+            types.SafetySetting(
+                category="HARM_CATEGORY_SEXUALLY_EXPLICIT",
+                threshold="BLOCK_ONLY_HIGH",
+            ),
+            types.SafetySetting(
+                category="HARM_CATEGORY_DANGEROUS_CONTENT",
+                threshold="BLOCK_ONLY_HIGH",
+            ),
         ]
 
     def generate(
@@ -143,21 +144,12 @@ class GeminiProvider(LLMProvider):
             LLMResponse with the generated content.
         """
         # Create generation config
-        generation_config = genai.GenerationConfig(
+        config = types.GenerateContentConfig(
             max_output_tokens=max_tokens,
             temperature=self._clamp_temperature(temperature),
+            safety_settings=self._get_safety_settings(),
+            system_instruction=system_prompt,
         )
-
-        # Create model with system instruction if provided
-        model_kwargs: dict[str, Any] = {
-            "model_name": self._model,
-            "generation_config": generation_config,
-            "safety_settings": self._get_safety_settings(),
-        }
-        if system_prompt:
-            model_kwargs["system_instruction"] = system_prompt
-
-        model = genai.GenerativeModel(**model_kwargs)
 
         # Convert messages to Gemini format
         # Gemini uses "user" and "model" (not "assistant")
@@ -167,10 +159,12 @@ class GeminiProvider(LLMProvider):
                 # System messages are handled via system_instruction
                 continue
             role = "model" if msg.role == "assistant" else "user"
-            gemini_history.append({"role": role, "parts": [{"text": msg.content}]})
-
-        # Start chat with history
-        chat = model.start_chat(history=gemini_history)
+            gemini_history.append(
+                types.Content(
+                    role=role,
+                    parts=[types.Part.from_text(text=msg.content)],
+                )
+            )
 
         # Get the last message to send
         last_message = messages[-1].content if messages else ""
@@ -179,13 +173,21 @@ class GeminiProvider(LLMProvider):
         last_exception = None
         for attempt in range(self.MAX_RETRIES):
             try:
-                response = chat.send_message(last_message)
+                # Create chat with history and send message
+                chat = self._client.chats.create(
+                    model=self._model,
+                    config=config,
+                    history=gemini_history,
+                )
+                response = chat.send_message(message=last_message)
 
                 # Check if response was blocked
                 if not response.candidates:
-                    block_reason = getattr(
-                        response.prompt_feedback, "block_reason", "Unknown"
-                    )
+                    block_reason = "Unknown"
+                    if hasattr(response, "prompt_feedback") and response.prompt_feedback:
+                        block_reason = getattr(
+                            response.prompt_feedback, "block_reason", "Unknown"
+                        )
                     raise ValueError(
                         f"Response blocked by Gemini safety filters: {block_reason}"
                     )
@@ -252,39 +254,42 @@ class GeminiProvider(LLMProvider):
             LLMResponse with the generated content.
         """
         # Create generation config
-        generation_config = genai.GenerationConfig(
+        config = types.GenerateContentConfig(
             max_output_tokens=max_tokens,
             temperature=self._clamp_temperature(temperature),
+            safety_settings=self._get_safety_settings(),
         )
 
         # Use vision-capable model
         vision_model = self.VISION_MODEL
-        model = genai.GenerativeModel(
-            model_name=vision_model,
-            generation_config=generation_config,
-            safety_settings=self._get_safety_settings(),
+
+        # Create image part from base64 data
+        image_part = types.Part.from_bytes(
+            data=__import__("base64").b64decode(image_base64),
+            mime_type=image_media_type,
         )
 
-        # Create image part
-        image_part = {
-            "inline_data": {
-                "mime_type": image_media_type,
-                "data": image_base64,
-            }
-        }
+        # Create content with image and text
+        contents = [image_part, prompt]
 
         # Handle rate limits with retry logic
         last_exception = None
         for attempt in range(self.MAX_RETRIES):
             try:
                 # Generate response with image and text
-                response = model.generate_content([image_part, prompt])
+                response = self._client.models.generate_content(
+                    model=vision_model,
+                    contents=contents,
+                    config=config,
+                )
 
                 # Check if response was blocked
                 if not response.candidates:
-                    block_reason = getattr(
-                        response.prompt_feedback, "block_reason", "Unknown"
-                    )
+                    block_reason = "Unknown"
+                    if hasattr(response, "prompt_feedback") and response.prompt_feedback:
+                        block_reason = getattr(
+                            response.prompt_feedback, "block_reason", "Unknown"
+                        )
                     raise ValueError(
                         f"Response blocked by Gemini safety filters: {block_reason}"
                     )
