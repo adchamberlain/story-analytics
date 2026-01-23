@@ -50,25 +50,41 @@ instructions: |
      - Histogram: Distribution of values
 
   5b. HORIZONTAL BAR CHARTS:
-     If the user explicitly requests a "horizontal bar chart", set:
+     CRITICAL: If the user mentions ANY of these phrases, you MUST set horizontal: true:
+       - "horizontal bar"
+       - "horizontal bars"
+       - "bars horizontal"
+       - "bar chart horizontal"
+     When detected, set:
        - chart_type: "BarChart"
-       - horizontal: true
-     Look for keywords: "horizontal bar", "horizontal bars", "bars horizontal"
+       - horizontal: true (THIS IS REQUIRED!)
+     Example: "Show me a horizontal bar chart" → horizontal: true
 
   6. RELEVANT TABLES: Which tables from the schema are needed?
 
   7. FILTERS: Any static data filters (baked into the query)
-     Examples: "last 12 months", "active customers only", "US region"
+     These are time periods or conditions that should be HARDCODED in the SQL.
+     Examples: "past year", "last 12 months", "last 6 months", "active customers only", "US region"
 
-  8. INTERACTIVE FILTERS: Does the user want interactive filter controls?
+     IMPORTANT: Time periods like "past year" or "last 12 months" are STATIC filters,
+     NOT interactive filters. They should go in the "filters" array, not "interactive_filters".
+
+  8. INTERACTIVE FILTERS: Does the user want USER-CONTROLLABLE filter controls?
+     ONLY add interactive filters when the user EXPLICITLY requests a UI control.
      Look for phrases like:
-     - "with a date range filter" → DateRange
-     - "with a date picker" → DateRange
-     - "with a dropdown to filter by X" → Dropdown
-     - "let me select the region" → Dropdown
-     - "filter by customer segment" → Dropdown
+     - "with a date range filter" or "add a date filter" → DateRange
+     - "with a date picker" or "let me select dates" → DateRange
+     - "with a dropdown to filter by X" or "dropdown to select" → Dropdown
+     - "let me select the region" or "add a filter for region" → Dropdown
+     - "filter by customer segment" (only if they want to select it) → Dropdown
      - "add a search box" → TextInput
      - "slider to set minimum" → Slider
+
+     DO NOT add interactive filters for:
+     - "over the past year" → This is a STATIC filter, not interactive
+     - "last 12 months of data" → This is a STATIC filter
+     - "for 2024" → This is a STATIC filter
+     - Any time period without explicit mention of user selection
 
      For each interactive filter detected, specify:
      - filter_type: "Dropdown", "DateRange", "TextInput", "ButtonGroup", or "Slider"
@@ -76,35 +92,51 @@ instructions: |
      - title: Display label (e.g., "Select Region")
      - column: The column to filter on (for Dropdown/ButtonGroup, or the date column for DateRange)
      - table: The table containing the filter values (for Dropdown/ButtonGroup)
+     - default_value: (For DateRange) Set based on the user's requested time period:
+       - "last 6 months" → default_value: "Last 6 Months"
+       - "last 12 months" or "past year" → default_value: "Last 12 Months"
+       - "last 30 days" → default_value: "Last 30 Days"
+       - If no time period mentioned → default_value: "Last 12 Months"
 
 output_format: |
   Respond with a JSON object in exactly this format:
 
+  Example 1 - Simple chart with NO interactive filters (most common):
   ```json
   {
-    "title": "Chart Title",
-    "description": "What business question does this chart answer?",
+    "title": "Monthly Revenue Trend",
+    "description": "How has our revenue changed over the past year?",
     "metric": "revenue",
     "aggregation": "SUM",
     "dimension": "month",
     "chart_type": "LineChart",
     "horizontal": false,
+    "relevant_tables": ["invoices"],
+    "filters": ["past year"],
+    "interactive_filters": []
+  }
+  ```
+
+  Example 2 - Chart WITH interactive filters (only when user explicitly requests controls):
+  ```json
+  {
+    "title": "Revenue by Region",
+    "description": "How does revenue vary by region?",
+    "metric": "revenue",
+    "aggregation": "SUM",
+    "dimension": "region",
+    "chart_type": "BarChart",
+    "horizontal": false,
     "relevant_tables": ["invoices", "customers"],
-    "filters": ["last 12 months"],
+    "filters": [],
     "interactive_filters": [
       {
         "filter_type": "DateRange",
         "name": "date_range",
         "title": "Select Date Range",
         "column": "invoice_date",
-        "table": "invoices"
-      },
-      {
-        "filter_type": "Dropdown",
-        "name": "region_filter",
-        "title": "Select Region",
-        "column": "region",
-        "table": "customers"
+        "table": "invoices",
+        "default_value": "Last 12 Months"
       }
     ]
   }
@@ -127,7 +159,8 @@ output_format: |
   - Be specific about the metric and aggregation
   - The dimension can be null if showing a single BigValue
   - Keep it simple - this is ONE chart, not a dashboard
-  - Only include interactive_filters if the user explicitly asks for them
-  - interactive_filters is an array (can be empty [])
+  - interactive_filters should be an EMPTY array [] unless user explicitly asks for filter controls
+  - Time periods like "past year", "last 12 months" go in "filters", NOT "interactive_filters"
+  - Only add interactive_filters when user says things like "add a filter", "with a dropdown", "let me select"
   - For "per entity" metrics like "avg revenue per customer", use aggregation: "AVG_PER_ENTITY"
     to indicate two-level aggregation is needed

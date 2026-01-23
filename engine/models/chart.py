@@ -94,7 +94,17 @@ class FilterSpec:
             if self.title:
                 props.append(f'title="{self.title}"')
             if self.default_value:
-                props.append(f'defaultValue="{self.default_value}"')
+                # Check if default is numeric - Evidence needs {number} not "string" for numeric
+                try:
+                    numeric_val = float(self.default_value)
+                    # Use integer format if it's a whole number (like year)
+                    if numeric_val == int(numeric_val):
+                        props.append(f"defaultValue={{{int(numeric_val)}}}")
+                    else:
+                        props.append(f"defaultValue={{{numeric_val}}}")
+                except (ValueError, TypeError):
+                    # String value - use quotes
+                    props.append(f'defaultValue="{self.default_value}"')
             return f"<Dropdown {' '.join(props)} />"
 
         elif self.filter_type == FilterType.DATE_RANGE:
@@ -103,9 +113,12 @@ class FilterSpec:
                 props.append(f'title="{self.title}"')
             # DateRange can use data+dates props OR start+end props
             # We'll use presetRanges for common date filtering
-            props.append('presetRanges={["Last 7 Days", "Last 30 Days", "Last 90 Days", "Last 12 Months", "Year to Date", "All Time"]}')
-            # IMPORTANT: Must set a default preset to avoid Unix epoch (Jan 1, 1970)
-            props.append('defaultValue="Last 12 Months"')
+            presets = ["Last 7 Days", "Last 30 Days", "Last 90 Days", "Last 6 Months", "Last 12 Months", "Year to Date", "All Time"]
+            presets_str = ", ".join(f'"{p}"' for p in presets)
+            props.append(f"presetRanges={{[{presets_str}]}}")
+            # Use specified default_value if provided, otherwise fall back to sensible default
+            default_preset = self.default_value if self.default_value else "Last 12 Months"
+            props.append(f'defaultValue="{default_preset}"')
             if self.default_start:
                 props.append(f'start="{self.default_start}"')
             if self.default_end:
@@ -601,9 +614,12 @@ class Chart:
             "config": {
                 "x": self.config.x,
                 "y": self.config.y,
+                "y2": self.config.y2,
                 "value": self.config.value,
                 "series": self.config.series,
                 "title": self.config.title,
+                "horizontal": self.config.horizontal,
+                "stacked": self.config.stacked,
                 "extra_props": self.config.extra_props,
             },
             "filters": [f.to_dict() for f in self.filters],
@@ -623,9 +639,12 @@ class Chart:
         config = ChartConfig(
             x=config_data.get("x"),
             y=config_data.get("y"),
+            y2=config_data.get("y2"),
             value=config_data.get("value"),
             series=config_data.get("series"),
             title=config_data.get("title"),
+            horizontal=config_data.get("horizontal", False),
+            stacked=config_data.get("stacked", False),
             extra_props=config_data.get("extra_props", {}),
         )
 

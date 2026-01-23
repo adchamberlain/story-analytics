@@ -209,6 +209,7 @@ class SQLValidator:
         Handles various template syntaxes:
         - '${inputs.filter_name}' -> 'placeholder'
         - '${inputs.date_range.start}' -> '2024-01-01'
+        - ${inputs.filter_name.column}' -> 'placeholder' or 0
         - ${inputs.numeric_filter} -> 0
         - Also handles $'${...}' patterns (where LLM adds extra $)
         """
@@ -225,6 +226,13 @@ class SQLValidator:
         # ${inputs.date_range.start} -> '2024-01-01'
         query = re.sub(r"\$\{inputs\.\w+\.start\}", "'2024-01-01'", query)
         query = re.sub(r"\$\{inputs\.\w+\.end\}", "'2024-12-31'", query)
+
+        # Replace dropdown column access patterns (filter_name.column_name)
+        # ${inputs.year_filter.year} -> 2024
+        query = re.sub(r"\$\{inputs\.\w+\.year\}", "2024", query)
+        # ${inputs.filter_name.column} -> 'placeholder' for non-year columns
+        query = re.sub(r"'\$\{inputs\.\w+\.\w+\}'", "'placeholder'", query)
+        query = re.sub(r"\$\{inputs\.\w+\.\w+\}", "'placeholder'", query)
 
         # Replace quoted string filter patterns
         # '${inputs.filter_name}' -> 'placeholder'
