@@ -28,6 +28,7 @@ from .models import Chart, ChartConfig, ChartSpec, ChartType, FilterSpec, Filter
 from .schema import get_schema_context
 from .sql_validator import validate_query
 from .config_loader import get_config_loader
+from .validators import ChartSpecValidator
 
 
 @dataclass
@@ -143,6 +144,7 @@ class ChartRequirementsAgent:
                 options_column=f_data.get("column"),
                 options_table=f_data.get("table"),
                 date_column=f_data.get("column"),  # For DateRangePicker
+                default_value=f_data.get("default_value"),  # For DateRange preset
             )
             interactive_filters.append(filter_spec)
 
@@ -388,10 +390,16 @@ class ChartPipeline:
 
         try:
             spec = self.requirements_agent.extract_spec(user_request, schema)
+
+            # Stage 1b: Validate and correct spec
+            spec = ChartSpecValidator.validate_spec(spec)
+
             if self.config.verbose:
                 print(f"[ChartPipeline]   Title: {spec.title}")
                 print(f"[ChartPipeline]   Type: {spec.chart_type.value}")
                 print(f"[ChartPipeline]   Metric: {spec.metric}")
+                if spec.horizontal:
+                    print(f"[ChartPipeline]   Horizontal: True")
         except Exception as e:
             return ChartPipelineResult(
                 success=False,
@@ -431,8 +439,22 @@ class ChartPipeline:
         # Determine chart config based on type and columns
         config = self._build_chart_config(spec, columns)
 
+        # Stage 3b: Analyze scales and use dual y-axis if needed
+        y_columns = columns[1:] if len(columns) >= 2 else []
+        if len(y_columns) == 2 and config.y2 is None:
+            # Only analyze if we have 2 metrics and didn't already set y2
+            scale_analysis = ChartSpecValidator.analyze_scales(sql, columns)
+            if scale_analysis and scale_analysis.needs_dual_axis:
+                if self.config.verbose:
+                    print(f"[ChartPipeline]   Scale analysis: {scale_analysis.scale_ratio:.1f}x ratio, using dual y-axis")
+                config.y = scale_analysis.primary_column
+                config.y2 = scale_analysis.secondary_column
+
         # Build filter specs with generated queries
         filters = self._build_filters(spec, filter_queries)
+
+        # Stage 4b: Validate filter defaults
+        filters = ChartSpecValidator.validate_filters(filters)
 
         validated_chart = ValidatedChart(
             spec=spec,
@@ -616,6 +638,10 @@ class ChartPipeline:
                 query_info = query_lookup[f.name]
                 filter_spec.options_query = query_info.get("sql")
                 filter_spec.options_query_name = query_info.get("name")
+                # Use the value_column from the SQL agent if provided
+                # This is the column alias that should be used in the Dropdown
+                if query_info.get("value_column"):
+                    filter_spec.options_column = query_info.get("value_column")
 
             filters.append(filter_spec)
 

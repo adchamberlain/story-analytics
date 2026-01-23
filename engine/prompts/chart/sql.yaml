@@ -26,9 +26,16 @@ critical_rules: |
   CORRECT DATE PATTERNS:
   - Last 12 months: WHERE date_col >= CURRENT_DATE - INTERVAL '12 months'
   - Last 30 days: WHERE date_col >= CURRENT_DATE - INTERVAL '30 days'
+  - Last 6 months: WHERE date_col >= CURRENT_DATE - INTERVAL '6 months'
+  - Past year: WHERE date_col >= CURRENT_DATE - INTERVAL '12 months'
   - Truncate to month: DATE_TRUNC('month', date_column)
   - Format as string: STRFTIME(date_column, '%Y-%m')
   - Extract year: YEAR(date_column) or EXTRACT(year FROM date_column)
+
+  STATIC vs INTERACTIVE FILTERS:
+  - If the spec has "filters": ["past year"] but NO DateRange in interactive_filters,
+    use HARDCODED date filtering: WHERE date_col >= CURRENT_DATE - INTERVAL '12 months'
+  - Only use ${inputs.date_range.start} syntax when there IS a DateRange in interactive_filters
 
 instructions: |
   Given a chart specification, write SQL queries that provide the data.
@@ -93,7 +100,11 @@ instructions: |
      - CRITICAL: Use a simple alias (like "year", "region", "status") NOT the SQL expression!
        WRONG: SELECT DISTINCT EXTRACT(YEAR FROM date) as "EXTRACT(YEAR FROM date)"
        RIGHT: SELECT DISTINCT EXTRACT(YEAR FROM date) as year
-     - Add WHERE clause to main query using: WHERE column = '${inputs.filter_name}'
+     - IMPORTANT: Evidence returns the FULL ROW from the dropdown query, not just a value.
+       Use ${inputs.filter_name.column_alias} to access the specific column value.
+       Example: If filter_options query has "year" column, use ${inputs.year_filter.year}
+     - Add WHERE clause to main query using: WHERE column = ${inputs.filter_name.column_alias}
+       (note: no quotes needed for numeric values like years)
 
   2. For DateRange filters:
      - Add WHERE clause: WHERE date_col >= '${inputs.filter_name.start}'
@@ -115,17 +126,21 @@ output_format: |
   {
     "query_name": "descriptive_name",
     "purpose": "What this query provides",
-    "sql": "SELECT ... FROM ... WHERE column = '${inputs.filter_name}'",
+    "sql": "SELECT ... FROM ... WHERE column = ${inputs.filter_name.column_alias}",
     "columns": ["x_column", "y_column"],
     "filter_queries": [
       {
-        "name": "filter_options_query_name",
-        "filter_name": "filter_name",
-        "sql": "SELECT DISTINCT column FROM table ORDER BY column"
+        "name": "year_options",
+        "filter_name": "year_filter",
+        "sql": "SELECT DISTINCT EXTRACT(YEAR FROM date_col) AS year FROM table ORDER BY year",
+        "value_column": "year"
       }
     ]
   }
   ```
+
+  NOTE: For dropdown filters, use ${inputs.filter_name.column_alias} syntax because
+  Evidence returns the full row object, not just the value. Example: ${inputs.year_filter.year}
 
   Column naming:
   - For x-axis data: use descriptive names like "month", "segment", "product"
@@ -142,6 +157,8 @@ output_format: |
   - Double-check for forbidden functions before outputting
   - filter_queries is optional - only include if there are Dropdown/ButtonGroup filters
   - Use ${inputs.filter_name} syntax for filter variables (this is Evidence syntax)
-  - CRITICAL for filter_queries: The column alias in the SELECT must be SIMPLE (e.g., "year", "region")
-    This alias becomes the "value" prop in the Dropdown component.
-    Example: SELECT DISTINCT YEAR(date) AS year  →  value="year" in Dropdown
+  - CRITICAL for filter_queries:
+    1. The column alias must be SIMPLE (e.g., "year", "region")
+    2. Include "value_column" in each filter_query set to the alias name
+    3. This value_column becomes the "value" prop in the Dropdown component
+    Example: {"sql": "SELECT DISTINCT YEAR(date) AS year ...", "value_column": "year"}
