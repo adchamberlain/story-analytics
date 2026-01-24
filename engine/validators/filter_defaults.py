@@ -23,9 +23,9 @@ class FilterDefaultResolver:
 
     @classmethod
     def get_data_dir(cls) -> str:
-        """Get the path to the Evidence data directory for parquet files."""
+        """Get the path to the data directory for parquet files."""
         base_dir = Path(__file__).parent.parent.parent
-        data_dir = base_dir / ".evidence" / "template" / "static" / "data"
+        data_dir = base_dir / "data"
         return str(data_dir)
 
     @classmethod

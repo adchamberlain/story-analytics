@@ -3,7 +3,7 @@
   "title": "Revenue by Customer",
   "description": "Total revenue by customer",
   "query_name": "revenue_by_customer",
-  "sql": "SELECT c.company_name, SUM(i.amount) as total_revenue FROM read_parquet('.evidence/template/static/data/snowflake_saas/invoices/*.parquet') i JOIN read_parquet('.evidence/template/static/data/snowflake_saas/customers/*.parquet') c ON i.customer_id = c.customer_id GROUP BY 1 ORDER BY 2 DESC LIMIT 10",
+  "sql": "SELECT c.company_name, SUM(i.amount) as total_revenue FROM read_parquet('data/snowflake_saas/invoices/*.parquet') i JOIN read_parquet('data/snowflake_saas/customers/*.parquet') c ON i.customer_id = c.customer_id GROUP BY 1 ORDER BY 2 DESC LIMIT 10",
   "chart_type": "BarChart",
   "config": {
     "x": "company_name",

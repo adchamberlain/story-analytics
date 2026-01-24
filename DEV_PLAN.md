@@ -170,91 +170,117 @@ Instead of markdown, the LLM generates a JSON dashboard spec:
 
 ---
 
-### Phase 2: Visual Polish 🔄 NEXT
-**Status:** Not started
+### Phase 2: Visual Polish ✅ COMPLETE
+**Status:** Completed 2026-01-24
 
 **Goal:** Make React charts look professional (Tableau/Looker quality)
 
 **Deliverables:**
-- [ ] Professional design system
-  - Typography scale (headers, labels, values)
-  - Color palette with semantic colors (success, warning, error)
-  - Spacing system (consistent padding/margins)
-  - Dark/light theme support
-- [ ] Enhanced BigValue/KPI cards
-  - Trend indicators (up/down arrows with color)
-  - Comparison values (vs. previous period)
-  - Sparkline mini-charts
-- [ ] Chart improvements
-  - Better axis formatting (smart number abbreviation)
-  - Grid line styling
-  - Hover tooltips with formatting
-  - Smooth animations on load/update
-- [ ] Loading states
-  - Skeleton loaders for charts
-  - Smooth transitions
+- [x] Professional design system
+  - Typography scale (text-xs through text-4xl)
+  - Color palette with semantic colors (trend-up, trend-down, trend-neutral)
+  - Spacing system (space-1 through space-12)
+  - Transitions (fast, base, slow)
+- [x] Enhanced BigValue/KPI cards
+  - Trend indicators (TrendIndicator.tsx - up/down arrows with semantic color)
+  - Comparison values (DeltaValue.tsx - formatted change with sign/color)
+  - Sparkline mini-charts (Sparkline.tsx - inline Plotly charts)
+- [x] Chart improvements
+  - Better axis formatting (smart SI prefixes via formatters.ts)
+  - Grid line styling (semi-transparent, zero-line highlighting)
+  - Hover tooltips with formatting (createHoverTemplate)
+  - Smooth animations on load/update (fade-in CSS, Plotly transitions)
+- [x] Loading states
+  - Skeleton loaders (SkeletonBase.tsx, ChartSkeleton.tsx)
+  - Smooth fade transitions
 
-**Files to modify:**
-- `app/src/styles/` - Design system CSS
-- `app/src/components/charts/` - Chart components
-- `app/src/components/charts/BigValue.tsx` - KPI enhancements
+**Key Files Created:**
+- `app/src/utils/formatters.ts` - Number formatting utilities
+- `app/src/components/charts/TrendIndicator.tsx` - Arrow indicators
+- `app/src/components/charts/DeltaValue.tsx` - Change value display
+- `app/src/components/charts/Sparkline.tsx` - Mini inline charts
+- `app/src/components/skeletons/` - Loading skeleton components
 
 ---
 
-### Phase 3: Chat UI Migration 📋 PLANNED
-**Status:** Not started
+### Phase 3: Chat UI Migration ✅ COMPLETE
+**Status:** Completed 2026-01-24
 
 **Goal:** Move conversation UI from SvelteKit to React (unified frontend)
 
 **Deliverables:**
-- [ ] Chat components in React
-  - Message list with user/assistant styling
-  - Input box with send button
-  - Action buttons (Generate, Modify, Done)
-  - Loading/typing indicators
-- [ ] Conversation state management
-  - Zustand store for messages, session, phase
-  - API client for conversation endpoints
-- [ ] Chart integration
-  - Inline chart preview in chat
-  - "View full" link to chart page
-- [ ] Navigation
+- [x] Chat components in React
+  - Message.tsx - Message display with markdown, action buttons
+  - ChatInput.tsx - Auto-resizing textarea
+  - ProgressSteps.tsx - Streaming progress indicator
+- [x] Conversation state management
+  - conversationStore.ts - Full Zustand store
+  - API client with SSE streaming support
+- [x] Chat page
+  - Welcome state with example prompts
+  - Message list with auto-scroll
+  - Dashboard creation success state
+- [x] Navigation
   - Sidebar with conversation history
+  - Dashboard list
   - New conversation button
 
-**Files to create:**
+**Key Files:**
 - `app/src/components/chat/` - Chat components
 - `app/src/stores/conversationStore.ts` - Chat state
-- `app/src/pages/Chat.tsx` - Main chat page
-
-**Reference:** Port from `frontend/src/lib/components/ChartChat.svelte`
+- `app/src/pages/ChatPage.tsx` - Main chat page
+- `app/src/components/layout/Sidebar.tsx` - Navigation sidebar
 
 ---
 
-### Phase 4: Deprecate SvelteKit 📋 PLANNED
-**Status:** Not started
+### Phase 4: Deprecate SvelteKit ✅ COMPLETE
+**Status:** Completed 2026-01-24
 
 **Goal:** Single unified React app replaces SvelteKit frontend
 
 **Deliverables:**
-- [ ] All SvelteKit routes migrated to React
-- [ ] Authentication flow in React
-- [ ] Remove SvelteKit from `dev.sh`
-- [ ] Update documentation
+- [x] All SvelteKit routes migrated to React
+  - Login page with magic link auth
+  - Auth verify page
+  - Charts list page with search/filter/preview
+  - Dashboards list page
+  - Settings page
+- [x] Authentication flow in React
+  - ProtectedRoute component
+  - JWT token management
+  - Redirect to login when not authenticated
+- [x] Remove SvelteKit from `dev.sh`
+  - React is now the primary frontend
+  - Evidence optional (--evidence flag)
+- [x] Update documentation
+
+**Key Files:**
+- `app/src/pages/LoginPage.tsx` - Magic link login
+- `app/src/pages/VerifyPage.tsx` - Token verification
+- `app/src/pages/ChartsPage.tsx` - Charts library
+- `app/src/pages/DashboardsPage.tsx` - Dashboard list
+- `app/src/pages/SettingsPage.tsx` - User settings
+- `app/src/components/auth/ProtectedRoute.tsx` - Auth guard
 
 ---
 
-### Phase 5: Remove Evidence 📋 PLANNED
-**Status:** Not started
+### Phase 5: Remove Evidence ✅ COMPLETE
+**Status:** Completed 2026-01-24
 
 **Goal:** Delete Evidence/markdown generation entirely
 
 **Deliverables:**
-- [ ] Remove Evidence from `dev.sh`
-- [ ] Delete `pages/` markdown generation code
-- [ ] Delete `.evidence/` directory
-- [ ] Update chart pipeline to skip markdown step
-- [ ] Clean up unused Evidence-related code
+- [x] Remove Evidence from `dev.sh`
+- [x] Delete `pages/` markdown generation code
+- [x] Delete `.evidence/` directory
+- [x] Delete `evidence.config.yaml` and `Dockerfile.evidence`
+- [x] Delete `engine/generator.py` (EvidenceGenerator)
+- [x] Delete `engine/components/evidence.yaml`
+- [x] Remove Evidence NPM dependencies from `package.json`
+- [x] Remove `to_evidence_markdown()` methods from models
+- [x] Update `dashboard_composer.py` to not write files
+- [x] Update `conversation.py` and `chart_conversation.py`
+- [x] Update tests to not reference Evidence
 
 ---
 

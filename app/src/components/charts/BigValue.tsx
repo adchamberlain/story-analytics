@@ -1,9 +1,12 @@
 /**
  * BigValue (KPI) component.
- * Displays a large metric value with optional comparison.
+ * Displays a large metric value with optional comparison, trend, and sparkline.
  */
 
 import type { ChartConfig } from '../../types/chart'
+import { formatCurrency, formatPercent, autoFormat } from '../../utils/formatters'
+import { DeltaValue, calculatePercentChange } from './DeltaValue'
+import { Sparkline, extractSparklineData } from './Sparkline'
 
 interface BigValueProps {
   data: Record<string, unknown>[]
@@ -13,6 +16,14 @@ interface BigValueProps {
 export function BigValue({ data, config }: BigValueProps) {
   const valueColumn = config.value || config.y
   const title = config.title
+  const valueFormat = config.valueFormat
+  const comparisonColumn = config.comparisonValue
+  const comparisonLabel = config.comparisonLabel || 'vs previous'
+  const positiveIsGood = config.positiveIsGood ?? true
+  const showTrend = config.showTrend ?? !!comparisonColumn
+  const sparklineX = config.sparklineX
+  const sparklineY = config.sparklineY
+  const sparklineType = config.sparklineType || 'line'
 
   if (!valueColumn || data.length === 0) {
     return <div className="error-message">No value to display</div>
@@ -21,45 +32,58 @@ export function BigValue({ data, config }: BigValueProps) {
   // Get the first row's value
   const firstColumn = typeof valueColumn === 'string' ? valueColumn : valueColumn[0]
   const rawValue = data[0][firstColumn]
+  const currentValue = typeof rawValue === 'number' ? rawValue : null
 
-  // Format the value
+  // Get comparison value if specified
+  const comparisonValue = comparisonColumn
+    ? (data[0][comparisonColumn] as number | null)
+    : null
+
+  // Calculate percent change for trend
+  const percentChange = calculatePercentChange(currentValue, comparisonValue)
+
+  // Format the main value
   let displayValue: string
-  if (typeof rawValue === 'number') {
-    // Format large numbers with K/M/B suffixes
-    if (Math.abs(rawValue) >= 1_000_000_000) {
-      displayValue = `${(rawValue / 1_000_000_000).toFixed(1)}B`
-    } else if (Math.abs(rawValue) >= 1_000_000) {
-      displayValue = `${(rawValue / 1_000_000).toFixed(1)}M`
-    } else if (Math.abs(rawValue) >= 1_000) {
-      displayValue = `${(rawValue / 1_000).toFixed(1)}K`
-    } else if (Number.isInteger(rawValue)) {
-      displayValue = rawValue.toLocaleString()
-    } else {
-      displayValue = rawValue.toLocaleString(undefined, { maximumFractionDigits: 2 })
-    }
+  if (currentValue === null) {
+    displayValue = '—'
+  } else if (valueFormat === 'currency') {
+    displayValue = formatCurrency(currentValue, { compact: true })
+  } else if (valueFormat === 'percent') {
+    displayValue = formatPercent(currentValue, { fromDecimal: true })
   } else {
-    displayValue = String(rawValue ?? '—')
+    displayValue = autoFormat(currentValue)
+  }
+
+  // Extract sparkline data if configured
+  let sparklineData: number[] | null = null
+  let sparklineXData: (string | number)[] | undefined
+  if (sparklineY && data.length > 1) {
+    const extracted = extractSparklineData(data, sparklineY, sparklineX)
+    sparklineData = extracted.data
+    sparklineXData = extracted.xData
   }
 
   return (
     <div
+      className="fade-in"
       style={{
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: '2rem',
+        padding: 'var(--space-8)',
         minHeight: '150px',
         textAlign: 'center',
+        gap: 'var(--space-2)',
       }}
     >
+      {/* Title */}
       {title && (
         <div
           style={{
-            fontSize: '0.875rem',
-            fontWeight: 500,
+            fontSize: 'var(--text-sm)',
+            fontWeight: 'var(--font-medium)' as unknown as number,
             color: 'var(--color-gray-500)',
-            marginBottom: '0.5rem',
             textTransform: 'uppercase',
             letterSpacing: '0.05em',
           }}
@@ -67,16 +91,65 @@ export function BigValue({ data, config }: BigValueProps) {
           {title}
         </div>
       )}
+
+      {/* Main value */}
       <div
         style={{
-          fontSize: '3rem',
-          fontWeight: 700,
+          fontSize: 'var(--text-4xl)',
+          fontWeight: 'var(--font-bold)' as unknown as number,
           color: 'var(--color-gray-900)',
           lineHeight: 1.1,
+          letterSpacing: '-0.02em',
         }}
       >
         {displayValue}
       </div>
+
+      {/* Trend/Comparison row */}
+      {showTrend && percentChange !== null && (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 'var(--space-2)',
+            marginTop: 'var(--space-1)',
+          }}
+        >
+          <DeltaValue
+            value={percentChange}
+            mode="percent"
+            positiveIsGood={positiveIsGood}
+            size="md"
+            showArrow={true}
+          />
+          <span
+            style={{
+              fontSize: 'var(--text-sm)',
+              color: 'var(--color-gray-400)',
+            }}
+          >
+            {comparisonLabel}
+          </span>
+        </div>
+      )}
+
+      {/* Sparkline */}
+      {sparklineData && sparklineData.length > 1 && (
+        <div
+          style={{
+            marginTop: 'var(--space-2)',
+          }}
+        >
+          <Sparkline
+            data={sparklineData}
+            xData={sparklineXData}
+            type={sparklineType}
+            width={120}
+            height={36}
+            fill={sparklineType === 'line'}
+          />
+        </div>
+      )}
     </div>
   )
 }

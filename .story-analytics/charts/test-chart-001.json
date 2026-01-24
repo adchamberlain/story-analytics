@@ -3,7 +3,7 @@
   "title": "Monthly Revenue",
   "description": "Total revenue by month",
   "query_name": "monthly_revenue",
-  "sql": "SELECT DATE_TRUNC('month', invoice_date) as month, SUM(amount) as revenue FROM read_parquet('.evidence/template/static/data/snowflake_saas/invoices/*.parquet') GROUP BY 1 ORDER BY 1",
+  "sql": "SELECT DATE_TRUNC('month', invoice_date) as month, SUM(amount) as revenue FROM read_parquet('data/snowflake_saas/invoices/*.parquet') GROUP BY 1 ORDER BY 1",
   "chart_type": "LineChart",
   "config": {
     "x": "month",

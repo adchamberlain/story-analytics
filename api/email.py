@@ -37,13 +37,20 @@ def send_magic_link_email(
     Returns:
         True if email sent successfully, False otherwise
     """
-    if not init_resend():
-        # In development without Resend, just log the link
-        print(f"\n{'='*50}")
-        print(f"MAGIC LINK (no email configured)")
+    # For localhost URLs, print to console (Resend click tracking breaks localhost redirects)
+    is_localhost = "localhost" in magic_link_url
+    if is_localhost:
+        print(f"\n{'='*60}")
+        print(f"MAGIC LINK (use this for local dev - email link won't work)")
+        print(f"{'='*60}")
         print(f"Email: {to_email}")
-        print(f"Link: {magic_link_url}")
-        print(f"{'='*50}\n")
+        print(f"Link:  {magic_link_url}")
+        print(f"{'='*60}\n")
+
+    if not init_resend():
+        # No Resend configured, link already printed above if localhost
+        if not is_localhost:
+            print(f"[No Resend API key] Magic link for {to_email}: {magic_link_url}")
         return True
 
     subject = "Sign in to Story Analytics" if not is_new_user else "Welcome to Story Analytics"

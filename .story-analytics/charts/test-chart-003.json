@@ -3,7 +3,7 @@
   "title": "Total Revenue",
   "description": "Total revenue across all invoices",
   "query_name": "total_revenue",
-  "sql": "SELECT SUM(amount) as total_revenue FROM read_parquet('.evidence/template/static/data/snowflake_saas/invoices/*.parquet')",
+  "sql": "SELECT SUM(amount) as total_revenue FROM read_parquet('data/snowflake_saas/invoices/*.parquet')",
   "chart_type": "BigValue",
   "config": {
     "x": null,

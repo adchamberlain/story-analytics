@@ -13,7 +13,6 @@ from typing import Any
 
 from .config import get_config
 from .config_loader import get_config_loader
-from .generator import create_dashboard_from_markdown
 from .llm.base import Message
 from .llm.claude import get_provider
 from .parser import DashboardParser
@@ -647,144 +646,46 @@ class ConversationManager:
         return response, qa_result, None
 
     def _finalize_dashboard(self, markdown: str, title: str) -> tuple[str, QAResultData | None]:
-        """Write dashboard to file and run QA validation.
+        """Store dashboard and return response.
+
+        Note: Evidence markdown generation has been removed.
+        This is a legacy flow - use chart_conversation.py for the new chart-first approach.
 
         Returns:
             Tuple of (response_text, qa_result_data)
         """
+        import re
+
         qa_result_data = None
 
         try:
             self._emit_progress(
                 STEP_WRITING,
                 ProgressStatus.IN_PROGRESS,
-                "Writing dashboard file..."
+                "Creating dashboard..."
             )
 
-            file_path = create_dashboard_from_markdown(markdown, title)
-            self.state.created_file = file_path
+            # Generate slug from title
+            slug = re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")
             self.state.phase = ConversationPhase.REFINEMENT
 
-            slug = file_path.parent.name
-            url = f"{self.config.dev_url}/{slug}"
+            url = f"/dashboard/{slug}"
 
             self._emit_progress(
                 STEP_WRITING,
                 ProgressStatus.COMPLETED,
-                "Dashboard file created",
+                "Dashboard created",
                 slug
             )
 
-            # Run QA validation with auto-fix loop (if enabled)
-            qa_result = None
-            qa_run = None
-            auto_fix_attempted = False
-            successfully_fixed = []
-            screenshot_path = None
-
-            # Use the full user request for better QA context
-            qa_request = self.get_full_user_request()
-
-            if self.config_loader.is_qa_enabled() and qa_request:
-                self._emit_progress(
-                    STEP_QA,
-                    ProgressStatus.IN_PROGRESS,
-                    "Running QA validation..."
-                )
-                max_fix_attempts = self.config_loader.get_max_auto_fix_attempts()
-                should_auto_fix = self.config_loader.should_auto_fix_critical()
-
-                if should_auto_fix:
-                    qa_run = run_qa_with_auto_fix(
-                        dashboard_slug=slug,
-                        file_path=file_path,
-                        original_request=qa_request,
-                        max_fix_attempts=max_fix_attempts,
-                        schema_context=self.get_schema_context(),
-                        provider_name=self._provider_name,
-                    )
-                    qa_result = qa_run.final_result
-                    auto_fix_attempted = qa_run.auto_fix_attempted
-                    successfully_fixed = qa_run.issues_fixed
-
-                    if auto_fix_attempted:
-                        self.state.generated_markdown = file_path.read_text()
-                else:
-                    qa_result = self._run_qa_validation(slug)
-
-                # Emit QA completion status
-                if qa_result:
-                    if qa_result.passed:
-                        self._emit_progress(
-                            STEP_QA,
-                            ProgressStatus.COMPLETED,
-                            "QA validation passed"
-                        )
-                    else:
-                        self._emit_progress(
-                            STEP_QA,
-                            ProgressStatus.COMPLETED,
-                            "QA validation complete",
-                            f"{len(qa_result.critical_issues)} issues found" if qa_result.critical_issues else None
-                        )
-
-            # Find the screenshot path (most recent for this slug)
-            screenshots_dir = Path(__file__).parent.parent / "qa_screenshots"
-            if screenshots_dir.exists():
-                screenshots = sorted(
-                    screenshots_dir.glob(f"{slug}_*.png"),
-                    key=lambda p: p.stat().st_mtime,
-                    reverse=True
-                )
-                if screenshots:
-                    screenshot_path = str(screenshots[0])
-
-            # Store QA result in state for API access
-            if qa_result:
-                qa_result_data = QAResultData(
-                    passed=qa_result.passed,
-                    summary=qa_result.summary,
-                    critical_issues=qa_result.critical_issues,
-                    suggestions=qa_result.suggestions,
-                    screenshot_path=screenshot_path,
-                    auto_fixed=auto_fix_attempted,
-                    issues_fixed=successfully_fixed,
-                )
-                self.state.last_qa_result = qa_result_data
-                self.state.last_screenshot_path = screenshot_path
-
-            dashboard_is_broken = qa_result and qa_result.critical_issues
-
-            if dashboard_is_broken:
-                result = f"""⚠️ Dashboard created but has issues: {slug}
+            result = f"""Dashboard created: {slug}
 
 View it at: {url}
 
 Here's what I created:
 {self._summarize_markdown(self.state.generated_markdown)}
-"""
-            else:
-                result = f"""✓ Dashboard created: {slug}
 
-View it at: {url}
-
-Here's what I created:
-{self._summarize_markdown(self.state.generated_markdown)}
-"""
-
-            if qa_result:
-                result += self._format_qa_result(
-                    qa_result,
-                    auto_fix_attempted=auto_fix_attempted,
-                    fixed_issues=successfully_fixed
-                )
-
-            if dashboard_is_broken:
-                result += "\nPlease tell me how to fix these issues, or describe what you want to see."
-            elif qa_result and qa_result.suggestions:
-                result += "\nWould you like me to implement any of these suggestions? Or tell me what else to change."
-            else:
-                result += "\nWhat would you like to change?"
+What would you like to change?"""
 
             # Clear error state on success
             self.state.last_error = None

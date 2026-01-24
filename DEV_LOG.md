@@ -9,21 +9,17 @@ This log captures development changes made during each session. Review this at t
 ### Completed
 - ✅ **Phase 1: Foundation** - React + Plotly.js frontend in `app/`
 - ✅ **Feature flag** - Toggle between Evidence and React renderers
+- ✅ **Phase 2: Visual Polish** - Professional-quality charts with formatters, KPI components, loading states
+- ✅ **Phase 3: Chat UI Migration** - Chat interface ported from SvelteKit to React
+- ✅ **Phase 4: Deprecate SvelteKit** - Single React frontend with all routes migrated
+- ✅ **Phase 5: Remove Evidence** - Deleted all Evidence-related code and dependencies
 
-### In Progress
-- 🔄 **Phase 2: Visual Polish** - Make charts professional quality
-
-### Upcoming
-- 📋 **Phase 3: Chat UI Migration** - Move chat from SvelteKit to React
-- 📋 **Phase 4: Deprecate SvelteKit** - Single React frontend
-- 📋 **Phase 5: Remove Evidence** - Delete markdown generation
-
-### Key Decision
-**Evidence will be deprecated** once React frontend is fully functional. Focus development on React, not Evidence.
+### Architecture
+**React + FastAPI + DuckDB**. No more SvelteKit or Evidence framework.
 
 ### Quick Start
 ```bash
-./dev.sh  # Starts all services (API:8000, Evidence:3000, React:3001, SvelteKit:5173)
+./dev.sh  # Starts API:8000 + React:3001
 ```
 
 ### To Continue Development
@@ -252,6 +248,425 @@ Three test charts stored in `.story-analytics/charts/`:
 
 - [ ] Add visual polish and animations to React renderer
 - [ ] Phase 2: Chat UI migration
+
+---
+
+## Session: 2026-01-24 (Phase 2: Visual Polish)
+
+### Focus: Transform React charts to professional quality
+
+**Context**: Implementing Phase 2 of the strategic plan - adding formatters, KPI components, loading states, and visual enhancements to achieve Tableau/Looker-level polish.
+
+### Implementation Completed
+
+1. **Utilities & Design Tokens** (Foundation):
+   - Created `app/src/utils/formatters.ts` with smart number formatting
+     - `formatCompact()` - Smart abbreviation (1.5M, 2.3K)
+     - `formatCurrency()` - Currency with optional compact mode
+     - `formatPercent()` - Percentage formatting
+     - `formatNumber()` - Locale formatting with separators
+     - `autoFormat()` - Automatic formatting based on value type
+     - `getAxisTickFormat()` - Plotly axis formatting helper
+   - Expanded `app/src/styles/index.css` with:
+     - Typography scale (text-xs through text-4xl)
+     - Font weights (normal, medium, semibold, bold)
+     - Spacing scale (space-1 through space-12)
+     - Transitions (fast, base, slow)
+     - Trend colors (up, down, neutral)
+     - Skeleton shimmer animation
+     - Fade-in animation classes
+
+2. **KPI Components**:
+   - Created `TrendIndicator.tsx` - SVG up/down/neutral arrows with semantic colors
+   - Created `DeltaValue.tsx` - Formatted change values with sign, color, and trend indicator
+   - Created `Sparkline.tsx` - Minimal inline Plotly chart for trend visualization
+   - Refactored `BigValue.tsx` to use formatters and support:
+     - Trend indicator
+     - Comparison delta
+     - Sparkline
+     - Value format hints (currency, percent, number)
+
+3. **Chart Enhancements**:
+   - Enhanced `PlotlyChart.tsx`:
+     - Smart Y-axis formatting based on data magnitude
+     - Better grid styling (semi-transparent)
+     - Zero-line highlighting
+     - Animation transition config
+     - Default styling helpers exported
+   - Updated `LineChart.tsx`:
+     - Professional hovertemplates
+     - Unified hover mode
+     - Spline interpolation
+   - Updated `BarChart.tsx`:
+     - Professional hovertemplates
+     - Better bar spacing (bargap, bargroupgap)
+     - Auto tick angle for many categories
+
+4. **Loading States**:
+   - Created `app/src/components/skeletons/`:
+     - `SkeletonBase.tsx` - Base shimmer component
+     - `ChartSkeleton.tsx` - Chart-specific skeletons (line, bar, bigvalue, table)
+     - `index.ts` - Barrel export
+   - Updated `ChartCard.tsx`:
+     - Loading prop with skeleton placeholder
+     - Error state with icon
+     - Empty state
+     - Smooth fade-in transitions
+
+### Files Created
+
+| File | Purpose |
+|------|---------|
+| `app/src/utils/formatters.ts` | Number/date formatting utilities |
+| `app/src/utils/index.ts` | Barrel export |
+| `app/src/components/charts/TrendIndicator.tsx` | Up/down/neutral arrow indicator |
+| `app/src/components/charts/DeltaValue.tsx` | Change value with color and sign |
+| `app/src/components/charts/Sparkline.tsx` | Mini inline chart |
+| `app/src/components/skeletons/SkeletonBase.tsx` | Base shimmer component |
+| `app/src/components/skeletons/ChartSkeleton.tsx` | Chart placeholders |
+| `app/src/components/skeletons/index.ts` | Barrel export |
+
+### Files Modified
+
+| File | Changes |
+|------|---------|
+| `app/src/styles/index.css` | Typography, spacing, transitions, animations |
+| `app/src/types/chart.ts` | KPI config fields (comparisonValue, sparkline, etc.) |
+| `app/src/components/charts/BigValue.tsx` | Full refactor with trend/comparison/sparkline |
+| `app/src/components/charts/PlotlyChart.tsx` | Smart formatting, better styling |
+| `app/src/components/charts/LineChart.tsx` | Hovertemplates, spline smoothing |
+| `app/src/components/charts/BarChart.tsx` | Hovertemplates, bar styling |
+| `app/src/components/layout/ChartCard.tsx` | Loading/error states |
+
+### Verification
+
+- TypeScript build passes successfully
+- All components follow existing patterns
+- CSS variables used consistently for theming
+- **Live testing verified** - Charts render correctly at http://localhost:3001/chart/test-chart-001, 002, 003
+
+### Deferred Items (Phase 2.5 or Later)
+
+- Dark/light theme toggle (foundation ready, UI deferred)
+- Gradient fills for AreaChart
+- Secondary y-axis support
+- Cross-filtering between charts
+
+### Next Steps
+
+- [x] Phase 3: Chat UI Migration - Move chat from SvelteKit to React
+- [ ] Test visual improvements with live data
+
+---
+
+## Session: 2026-01-24 (Phase 3: Chat UI Migration)
+
+### Focus: Migrate Chat Interface from SvelteKit to React
+
+**Context**: Implementing Phase 3 of the strategic plan - porting the chat UI from the SvelteKit frontend to the React app.
+
+### Implementation Completed
+
+1. **TypeScript Types** (`app/src/types/conversation.ts`):
+   - User & Auth types (User, BusinessType)
+   - Message types (Message, ExtendedMessage, ClarifyingOption, ActionButton, QAResult)
+   - Conversation types (ConversationSession, ConversationSummary)
+   - API response types (MessageResponse, ProgressEvent)
+   - Dashboard types for sidebar (SidebarDashboard, SidebarDashboardList)
+   - Schema types for data explorer (SchemaInfo, TableInfo, ColumnInfo)
+
+2. **API Client Extensions** (`app/src/api/client.ts`):
+   - `sendMessage()` - Send message to conversation engine
+   - `sendMessageStream()` - SSE streaming with progress callbacks
+   - `listConversations()` - Get conversation history
+   - `getConversation()` - Get specific conversation
+   - `newConversation()` - Start new conversation
+   - `deleteConversation()` - Delete conversation
+   - `renameConversation()` - Rename conversation
+   - `getDashboards()` - Get dashboard list for sidebar
+   - `getSourceSchema()` - Get schema for data explorer
+   - `getMe()` - Get current user info
+
+3. **Zustand Store** (`app/src/stores/conversationStore.ts`):
+   - Full conversation state management
+   - Session tracking (currentSessionId, currentTitle)
+   - Message history with extended properties
+   - Streaming progress steps
+   - User authentication state
+   - Dashboard and conversation lists for sidebar
+   - All CRUD operations for conversations
+
+4. **Chat Components** (`app/src/components/chat/`):
+   - `Message.tsx` - Message display with react-markdown, action buttons, clarifying options
+   - `ChatInput.tsx` - Auto-resizing textarea with submit handling
+   - `ProgressSteps.tsx` - Streaming progress indicator with step labels
+   - `index.ts` - Barrel export
+
+5. **Layout Components** (`app/src/components/layout/`):
+   - `Sidebar.tsx` - Navigation, conversation list, dashboard list, user info
+   - `AppLayout.tsx` - Layout wrapper with sidebar and Outlet
+
+6. **Chat Page** (`app/src/pages/ChatPage.tsx`):
+   - Welcome state with example prompts
+   - Message list with auto-scroll
+   - Streaming progress display
+   - Dashboard creation success state
+   - Loading indicators
+
+7. **Route Configuration** (`app/src/App.tsx`):
+   - Added `/chat` route within AppLayout
+   - Added placeholder routes for `/charts`, `/charts/new`, `/dashboards`
+   - Nested routing with React Router Outlet
+
+### Files Created
+
+| File | Purpose |
+|------|---------|
+| `app/src/types/conversation.ts` | Full conversation type definitions |
+| `app/src/stores/conversationStore.ts` | Zustand state management |
+| `app/src/components/chat/Message.tsx` | Message display component |
+| `app/src/components/chat/ChatInput.tsx` | Chat input with auto-resize |
+| `app/src/components/chat/ProgressSteps.tsx` | Streaming progress display |
+| `app/src/components/chat/index.ts` | Barrel export |
+| `app/src/pages/ChatPage.tsx` | Main chat page |
+| `app/src/components/layout/Sidebar.tsx` | Sidebar navigation |
+| `app/src/components/layout/AppLayout.tsx` | App layout wrapper |
+
+### Files Modified
+
+| File | Change |
+|------|--------|
+| `app/src/api/client.ts` | Added conversation API endpoints and SSE streaming |
+| `app/src/stores/index.ts` | Added conversationStore export |
+| `app/src/types/index.ts` | Added conversation types export |
+| `app/src/App.tsx` | Added chat route with AppLayout |
+
+### Build Errors Fixed
+
+1. **ProgressSteps.tsx font-weight**: Changed CSS variable strings to numeric values (400, 500)
+2. **Sidebar.tsx unused function**: Removed unused `formatDate` function
+3. **Type export conflict**: Renamed `Dashboard` to `SidebarDashboard` in conversation.ts to avoid conflict with dashboard.ts
+
+### Verification
+
+- TypeScript build passes successfully
+- All components follow existing design patterns
+- CSS variables used consistently
+- **Ready for live testing** at http://localhost:3001/chat
+
+### Next Steps
+
+- [x] Live test chat UI at http://localhost:3001/chat
+- [x] Phase 4: Deprecate SvelteKit - Single React frontend
+- [ ] Phase 5: Remove Evidence - Delete markdown generation
+
+---
+
+## Session: 2026-01-24 (Phase 4: Deprecate SvelteKit)
+
+### Focus: Single React Frontend - Remove SvelteKit Dependency
+
+**Context**: Migrating all remaining SvelteKit routes to React to have a single frontend.
+
+### Implementation Completed
+
+1. **Chart Types and API** (`app/src/types/conversation.ts`, `app/src/api/client.ts`):
+   - Added ChartLibraryItem type for chart library API responses
+   - Added chart API endpoints: getCharts, getChart, deleteChart, getChartPreviewUrl
+   - Added settings API: getProviders, updateProvider, updateBusinessType, updateSource, getSources
+   - Added deleteDashboard API endpoint
+
+2. **Chart Store** (`app/src/stores/chartStore.ts`):
+   - Zustand store for chart library state
+   - Manages charts list, loading, error, search/filter
+   - Selection mode for dashboard composition
+   - Preview modal state
+
+3. **Login Page** (`app/src/pages/LoginPage.tsx`):
+   - Magic link email authentication
+   - Terminal-style UI matching design system
+   - Success state with "check your email" message
+
+4. **Auth Verify Page** (`app/src/pages/VerifyPage.tsx`):
+   - Reads token from URL params
+   - Verifies with API, stores JWT token
+   - Shows verifying/success/error states
+   - Redirects to /chat on success
+
+5. **Charts List Page** (`app/src/pages/ChartsPage.tsx`):
+   - Grid view of saved charts
+   - Search and chart type filter
+   - Delete with confirmation
+   - Preview modal with iframe embed
+
+6. **Dashboards List Page** (`app/src/pages/DashboardsPage.tsx`):
+   - List of dashboards with search
+   - Links to view in Evidence or React
+   - Delete with confirmation
+
+7. **Settings Page** (`app/src/pages/SettingsPage.tsx`):
+   - Account info display
+   - AI provider selection (radio buttons)
+   - Business type selection with descriptions
+   - Data source selection
+   - API keys info section
+
+8. **Auth Guard** (`app/src/components/auth/ProtectedRoute.tsx`):
+   - Wraps protected routes
+   - Redirects to /login if not authenticated
+   - Uses localStorage token check
+
+9. **Updated Routing** (`app/src/App.tsx`):
+   - Public routes: /, /login, /auth/verify
+   - Protected routes: /chat, /charts, /charts/new, /dashboards, /settings
+   - Added Settings link to Sidebar
+
+10. **Updated dev.sh**:
+    - Removed SvelteKit service
+    - React is now the primary frontend
+    - Evidence is optional (--evidence flag)
+    - Updated quick links and documentation
+
+### Files Created
+
+| File | Purpose |
+|------|---------|
+| `app/src/stores/chartStore.ts` | Chart library Zustand store |
+| `app/src/pages/LoginPage.tsx` | Magic link login page |
+| `app/src/pages/VerifyPage.tsx` | Token verification page |
+| `app/src/pages/ChartsPage.tsx` | Charts library list page |
+| `app/src/pages/DashboardsPage.tsx` | Dashboards list page |
+| `app/src/pages/SettingsPage.tsx` | Settings page |
+| `app/src/components/auth/ProtectedRoute.tsx` | Auth guard component |
+| `app/src/components/auth/index.ts` | Auth barrel export |
+
+### Files Modified
+
+| File | Change |
+|------|--------|
+| `app/src/types/conversation.ts` | Added chart library types, provider/source types |
+| `app/src/api/client.ts` | Added chart, settings, and dashboard API endpoints |
+| `app/src/stores/index.ts` | Added chartStore export |
+| `app/src/components/layout/Sidebar.tsx` | Added Settings nav link |
+| `app/src/App.tsx` | Added all new routes with auth protection |
+| `dev.sh` | Removed SvelteKit, made Evidence optional |
+
+### Verification
+
+- TypeScript build passes successfully
+- All routes accessible in React app
+- Auth flow: login -> verify -> protected routes
+
+### Next Steps
+
+- [x] Phase 5: Remove Evidence - Delete markdown generation
+
+---
+
+## Session: 2026-01-24 (Phase 5: Remove Evidence)
+
+### Focus: Remove Evidence Framework Completely
+
+**Context**: With React frontend fully functional, removing all Evidence-related code, dependencies, and file generation logic.
+
+### Implementation Completed
+
+1. **Removed Evidence Config Files**:
+   - Deleted `evidence.config.yaml`
+   - Deleted `Dockerfile.evidence`
+   - Deleted `.evidence/` directory
+
+2. **Removed Pages Directory**:
+   - Deleted `pages/` (Evidence markdown output)
+
+3. **Removed Evidence Markdown Generators**:
+   - Deleted `engine/generator.py` (EvidenceGenerator class)
+   - Removed `to_evidence_markdown()` methods from Chart, ValidatedChart, Dashboard models
+   - Removed `to_evidence_component()` from FilterSpec
+   - Renamed `to_evidence_props()` to `to_props()` in ChartConfig
+   - Simplified `dashboard_composer.py` (removed file writing, kept storage)
+
+4. **Removed Evidence Component Reference**:
+   - Deleted `engine/components/evidence.yaml`
+
+5. **Removed Evidence NPM Dependencies**:
+   - Removed all `@evidence-dev/*` packages from `package.json`
+   - Simplified `package.json` scripts
+
+6. **Updated dev.sh**:
+   - Removed `--evidence` flag and related logic
+   - Removed Evidence service startup
+   - Simplified to just API + React
+
+7. **Updated Conversation Engine**:
+   - Removed import of `create_dashboard_from_markdown` from `conversation.py`
+   - Simplified `_finalize_dashboard()` to not write files
+   - Updated `chart_conversation.py` to remove file path tracking
+   - Updated `validators/__init__.py` docstring
+
+8. **Updated Tests**:
+   - Updated `test_chart_models.py` to use `to_props()` instead of `to_evidence_props()`
+   - Removed Evidence-specific tests
+   - Updated `test_chart_pipeline.py` to remove Evidence markdown tests
+
+### Files Deleted
+
+| File | Purpose |
+|------|---------|
+| `evidence.config.yaml` | Evidence framework config |
+| `Dockerfile.evidence` | Evidence Docker build |
+| `.evidence/` | Evidence template and build artifacts |
+| `pages/` | Generated Evidence markdown pages |
+| `engine/generator.py` | Evidence markdown generator |
+| `engine/components/evidence.yaml` | Evidence component documentation |
+
+### Files Modified
+
+| File | Changes |
+|------|---------|
+| `package.json` | Removed @evidence-dev/* dependencies |
+| `dev.sh` | Removed Evidence service, simplified |
+| `engine/models/chart.py` | Removed to_evidence_markdown(), renamed to_evidence_props() to to_props() |
+| `engine/dashboard_composer.py` | Removed file writing, kept storage functions |
+| `engine/conversation.py` | Removed Evidence-specific imports and file writing |
+| `engine/chart_conversation.py` | Removed file path tracking |
+| `engine/validators/__init__.py` | Updated docstring |
+| `api/routers/chart.py` | Removed write_dashboard() calls, updated URLs |
+| `tests/test_chart_models.py` | Updated to use to_props(), removed Evidence tests |
+| `tests/test_chart_pipeline.py` | Removed Evidence markdown tests |
+
+### Architecture After Phase 5
+
+```
+User Request → LLM Pipeline → Chart JSON → Storage
+                                     ↓
+                              React Frontend ← Render API
+```
+
+No more markdown intermediary. Charts are stored as JSON and rendered directly by React + Plotly.js.
+
+### Data Migration
+
+During testing, discovered that parquet data files were deleted with `.evidence/` directory.
+Fixed by:
+1. Restored data from git (`git restore .evidence/template/static/data`)
+2. Moved parquet files to `data/` directory
+3. Updated `sql_validator.py`, `filter_defaults.py`, `scale_analyzer.py` to use new path
+4. Updated test chart SQL paths
+
+### Verification
+
+- All Evidence-related code removed
+- Tests updated to not reference Evidence
+- Dev server starts with just API + React
+- Chart data flows through render API to React frontend
+- All 3 test charts render correctly via API
+
+### Next Steps
+
+- [ ] Clean up any remaining Evidence references in comments/docs
+- [ ] Test full chat → chart → view flow
+- [ ] Consider removing SvelteKit frontend directory if no longer needed
 
 ---
 
