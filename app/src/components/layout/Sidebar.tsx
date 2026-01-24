@@ -6,6 +6,7 @@
 import { useState, useEffect } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useConversationStore } from '../../stores/conversationStore'
+import { Logo } from '../brand'
 import type { ConversationSummary } from '../../types/conversation'
 
 // Navigation items
@@ -104,44 +105,14 @@ export function Sidebar() {
         flexDirection: 'column',
       }}
     >
-      {/* Logo */}
+      {/* Logo with dual cursors */}
       <div
         style={{
           padding: 'var(--space-4)',
           borderBottom: '1px solid var(--color-gray-200)',
         }}
       >
-        <h1
-          style={{
-            color: 'var(--color-primary)',
-            fontWeight: 'var(--font-bold)' as unknown as number,
-            fontSize: 'var(--text-xl)',
-            letterSpacing: '0.1em',
-            margin: 0,
-          }}
-        >
-          STORY
-          <span
-            style={{
-              display: 'inline-block',
-              width: '8px',
-              height: '20px',
-              backgroundColor: 'var(--color-primary)',
-              marginLeft: '4px',
-              verticalAlign: 'middle',
-              animation: 'blink 1s step-end infinite',
-            }}
-          />
-        </h1>
-        <p
-          style={{
-            color: 'var(--color-gray-500)',
-            fontSize: 'var(--text-xs)',
-            marginTop: 'var(--space-1)',
-          }}
-        >
-          AI-native analytics.
-        </p>
+        <Logo size="md" showTagline={true} />
       </div>
 
       {/* Navigation */}
@@ -510,12 +481,6 @@ export function Sidebar() {
         </div>
       )}
 
-      {/* Blink animation */}
-      <style>{`
-        @keyframes blink {
-          50% { opacity: 0; }
-        }
-      `}</style>
     </aside>
   )
 }

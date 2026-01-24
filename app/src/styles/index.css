@@ -213,3 +213,13 @@ html, body {
 .trend-neutral {
   color: var(--color-trend-neutral);
 }
+
+/* =============================================================================
+   Brand - Blinking Cursor Animation
+   ============================================================================= */
+
+@keyframes blink {
+  50% {
+    opacity: 0;
+  }
+}
