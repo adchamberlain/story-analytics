@@ -1,14 +1,9 @@
-.svelte-kit
-build
 node_modules
 .DS_Store
-static/data
 *.options.yaml
 .vscode/settings.json
 .env
 credentials.txt
-.evidence/meta
-.evidence/template/.svelte-kit
 sources/snowflake_saas/connection.yaml
 __pycache__
 *.pyc
@@ -17,3 +12,4 @@ __pycache__
 data/*
 !data/snowflake_saas
 qa_screenshots/
+app/dist/

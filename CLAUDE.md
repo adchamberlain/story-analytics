@@ -34,9 +34,22 @@ This is a rethinking of how analytics tools work—the LLM is the core, not a bo
 **What works well:** The action button system for phase transitions (Generate/Modify Plan, Done/Modify) tested very well. Users click buttons to advance phases rather than typing magic words.
 
 ## Project Overview
-Story Analytics is a dashboard creation tool that combines:
-- **Evidence** (npm-based BI framework) for rendering dashboards
-- **Python conversation engine** for creating dashboards via natural language
+
+Story Analytics is an AI-native dashboard creation tool:
+- **React + Plotly.js** frontend for professional chart rendering
+- **FastAPI** backend with render endpoints
+- **Python conversation engine** for creating charts via natural language
+- **DuckDB** for SQL validation and query execution
+
+## Architecture
+
+```
+User Request → LLM Pipeline → Chart JSON → Storage
+                                    ↓
+                             React Frontend ← Render API
+```
+
+Charts are stored as JSON and rendered directly by React + Plotly.js. No markdown intermediary.
 
 ## Environment Setup (IMPORTANT for Remote/Mobile Sessions)
 
@@ -55,41 +68,30 @@ Then create `.env` based on `.env.example` with the provided values.
 
 ### Cached Test Data
 
-Test data from Snowflake is committed to the repo at `.evidence/template/static/data/snowflake_saas/`. This allows the app to run **without Snowflake access** (e.g., Claude Code sandbox, mobile testing). The cached data includes: customers, events, invoices, subscriptions, users.
-
-To refresh the cache from Snowflake (requires credentials): `npm run sources`
+Test data from Snowflake is committed to the repo at `data/snowflake_saas/`. This allows the app to run **without Snowflake access** (e.g., Claude Code sandbox, mobile testing). The cached data includes: customers, events, invoices, subscriptions, users.
 
 ## Setup Steps (Run These When Starting Development)
 
 When the user wants to develop or test, run these commands:
 
-1. **Install npm dependencies** (if node_modules is missing):
-   ```bash
-   npm install
-   ```
-
-2. **Install Python dependencies** (if needed):
+1. **Install Python dependencies** (if needed):
    ```bash
    pip install -r requirements.txt
    playwright install chromium
    ```
 
-3. **Generate source data from Snowflake** (optional for remote testing - cached data exists):
+2. **Install React app dependencies** (if node_modules is missing):
    ```bash
-   npm run sources
+   cd app && npm install && cd ..
    ```
 
-4. **Start the Evidence dev server**:
+3. **Start the dev server**:
    ```bash
-   npm run dev
+   ./dev.sh
    ```
-   This opens the dashboard at http://localhost:3000
-
-5. **Start the conversation engine** (in a separate terminal):
-   ```bash
-   python -m engine
-   ```
-   Credentials are loaded from `.env` file (see Environment Setup above).
+   This starts:
+   - API server on http://localhost:8000
+   - React app on http://localhost:3001
 
 ## QA Validation Feature
 
@@ -124,8 +126,6 @@ engine/
 │   ├── create.yaml    # Dashboard creation prompts
 │   ├── edit.yaml      # Dashboard editing prompts
 │   └── generate.yaml  # Generation prompts
-├── components/        # UI component definitions
-│   └── evidence.yaml  # Evidence component reference
 ├── qa/                # QA validation rules
 │   └── rules.yaml     # Critical issues vs suggestions
 └── config_loader.py   # Loads all YAML configs
@@ -140,7 +140,6 @@ To customize behavior:
 - Edit YAML files in `engine/prompts/` for prompt changes
 - Edit `sources/{source}/dialect.yaml` for SQL rules per database
 - Edit `engine/qa/rules.yaml` for QA behavior
-- Edit `engine/components/evidence.yaml` for component documentation
 
 ## Testing Workflow
 
@@ -170,7 +169,6 @@ This ensures continuity across sessions and tracks progress toward 100% pass rat
 
 ## Common Issues
 
-- **"Timeout while initializing database"**: Run `npm run sources` to regenerate source data
-- **Python dotenv conflict**: package.json uses `npx dotenv-cli` to avoid conda conflicts
-- **Evidence CLI not found**: Run `npm install`
 - **SQL errors**: Check `sources/{source}/dialect.yaml` for allowed/forbidden functions
+- **Chart not rendering**: Check browser console for errors, verify API is running
+- **Auth issues**: Clear localStorage and re-login

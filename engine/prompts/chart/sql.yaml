@@ -164,7 +164,7 @@ output_format: |
   - Use exact table references from the schema (e.g., snowflake_saas.customers)
   - Double-check for forbidden functions before outputting
   - filter_queries is optional - only include if there are Dropdown/ButtonGroup filters
-  - Use ${inputs.filter_name} syntax for filter variables (this is Evidence syntax)
+  - Use ${inputs.filter_name} syntax for filter variables
   - CRITICAL for filter_queries:
     1. The column alias must be SIMPLE (e.g., "year", "region")
     2. Include "value_column" in each filter_query set to the alias name

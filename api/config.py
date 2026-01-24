@@ -19,12 +19,11 @@ class Settings(BaseSettings):
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 60 * 24 * 7  # 1 week
 
-    # CORS
-    cors_origins: list[str] = ["http://localhost:5173", "http://localhost:3000", "http://localhost:3001"]
+    # CORS - React app on port 3001
+    cors_origins: list[str] = ["http://localhost:3001"]
 
-    # Paths
-    pages_dir: str = "pages"
-    evidence_base_url: str = "http://localhost:3000"
+    # API base URL for generating chart URLs
+    api_base_url: str = "http://localhost:8000"
 
     class Config:
         env_file = ".env"

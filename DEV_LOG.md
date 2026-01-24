@@ -664,9 +664,83 @@ Fixed by:
 
 ### Next Steps
 
-- [ ] Clean up any remaining Evidence references in comments/docs
-- [ ] Test full chat → chart → view flow
-- [ ] Consider removing SvelteKit frontend directory if no longer needed
+- [x] Clean up any remaining Evidence references in comments/docs
+- [x] Test full chat → chart → view flow
+- [x] Remove SvelteKit frontend directory
+
+---
+
+## Session: 2026-01-24 (Post-Phase 5 Cleanup)
+
+### Focus: Evidence Reference Cleanup and E2E Testing
+
+**Context**: Final cleanup after Phase 5. Removed all Evidence references and tested the full application flow.
+
+### Changes Made
+
+1. **Removed SvelteKit Frontend**:
+   - Deleted `frontend/` directory entirely
+   - Updated docker-compose.yml to remove frontend service
+
+2. **Evidence Reference Cleanup**:
+   - Updated `.gitignore` - removed Evidence paths
+   - Updated `CLAUDE.md` - new architecture description, updated setup steps
+   - Updated `README.md` - React + Plotly.js description
+   - Updated `api/config.py` - removed Evidence URL, simplified CORS
+   - Updated `engine_config.yaml` - replaced Evidence section with app URLs
+   - Updated `engine/config.py` - removed pages_dir/dev_url, added api_url/frontend_url
+   - Updated `engine/__init__.py` - updated docstring
+   - Updated `engine/prompts/base.yaml` - removed Evidence markdown syntax
+   - Updated `engine/prompts/chart/sql.yaml` - removed Evidence comment
+   - Updated `engine/qa/rules.yaml` - removed Evidence-specific notes
+   - Updated `engine/pipeline/__init__.py` - marked as legacy
+   - Deleted `engine/prompts/generate.yaml` - unused Evidence generator prompt
+   - Deleted `scripts/start-dev.sh` - dev.sh is the new script
+
+3. **E2E Testing**:
+   - Tested chart viewing: All 3 test charts render correctly
+   - Tested React app: Home, login pages work
+   - Tested API: Health check, render endpoints work
+   - Tested chart pipeline: Successfully creates charts
+
+### Files Deleted
+
+| File/Directory | Purpose |
+|----------------|---------|
+| `frontend/` | SvelteKit frontend (replaced by React) |
+| `scripts/start-dev.sh` | Old dev script (replaced by dev.sh) |
+| `engine/prompts/generate.yaml` | Evidence markdown generation prompt |
+
+### Files Modified
+
+| File | Changes |
+|------|---------|
+| `.gitignore` | Removed Evidence paths |
+| `CLAUDE.md` | Updated architecture, setup steps |
+| `README.md` | React + Plotly.js description |
+| `api/config.py` | Removed Evidence URL |
+| `engine_config.yaml` | Replaced Evidence with app URLs |
+| `engine/config.py` | api_url, frontend_url properties |
+| `engine/prompts/base.yaml` | JSON output instead of markdown |
+| `engine/qa/rules.yaml` | Removed Evidence notes |
+| `docker-compose.yml` | Removed Evidence/SvelteKit services |
+
+### Verification
+
+All tests pass:
+- ✓ Chart rendering (test-chart-001, 002, 003)
+- ✓ React app (home, login pages)
+- ✓ API health check
+- ✓ Render API (chart data)
+- ✓ Chart pipeline (creates charts successfully)
+
+Screenshots saved in `test_results/`
+
+### Next Steps
+
+- [ ] Create Dockerfile for React app (for docker-compose)
+- [ ] Add integration tests for authenticated chat flow
+- [ ] Consider consolidating root package.json (currently minimal)
 
 ---
 

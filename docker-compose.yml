@@ -10,40 +10,24 @@ services:
       - "8000:8000"
     volumes:
       - ./data:/app/data
-      - ./pages:/app/pages
       - ./sources:/app/sources
       - ./engine:/app/engine
+      - ./.story-analytics:/app/.story-analytics
     environment:
       - SECRET_KEY=${SECRET_KEY:-dev-secret-key-change-in-production}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - GOOGLE_API_KEY=${GOOGLE_API_KEY}
-    depends_on:
-      - evidence
 
-  # Evidence Dashboard Server
-  evidence:
+  # React Frontend
+  app:
     build:
-      context: .
-      dockerfile: Dockerfile.evidence
-    ports:
-      - "3000:3000"
-    volumes:
-      - ./pages:/app/pages
-      - ./sources:/app/sources
-      - ./.evidence/template:/app/.evidence/template
-    environment:
-      - NODE_ENV=development
-
-  # Svelte Frontend
-  frontend:
-    build:
-      context: ./frontend
+      context: ./app
       dockerfile: Dockerfile
     ports:
-      - "5173:5173"
+      - "3001:3001"
     volumes:
-      - ./frontend/src:/app/src
+      - ./app/src:/app/src
     environment:
       - VITE_API_URL=http://localhost:8000
     depends_on:

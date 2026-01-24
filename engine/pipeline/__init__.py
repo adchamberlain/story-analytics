@@ -1,13 +1,12 @@
 """
-Decomposed dashboard generation pipeline.
+Dashboard generation pipeline (legacy).
 
-This module implements a three-stage pipeline for generating dashboards:
-1. RequirementsAgent - Understands user intent and extracts structured specs
-2. SQLAgent - Generates and validates DuckDB queries
-3. LayoutAgent - Assembles the final Evidence markdown dashboard
+Note: This pipeline was designed for Evidence markdown generation.
+The chart-first architecture now uses engine/chart_pipeline.py for
+single chart generation with React rendering.
 
-Each agent has a focused prompt with only the context it needs,
-reducing guardrail creep and improving output quality.
+This pipeline is maintained for backwards compatibility with the
+multi-chart dashboard flow, but may be deprecated in a future version.
 """
 
 from .models import DashboardSpec, QuerySpec, ValidatedQueries, PipelineResult

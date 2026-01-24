@@ -8,7 +8,7 @@ AI-native analytics. Create dashboards by describing what you need.
 
 Story is an AI-powered dashboard builder. Describe what you want to see, and Story's AI agents write the SQL, design the visualizations, and catch errors automatically.
 
-Built on [Evidence.dev](https://evidence.dev) for rendering. Choose Claude, OpenAI, or Gemini as your AI.
+Built with React + Plotly.js for professional chart rendering. Choose Claude, OpenAI, or Gemini as your AI.
 
 ## Features
 
@@ -18,58 +18,38 @@ Built on [Evidence.dev](https://evidence.dev) for rendering. Choose Claude, Open
 - **Automatic SQL generation** - No need to write queries manually
 - **QA validation** - Screenshots and validates dashboards automatically
 - **Auto-fix** - Detects and fixes broken dashboards
-- **Split-pane editor** - Edit markdown with live preview
-- **Web app + CLI** - Use via browser or command line
+- **Professional charts** - React + Plotly.js with Tableau-quality visuals
 
 ## Quick Start
 
-### Web Application
-
 ```bash
 # Install dependencies
-npm install
 pip install -r requirements.txt
-playwright install chromium
+cd app && npm install && cd ..
 
 # Set environment variables
 export ANTHROPIC_API_KEY='your-key-here'
 export SECRET_KEY='your-secret-key'
 
-# Terminal 1: Start Evidence server
-npm run dev
-
-# Terminal 2: Start FastAPI backend
-cd api && uvicorn main:app --reload --port 8000
-
-# Terminal 3: Start SvelteKit frontend
-cd frontend && npm run dev
+# Start dev server (API + React)
+./dev.sh
 ```
 
-Open http://localhost:5173 to access the web interface.
-
-### CLI Only
-
-```bash
-# Start Evidence dev server
-npm run dev
-
-# In a separate terminal, run Story CLI
-python -m engine
-```
+Open http://localhost:3001 to access the web interface.
 
 ## Usage
 
-1. Click **Create New Dashboard** or **Edit Existing**
-2. Describe what you want, or choose a quick-start template
+1. Click **Create New Chart** or start a chat
+2. Describe what you want to see
 3. Click **Generate** when ready, or **Modify Plan** to refine
 4. After generation, click **Done** or **Modify** to iterate
 
 Example prompts:
 - "Show me MRR trends and churn rates"
-- "I need a dashboard tracking user signups over time"
-- "Revenue by region with monthly breakdown"
+- "Monthly revenue by customer segment"
+- "Top 10 customers by revenue"
 
-Story will understand your data and generate the dashboard.
+Story will understand your data and generate the chart.
 
 ## LLM Providers
 
@@ -89,17 +69,16 @@ story-analytics/
 │   ├── routers/         # API endpoints
 │   ├── models/          # SQLAlchemy models
 │   └── schemas/         # Pydantic schemas
-├── frontend/            # SvelteKit frontend
+├── app/                 # React frontend
 │   └── src/
-│       ├── lib/         # Components and stores
-│       └── routes/      # Pages
+│       ├── components/  # Chart and UI components
+│       ├── pages/       # Page components
+│       └── stores/      # Zustand state management
 ├── engine/              # LLM conversation engine
 │   ├── prompts/         # YAML prompt templates
-│   ├── components/      # Evidence component reference
 │   ├── qa/              # QA validation rules
 │   └── llm/             # LLM provider integrations
-├── pages/               # Evidence dashboard pages
-├── static/              # Static assets (favicon, icons)
+├── data/                # Parquet data files
 └── sources/             # Database connections
 ```
 
@@ -109,7 +88,6 @@ story-analytics/
 |------|---------|
 | `engine_config.yaml` | LLM provider and database connection settings |
 | `brand_config.yaml` | Customize colors, fonts, and logo |
-| `evidence.config.yaml` | Evidence theme and chart colors |
 | `sources/*/dialect.yaml` | SQL dialect rules per data source |
 | `engine/qa/rules.yaml` | QA validation behavior |
 
@@ -130,8 +108,3 @@ story-analytics/
 - Python 3.10+
 - At least one LLM API key (Anthropic, OpenAI, or Google)
 - Data source (Snowflake, BigQuery, PostgreSQL, etc.)
-
-## Learn More
-
-- [Evidence.dev Documentation](https://docs.evidence.dev/)
-- [Project Status](PROJECT_STATUS.md) - Detailed implementation status
