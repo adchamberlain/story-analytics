@@ -1,0 +1,15 @@
+{
+  "id": "51e046e0-8aa7-4eed-b846-8bce65f953ff",
+  "slug": "monthly-revenue",
+  "title": "Monthly Revenue",
+  "description": "Total revenue by month",
+  "chart_ids": [
+    "test-chart-001"
+  ],
+  "layout": {
+    "sections": []
+  },
+  "created_at": "2026-01-24T11:38:23.291933",
+  "updated_at": "2026-01-24T11:38:23.291949",
+  "created_by": null
+}

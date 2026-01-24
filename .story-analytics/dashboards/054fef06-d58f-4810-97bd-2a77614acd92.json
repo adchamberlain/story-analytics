@@ -1,0 +1,15 @@
+{
+  "id": "054fef06-d58f-4810-97bd-2a77614acd92",
+  "slug": "total-revenue",
+  "title": "Total Revenue",
+  "description": "Total revenue across all invoices",
+  "chart_ids": [
+    "test-chart-003"
+  ],
+  "layout": {
+    "sections": []
+  },
+  "created_at": "2026-01-24T11:38:30.006679",
+  "updated_at": "2026-01-24T11:38:30.006688",
+  "created_by": null
+}

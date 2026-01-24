@@ -1,0 +1,15 @@
+{
+  "id": "f7de0608-e2b5-4074-9b62-743263f21035",
+  "slug": "revenue-by-customer",
+  "title": "Revenue by Customer",
+  "description": "Total revenue by customer",
+  "chart_ids": [
+    "test-chart-002"
+  ],
+  "layout": {
+    "sections": []
+  },
+  "created_at": "2026-01-24T11:38:27.345610",
+  "updated_at": "2026-01-24T11:38:27.345623",
+  "created_by": null
+}

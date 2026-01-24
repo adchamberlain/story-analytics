@@ -1,0 +1,27 @@
+{
+  "id": "test-chart-002",
+  "title": "Revenue by Customer",
+  "description": "Total revenue by customer",
+  "query_name": "revenue_by_customer",
+  "sql": "SELECT c.company_name, SUM(i.amount) as total_revenue FROM read_parquet('.evidence/template/static/data/snowflake_saas/invoices/*.parquet') i JOIN read_parquet('.evidence/template/static/data/snowflake_saas/customers/*.parquet') c ON i.customer_id = c.customer_id GROUP BY 1 ORDER BY 2 DESC LIMIT 10",
+  "chart_type": "BarChart",
+  "config": {
+    "x": "company_name",
+    "y": "total_revenue",
+    "y2": null,
+    "value": null,
+    "series": null,
+    "title": "Top 10 Customers by Revenue",
+    "horizontal": true,
+    "stacked": false,
+    "extra_props": {}
+  },
+  "filters": [],
+  "created_at": "2026-01-24T12:00:00",
+  "updated_at": "2026-01-24T12:00:00",
+  "created_by": null,
+  "original_request": "Show top 10 customers by revenue",
+  "conversation_id": null,
+  "is_valid": true,
+  "last_error": null
+}
