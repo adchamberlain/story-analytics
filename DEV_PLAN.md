@@ -152,30 +152,111 @@ Instead of markdown, the LLM generates a JSON dashboard spec:
 
 ## Implementation Phases
 
-### Phase 1: Foundation (Recommended First Step)
-- Build React frontend with Plotly.js
-- Implement JSON spec parser
-- Create basic layout grid
-- Connect to existing SQL pipeline
-- Parallel: Keep Evidence running for comparison
+### Phase 1: Foundation ✅ COMPLETE
+**Status:** Completed 2026-01-24
 
-### Phase 2: Visual Polish
-- Professional design system (typography, spacing, colors)
-- KPI cards with trend indicators
-- Chart annotations and reference lines
-- Loading states and animations
+**Deliverables:**
+- [x] React app scaffold in `app/` with Vite + TypeScript
+- [x] Plotly.js chart components (Line, Bar, Area, Scatter, BigValue, DataTable)
+- [x] Backend render endpoints (`api/routers/render.py`)
+- [x] Feature flag to toggle between Evidence and React renderers
+- [x] Test charts for verification
 
-### Phase 3: Intelligence Layer
-- Auto-generated insights from data
-- Anomaly highlighting
-- Comparative analysis (vs. previous period)
-- Natural language explanations
+**Key Files:**
+- `app/` - React frontend
+- `api/routers/render.py` - Render API
+- `frontend/src/lib/stores/settings.ts` - Renderer toggle
+- `frontend/src/lib/components/ChartEmbed.svelte` - Updated with toggle
 
-### Phase 4: Interactivity
-- Cross-filtering between charts
-- Drill-down capabilities
-- Export (PDF, PNG, data)
-- Sharing and embedding
+---
+
+### Phase 2: Visual Polish 🔄 NEXT
+**Status:** Not started
+
+**Goal:** Make React charts look professional (Tableau/Looker quality)
+
+**Deliverables:**
+- [ ] Professional design system
+  - Typography scale (headers, labels, values)
+  - Color palette with semantic colors (success, warning, error)
+  - Spacing system (consistent padding/margins)
+  - Dark/light theme support
+- [ ] Enhanced BigValue/KPI cards
+  - Trend indicators (up/down arrows with color)
+  - Comparison values (vs. previous period)
+  - Sparkline mini-charts
+- [ ] Chart improvements
+  - Better axis formatting (smart number abbreviation)
+  - Grid line styling
+  - Hover tooltips with formatting
+  - Smooth animations on load/update
+- [ ] Loading states
+  - Skeleton loaders for charts
+  - Smooth transitions
+
+**Files to modify:**
+- `app/src/styles/` - Design system CSS
+- `app/src/components/charts/` - Chart components
+- `app/src/components/charts/BigValue.tsx` - KPI enhancements
+
+---
+
+### Phase 3: Chat UI Migration 📋 PLANNED
+**Status:** Not started
+
+**Goal:** Move conversation UI from SvelteKit to React (unified frontend)
+
+**Deliverables:**
+- [ ] Chat components in React
+  - Message list with user/assistant styling
+  - Input box with send button
+  - Action buttons (Generate, Modify, Done)
+  - Loading/typing indicators
+- [ ] Conversation state management
+  - Zustand store for messages, session, phase
+  - API client for conversation endpoints
+- [ ] Chart integration
+  - Inline chart preview in chat
+  - "View full" link to chart page
+- [ ] Navigation
+  - Sidebar with conversation history
+  - New conversation button
+
+**Files to create:**
+- `app/src/components/chat/` - Chat components
+- `app/src/stores/conversationStore.ts` - Chat state
+- `app/src/pages/Chat.tsx` - Main chat page
+
+**Reference:** Port from `frontend/src/lib/components/ChartChat.svelte`
+
+---
+
+### Phase 4: Deprecate SvelteKit 📋 PLANNED
+**Status:** Not started
+
+**Goal:** Single unified React app replaces SvelteKit frontend
+
+**Deliverables:**
+- [ ] All SvelteKit routes migrated to React
+- [ ] Authentication flow in React
+- [ ] Remove SvelteKit from `dev.sh`
+- [ ] Update documentation
+
+---
+
+### Phase 5: Remove Evidence 📋 PLANNED
+**Status:** Not started
+
+**Goal:** Delete Evidence/markdown generation entirely
+
+**Deliverables:**
+- [ ] Remove Evidence from `dev.sh`
+- [ ] Delete `pages/` markdown generation code
+- [ ] Delete `.evidence/` directory
+- [ ] Update chart pipeline to skip markdown step
+- [ ] Clean up unused Evidence-related code
+
+---
 
 ## Alternative: Evidence Fork with Custom Components
 

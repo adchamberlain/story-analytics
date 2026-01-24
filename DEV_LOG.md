@@ -4,6 +4,34 @@ This log captures development changes made during each session. Review this at t
 
 ---
 
+## Current Status (2026-01-24)
+
+### Completed
+- ✅ **Phase 1: Foundation** - React + Plotly.js frontend in `app/`
+- ✅ **Feature flag** - Toggle between Evidence and React renderers
+
+### In Progress
+- 🔄 **Phase 2: Visual Polish** - Make charts professional quality
+
+### Upcoming
+- 📋 **Phase 3: Chat UI Migration** - Move chat from SvelteKit to React
+- 📋 **Phase 4: Deprecate SvelteKit** - Single React frontend
+- 📋 **Phase 5: Remove Evidence** - Delete markdown generation
+
+### Key Decision
+**Evidence will be deprecated** once React frontend is fully functional. Focus development on React, not Evidence.
+
+### Quick Start
+```bash
+./dev.sh  # Starts all services (API:8000, Evidence:3000, React:3001, SvelteKit:5173)
+```
+
+### To Continue Development
+1. Read `DEV_PLAN.md` for detailed specs on each phase
+2. Phase 2 specs are ready - start with design system in `app/src/styles/`
+
+---
+
 ## Session: 2026-01-24
 
 ### Focus: Architecture Review & Strategic Planning
