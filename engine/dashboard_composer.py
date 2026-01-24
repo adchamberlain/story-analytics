@@ -4,17 +4,17 @@ Dashboard Composer - Assembles charts into dashboards.
 This module provides functionality to:
 1. Create new dashboards from charts
 2. Add/remove charts from existing dashboards
-3. Generate Evidence markdown from dashboard definitions
-4. Write dashboards to the Evidence pages directory
+3. Store dashboard metadata
+
+Note: Evidence markdown generation has been removed.
+Charts are now rendered directly via the React frontend.
 """
 
 from __future__ import annotations
 
 import re
-from pathlib import Path
 from typing import TYPE_CHECKING
 
-from .config import get_config
 from .models import Chart, Dashboard, DashboardLayout, get_chart_storage, get_dashboard_storage
 
 if TYPE_CHECKING:
@@ -23,13 +23,13 @@ if TYPE_CHECKING:
 
 class DashboardComposer:
     """
-    Composes charts into dashboards and generates Evidence markdown.
+    Composes charts into dashboards.
 
-    This is a deterministic process - no LLM needed.
+    Handles dashboard metadata storage. Charts are rendered
+    directly by the React frontend via the render API.
     """
 
     def __init__(self):
-        self.config = get_config()
         self.chart_storage = get_chart_storage()
         self.dashboard_storage = get_dashboard_storage()
 
@@ -133,55 +133,11 @@ class DashboardComposer:
         self.dashboard_storage.save(dashboard)
         return dashboard
 
-    def generate_markdown(self, dashboard: Dashboard) -> str:
-        """
-        Generate Evidence markdown for a dashboard.
-
-        Args:
-            dashboard: The dashboard to render
-
-        Returns:
-            Complete Evidence markdown string
-        """
-        # Load all charts
-        charts = []
-        for chart_id in dashboard.chart_ids:
-            chart = self.chart_storage.get(chart_id)
-            if chart:
-                charts.append(chart)
-
-        return dashboard.to_evidence_markdown(charts)
-
-    def write_dashboard(self, dashboard: Dashboard) -> Path:
-        """
-        Write a dashboard to the Evidence pages directory.
-
-        Args:
-            dashboard: The dashboard to write
-
-        Returns:
-            Path to the created file
-        """
-        markdown = self.generate_markdown(dashboard)
-
-        # Evidence expects: pages_dir/slug/+page.md
-        dashboard_dir = self.config.pages_dir / dashboard.slug
-        dashboard_dir.mkdir(parents=True, exist_ok=True)
-        file_path = dashboard_dir / "+page.md"
-
-        # Create backup if file exists
-        if file_path.exists():
-            backup_path = file_path.with_suffix(".md.bak")
-            backup_path.write_text(file_path.read_text())
-
-        file_path.write_text(markdown)
-        return file_path
-
     def create_single_chart_dashboard(
         self,
         chart: Chart | ValidatedChart,
         title: str | None = None,
-    ) -> tuple[Dashboard, Path]:
+    ) -> Dashboard:
         """
         Create a dashboard containing a single chart.
 
@@ -193,7 +149,7 @@ class DashboardComposer:
             title: Optional title override (defaults to chart title)
 
         Returns:
-            Tuple of (Dashboard, file_path)
+            The created Dashboard
         """
         # Handle ValidatedChart by converting to Chart first
         if hasattr(chart, 'spec'):
@@ -216,52 +172,7 @@ class DashboardComposer:
         )
 
         self.dashboard_storage.save(dashboard)
-        file_path = self.write_dashboard(dashboard)
-
-        return dashboard, file_path
-
-    def write_chart_preview(self, chart: Chart | ValidatedChart) -> Path:
-        """
-        Write a chart to a preview location for viewing.
-
-        This creates a minimal Evidence page just for this chart,
-        without creating a full dashboard entry.
-
-        Args:
-            chart: The chart to preview
-
-        Returns:
-            Path to the preview file
-        """
-        # Generate markdown for just this chart
-        if hasattr(chart, 'to_evidence_markdown'):
-            chart_markdown = chart.to_evidence_markdown()
-        else:
-            # ValidatedChart
-            chart_markdown = chart.to_evidence_markdown()
-
-        # Get title
-        if hasattr(chart, 'title'):
-            title = chart.title
-        else:
-            title = chart.spec.title
-
-        # Create the preview page
-        lines = [
-            f"# {title}",
-            "",
-            chart_markdown,
-        ]
-        markdown = "\n".join(lines)
-
-        # Write to preview location
-        slug = self._slugify(title)
-        preview_dir = self.config.pages_dir / "_preview" / slug
-        preview_dir.mkdir(parents=True, exist_ok=True)
-        file_path = preview_dir / "+page.md"
-        file_path.write_text(markdown)
-
-        return file_path
+        return dashboard
 
     def _slugify(self, text: str) -> str:
         """Convert text to a URL-friendly slug."""
@@ -286,7 +197,7 @@ def get_composer() -> DashboardComposer:
 def create_chart_dashboard(
     chart: Chart | ValidatedChart,
     title: str | None = None,
-) -> tuple[Dashboard, Path]:
+) -> Dashboard:
     """
     Convenience function to create a single-chart dashboard.
 
@@ -295,6 +206,6 @@ def create_chart_dashboard(
         title: Optional title override
 
     Returns:
-        Tuple of (Dashboard, file_path)
+        The created Dashboard
     """
     return get_composer().create_single_chart_dashboard(chart, title)

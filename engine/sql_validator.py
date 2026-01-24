@@ -1,8 +1,8 @@
 """
 SQL validation module.
 
-Tests SQL queries against DuckDB before writing dashboards to catch errors early.
-Evidence uses DuckDB locally, so we validate against the same engine.
+Tests SQL queries against DuckDB before creating charts to catch errors early.
+Data is loaded from parquet files in the data/ directory.
 """
 
 import re
@@ -80,43 +80,43 @@ class ValidationReport:
 
 
 class SQLValidator:
-    """Validates SQL queries against Evidence's DuckDB data."""
+    """Validates SQL queries against DuckDB data."""
 
-    def __init__(self, evidence_data_dir: Path | None = None):
+    def __init__(self, data_dir: Path | None = None):
         """
         Initialize the validator.
 
         Args:
-            evidence_data_dir: Path to Evidence's static data directory.
-                              Defaults to .evidence/template/static/data/
+            data_dir: Path to the data directory with parquet files.
+                     Defaults to data/ in project root.
         """
-        if evidence_data_dir is None:
-            # Find the evidence data directory relative to project root
+        if data_dir is None:
+            # Find the data directory relative to project root
             project_root = Path(__file__).parent.parent
-            evidence_data_dir = project_root / ".evidence" / "template" / "static" / "data"
+            data_dir = project_root / "data"
 
-        self.evidence_data_dir = evidence_data_dir
+        self.data_dir = data_dir
         self._connection: duckdb.DuckDBPyConnection | None = None
 
     def _get_connection(self) -> duckdb.DuckDBPyConnection:
-        """Get or create a DuckDB connection with Evidence data loaded."""
+        """Get or create a DuckDB connection with data loaded."""
         if self._connection is None:
             self._connection = duckdb.connect(":memory:")
-            self._load_evidence_data()
+            self._load_data()
         return self._connection
 
-    def _load_evidence_data(self):
-        """Load all Evidence parquet files as views in DuckDB."""
+    def _load_data(self):
+        """Load all parquet files as views in DuckDB."""
         conn = self._connection
 
-        if not self.evidence_data_dir.exists():
+        if not self.data_dir.exists():
             raise FileNotFoundError(
-                f"Evidence data directory not found: {self.evidence_data_dir}. "
-                "Run 'npm run sources' to generate data."
+                f"Data directory not found: {self.data_dir}. "
+                "Ensure parquet files are in the data/ directory."
             )
 
         # Find all source directories
-        for source_dir in self.evidence_data_dir.iterdir():
+        for source_dir in self.data_dir.iterdir():
             if not source_dir.is_dir():
                 continue
 

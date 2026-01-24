@@ -12,7 +12,7 @@ Architecture:
       → ChartSpecValidator.analyze_scales() → scale hints
       → _build_chart_config() → ChartConfig [with y2 if needed]
       → ChartSpecValidator.validate_filters() → Filters [with defaults]
-      → to_evidence_markdown() → Evidence page
+      → React Frontend → Rendered chart
 
 Validators:
     - RequestPatternValidator: Detects horizontal bar requests

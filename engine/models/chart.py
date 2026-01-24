@@ -6,6 +6,9 @@ Key concepts:
 - ValidatedChart: Chart with validated SQL (output from SQLAgent)
 - Chart: Stored chart entity with all metadata
 - Dashboard: Collection of charts with layout configuration
+
+Note: Evidence markdown generation has been removed.
+Charts are now rendered directly via the React frontend.
 """
 
 from __future__ import annotations
@@ -19,10 +22,10 @@ from typing import Any
 
 
 class FilterType(Enum):
-    """Types of filter/input components available in Evidence."""
+    """Types of filter/input components."""
 
     DROPDOWN = "Dropdown"
-    DATE_RANGE = "DateRange"  # Evidence uses DateRange, not DateRangePicker
+    DATE_RANGE = "DateRange"
     TEXT_INPUT = "TextInput"
     BUTTON_GROUP = "ButtonGroup"
     SLIDER = "Slider"
@@ -83,88 +86,10 @@ class FilterSpec:
     # For all types
     default_value: str | None = None
 
-    def to_evidence_component(self) -> str:
-        """Generate the Evidence component markup."""
-        if self.filter_type == FilterType.DROPDOWN:
-            props = [f'name="{self.name}"']
-            if self.options_query_name:
-                props.append(f"data={{{self.options_query_name}}}")
-            if self.options_column:
-                props.append(f'value="{self.options_column}"')
-            if self.title:
-                props.append(f'title="{self.title}"')
-            if self.default_value:
-                # Check if default is numeric - Evidence needs {number} not "string" for numeric
-                try:
-                    numeric_val = float(self.default_value)
-                    # Use integer format if it's a whole number (like year)
-                    if numeric_val == int(numeric_val):
-                        props.append(f"defaultValue={{{int(numeric_val)}}}")
-                    else:
-                        props.append(f"defaultValue={{{numeric_val}}}")
-                except (ValueError, TypeError):
-                    # String value - use quotes
-                    props.append(f'defaultValue="{self.default_value}"')
-            return f"<Dropdown {' '.join(props)} />"
-
-        elif self.filter_type == FilterType.DATE_RANGE:
-            props = [f'name="{self.name}"']
-            if self.title:
-                props.append(f'title="{self.title}"')
-            # DateRange can use data+dates props OR start+end props
-            # We'll use presetRanges for common date filtering
-            presets = ["Last 7 Days", "Last 30 Days", "Last 90 Days", "Last 6 Months", "Last 12 Months", "Year to Date", "All Time"]
-            presets_str = ", ".join(f'"{p}"' for p in presets)
-            props.append(f"presetRanges={{[{presets_str}]}}")
-            # Use specified default_value if provided, otherwise fall back to sensible default
-            default_preset = self.default_value if self.default_value else "Last 12 Months"
-            props.append(f'defaultValue="{default_preset}"')
-            if self.default_start:
-                props.append(f'start="{self.default_start}"')
-            if self.default_end:
-                props.append(f'end="{self.default_end}"')
-            return f"<DateRange {' '.join(props)} />"
-
-        elif self.filter_type == FilterType.TEXT_INPUT:
-            props = [f'name="{self.name}"']
-            if self.title:
-                props.append(f'title="{self.title}"')
-            if self.default_value:
-                props.append(f'defaultValue="{self.default_value}"')
-            return f"<TextInput {' '.join(props)} />"
-
-        elif self.filter_type == FilterType.BUTTON_GROUP:
-            props = [f'name="{self.name}"']
-            if self.options_query_name:
-                props.append(f"data={{{self.options_query_name}}}")
-            if self.options_column:
-                props.append(f'value="{self.options_column}"')
-            if self.title:
-                props.append(f'title="{self.title}"')
-            if self.default_value:
-                props.append(f'defaultValue="{self.default_value}"')
-            return f"<ButtonGroup {' '.join(props)} />"
-
-        elif self.filter_type == FilterType.SLIDER:
-            props = [f'name="{self.name}"']
-            if self.min_value is not None:
-                props.append(f"min={{{self.min_value}}}")
-            if self.max_value is not None:
-                props.append(f"max={{{self.max_value}}}")
-            if self.step is not None:
-                props.append(f"step={{{self.step}}}")
-            if self.title:
-                props.append(f'title="{self.title}"')
-            if self.default_value:
-                props.append(f"defaultValue={{{self.default_value}}}")
-            return f"<Slider {' '.join(props)} />"
-
-        return ""
-
     def get_sql_variable(self) -> str:
         """Get the SQL variable syntax for this filter."""
-        if self.filter_type == FilterType.DATE_RANGE_PICKER:
-            # DateRangePicker creates .start and .end
+        if self.filter_type == FilterType.DATE_RANGE:
+            # DateRange creates .start and .end
             return f"${{inputs.{self.name}.start}} / ${{inputs.{self.name}.end}}"
         return f"${{inputs.{self.name}}}"
 
@@ -209,7 +134,7 @@ class FilterSpec:
 
 
 class ChartType(Enum):
-    """Types of chart visualizations available in Evidence."""
+    """Types of chart visualizations."""
 
     LINE_CHART = "LineChart"
     BAR_CHART = "BarChart"
@@ -258,8 +183,6 @@ class ChartType(Enum):
 class ChartConfig:
     """
     Visual configuration for a chart component.
-
-    These are the Evidence component props that control appearance.
     """
 
     # Core data binding
@@ -288,11 +211,11 @@ class ChartConfig:
     horizontal: bool = False  # For bar charts
     stacked: bool = False  # For bar/area charts
 
-    # Additional Evidence props
+    # Additional props
     extra_props: dict[str, Any] = field(default_factory=dict)
 
-    def to_evidence_props(self) -> dict[str, Any]:
-        """Convert to Evidence component props dictionary."""
+    def to_props(self) -> dict[str, Any]:
+        """Convert to props dictionary for rendering."""
         props = {}
 
         if self.x:
@@ -405,7 +328,7 @@ class ValidatedChart:
     spec: ChartSpec
 
     # Validated SQL
-    query_name: str  # The identifier used in Evidence (e.g., "monthly_revenue")
+    query_name: str  # The identifier used (e.g., "monthly_revenue")
     sql: str  # The validated SQL query
     columns: list[str] = field(default_factory=list)  # Output columns from query
 
@@ -419,64 +342,6 @@ class ValidatedChart:
     validation_status: str = "valid"  # "valid", "invalid", "pending"
     validation_error: str | None = None
     validation_attempts: int = 0
-
-    def to_evidence_markdown(self) -> str:
-        """Generate the Evidence markdown for this chart."""
-        lines = []
-
-        # First, render filter option queries (if any)
-        for f in self.filters:
-            if f.options_query and f.options_query_name:
-                lines.append(f"```sql {f.options_query_name}")
-                lines.append(f.options_query.strip())
-                lines.append("```")
-                lines.append("")
-
-        # Render filter components (if any)
-        if self.filters:
-            for f in self.filters:
-                lines.append(f.to_evidence_component())
-            lines.append("")
-
-        # Main SQL query block
-        lines.append(f"```sql {self.query_name}")
-        lines.append(self.sql.strip())
-        lines.append("```")
-        lines.append("")
-
-        # Chart component
-        chart_type = self.spec.chart_type.value
-        props = self.config.to_evidence_props()
-
-        # Build component string
-        prop_strings = [f"data={{{self.query_name}}}"]
-
-        for key, value in props.items():
-            if isinstance(value, bool):
-                prop_strings.append(f"{key}={{{str(value).lower()}}}")
-            elif isinstance(value, str):
-                prop_strings.append(f'{key}="{value}"')
-            elif isinstance(value, dict):
-                # Serialize dicts (like echartsOptions) as JSON
-                json_str = json.dumps(value)
-                prop_strings.append(f"{key}={{{json_str}}}")
-            elif isinstance(value, list):
-                items = ", ".join(f'"{v}"' if isinstance(v, str) else str(v) for v in value)
-                prop_strings.append(f"{key}={{[{items}]}}")
-            else:
-                prop_strings.append(f"{key}={{{value}}}")
-
-        if len(prop_strings) <= 3:
-            # Single line for simple charts
-            lines.append(f"<{chart_type} {' '.join(prop_strings)} />")
-        else:
-            # Multi-line for complex charts
-            lines.append(f"<{chart_type}")
-            for prop in prop_strings:
-                lines.append(f"    {prop}")
-            lines.append("/>")
-
-        return "\n".join(lines)
 
     def to_prompt_context(self) -> str:
         """Format for LLM prompt context."""
@@ -531,59 +396,6 @@ class Chart:
     # Status
     is_valid: bool = True
     last_error: str | None = None
-
-    def to_evidence_markdown(self) -> str:
-        """Generate Evidence markdown for this chart."""
-        lines = []
-
-        # First, render filter option queries (if any)
-        for f in self.filters:
-            if f.options_query and f.options_query_name:
-                lines.append(f"```sql {f.options_query_name}")
-                lines.append(f.options_query.strip())
-                lines.append("```")
-                lines.append("")
-
-        # Render filter components (if any)
-        if self.filters:
-            for f in self.filters:
-                lines.append(f.to_evidence_component())
-            lines.append("")
-
-        # Main SQL query block
-        lines.append(f"```sql {self.query_name}")
-        lines.append(self.sql.strip())
-        lines.append("```")
-        lines.append("")
-
-        # Chart component
-        chart_type = self.chart_type.value
-        props = self.config.to_evidence_props()
-
-        # Build component string
-        prop_strings = [f"data={{{self.query_name}}}"]
-
-        for key, value in props.items():
-            if isinstance(value, bool):
-                prop_strings.append(f"{key}={{{str(value).lower()}}}")
-            elif isinstance(value, str):
-                prop_strings.append(f'{key}="{value}"')
-            elif isinstance(value, dict):
-                # Serialize dicts (like echartsOptions) as JSON
-                json_str = json.dumps(value)
-                prop_strings.append(f"{key}={{{json_str}}}")
-            elif isinstance(value, list):
-                items = ", ".join(f'"{v}"' if isinstance(v, str) else str(v) for v in value)
-                prop_strings.append(f"{key}={{[{items}]}}")
-            else:
-                prop_strings.append(f"{key}={{{value}}}")
-
-        lines.append(f"<{chart_type}")
-        for prop in prop_strings:
-            lines.append(f"    {prop}")
-        lines.append("/>")
-
-        return "\n".join(lines)
 
     @classmethod
     def from_validated(cls, validated: ValidatedChart, conversation_id: str | None = None) -> Chart:
@@ -681,10 +493,6 @@ class DashboardLayout:
     sections: list[dict[str, Any]] = field(default_factory=list)
     # Each section: {"title": "Section Name", "chart_ids": ["id1", "id2"]}
 
-    # Future: grid-based positioning
-    # grid: list[dict] = field(default_factory=list)
-    # Each grid item: {"chart_id": "...", "row": 0, "col": 0, "width": 6, "height": 2}
-
     def to_dict(self) -> dict[str, Any]:
         return {"sections": self.sections}
 
@@ -760,54 +568,6 @@ class Dashboard:
             raise ValueError("Chart IDs must match existing charts")
         self.chart_ids = chart_ids
         self.updated_at = datetime.now()
-
-    def to_evidence_markdown(self, charts: list[Chart]) -> str:
-        """
-        Generate complete Evidence markdown for the dashboard.
-
-        Args:
-            charts: The Chart entities referenced by this dashboard
-
-        Returns:
-            Complete Evidence markdown string
-        """
-        lines = []
-
-        # Title
-        lines.append(f"# {self.title}")
-        lines.append("")
-
-        if self.description:
-            lines.append(self.description)
-            lines.append("")
-
-        # Build chart lookup
-        chart_lookup = {c.id: c for c in charts}
-
-        # If we have sections, use them
-        if self.layout.sections:
-            for section in self.layout.sections:
-                section_title = section.get("title")
-                section_chart_ids = section.get("chart_ids", [])
-
-                if section_title:
-                    lines.append(f"## {section_title}")
-                    lines.append("")
-
-                for chart_id in section_chart_ids:
-                    chart = chart_lookup.get(chart_id)
-                    if chart:
-                        lines.append(chart.to_evidence_markdown())
-                        lines.append("")
-        else:
-            # No sections, just render charts in order
-            for chart_id in self.chart_ids:
-                chart = chart_lookup.get(chart_id)
-                if chart:
-                    lines.append(chart.to_evidence_markdown())
-                    lines.append("")
-
-        return "\n".join(lines)
 
     def to_dict(self) -> dict[str, Any]:
         """Serialize to dictionary for storage."""

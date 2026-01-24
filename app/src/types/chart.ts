@@ -78,6 +78,8 @@ export interface ChartConfig {
   xFmt?: string
   yFmt?: string
   valueFmt?: string
+  /** Format hint for auto-formatting: 'currency', 'percent', 'number' */
+  valueFormat?: 'currency' | 'percent' | 'number'
 
   /** Labels and titles */
   title?: string
@@ -92,6 +94,21 @@ export interface ChartConfig {
   sort?: boolean | string
   horizontal?: boolean
   stacked?: boolean
+
+  /** KPI/BigValue options */
+  /** Column containing comparison value (e.g., previous period) */
+  comparisonValue?: string
+  /** Label for comparison (e.g., "vs last month") */
+  comparisonLabel?: string
+  /** Whether positive change is good (default: true) */
+  positiveIsGood?: boolean
+  /** Column(s) for sparkline data (time series) */
+  sparklineX?: string
+  sparklineY?: string
+  /** Type of sparkline: 'line' or 'bar' */
+  sparklineType?: 'line' | 'bar'
+  /** Show trend indicator arrow */
+  showTrend?: boolean
 
   /** Additional props */
   extraProps?: Record<string, unknown>

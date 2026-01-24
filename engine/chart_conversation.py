@@ -15,7 +15,6 @@ Much simpler than the full dashboard conversation because:
 
 from dataclasses import dataclass, field
 from enum import Enum
-from pathlib import Path
 from typing import Any
 
 from .chart_pipeline import ChartPipeline, ChartPipelineConfig, ChartPipelineResult
@@ -66,7 +65,6 @@ class ChartConversationState:
     # Current chart
     current_chart: ValidatedChart | None = None
     current_chart_id: str | None = None
-    chart_file_path: Path | None = None
     dashboard_slug: str | None = None
 
     # Original request for refinement
@@ -339,8 +337,7 @@ Keep your response brief and friendly."""
         self.state.current_chart_id = stored_chart.id
 
         # Create a preview dashboard for viewing
-        dashboard, file_path = create_chart_dashboard(stored_chart)
-        self.state.chart_file_path = file_path
+        dashboard = create_chart_dashboard(stored_chart)
         self.state.dashboard_slug = dashboard.slug
 
         # Build response
@@ -371,7 +368,7 @@ What would you like to do next?"""
 
     def _handle_refinement_request(self, user_input: str) -> ChartConversationResult:
         """Handle a refinement request for the current chart."""
-        if not self.state.current_chart or not self.state.chart_file_path:
+        if not self.state.current_chart or not self.state.dashboard_slug:
             return self._handle_new_chart_request(user_input)
 
         # Store old chart SQL for comparison
@@ -431,9 +428,8 @@ What would you like to try?"""
 
         self.state.current_chart = chart
 
-        # Update the dashboard file
-        dashboard, file_path = create_chart_dashboard(stored_chart)
-        self.state.chart_file_path = file_path
+        # Update the dashboard
+        dashboard = create_chart_dashboard(stored_chart)
 
         chart_url = f"{self.config.dev_url}/{dashboard.slug}?embed=true"
 

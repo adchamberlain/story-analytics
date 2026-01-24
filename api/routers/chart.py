@@ -451,10 +451,10 @@ async def create_chart(
     # Create preview dashboard
     from engine.dashboard_composer import create_chart_dashboard
 
-    dashboard, file_path = create_chart_dashboard(chart)
+    dashboard = create_chart_dashboard(chart)
 
-    config = get_config()
-    chart_url = f"{config.dev_url}/{dashboard.slug}?embed=true"
+    # Return chart URL for React frontend
+    chart_url = f"/chart/{chart.id}"
 
     return ChartCreateResponse(
         success=True,
@@ -469,7 +469,7 @@ async def get_chart_by_slug(
     current_user: User = Depends(get_current_user),
 ):
     """
-    Get a chart by its Evidence URL slug.
+    Get a chart by its URL slug.
 
     This looks up the dashboard by slug and returns the chart info.
     Used for the "View Source" functionality.
@@ -530,12 +530,11 @@ async def get_chart_preview_url(
     # Create or get existing dashboard for this chart
     from engine.dashboard_composer import create_chart_dashboard
 
-    dashboard, _ = create_chart_dashboard(chart)
+    dashboard = create_chart_dashboard(chart)
 
-    config = get_config()
     return {
         "chart_id": chart_id,
-        "url": f"{config.dev_url}/{dashboard.slug}?embed=true",
+        "url": f"/chart/{chart_id}",
         "dashboard_slug": dashboard.slug,
     }
 
@@ -589,11 +588,7 @@ async def create_dashboard(
             chart_ids=request.chart_ids,
         )
 
-        # Write to Evidence pages
-        file_path = composer.write_dashboard(dashboard)
-
-        config = get_config()
-        dashboard_url = f"{config.dev_url}/{dashboard.slug}"
+        dashboard_url = f"/dashboard/{dashboard.slug}"
 
         return DashboardCreateResponse(
             success=True,
@@ -640,9 +635,6 @@ async def add_chart_to_dashboard(
     if not dashboard:
         raise HTTPException(status_code=404, detail="Dashboard not found")
 
-    # Regenerate the Evidence markdown
-    composer.write_dashboard(dashboard)
-
     return _dashboard_to_schema(dashboard)
 
 
@@ -662,9 +654,6 @@ async def remove_chart_from_dashboard(
 
     if not dashboard:
         raise HTTPException(status_code=404, detail="Dashboard not found")
-
-    # Regenerate the Evidence markdown
-    composer.write_dashboard(dashboard)
 
     return _dashboard_to_schema(dashboard)
 
@@ -686,9 +675,6 @@ async def reorder_dashboard_charts(
     if not dashboard:
         raise HTTPException(status_code=404, detail="Dashboard not found")
 
-    # Regenerate the Evidence markdown
-    composer.write_dashboard(dashboard)
-
     return _dashboard_to_schema(dashboard)
 
 
@@ -697,23 +683,16 @@ async def publish_dashboard(
     dashboard_id: str,
     current_user: User = Depends(get_current_user),
 ):
-    """Publish/write a dashboard to Evidence pages."""
+    """Mark a dashboard as published (no-op, dashboards are always accessible)."""
     storage = get_dashboard_storage()
     dashboard = storage.get(dashboard_id)
 
     if not dashboard:
         raise HTTPException(status_code=404, detail="Dashboard not found")
 
-    composer = DashboardComposer()
-    file_path = composer.write_dashboard(dashboard)
-
-    config = get_config()
-
     return {
         "success": True,
         "dashboard_id": dashboard_id,
         "slug": dashboard.slug,
-        "url": f"{config.dev_url}/{dashboard.slug}",
-        "embed_url": f"{config.dev_url}/{dashboard.slug}?embed=true",
-        "file_path": str(file_path),
+        "url": f"/dashboard/{dashboard.slug}",
     }

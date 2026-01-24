@@ -81,7 +81,7 @@ async def request_magic_link(
     db.commit()
 
     # Build the verification URL
-    frontend_url = os.environ.get("FRONTEND_URL", "http://localhost:5173")
+    frontend_url = os.environ.get("FRONTEND_URL", "http://localhost:3001")
     verify_url = f"{frontend_url}/auth/verify?token={magic_link.token}"
 
     # Send email

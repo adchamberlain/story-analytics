@@ -63,7 +63,7 @@ class TestChartModels:
         assert "SUM" in context
 
     def test_chart_config_to_props(self):
-        """Test ChartConfig to Evidence props conversion."""
+        """Test ChartConfig to props conversion."""
         from engine.models import ChartConfig
 
         config = ChartConfig(
@@ -74,7 +74,7 @@ class TestChartModels:
             extra_props={"smooth": 0.3},
         )
 
-        props = config.to_evidence_props()
+        props = config.to_props()
 
         assert props["x"] == "month"
         assert props["y"] == "revenue"
@@ -214,42 +214,28 @@ class TestDashboardComposition:
         dashboard.add_chart("chart-2")
         assert dashboard.chart_ids.count("chart-2") == 1
 
-    def test_dashboard_markdown_generation(self):
-        """Test generating Evidence markdown from dashboard."""
-        from engine.models import Dashboard, Chart, ChartType, ChartConfig
-
-        charts = [
-            Chart(
-                id="chart-1",
-                title="Revenue",
-                query_name="revenue",
-                sql="SELECT date, SUM(amount) as revenue FROM invoices GROUP BY date",
-                chart_type=ChartType.LINE_CHART,
-                config=ChartConfig(x="date", y="revenue"),
-            ),
-            Chart(
-                id="chart-2",
-                title="Customers",
-                query_name="customers",
-                sql="SELECT COUNT(*) as count FROM customers",
-                chart_type=ChartType.BIG_VALUE,
-                config=ChartConfig(value="count"),
-            ),
-        ]
+    def test_dashboard_serialization(self):
+        """Test dashboard serialization to/from dict."""
+        from engine.models import Dashboard
 
         dashboard = Dashboard(
-            slug="test",
+            slug="test-dash",
             title="Test Dashboard",
+            description="A test",
             chart_ids=["chart-1", "chart-2"],
         )
 
-        markdown = dashboard.to_evidence_markdown(charts)
+        # Serialize
+        data = dashboard.to_dict()
+        assert data["slug"] == "test-dash"
+        assert data["title"] == "Test Dashboard"
+        assert len(data["chart_ids"]) == 2
 
-        assert "# Test Dashboard" in markdown
-        assert "```sql revenue" in markdown
-        assert "```sql customers" in markdown
-        assert "<LineChart" in markdown
-        assert "<BigValue" in markdown
+        # Deserialize
+        restored = Dashboard.from_dict(data)
+        assert restored.slug == dashboard.slug
+        assert restored.title == dashboard.title
+        assert restored.chart_ids == dashboard.chart_ids
 
 
 @pytest.mark.skipif(
@@ -316,23 +302,6 @@ class TestChartConversation:
         # If we got to viewing, we should have a chart
         if manager.state.phase.value == "viewing":
             assert result.chart_url is not None or result.chart_id is not None
-
-
-class TestEmbedMode:
-    """Test embed mode layout changes."""
-
-    def test_layout_svelte_has_embed_mode(self):
-        """Verify the Evidence layout includes embed mode support."""
-        layout_path = Path(__file__).parent.parent / ".evidence" / "template" / "src" / "pages" / "+layout.svelte"
-
-        assert layout_path.exists(), "Layout file should exist"
-
-        content = layout_path.read_text()
-
-        # Check for embed mode query param handling
-        assert "embed" in content.lower(), "Layout should reference embed mode"
-        assert "isEmbedMode" in content, "Layout should have isEmbedMode variable"
-        assert "embed-container" in content, "Layout should have embed container class"
 
 
 if __name__ == "__main__":
