@@ -37,6 +37,9 @@ from engine.qa import DashboardScreenshot, DashboardQA, QAResult
 # =============================================================================
 
 TEST_CASES = [
+    # ==========================================================================
+    # SMOKE TESTS (3 basic tests for quick validation)
+    # ==========================================================================
     {
         "id": "01_simple_bar",
         "name": "Simple Bar Chart",
@@ -50,7 +53,7 @@ TEST_CASES = [
             "Shows revenue values on y-axis",
             "Has appropriate title",
         ],
-        "smoke": True,  # Include in smoke tests
+        "smoke": True,
     },
     {
         "id": "02_time_series_line",
@@ -68,21 +71,7 @@ TEST_CASES = [
         "smoke": True,
     },
     {
-        "id": "03_multi_line_with_filter",
-        "name": "Multi-Line Chart with Date Filter",
-        "complexity": "Medium",
-        "chart_type": "LineChart",
-        "features": ["multiple metrics", "date filter"],
-        "request": "Create a line chart with 2 lines: average customer invoice amount and median customer invoice amount, by month. Show the latest 16 months and add a date filter.",
-        "validation_criteria": [
-            "Line chart with TWO distinct lines",
-            "Legend showing both average and median",
-            "Date filter/picker is present",
-            "Monthly data on x-axis",
-        ],
-    },
-    {
-        "id": "04_kpi_big_value",
+        "id": "03_kpi_big_value",
         "name": "KPI Big Value",
         "complexity": "Simple",
         "chart_type": "BigValue",
@@ -94,6 +83,24 @@ TEST_CASES = [
             "Shows customer count (not revenue)",
         ],
         "smoke": True,
+    },
+
+    # ==========================================================================
+    # CORE CHART TYPES
+    # ==========================================================================
+    {
+        "id": "04_multi_line_with_filter",
+        "name": "Multi-Line Chart with Date Filter",
+        "complexity": "Medium",
+        "chart_type": "LineChart",
+        "features": ["multiple metrics", "date filter"],
+        "request": "Create a line chart with 2 lines: average customer invoice amount and median customer invoice amount, by month. Show the latest 16 months and add a date filter.",
+        "validation_criteria": [
+            "Line chart with TWO distinct lines",
+            "Legend showing both average and median",
+            "Date filter/picker is present",
+            "Monthly data on x-axis",
+        ],
     },
     {
         "id": "05_area_chart_subscriptions",
@@ -180,6 +187,301 @@ TEST_CASES = [
             "Date filter is present",
             "Weekly granularity visible",
             "Approximately 6 months of data",
+        ],
+    },
+
+    # ==========================================================================
+    # NATURAL LANGUAGE VARIATIONS - Testing robustness to different input styles
+    # ==========================================================================
+    {
+        "id": "11_question_format",
+        "name": "Question Format Request",
+        "complexity": "Simple",
+        "chart_type": "Any",
+        "features": ["question format", "implicit chart type"],
+        "request": "What's our total revenue this year?",
+        "validation_criteria": [
+            "A visualization is displayed (chart or big number)",
+            "Shows revenue data",
+            "Has a clear title or label",
+        ],
+    },
+    {
+        "id": "12_casual_language",
+        "name": "Casual/Informal Request",
+        "complexity": "Simple",
+        "chart_type": "Any",
+        "features": ["casual language", "implicit chart type"],
+        "request": "gimme a quick breakdown of sales by industry",
+        "validation_criteria": [
+            "A chart is displayed",
+            "Shows breakdown by industry/segment",
+            "Data is visible and interpretable",
+        ],
+    },
+    {
+        "id": "13_minimal_request",
+        "name": "Minimal/Short Request",
+        "complexity": "Simple",
+        "chart_type": "Any",
+        "features": ["minimal input", "implicit details"],
+        "request": "monthly revenue trend",
+        "validation_criteria": [
+            "A chart is displayed",
+            "Title or context indicates revenue trend",
+            "Chart type is appropriate (line or bar)",
+        ],
+    },
+    {
+        "id": "14_verbose_request",
+        "name": "Verbose/Detailed Request",
+        "complexity": "Medium",
+        "chart_type": "LineChart",
+        "features": ["verbose input", "multiple requirements"],
+        "request": "I need to see a visualization that shows how our subscription numbers have been trending over the past several months. It would be great if we could see this as a line graph with the months on the bottom and the count of subscriptions on the side. Please make sure to include data from the last year or so.",
+        "validation_criteria": [
+            "Line chart is displayed",
+            "Shows subscription data over time",
+            "Monthly x-axis",
+            "Shows approximately a year of data",
+        ],
+    },
+    {
+        "id": "15_business_question",
+        "name": "Business Question Format",
+        "complexity": "Medium",
+        "chart_type": "Any",
+        "features": ["business context", "implicit visualization"],
+        "request": "Which customer segments are driving the most revenue growth?",
+        "validation_criteria": [
+            "A chart is displayed",
+            "Shows revenue by customer segment",
+            "Segments are clearly labeled",
+        ],
+    },
+
+    # ==========================================================================
+    # AGGREGATION VARIATIONS
+    # ==========================================================================
+    {
+        "id": "16_count_distinct",
+        "name": "Count Distinct Metric",
+        "complexity": "Medium",
+        "chart_type": "LineChart",
+        "features": ["count distinct", "time series"],
+        "request": "Show me the number of unique customers who made purchases each month",
+        "validation_criteria": [
+            "Chart is displayed",
+            "Shows customer counts (not revenue)",
+            "Monthly breakdown",
+            "Values represent distinct/unique counts",
+        ],
+    },
+    {
+        "id": "17_min_max_metrics",
+        "name": "Min/Max Aggregation",
+        "complexity": "Medium",
+        "chart_type": "BarChart",
+        "features": ["min aggregation", "max aggregation"],
+        "request": "Show me the highest and lowest invoice amounts by customer segment",
+        "validation_criteria": [
+            "Chart is displayed",
+            "Shows both max and min values",
+            "Segments visible on axis",
+        ],
+    },
+    {
+        "id": "18_percentage_metric",
+        "name": "Percentage/Rate Calculation",
+        "complexity": "Complex",
+        "chart_type": "LineChart",
+        "features": ["calculated metric", "ratio"],
+        "request": "What is the invoice payment rate (paid invoices / total invoices) by month?",
+        "validation_criteria": [
+            "Chart is displayed",
+            "Shows rate or percentage values",
+            "Monthly breakdown",
+            "Values appear to be ratios (0-1 or 0-100%)",
+        ],
+    },
+    {
+        "id": "19_top_bottom_n",
+        "name": "Top and Bottom N Items",
+        "complexity": "Medium",
+        "chart_type": "BarChart",
+        "features": ["top N", "bottom N", "ranking"],
+        "request": "Show me the top 10 customers by invoice count",
+        "validation_criteria": [
+            "Bar chart is displayed",
+            "Shows approximately 10 customers",
+            "Customers appear ordered by count",
+            "Counts are visible",
+        ],
+    },
+
+    # ==========================================================================
+    # TIME-BASED VARIATIONS
+    # ==========================================================================
+    {
+        "id": "20_weekly_revenue",
+        "name": "Weekly Revenue Trend",
+        "complexity": "Medium",
+        "chart_type": "LineChart",
+        "features": ["weekly data", "time series"],
+        "request": "Show me revenue by week over time",
+        "validation_criteria": [
+            "Chart is displayed showing revenue over time",
+            "Shows weekly data intervals",
+            "Revenue values visible on y-axis",
+            "Multiple weeks of data points",
+        ],
+    },
+    {
+        "id": "21_weekly_granularity",
+        "name": "Weekly Time Granularity",
+        "complexity": "Medium",
+        "chart_type": "LineChart",
+        "features": ["weekly data", "time granularity"],
+        "request": "Show invoice volume by week",
+        "validation_criteria": [
+            "Chart is displayed",
+            "Shows time-based data",
+            "Title indicates invoice volume",
+            "Volume/count values visible",
+        ],
+    },
+    {
+        "id": "22_quarterly_aggregation",
+        "name": "Quarterly Aggregation",
+        "complexity": "Medium",
+        "chart_type": "BarChart",
+        "features": ["quarterly", "time aggregation"],
+        "request": "Show total revenue by quarter",
+        "validation_criteria": [
+            "Chart is displayed",
+            "Shows quarterly data (Q1, Q2, etc. or by quarter dates)",
+            "Revenue values visible",
+            "Multiple quarters shown",
+        ],
+    },
+
+    # ==========================================================================
+    # FILTER VARIATIONS
+    # ==========================================================================
+    {
+        "id": "23_industry_dropdown",
+        "name": "Dropdown Filter by Category",
+        "complexity": "Medium",
+        "chart_type": "BarChart",
+        "features": ["dropdown filter", "category filter"],
+        "request": "Create a bar chart of monthly revenue with a dropdown to filter by customer industry",
+        "validation_criteria": [
+            "Bar chart is displayed",
+            "Dropdown filter is present",
+            "Industry options available",
+            "Monthly revenue shown",
+        ],
+    },
+    {
+        "id": "24_multiple_filters",
+        "name": "Multiple Filter Types",
+        "complexity": "Complex",
+        "chart_type": "LineChart",
+        "features": ["date filter", "dropdown filter", "multiple filters"],
+        "request": "Show revenue over time with both a date range filter and a dropdown to select the plan tier",
+        "validation_criteria": [
+            "Chart is displayed",
+            "Date range filter present",
+            "Dropdown filter for plan tier present",
+            "Both filters appear functional",
+        ],
+    },
+
+    # ==========================================================================
+    # DATA TABLE AND OTHER FORMATS
+    # ==========================================================================
+    {
+        "id": "25_top_customers_list",
+        "name": "Top Customers List",
+        "complexity": "Simple",
+        "chart_type": "Any",
+        "features": ["top N", "customer data"],
+        "request": "Show me the top 10 customers by revenue",
+        "validation_criteria": [
+            "Visualization showing customer data is displayed",
+            "Shows top customers ranked by revenue",
+            "Customer names or identifiers visible",
+            "Revenue values or relative amounts shown",
+        ],
+    },
+    {
+        "id": "26_single_kpi_revenue",
+        "name": "Single Revenue KPI",
+        "complexity": "Simple",
+        "chart_type": "BigValue",
+        "features": ["single metric", "KPI"],
+        "request": "What's our total revenue? Just show me the number",
+        "validation_criteria": [
+            "Large number is displayed",
+            "Shows revenue value",
+            "Formatted appropriately (likely with K or M suffix)",
+        ],
+    },
+
+    # ==========================================================================
+    # EDGE CASES AND ROBUSTNESS
+    # ==========================================================================
+    {
+        "id": "27_typo_tolerance",
+        "name": "Typo/Misspelling Tolerance",
+        "complexity": "Simple",
+        "chart_type": "BarChart",
+        "features": ["typo handling", "robustness"],
+        "request": "show me revnue by custmer segmnt",
+        "validation_criteria": [
+            "A chart is displayed despite typos",
+            "Shows revenue data",
+            "Shows customer segments",
+        ],
+    },
+    {
+        "id": "28_ambiguous_metric",
+        "name": "Ambiguous Metric Request",
+        "complexity": "Simple",
+        "chart_type": "Any",
+        "features": ["ambiguous input", "reasonable default"],
+        "request": "how are we doing with customers",
+        "validation_criteria": [
+            "Some visualization is displayed",
+            "Shows customer-related data",
+            "Interpretation is reasonable",
+        ],
+    },
+    {
+        "id": "29_mixed_requirements",
+        "name": "Mixed Chart and Table Request",
+        "complexity": "Medium",
+        "chart_type": "Any",
+        "features": ["mixed format", "flexible output"],
+        "request": "Give me a summary of revenue by industry - whatever format works best",
+        "validation_criteria": [
+            "A visualization is displayed",
+            "Shows revenue by industry",
+            "Format is appropriate (chart or table)",
+        ],
+    },
+    {
+        "id": "30_no_explicit_chart_type",
+        "name": "No Chart Type Specified",
+        "complexity": "Simple",
+        "chart_type": "Any",
+        "features": ["implicit chart type", "auto-selection"],
+        "request": "I want to see our subscription numbers over time",
+        "validation_criteria": [
+            "A time-series visualization is displayed",
+            "Shows subscription data",
+            "Time axis is present",
+            "Chart type is appropriate (line or area)",
         ],
     },
 ]

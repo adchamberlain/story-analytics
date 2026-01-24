@@ -214,29 +214,30 @@ Just describe what you want to see!"""
         """
         system_prompt = """You are an intent classifier for a SaaS analytics chart creation tool.
 
-This tool can ONLY create charts from SaaS business data:
-- Customers, subscriptions, invoices, revenue
-- User signups, events, activity
-- Business metrics like MRR, churn, retention
+This tool creates charts from SaaS business data: customers, subscriptions, invoices, revenue, user signups, events, business metrics.
 
 Classify the user's message into ONE of these categories:
 
-1. "chart_request" - User wants a chart about SaaS/business metrics that this tool can provide
-   Examples: "Show me revenue by month", "Create a bar chart of sales", "User signups over time"
+1. "chart_request" - User wants to SEE a specific metric or visualization:
+   - Questions asking for specific numbers: "What's our total revenue?", "How many customers do we have?"
+   - Visualization requests: "Show me revenue by month", "Create a bar chart of sales"
+   - Metric queries: "Total revenue this year", "Average order value", "Customer count"
+   - Business questions: "How are we doing with revenue?", "What's our subscription growth?"
 
-2. "data_question" - User is asking about the available data or system capabilities
-   Examples: "What data do you have?", "What tables are available?", "Help", "What can you do?"
+2. "data_question" - User is asking about the SYSTEM or CAPABILITIES (not asking for data):
+   - "What data do you have?", "What tables are available?"
+   - "Help", "What can you do?", "How does this work?"
+   - Questions about the tool itself, not about business metrics
 
-3. "unclear" - ANY of these:
-   - Off-topic requests (weather, sports, news, general knowledge, science questions)
-   - Greetings or small talk ("Hello", "How are you?")
-   - Vague or ambiguous ("hmm", "maybe", "something interesting")
-   - Data this tool doesn't have (weather, stocks, social media, etc.)
-   - Questions that cannot be answered with business data
+3. "unclear" - Off-topic or truly ambiguous:
+   - Off-topic: weather, sports, news, jokes, general knowledge
+   - Greetings: "Hello", "How are you?"
+   - Too vague to interpret: "hmm", "maybe", "something"
 
-   Examples of UNCLEAR: "What's the weather?", "Tell me a joke", "Hello", "Why is the sky blue?", "What time is it?"
-
-IMPORTANT: If the request is about data this tool doesn't have, classify as "unclear", NOT "chart_request".
+CRITICAL DISTINCTION:
+- "What's our revenue?" = chart_request (asking for a metric VALUE)
+- "What data do you have?" = data_question (asking about the SYSTEM)
+- "How are we doing with customers?" = chart_request (asking about business PERFORMANCE)
 
 Respond with EXACTLY one word: chart_request, data_question, or unclear"""
 
