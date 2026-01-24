@@ -72,6 +72,7 @@
 							url={message.chartUrl}
 							title={$currentChartTitle || 'Chart'}
 							height="350px"
+							chartId={message.chartId}
 						/>
 					</div>
 				{/if}

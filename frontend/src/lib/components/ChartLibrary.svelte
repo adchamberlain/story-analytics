@@ -268,6 +268,7 @@
 						url={previewUrl}
 						title={previewChart.title}
 						height="500px"
+						chartId={previewChart.id}
 					/>
 				</div>
 				<div class="preview-footer">

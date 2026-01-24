@@ -1,26 +1,54 @@
 <script lang="ts">
 	/**
-	 * ChartEmbed - Embeds an Evidence chart via iframe.
+	 * ChartEmbed - Embeds a chart via iframe.
+	 *
+	 * Supports two renderers:
+	 * - Evidence (port 3000) - legacy markdown-based rendering
+	 * - React + Plotly.js (port 3001) - new direct rendering
 	 *
 	 * Features:
 	 * - Responsive sizing
 	 * - Loading state
 	 * - Error handling
 	 * - Full-screen toggle
+	 * - Renderer toggle (Evidence vs React)
 	 */
 
 	import { createEventDispatcher } from 'svelte';
+	import { chartRenderer, toggleRenderer, getChartUrl, getChartFullUrl } from '$lib/stores/settings';
 
-	export let url: string;
+	// Props
+	export let url: string; // Evidence URL (e.g., http://localhost:3000/{slug}?embed=true)
 	export let title: string = 'Chart';
 	export let height: string = '400px';
 	export let showToolbar: boolean = true;
+	export let chartId: string | undefined = undefined; // Optional chart ID for React renderer
 
 	const dispatch = createEventDispatcher();
 
 	let loading = true;
 	let error = false;
 	let fullscreen = false;
+	let iframeElement: HTMLIFrameElement;
+
+	// Extract slug from Evidence URL
+	$: slug = extractSlug(url);
+
+	// Compute the actual URL based on renderer
+	$: actualUrl = getChartUrl(slug, chartId);
+
+	function extractSlug(evidenceUrl: string): string {
+		// Extract slug from URL like "http://localhost:3000/{slug}?embed=true"
+		try {
+			const urlObj = new URL(evidenceUrl);
+			// Remove leading slash and query params
+			return urlObj.pathname.replace(/^\//, '');
+		} catch {
+			// If URL parsing fails, try simple extraction
+			const match = evidenceUrl.match(/localhost:\d+\/([^?]+)/);
+			return match ? match[1] : '';
+		}
+	}
 
 	function handleLoad() {
 		loading = false;
@@ -38,23 +66,33 @@
 	}
 
 	function openInNewTab() {
-		// Remove embed param to get full view
-		const fullUrl = url.replace('?embed=true', '');
+		const fullUrl = getChartFullUrl(slug, chartId);
 		window.open(fullUrl, '_blank');
 	}
 
 	function refresh() {
 		loading = true;
 		error = false;
-		// Force iframe reload by changing src briefly
-		const iframe = document.querySelector(`iframe[src="${url}"]`) as HTMLIFrameElement;
-		if (iframe) {
-			const currentSrc = iframe.src;
-			iframe.src = '';
+		// Force iframe reload
+		if (iframeElement) {
+			const currentSrc = iframeElement.src;
+			iframeElement.src = '';
 			setTimeout(() => {
-				iframe.src = currentSrc;
+				iframeElement.src = currentSrc;
 			}, 100);
 		}
+	}
+
+	function handleToggleRenderer() {
+		loading = true;
+		error = false;
+		toggleRenderer();
+	}
+
+	// React to renderer changes - reload iframe
+	$: if ($chartRenderer && iframeElement) {
+		loading = true;
+		error = false;
 	}
 </script>
 
@@ -67,6 +105,35 @@
 		<div class="toolbar">
 			<span class="title">{title}</span>
 			<div class="actions">
+				<!-- Renderer toggle -->
+				<button
+					class="renderer-toggle"
+					class:react={$chartRenderer === 'react'}
+					on:click={handleToggleRenderer}
+					title={$chartRenderer === 'react' ? 'Using React (click for Evidence)' : 'Using Evidence (click for React)'}
+				>
+					{#if $chartRenderer === 'react'}
+						<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+							<circle cx="12" cy="12" r="10"/>
+							<circle cx="12" cy="12" r="4"/>
+							<line x1="4.93" y1="4.93" x2="9.17" y2="9.17"/>
+							<line x1="14.83" y1="14.83" x2="19.07" y2="19.07"/>
+							<line x1="14.83" y1="9.17" x2="19.07" y2="4.93"/>
+							<line x1="4.93" y1="19.07" x2="9.17" y2="14.83"/>
+						</svg>
+						<span>React</span>
+					{:else}
+						<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+							<path d="M12 2L2 7l10 5 10-5-10-5z"/>
+							<path d="M2 17l10 5 10-5"/>
+							<path d="M2 12l10 5 10-5"/>
+						</svg>
+						<span>Evidence</span>
+					{/if}
+				</button>
+
+				<div class="separator"></div>
+
 				<button
 					class="action-btn"
 					on:click={refresh}
@@ -135,14 +202,17 @@
 			</div>
 		{/if}
 
-		<iframe
-			src={url}
-			{title}
-			on:load={handleLoad}
-			on:error={handleError}
-			class:hidden={loading || error}
-			sandbox="allow-scripts allow-same-origin"
-		></iframe>
+		{#key actualUrl}
+			<iframe
+				bind:this={iframeElement}
+				src={actualUrl}
+				{title}
+				on:load={handleLoad}
+				on:error={handleError}
+				class:hidden={loading || error}
+				sandbox="allow-scripts allow-same-origin"
+			></iframe>
+		{/key}
 	</div>
 </div>
 
@@ -187,7 +257,46 @@
 
 	.actions {
 		display: flex;
+		align-items: center;
 		gap: 0.25rem;
+	}
+
+	.separator {
+		width: 1px;
+		height: 20px;
+		background: #3d3d54;
+		margin: 0 0.5rem;
+	}
+
+	.renderer-toggle {
+		display: flex;
+		align-items: center;
+		gap: 0.375rem;
+		padding: 0.25rem 0.5rem;
+		background: #2d2d44;
+		border: 1px solid #3d3d54;
+		border-radius: 4px;
+		color: #9ca3af;
+		font-size: 0.7rem;
+		font-weight: 500;
+		cursor: pointer;
+		transition: all 0.2s;
+	}
+
+	.renderer-toggle:hover {
+		background: #3d3d54;
+		color: #e5e7eb;
+	}
+
+	.renderer-toggle.react {
+		background: rgba(99, 102, 241, 0.2);
+		border-color: #6366f1;
+		color: #a5b4fc;
+	}
+
+	.renderer-toggle.react:hover {
+		background: rgba(99, 102, 241, 0.3);
+		color: #c7d2fe;
 	}
 
 	.action-btn {

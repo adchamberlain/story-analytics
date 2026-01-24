@@ -164,8 +164,65 @@ Three test charts stored in `.story-analytics/charts/`:
 
 - [x] Start the React app and verify rendering works
 - [x] Test with existing charts from the database
+- [x] Implement feature flag in SvelteKit frontend for A/B testing
 - [ ] Add visual polish and animations
-- [ ] Implement feature flag in SvelteKit frontend for A/B testing
+- [ ] Phase 2: Chat UI migration
+
+---
+
+## Session: 2026-01-24 (Feature Flag)
+
+### Focus: Implement Renderer Toggle Feature Flag
+
+**Context**: Adding ability to switch between Evidence and React renderers in the SvelteKit frontend for A/B testing.
+
+### Implementation
+
+1. **Settings Store** (`frontend/src/lib/stores/settings.ts`):
+   - `chartRenderer` store with values: 'evidence' | 'react'
+   - Persisted to localStorage for session persistence
+   - `toggleRenderer()` and `setRenderer()` functions
+   - `getChartUrl()` utility to generate correct URL based on renderer
+
+2. **ChartEmbed Component Updates**:
+   - Added `chartId` optional prop for React renderer
+   - Added renderer toggle button in toolbar (Evidence/React)
+   - Toggle button shows current renderer with icon
+   - React mode has highlighted purple styling
+   - URL automatically switches between ports 3000/3001
+
+3. **Updated Components to Pass chartId**:
+   - `ChartLibrary.svelte` - preview modal
+   - `ChartChat.svelte` - chat chart embeds
+   - `view/[slug]/+page.svelte` - chart view page
+
+### Files Created
+
+| File | Purpose |
+|------|---------|
+| `frontend/src/lib/stores/settings.ts` | Settings store with renderer preference |
+
+### Files Modified
+
+| File | Change |
+|------|--------|
+| `frontend/src/lib/components/ChartEmbed.svelte` | Added renderer toggle and chartId prop |
+| `frontend/src/lib/components/ChartLibrary.svelte` | Pass chartId to ChartEmbed |
+| `frontend/src/lib/components/ChartChat.svelte` | Pass chartId to ChartEmbed |
+| `frontend/src/routes/app/charts/view/[slug]/+page.svelte` | Pass chartId to ChartEmbed |
+
+### How to Test
+
+1. Start all services: `./dev.sh`
+2. Open SvelteKit frontend: http://localhost:5173
+3. Navigate to a chart view
+4. Click the "Evidence" button in the chart toolbar to toggle to "React"
+5. Chart reloads using React + Plotly.js renderer
+6. Setting persists across page refreshes (stored in localStorage)
+
+### Next Steps
+
+- [ ] Add visual polish and animations to React renderer
 - [ ] Phase 2: Chat UI migration
 
 ---
