@@ -738,9 +738,64 @@ Screenshots saved in `test_results/`
 
 ### Next Steps
 
+- [x] Sync up branding with dual cursor motif
+
+---
+
+## Session: 2026-01-24 (Branding Update)
+
+### Focus: Dual Cursor Logo - Analyst + AI
+
+**Context**: Updated branding to feature dual blinking cursors, representing the analyst and AI working together. This reinforces the "AI-native" identity and differentiates from traditional BI tools.
+
+### Design Decision
+
+The dual cursor motif (**STORY ▌▌**) symbolizes:
+- Two entities (analyst + AI) collaborating
+- Terminal/developer aesthetic (signals power users)
+- Distinctive brand identity vs. generic SaaS dashboards
+
+Decision: Keep the terminal vibe, sync branding across all touchpoints.
+
+### Changes Made
+
+1. **Created Logo Component**:
+   - `app/src/components/brand/Logo.tsx` - Reusable logo with dual cursors
+   - `app/src/components/brand/index.ts` - Barrel export
+   - Supports sizes: sm, md, lg
+   - Optional tagline ("AI-native analytics.")
+   - Dark mode support for different backgrounds
+
+2. **Updated Components**:
+   - `LoginPage.tsx` - Uses Logo component (lg size)
+   - `Sidebar.tsx` - Uses Logo component (md size)
+   - Removed inline blink animations (now in global CSS)
+
+3. **Global CSS**:
+   - Added `@keyframes blink` animation to `styles/index.css`
+   - Centralized animation for consistency
+
+### Files Created
+
+| File | Purpose |
+|------|---------|
+| `app/src/components/brand/Logo.tsx` | Reusable dual-cursor logo |
+| `app/src/components/brand/index.ts` | Barrel export |
+
+### Files Modified
+
+| File | Changes |
+|------|---------|
+| `app/src/styles/index.css` | Added blink animation |
+| `app/src/pages/LoginPage.tsx` | Use Logo component |
+| `app/src/components/layout/Sidebar.tsx` | Use Logo component |
+
+### Next Steps
+
 - [ ] Create Dockerfile for React app (for docker-compose)
 - [ ] Add integration tests for authenticated chat flow
-- [ ] Consider consolidating root package.json (currently minimal)
+- [ ] Consider adding logo to chart embed pages
+- [ ] Update website (storyanalytics.ai) to match dual cursor branding
 
 ---
 
