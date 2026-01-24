@@ -462,9 +462,10 @@ class ChartPipeline:
         config = self._build_chart_config(spec, columns)
 
         # Stage 3b: Analyze scales and use dual y-axis if needed
-        # Only for chart types that support dual y-axis (not DataTable, BigValue)
+        # Only for chart types that support dual y-axis (LineChart, AreaChart)
+        # Note: BarChart does NOT support y2 in Evidence
         y_columns = columns[1:] if len(columns) >= 2 else []
-        chart_supports_dual_axis = spec.chart_type not in (ChartType.DATA_TABLE, ChartType.BIG_VALUE)
+        chart_supports_dual_axis = spec.chart_type in (ChartType.LINE_CHART, ChartType.AREA_CHART)
         if chart_supports_dual_axis and len(y_columns) == 2 and config.y2 is None:
             # Only analyze if we have 2 metrics and didn't already set y2
             scale_analysis = ChartSpecValidator.analyze_scales(sql, columns)
@@ -578,9 +579,28 @@ class ChartPipeline:
             # Category comparison: x is category, y is metric(s)
             if len(columns) >= 2:
                 config.x = columns[0]
-                # Use all remaining columns as Y-axis values for grouped bar charts
                 y_columns = columns[1:]
-                config.y = y_columns if len(y_columns) > 1 else y_columns[0]
+
+                # Detect if any column is a categorical "series" column (for grouped bar charts)
+                # Keywords that indicate a grouping/category column, not a metric
+                series_keywords = ["type", "category", "segment", "group", "status", "event", "name", "label", "tier", "plan"]
+                series_col = None
+                metric_cols = []
+
+                for col in y_columns:
+                    col_lower = col.lower()
+                    if any(kw in col_lower for kw in series_keywords):
+                        series_col = col
+                    else:
+                        metric_cols.append(col)
+
+                # If we found a series column, use it for grouping (stacked/grouped bars)
+                if series_col and metric_cols:
+                    config.series = series_col
+                    config.y = metric_cols[0] if len(metric_cols) == 1 else metric_cols
+                else:
+                    # No series column found, use all columns as Y values
+                    config.y = y_columns if len(y_columns) > 1 else y_columns[0]
             config.title = spec.title
 
             # Check if horizontal bar chart was requested
