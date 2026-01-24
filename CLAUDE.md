@@ -1,5 +1,23 @@
 # Claude Code Project Instructions
 
+## Development Log Workflow (IMPORTANT)
+
+**At the start of every session**, read `DEV_LOG.md` to understand:
+- What was done in recent sessions
+- Current project state and context
+- Outstanding next steps
+
+**At the end of every session**, update `DEV_LOG.md` with:
+- Summary of work completed
+- Files created or modified
+- Decisions made and rationale
+- Issues encountered and how they were resolved
+- Next steps for future sessions
+
+Also review `DEV_PLAN.md` for the current strategic direction and implementation phases.
+
+---
+
 ## Design Philosophy: AI-Native
 
 This app is intentionally AI-native. **Never use naive string/keyword matching** for intent detection or control flow. This includes:
