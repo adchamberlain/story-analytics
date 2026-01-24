@@ -16,6 +16,7 @@ from .database import create_tables
 from .routers import auth_router, conversation_router, dashboards_router, templates_router
 from .routers.sources import router as sources_router
 from .routers.chart import router as chart_router
+from .routers.render import router as render_router
 
 settings = get_settings()
 
@@ -42,6 +43,7 @@ app.include_router(dashboards_router, prefix="/api")
 app.include_router(sources_router, prefix="/api")
 app.include_router(templates_router, prefix="/api")
 app.include_router(chart_router, prefix="/api")
+app.include_router(render_router, prefix="/api")
 
 
 @app.on_event("startup")
