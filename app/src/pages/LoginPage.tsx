@@ -4,6 +4,7 @@
 
 import { useState } from 'react'
 import { requestMagicLink } from '../api/client'
+import { Logo } from '../components/brand'
 
 export function LoginPage() {
   const [email, setEmail] = useState('')
@@ -102,39 +103,10 @@ export function LoginPage() {
 
         {/* Content */}
         <div style={{ padding: 'var(--space-6)' }}>
-          {/* Logo */}
-          <h1
-            style={{
-              color: 'var(--color-primary)',
-              fontWeight: 700,
-              fontSize: 'var(--text-2xl)',
-              letterSpacing: '0.1em',
-              margin: 0,
-            }}
-          >
-            STORY
-            <span
-              style={{
-                display: 'inline-block',
-                width: '8px',
-                height: '24px',
-                backgroundColor: 'var(--color-primary)',
-                marginLeft: '4px',
-                verticalAlign: 'middle',
-                animation: 'blink 1s step-end infinite',
-              }}
-            />
-          </h1>
-          <p
-            style={{
-              color: 'var(--color-gray-400)',
-              fontSize: 'var(--text-sm)',
-              marginTop: 'var(--space-1)',
-              marginBottom: 'var(--space-6)',
-            }}
-          >
-            AI-native analytics.
-          </p>
+          {/* Logo with dual cursors */}
+          <div style={{ marginBottom: 'var(--space-6)' }}>
+            <Logo size="lg" showTagline={true} dark={true} />
+          </div>
 
           {emailSent ? (
             /* Success state */
@@ -284,12 +256,6 @@ export function LoginPage() {
         </div>
       </div>
 
-      {/* Blink animation */}
-      <style>{`
-        @keyframes blink {
-          50% { opacity: 0; }
-        }
-      `}</style>
     </div>
   )
 }
