@@ -118,7 +118,7 @@ fixed = re.sub(r'\\\s+', ' ', json_str)
 
 ## Files Modified This Session
 
-1. `engine/chart_pipeline.py` - JSON repair for backslash-continuation
+1. `engine/chart_pipeline.py` - JSON repair for backslash-continuation, multi-series chart colors
 2. `engine/chart_conversation.py` - Intent classification prompt improvement
 
 ---
@@ -129,7 +129,64 @@ fixed = re.sub(r'\\\s+', ' ', json_str)
 - [x] Run full test suite on OpenAI provider (29/30 - 97%)
 - [x] Run full test suite on Gemini provider (29/30 - 97%)
 - [x] Investigate weekly granularity issue (Test 10) - **documented as known limitation**
-- [ ] Consider adding test for multi-line chart display (related to provider_comparison_results.md issues)
+- [x] Investigate multi-line chart display issue - **fixed**
+
+---
+
+## Session: 2026-01-23 (continued)
+
+### Multi-Line Chart Fix
+
+#### Issue Identified
+
+**Multi-Line Chart Shows Only One Line**
+- **Symptom:** When requesting a chart with multiple lines (e.g., average and median), only one line is displayed
+- **Source:** Discovered in `provider_comparison_results.md` - Test "Average and median customer invoice amount by month"
+- **Root Cause:** `_build_echarts_options()` in `engine/chart_pipeline.py` always generated a single series configuration, regardless of how many y-columns were specified
+
+#### Technical Details
+
+The chart config correctly set `y={["avg_invoice_amount", "median_invoice_amount"]}`, but `echartsOptions.series` only contained ONE style configuration. ECharts applies series styles sequentially to data series - with only one style config, all lines received the same color (#6366f1), making them appear as one.
+
+**Before fix:**
+```python
+if series_options:
+    options["series"] = [series_options]  # Always single element
+```
+
+**After fix:**
+```python
+# Generate a series config for each y-column
+for i in range(num_series):
+    series_color = series_palette[i % len(series_palette)]
+    series_options["lineStyle"]["color"] = series_color
+    series_options["itemStyle"]["color"] = series_color
+    series_list.append(series_options)
+options["series"] = series_list  # Multiple elements with different colors
+```
+
+#### Fix Applied
+
+**File:** `engine/chart_pipeline.py`
+
+1. Modified `_build_echarts_options()` to accept `num_series` parameter
+2. Generate multiple series configurations when `num_series > 1`
+3. Apply different colors from `series_palette` to each series:
+   - Series 0: `#3730a3` (dark indigo)
+   - Series 1: `#6366f1` (primary indigo)
+   - Series 2: `#a5b4fc` (light indigo)
+4. Updated callers in `_build_chart_config()` to pass the count of y-columns
+
+#### Verification
+
+```
+config.y: ['avg_invoice_amount', 'median_invoice_amount']
+Number of series configs: 2
+  Series 0 color: #3730a3
+  Series 1 color: #6366f1
+```
+
+Smoke tests: 3/3 passed (100%)
 
 ---
 

@@ -566,10 +566,12 @@ class ChartPipeline:
 
             # Apply design system defaults for line charts
             line_defaults = config_loader.get_chart_type_defaults("line")
+            # Determine number of series for multi-line charts
+            num_series = len(config.y) if isinstance(config.y, list) else 1
             config.extra_props = {
                 "fillColor": "#6366f1",  # Indigo primary
                 "chartAreaHeight": 350,  # Match design system standard height
-                "echartsOptions": self._build_echarts_options(base_options, line_defaults),
+                "echartsOptions": self._build_echarts_options(base_options, line_defaults, num_series),
             }
 
         elif spec.chart_type == ChartType.BAR_CHART:
@@ -587,10 +589,12 @@ class ChartPipeline:
             # Apply design system defaults for bar charts
             bar_type = "bar_horizontal" if spec.horizontal else "bar_vertical"
             bar_defaults = config_loader.get_chart_type_defaults(bar_type)
+            # Determine number of series for grouped bar charts
+            num_series = len(config.y) if isinstance(config.y, list) else 1
             config.extra_props = {
                 "fillColor": "#6366f1",  # Indigo primary
                 "chartAreaHeight": 350,  # Match design system standard height
-                "echartsOptions": self._build_echarts_options(base_options, bar_defaults),
+                "echartsOptions": self._build_echarts_options(base_options, bar_defaults, num_series),
             }
 
         elif spec.chart_type == ChartType.DATA_TABLE:
@@ -611,9 +615,16 @@ class ChartPipeline:
 
         return config
 
-    def _build_echarts_options(self, base_options: dict, type_defaults: dict) -> dict:
-        """Build echartsOptions by merging base options with type-specific defaults."""
+    def _build_echarts_options(self, base_options: dict, type_defaults: dict, num_series: int = 1) -> dict:
+        """Build echartsOptions by merging base options with type-specific defaults.
+
+        Args:
+            base_options: Base grid/axis options from design system
+            type_defaults: Chart-type-specific styling (line, bar, etc.)
+            num_series: Number of data series (y-columns) to style
+        """
         options = {}
+        config_loader = get_config_loader()
 
         # Apply base grid and axis options
         if "grid" in base_options:
@@ -625,28 +636,47 @@ class ChartPipeline:
 
         # Apply type-specific series options
         if type_defaults:
-            series_options = {}
+            # Get color palette for multi-series charts
+            use_extended = num_series > 3
+            series_palette = config_loader.get_series_palette(extended=use_extended)
 
-            # Line/area chart styling
-            if "smooth" in type_defaults:
-                series_options["smooth"] = type_defaults["smooth"]
-            if "symbolSize" in type_defaults:
-                series_options["symbolSize"] = type_defaults["symbolSize"]
-            if "lineStyle" in type_defaults:
-                series_options["lineStyle"] = type_defaults["lineStyle"]
-            if "itemStyle" in type_defaults:
-                series_options["itemStyle"] = type_defaults["itemStyle"]
-            if "areaStyle" in type_defaults:
-                series_options["areaStyle"] = type_defaults["areaStyle"]
-            if "emphasis" in type_defaults:
-                series_options["emphasis"] = type_defaults["emphasis"]
+            # Build series options for each data series
+            series_list = []
+            for i in range(num_series):
+                series_options = {}
 
-            # Bar chart styling
-            if "barWidth" in type_defaults:
-                series_options["barWidth"] = type_defaults["barWidth"]
+                # Get color for this series (cycle through palette if needed)
+                series_color = series_palette[i % len(series_palette)] if series_palette else "#6366f1"
 
-            if series_options:
-                options["series"] = [series_options]
+                # Line/area chart styling
+                if "smooth" in type_defaults:
+                    series_options["smooth"] = type_defaults["smooth"]
+                if "symbolSize" in type_defaults:
+                    series_options["symbolSize"] = type_defaults["symbolSize"]
+                if "lineStyle" in type_defaults:
+                    # Deep copy and override color for this series
+                    line_style = dict(type_defaults["lineStyle"])
+                    line_style["color"] = series_color
+                    series_options["lineStyle"] = line_style
+                if "itemStyle" in type_defaults:
+                    # Deep copy and override color for this series
+                    item_style = dict(type_defaults["itemStyle"])
+                    item_style["color"] = series_color
+                    series_options["itemStyle"] = item_style
+                if "areaStyle" in type_defaults:
+                    series_options["areaStyle"] = type_defaults["areaStyle"]
+                if "emphasis" in type_defaults:
+                    series_options["emphasis"] = type_defaults["emphasis"]
+
+                # Bar chart styling
+                if "barWidth" in type_defaults:
+                    series_options["barWidth"] = type_defaults["barWidth"]
+
+                if series_options:
+                    series_list.append(series_options)
+
+            if series_list:
+                options["series"] = series_list
 
         return options
 
