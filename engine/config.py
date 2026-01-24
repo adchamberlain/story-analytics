@@ -59,15 +59,14 @@ class Config:
         return self.config_path.parent / rel_path
 
     @property
-    def pages_dir(self) -> Path:
-        """Get the Evidence pages directory."""
-        rel_path = self._config.get("evidence", {}).get("pages_dir", "pages/")
-        return self.config_path.parent / rel_path
+    def api_url(self) -> str:
+        """Get the API server URL."""
+        return self._config.get("app", {}).get("api_url", "http://localhost:8000")
 
     @property
-    def dev_url(self) -> str:
-        """Get the Evidence dev server URL."""
-        return self._config.get("evidence", {}).get("dev_url", "http://localhost:3000")
+    def frontend_url(self) -> str:
+        """Get the React frontend URL."""
+        return self._config.get("app", {}).get("frontend_url", "http://localhost:3001")
 
     def get_snowflake_config(self) -> dict[str, Any]:
         """Load and return the Snowflake connection configuration.

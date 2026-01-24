@@ -3,11 +3,10 @@ llm:
   model: claude-sonnet-4-20250514
   fast_model: claude-3-5-haiku-20241022  # For structured tasks (faster)
   api_key_env: ANTHROPIC_API_KEY
-  api_key: REDACTED_API_KEY
 
 snowflake:
   connection_file: sources/snowflake_saas/connection.yaml
 
-evidence:
-  pages_dir: .evidence/template/src/pages/
-  dev_url: http://localhost:3000
+app:
+  api_url: http://localhost:8000
+  frontend_url: http://localhost:3001
