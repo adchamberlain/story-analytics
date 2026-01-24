@@ -101,8 +101,16 @@ instructions: |
        WRONG: SELECT DISTINCT EXTRACT(YEAR FROM date) as "EXTRACT(YEAR FROM date)"
        RIGHT: SELECT DISTINCT EXTRACT(YEAR FROM date) as year
      - In the main query, use ${inputs.filter_name.value} to access the selected value.
+
+     CRITICAL - QUOTING RULES for filter values:
+     - STRING values (industry, name, status, tier, category): USE SINGLE QUOTES
+       Example: WHERE industry = '${inputs.industry_filter.value}'
+       Example: WHERE plan_tier = '${inputs.plan_filter.value}'
+     - NUMERIC values (year, month number, count): NO QUOTES
        Example: WHERE EXTRACT(YEAR FROM date) = ${inputs.year_filter.value}
-     - (note: no quotes needed for numeric values like years)
+
+     If you forget quotes around string values, you will get errors like:
+     "Binder Error: Referenced column 'Finance' not found in FROM clause!"
 
   2. For DateRange filters:
      - Add WHERE clause: WHERE date_col >= '${inputs.filter_name.start}'
@@ -124,21 +132,23 @@ output_format: |
   {
     "query_name": "descriptive_name",
     "purpose": "What this query provides",
-    "sql": "SELECT ... FROM ... WHERE column = ${inputs.filter_name.value}",
+    "sql": "SELECT ... FROM ... WHERE string_col = '${inputs.filter_name.value}'",
     "columns": ["x_column", "y_column"],
     "filter_queries": [
       {
-        "name": "year_options",
-        "filter_name": "year_filter",
-        "sql": "SELECT DISTINCT EXTRACT(YEAR FROM date_col) AS year FROM table ORDER BY year",
-        "value_column": "year"
+        "name": "industry_options",
+        "filter_name": "industry_filter",
+        "sql": "SELECT DISTINCT industry FROM customers ORDER BY industry",
+        "value_column": "industry"
       }
     ]
   }
   ```
 
-  NOTE: For dropdown filters, use ${inputs.filter_name.value} to access the selected value.
-  Example: ${inputs.year_filter.value} returns the year number (e.g., 2025).
+  FILTER VALUE EXAMPLES:
+  - String filter (industry): WHERE industry = '${inputs.industry_filter.value}'  ← QUOTES!
+  - String filter (plan tier): WHERE plan_tier = '${inputs.plan_filter.value}'  ← QUOTES!
+  - Numeric filter (year): WHERE YEAR(date) = ${inputs.year_filter.value}  ← NO QUOTES
 
   Column naming:
   - For x-axis data: use descriptive names like "month", "segment", "product"

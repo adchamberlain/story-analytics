@@ -29,6 +29,7 @@ from .schema import get_schema_context
 from .sql_validator import validate_query
 from .config_loader import get_config_loader
 from .validators import ChartSpecValidator
+from .validators.sql_fixer import SQLFixer
 
 
 @dataclass
@@ -305,7 +306,17 @@ Please fix the query and output the corrected JSON."""
 
     def _try_repair_json(self, json_str: str) -> dict | None:
         """Try to repair common JSON formatting issues."""
-        # Try fixing unescaped newlines in strings
+        # Fix 1: Handle backslash-continuation that some LLMs use for multi-line SQL
+        # Pattern: "sql": "SELECT \ \n   col" -> "sql": "SELECT col"
+        # This is invalid JSON but common in LLM output
+        try:
+            # Remove backslash followed by whitespace (line continuation)
+            fixed = re.sub(r'\\\s+', ' ', json_str)
+            return json.loads(fixed)
+        except (json.JSONDecodeError, Exception):
+            pass
+
+        # Fix 2: Try fixing unescaped newlines in strings
         # This is a common issue when SQL has newlines that weren't escaped
         try:
             # Replace literal newlines inside strings with escaped newlines
@@ -320,7 +331,7 @@ Please fix the query and output the corrected JSON."""
         except (json.JSONDecodeError, Exception):
             pass
 
-        # Try extracting just the SQL from a partially valid response
+        # Fix 3: Try extracting just the SQL from a partially valid response
         try:
             sql_match = re.search(r'"sql"\s*:\s*"((?:[^"\\]|\\.)*)"|"sql"\s*:\s*`(.*?)`', json_str, re.DOTALL)
             name_match = re.search(r'"query_name"\s*:\s*"([^"]*)"', json_str)
@@ -328,13 +339,16 @@ Please fix the query and output the corrected JSON."""
 
             if sql_match:
                 sql = sql_match.group(1) or sql_match.group(2) or ""
+                # Clean up the SQL: remove backslash continuations and unescape
+                sql = re.sub(r'\\\s+', ' ', sql)
+                sql = sql.replace('\\n', '\n')
                 name = name_match.group(1) if name_match else "query"
                 cols = []
                 if cols_match:
                     cols = [c.strip().strip('"\'') for c in cols_match.group(1).split(',') if c.strip()]
                 return {
                     "query_name": name,
-                    "sql": sql.replace('\\n', '\n'),
+                    "sql": sql,
                     "columns": cols,
                     "filter_queries": []
                 }
@@ -432,6 +446,14 @@ class ChartPipeline:
                 error=f"SQL generation failed: {e}",
             )
 
+        # Stage 2b: Fix SQL filter quoting
+        # This catches cases where LLMs (especially non-Claude) forget to quote string values
+        if spec.interactive_filters:
+            original_sql = sql
+            sql = SQLFixer.fix_filter_quoting(sql, spec.interactive_filters)
+            if sql != original_sql and self.config.verbose:
+                print("[ChartPipeline]   Fixed filter quoting in SQL")
+
         # Stage 3: Assemble chart
         if self.config.verbose:
             print("[ChartPipeline] Stage 3: Assembling chart...")
@@ -440,8 +462,10 @@ class ChartPipeline:
         config = self._build_chart_config(spec, columns)
 
         # Stage 3b: Analyze scales and use dual y-axis if needed
+        # Only for chart types that support dual y-axis (not DataTable, BigValue)
         y_columns = columns[1:] if len(columns) >= 2 else []
-        if len(y_columns) == 2 and config.y2 is None:
+        chart_supports_dual_axis = spec.chart_type not in (ChartType.DATA_TABLE, ChartType.BIG_VALUE)
+        if chart_supports_dual_axis and len(y_columns) == 2 and config.y2 is None:
             # Only analyze if we have 2 metrics and didn't already set y2
             scale_analysis = ChartSpecValidator.analyze_scales(sql, columns)
             if scale_analysis and scale_analysis.needs_dual_axis:

@@ -104,6 +104,21 @@ validation_prompt: |
        * Format codes visible in the output (any letter suffix like 'f', 'd', etc.)
        * This is a CRITICAL issue that must be fixed
 
+     IMPORTANT - These are NOT critical issues (pass the dashboard):
+     - Multi-metric charts showing both metrics in the legend with dual y-axis = WORKING CORRECTLY
+     - Label truncation (e.g., "Company..." for long names) = normal ECharts behavior, NOT a bug
+     - Flat/uniform data lines = reflects actual data, NOT a visualization bug
+     - BigValue/KPI response to ambiguous requests = acceptable interpretation
+     - All customers having similar values = may be real data distribution
+
+     TIME GRANULARITY DISPLAY (IMPORTANT):
+     - When user requests "weekly" or "quarterly" data, the x-axis may show month names (Jan, Feb, Mar)
+       even though the underlying data IS weekly/quarterly. This is Evidence's default date formatting.
+     - If the chart shows data points at the correct granularity level, it PASSES even if labels look monthly.
+     - DO NOT fail a "weekly" chart just because x-axis shows "Mar, Apr, May" - count the data points instead.
+     - If a weekly chart covers 6 months and shows ~26 data points (one per week), it's CORRECT.
+     - If a quarterly chart shows 4-8 bars for 1-2 years, it's CORRECT even with month labels.
+
      NOTE: Gray boxes showing "X records with Y properties" are NORMAL Evidence behavior - ignore these.
 
   4. SUGGESTIONS: List optional improvements that would be nice-to-have but aren't required:

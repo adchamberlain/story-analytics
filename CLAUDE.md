@@ -124,6 +124,32 @@ To customize behavior:
 - Edit `engine/qa/rules.yaml` for QA behavior
 - Edit `engine/components/evidence.yaml` for component documentation
 
+## Testing Workflow
+
+When doing automated testing of the chart pipeline, **always use the testing log** to pick up where we left off:
+
+1. **Read the log first**: `test_results/TESTING_LOG.md`
+   - Check which providers have been tested
+   - Review any outstanding issues or next steps
+   - Understand what fixes have already been applied
+
+2. **Run tests**: `python tests/comprehensive_chart_tests.py --provider <provider>`
+   - Use `--smoke` for quick 3-test validation
+   - Use `--provider claude|openai|gemini` for specific provider
+   - Full suite is 30 tests across all chart types and edge cases
+
+3. **Update the log** after each testing session:
+   - Record initial results (pass rate, failing tests)
+   - Document issues identified (symptoms, root causes)
+   - Record fixes applied (with code snippets)
+   - Record re-test results and improvement metrics
+
+4. **Test results are stored in**: `test_results/`
+   - `TESTING_LOG.md` - Consolidated progress log (use this!)
+   - `comprehensive_test_results_<date>.md` - Detailed per-run results
+
+This ensures continuity across sessions and tracks progress toward 100% pass rate on all providers.
+
 ## Common Issues
 
 - **"Timeout while initializing database"**: Run `npm run sources` to regenerate source data
