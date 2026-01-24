@@ -115,6 +115,7 @@
 							url={`http://localhost:3000/${slug}?embed=true`}
 							title={pageData.chart.title}
 							height="400px"
+							chartId={pageData.chart.id}
 						/>
 					</div>
 				</div>
