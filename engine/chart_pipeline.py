@@ -30,6 +30,12 @@ from .sql_validator import validate_query
 from .config_loader import get_config_loader
 from .validators import ChartSpecValidator
 from .validators.sql_fixer import SQLFixer
+from .validators.quality_validator import (
+    ChartQualityValidator,
+    QualityValidationResult,
+    ValidationIssue,
+    ValidationSeverity,
+)
 
 
 @dataclass
@@ -39,6 +45,14 @@ class ChartPipelineConfig:
     provider_name: str | None = None
     max_sql_fix_attempts: int = 3
     verbose: bool = True
+
+    # Quality validation options
+    enable_quality_validation: bool = True
+    enable_spec_verification: bool = True  # LLM check that spec matches request
+    enable_data_validation: bool = True    # Check query results shape
+    enable_aggregation_check: bool = True  # Check SQL aggregation matches spec
+    enable_chart_type_check: bool = True   # Check chart type is appropriate
+    fail_on_quality_warnings: bool = False # Treat warnings as errors
 
 
 @dataclass
@@ -52,6 +66,37 @@ class ChartPipelineResult:
     # For debugging
     spec: ChartSpec | None = None
     raw_sql_response: str | None = None
+
+    # Quality validation results
+    quality_result: QualityValidationResult | None = None
+
+    @property
+    def quality_issues(self) -> list[ValidationIssue]:
+        """Get all quality issues found during validation."""
+        if self.quality_result:
+            return self.quality_result.issues
+        return []
+
+    @property
+    def quality_warnings(self) -> list[ValidationIssue]:
+        """Get quality warnings (non-blocking issues)."""
+        if self.quality_result:
+            return self.quality_result.warnings
+        return []
+
+    @property
+    def quality_errors(self) -> list[ValidationIssue]:
+        """Get quality errors (blocking issues)."""
+        if self.quality_result:
+            return self.quality_result.errors
+        return []
+
+    @property
+    def data_preview(self) -> list[dict] | None:
+        """Get preview of query results (first few rows)."""
+        if self.quality_result:
+            return self.quality_result.data_preview
+        return None
 
 
 class ChartRequirementsAgent:
@@ -108,7 +153,7 @@ class ChartRequirementsAgent:
         response = self.llm.generate(
             messages=messages,
             system_prompt=system_prompt,
-            temperature=0.3,
+            temperature=0.1,  # Low temperature for deterministic JSON extraction
             max_tokens=1024,
         )
 
@@ -380,6 +425,19 @@ class ChartPipeline:
             max_fix_attempts=self.config.max_sql_fix_attempts,
         )
 
+        # Initialize quality validator
+        if self.config.enable_quality_validation:
+            self.quality_validator = ChartQualityValidator(
+                enable_data_validation=self.config.enable_data_validation,
+                enable_spec_verification=self.config.enable_spec_verification,
+                enable_aggregation_check=self.config.enable_aggregation_check,
+                enable_chart_type_check=self.config.enable_chart_type_check,
+                enable_visual_qa=False,  # Visual QA requires running app
+                provider_name=self.config.provider_name,
+            )
+        else:
+            self.quality_validator = None
+
     def get_schema_context(self) -> str:
         """Get cached schema context."""
         if self._schema_context is None:
@@ -397,6 +455,7 @@ class ChartPipeline:
             ChartPipelineResult with the generated chart or error
         """
         schema = self.get_schema_context()
+        quality_result = QualityValidationResult(passed=True)
 
         # Stage 1: Extract requirements
         if self.config.verbose:
@@ -405,7 +464,7 @@ class ChartPipeline:
         try:
             spec = self.requirements_agent.extract_spec(user_request, schema)
 
-            # Stage 1b: Validate and correct spec
+            # Stage 1b: Validate and correct spec (pattern-based)
             spec = ChartSpecValidator.validate_spec(spec)
 
             if self.config.verbose:
@@ -414,10 +473,22 @@ class ChartPipeline:
                 print(f"[ChartPipeline]   Metric: {spec.metric}")
                 if spec.horizontal:
                     print(f"[ChartPipeline]   Horizontal: True")
+
+            # Stage 1c: Quality validation of spec
+            if self.quality_validator:
+                if self.config.verbose:
+                    print("[ChartPipeline] Stage 1c: Validating spec quality...")
+                spec_validation = self.quality_validator.validate_spec(spec)
+                for issue in spec_validation.issues:
+                    quality_result.add_issue(issue)
+                    if self.config.verbose and issue.severity != ValidationSeverity.INFO:
+                        print(f"[ChartPipeline]   {issue}")
+
         except Exception as e:
             return ChartPipelineResult(
                 success=False,
                 error=f"Requirements extraction failed: {e}",
+                quality_result=quality_result,
             )
 
         # Stage 2: Generate and validate SQL
@@ -432,6 +503,7 @@ class ChartPipeline:
                     success=False,
                     spec=spec,
                     error=f"SQL validation failed: {error}",
+                    quality_result=quality_result,
                 )
 
             if self.config.verbose:
@@ -444,6 +516,7 @@ class ChartPipeline:
                 success=False,
                 spec=spec,
                 error=f"SQL generation failed: {e}",
+                quality_result=quality_result,
             )
 
         # Stage 2b: Fix SQL filter quoting
@@ -453,6 +526,32 @@ class ChartPipeline:
             sql = SQLFixer.fix_filter_quoting(sql, spec.interactive_filters)
             if sql != original_sql and self.config.verbose:
                 print("[ChartPipeline]   Fixed filter quoting in SQL")
+
+        # Stage 2c: Quality validation of SQL query
+        if self.quality_validator:
+            if self.config.verbose:
+                print("[ChartPipeline] Stage 2c: Validating query quality...")
+            query_validation = self.quality_validator.validate_query(sql, spec, columns)
+            quality_result.row_count = query_validation.row_count
+            quality_result.column_count = query_validation.column_count
+            quality_result.data_preview = query_validation.data_preview
+            for issue in query_validation.issues:
+                quality_result.add_issue(issue)
+                if self.config.verbose and issue.severity != ValidationSeverity.INFO:
+                    print(f"[ChartPipeline]   {issue}")
+
+            if self.config.verbose and query_validation.row_count > 0:
+                print(f"[ChartPipeline]   Data: {query_validation.row_count} rows, {query_validation.column_count} columns")
+
+            # Check for blocking errors
+            if quality_result.errors and self.config.fail_on_quality_warnings:
+                error_messages = [e.message for e in quality_result.errors]
+                return ChartPipelineResult(
+                    success=False,
+                    spec=spec,
+                    error=f"Quality validation failed: {'; '.join(error_messages)}",
+                    quality_result=quality_result,
+                )
 
         # Stage 3: Assemble chart
         if self.config.verbose:
@@ -493,11 +592,16 @@ class ChartPipeline:
 
         if self.config.verbose:
             print("[ChartPipeline] Complete!")
+            if quality_result.warnings:
+                print(f"[ChartPipeline] Quality warnings: {len(quality_result.warnings)}")
+            if quality_result.errors:
+                print(f"[ChartPipeline] Quality errors: {len(quality_result.errors)}")
 
         return ChartPipelineResult(
             success=True,
             chart=validated_chart,
             spec=spec,
+            quality_result=quality_result,
         )
 
     def _build_chart_config(self, spec: ChartSpec, columns: list[str]) -> ChartConfig:

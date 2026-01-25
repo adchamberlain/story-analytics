@@ -28,6 +28,17 @@ from typing import TYPE_CHECKING, Optional
 from .filter_defaults import DateRangeDefaultExtractor, FilterDefaultResolver
 from .request_patterns import RequestPatternValidator
 from .scale_analyzer import ScaleAnalysis, ScaleAnalyzer
+from .quality_validator import (
+    ChartQualityValidator,
+    QualityValidationResult,
+    ValidationIssue,
+    ValidationSeverity,
+    DataShapeValidator,
+    AggregationValidator,
+    ChartTypeValidator,
+    SpecVerifier,
+    validate_chart_quality,
+)
 
 if TYPE_CHECKING:
     from ..models.chart import ChartConfig, ChartSpec, FilterSpec
@@ -39,6 +50,16 @@ __all__ = [
     "ScaleAnalysis",
     "FilterDefaultResolver",
     "DateRangeDefaultExtractor",
+    # Quality validators
+    "ChartQualityValidator",
+    "QualityValidationResult",
+    "ValidationIssue",
+    "ValidationSeverity",
+    "DataShapeValidator",
+    "AggregationValidator",
+    "ChartTypeValidator",
+    "SpecVerifier",
+    "validate_chart_quality",
 ]
 
 
