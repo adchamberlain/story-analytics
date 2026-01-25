@@ -43,11 +43,22 @@ class QAResult:
 
 
 class DashboardScreenshot:
-    """Captures screenshots of Evidence dashboards."""
+    """Captures screenshots of dashboards and charts."""
 
-    def __init__(self, base_url: str | None = None):
+    def __init__(self, base_url: str | None = None, mode: str = "chart"):
+        """
+        Initialize the screenshot capturer.
+
+        Args:
+            base_url: Base URL for the app (defaults to config)
+            mode: "chart" for React app charts, "dashboard" for dashboards
+        """
         config = get_config()
-        self.base_url = base_url or config.dev_url
+        # Use React app URL for charts
+        if mode == "chart":
+            self.base_url = base_url or config.frontend_url
+        else:
+            self.base_url = base_url or config.api_url
 
     async def capture_async(
         self,
@@ -487,3 +498,206 @@ def run_qa_with_auto_fix(
         issues_fixed=issues_fixed,
         issues_remaining=issues_remaining,
     )
+
+
+class ChartQA:
+    """Validates individual charts using vision analysis."""
+
+    def __init__(self, provider_name: str | None = None):
+        from .llm.claude import get_provider
+        from .config_loader import get_config_loader
+        self.llm = get_provider(provider_name)
+        self.config_loader = get_config_loader()
+        self.config = get_config()
+        print(f"[ChartQA] Using provider: {self.llm.name}")
+
+    def validate(
+        self,
+        chart_id: str,
+        original_request: str,
+        chart_type: str | None = None,
+    ) -> QAResult:
+        """
+        Validate a chart against the original request.
+
+        Args:
+            chart_id: The chart ID to validate
+            original_request: The original user request for the chart
+            chart_type: Optional chart type for context
+
+        Returns:
+            QAResult with validation results
+        """
+        print(f"[ChartQA] Capturing screenshot of chart {chart_id}...")
+
+        # Create debug screenshot directory
+        screenshots_dir = Path(__file__).parent.parent / "qa_screenshots"
+        screenshots_dir.mkdir(exist_ok=True)
+
+        # Generate filename with timestamp
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        screenshot_path = screenshots_dir / f"chart_{chart_id}_{timestamp}.png"
+
+        # Capture screenshot from React app
+        screenshotter = DashboardScreenshot(mode="chart")
+        screenshot = screenshotter.capture(
+            f"chart/{chart_id}",
+            save_path=screenshot_path
+        )
+
+        if not screenshot.success:
+            print(f"[ChartQA] Screenshot failed: {screenshot.error}")
+            return QAResult(
+                passed=False,
+                summary=f"Could not capture screenshot: {screenshot.error}",
+                critical_issues=[screenshot.error or "Screenshot capture failed"],
+                suggestions=["Ensure the React app is running on port 3001"],
+            )
+
+        print(f"[ChartQA] Screenshot saved to: {screenshot_path}")
+        print(f"[ChartQA] Sending to {self.llm.name} vision for validation...")
+
+        # Build the validation prompt
+        prompt = self._build_chart_validation_prompt(original_request, chart_type)
+
+        # Send to LLM with vision
+        response = self.llm.generate_with_image(
+            prompt=prompt,
+            image_base64=screenshot.image_base64,
+            image_media_type="image/png",
+        )
+
+        # Parse the response
+        result = self._parse_validation_response(response.content)
+        print(f"[ChartQA] Validation complete: {'PASSED' if result.passed else 'FAILED'} - {result.summary[:100]}...")
+
+        return result
+
+    def _build_chart_validation_prompt(
+        self,
+        original_request: str,
+        chart_type: str | None,
+    ) -> str:
+        """Build the validation prompt for chart QA."""
+        type_context = f"\nEXPECTED CHART TYPE: {chart_type}" if chart_type else ""
+
+        return f"""You are a QA analyst reviewing a data chart. Analyze this screenshot and validate it against the original request.
+
+ORIGINAL REQUEST:
+{original_request}
+{type_context}
+
+Please analyze the chart screenshot and provide:
+
+1. VALIDATION RESULT: Does this chart fulfill the original request? Answer PASS or FAIL.
+
+2. SUMMARY: A brief 1-2 sentence summary of what the chart shows.
+
+3. CRITICAL ISSUES: List any problems that MUST be fixed:
+   - Data errors (wrong calculations, obviously missing data)
+   - Broken visualization (chart not rendering, error messages visible)
+   - Wrong chart type (user asked for line chart but got bar chart)
+   - Missing the primary metric or dimension the user asked for
+   - NUMBER FORMATTING ERRORS (numbers ending with 'f' like "$123.0f")
+
+   IMPORTANT - These are NOT critical issues:
+   - Label truncation for long names (normal behavior)
+   - Flat/uniform data (may be real data)
+   - Minor aesthetic issues (colors, spacing)
+   - Data showing unexpected patterns (unless clearly wrong)
+
+4. SUGGESTIONS: List optional improvements (nice-to-have, not required):
+   - Better formatting
+   - Additional context
+   - Aesthetic improvements
+
+Format your response exactly like this:
+RESULT: [PASS or FAIL]
+SUMMARY: [your summary]
+CRITICAL:
+- [critical issue 1]
+- [critical issue 2]
+SUGGESTIONS:
+- [suggestion 1]
+- [suggestion 2]
+
+If there are no critical issues or suggestions, write "None" for that section."""
+
+    def _parse_validation_response(self, response: str) -> QAResult:
+        """Parse the LLM validation response into a QAResult."""
+        lines = response.strip().split("\n")
+
+        result_says_pass = False
+        summary = ""
+        critical_issues = []
+        suggestions = []
+
+        current_section = None
+
+        for line in lines:
+            line = line.strip()
+            if not line:
+                continue
+
+            if line.startswith("RESULT:"):
+                result_text = line.replace("RESULT:", "").strip().upper()
+                result_says_pass = "PASS" in result_text
+            elif line.startswith("SUMMARY:"):
+                summary = line.replace("SUMMARY:", "").strip()
+            elif line.startswith("CRITICAL:"):
+                current_section = "critical"
+            elif line.startswith("SUGGESTIONS:"):
+                current_section = "suggestions"
+            elif line.startswith("- "):
+                item = line[2:].strip()
+                if item.lower() != "none":
+                    if current_section == "critical":
+                        critical_issues.append(item)
+                    elif current_section == "suggestions":
+                        suggestions.append(item)
+
+        # Determine actual pass/fail status
+        passed = result_says_pass
+        if critical_issues:
+            passed = False
+
+        # Check summary for failure indicators
+        failure_keywords = [
+            "broken", "error", "failed", "failing", "not working",
+            "cannot", "can't", "unable", "no data", "missing",
+            "catalog error", "sql error", "binder error"
+        ]
+        summary_lower = summary.lower()
+        for keyword in failure_keywords:
+            if keyword in summary_lower:
+                passed = False
+                break
+
+        return QAResult(
+            passed=passed,
+            summary=summary,
+            critical_issues=critical_issues,
+            suggestions=suggestions,
+        )
+
+
+def validate_chart(
+    chart_id: str,
+    original_request: str,
+    chart_type: str | None = None,
+    provider_name: str | None = None,
+) -> QAResult:
+    """
+    Convenience function to validate a chart.
+
+    Args:
+        chart_id: The chart ID to validate
+        original_request: The original user request
+        chart_type: Optional expected chart type
+        provider_name: Optional LLM provider
+
+    Returns:
+        QAResult with validation results
+    """
+    qa = ChartQA(provider_name=provider_name)
+    return qa.validate(chart_id, original_request, chart_type)
