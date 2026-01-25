@@ -25,6 +25,14 @@ class Settings(BaseSettings):
     # API base URL for generating chart URLs
     api_base_url: str = "http://localhost:8000"
 
+    # Frontend base URL for dashboard links
+    frontend_base_url: str = "http://localhost:3001"
+
+    # Legacy alias (for backwards compatibility)
+    @property
+    def evidence_base_url(self) -> str:
+        return f"{self.frontend_base_url}/dashboard"
+
     class Config:
         env_file = ".env"
         extra = "ignore"

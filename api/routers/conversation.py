@@ -133,15 +133,17 @@ def restore_manager_state(manager, session: ConversationSession, db: Session = N
     manager.state.target_dashboard = session.target_dashboard
     manager.state.original_request = session.original_request
 
-    # Restore created_file and generated_markdown if in refinement phase with a linked dashboard
+    # Restore dashboard state if in refinement phase with a linked dashboard
     if session.dashboard_id and db:
         dashboard = db.query(Dashboard).filter(Dashboard.id == session.dashboard_id).first()
-        if dashboard and dashboard.file_path:
-            file_path = Path(dashboard.file_path)
-            if file_path.exists():
-                manager.state.created_file = file_path
-                manager.state.generated_markdown = file_path.read_text()
-                manager.state.dashboard_title = dashboard.title
+        if dashboard:
+            manager.state.dashboard_slug = dashboard.slug
+            manager.state.dashboard_title = dashboard.title
+            if dashboard.file_path:
+                file_path = Path(dashboard.file_path)
+                if file_path.exists():
+                    manager.state.created_file = file_path
+                    manager.state.generated_markdown = file_path.read_text()
 
 
 def save_manager_state(manager, session: ConversationSession):
@@ -201,8 +203,14 @@ async def send_message(
         # Check if a dashboard was created
         dashboard_url = None
         dashboard_created = False
-        if manager.state.created_file:
-            # File is at pages_dir/slug/+page.md, so get the parent directory name
+        slug = None
+        if manager.state.dashboard_slug:
+            # New flow: dashboard_slug is set directly
+            slug = manager.state.dashboard_slug
+            dashboard_url = f"{settings.evidence_base_url}/{slug}"
+            dashboard_created = True
+        elif manager.state.created_file:
+            # Legacy flow: get slug from file path
             slug = manager.state.created_file.parent.name
             dashboard_url = f"{settings.evidence_base_url}/{slug}"
             dashboard_created = True
@@ -273,10 +281,8 @@ async def send_message(
                 issues_fixed=result.qa_result.issues_fixed,
             )
 
-        # Get dashboard slug if created
-        dashboard_slug = None
-        if manager.state.created_file:
-            dashboard_slug = manager.state.created_file.parent.name
+        # Get dashboard slug if created (already computed above)
+        dashboard_slug = slug
 
         return MessageResponse(
             response=response_text,
@@ -373,7 +379,12 @@ async def send_message_stream(
             dashboard_created = False
             dashboard_slug = None
 
-            if manager.state.created_file:
+            if manager.state.dashboard_slug:
+                slug = manager.state.dashboard_slug
+                dashboard_url = f"{settings.evidence_base_url}/{slug}"
+                dashboard_created = True
+                dashboard_slug = slug
+            elif manager.state.created_file:
                 slug = manager.state.created_file.parent.name
                 dashboard_url = f"{settings.evidence_base_url}/{slug}"
                 dashboard_created = True

@@ -54,6 +54,8 @@ export interface ExtendedMessage extends Message {
   action_buttons?: ActionButton[] | null
   qa_result?: QAResult | null
   error_context?: string | null
+  dashboard_url?: string | null
+  dashboard_slug?: string | null
 }
 
 // =============================================================================

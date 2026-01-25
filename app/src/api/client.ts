@@ -402,8 +402,8 @@ export async function getProviders(): Promise<ProvidersResponse> {
  * Update user's preferred provider.
  */
 export async function updateProvider(provider: string): Promise<void> {
-  await apiFetch('/auth/me', {
-    method: 'PATCH',
+  await apiFetch('/auth/preferences', {
+    method: 'PUT',
     body: JSON.stringify({ preferred_provider: provider }),
   })
 }
@@ -412,8 +412,8 @@ export async function updateProvider(provider: string): Promise<void> {
  * Update user's business type.
  */
 export async function updateBusinessType(businessType: string): Promise<void> {
-  await apiFetch('/auth/me', {
-    method: 'PATCH',
+  await apiFetch('/auth/preferences', {
+    method: 'PUT',
     body: JSON.stringify({ business_type: businessType }),
   })
 }
@@ -422,8 +422,8 @@ export async function updateBusinessType(businessType: string): Promise<void> {
  * Update user's preferred source.
  */
 export async function updateSource(source: string): Promise<void> {
-  await apiFetch('/auth/me', {
-    method: 'PATCH',
+  await apiFetch('/auth/preferences', {
+    method: 'PUT',
     body: JSON.stringify({ preferred_source: source }),
   })
 }

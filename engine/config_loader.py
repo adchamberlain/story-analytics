@@ -75,50 +75,72 @@ class ConfigLoader:
         config = self.get_prompt("generate")
         return config.get("instructions", "")
 
-    # --- Components ---
+    # --- Components (Chart Types) ---
 
     def get_components(self) -> dict:
-        """Load the UI components configuration (Evidence components, etc.)."""
+        """Load the chart types configuration from charts.yaml."""
         if self._components_cache is None:
-            path = self.engine_dir / "components" / "evidence.yaml"
+            path = self.engine_dir / "components" / "charts.yaml"
             self._components_cache = self._load_yaml(path)
         return self._components_cache
 
+    def get_chart_types(self) -> dict:
+        """Get the chart types dictionary."""
+        return self.get_components().get("charts", {})
+
+    def get_chart_selection_guide(self) -> dict:
+        """Get the chart selection guide for the LLM."""
+        return self.get_components().get("selection_guide", {})
+
     def get_components_prompt(self) -> str:
-        """Get component documentation formatted for the LLM prompt."""
-        components = self.get_components()
-        lines = ["AVAILABLE COMPONENTS:", ""]
+        """Get chart type documentation formatted for the LLM prompt."""
+        charts = self.get_chart_types()
+        lines = ["AVAILABLE CHART TYPES:", ""]
 
-        for comp_name, comp_config in components.get("components", {}).items():
-            lines.append(f"{comp_name}: {comp_config.get('description', '')}")
+        for chart_key, chart_config in charts.items():
+            name = chart_config.get("name", chart_key)
+            description = chart_config.get("description", "")
+            lines.append(f"**{name}** ({chart_key}): {description}")
 
-            # Required props
-            if "required_props" in comp_config:
-                lines.append("  Required props:")
-                for prop in comp_config["required_props"]:
-                    if isinstance(prop, dict):
-                        for k, v in prop.items():
+            # Best for
+            best_for = chart_config.get("best_for", [])
+            if best_for:
+                lines.append(f"  Best for: {', '.join(best_for)}")
+
+            # Required config
+            required = chart_config.get("required_config", [])
+            if required:
+                lines.append("  Required config:")
+                for req in required:
+                    if isinstance(req, dict):
+                        for k, v in req.items():
                             lines.append(f"    - {k}: {v}")
                     else:
-                        lines.append(f"    - {prop}")
+                        lines.append(f"    - {req}")
 
-            # Notes
-            if "notes" in comp_config:
-                lines.append("  Notes:")
-                for note in comp_config["notes"]:
-                    lines.append(f"    - {note}")
-
-            # Example
-            if "example" in comp_config:
-                lines.append(f"  Example: {comp_config['example'].strip()}")
+            # Optional config
+            optional = chart_config.get("optional_config", [])
+            if optional:
+                # Handle both string and dict formats
+                opt_names = []
+                for opt in optional:
+                    if isinstance(opt, dict):
+                        opt_names.extend(opt.keys())
+                    else:
+                        opt_names.append(str(opt))
+                lines.append(f"  Optional: {', '.join(opt_names)}")
 
             lines.append("")
 
-        # Common mistakes
-        if "common_mistakes" in components:
-            lines.append("COMMON MISTAKES TO AVOID:")
-            for mistake in components["common_mistakes"]:
-                lines.append(f"  - {mistake.get('mistake', '')} → {mistake.get('correct', '')}")
+        # Selection guide
+        guide = self.get_chart_selection_guide()
+        if guide:
+            lines.append("CHART SELECTION GUIDE:")
+            lines.append("")
+            for category, info in guide.items():
+                keywords = info.get("keywords", [])
+                default = info.get("default", "")
+                lines.append(f"  {category}: keywords=[{', '.join(keywords)}] → default={default}")
 
         return "\n".join(lines)
 

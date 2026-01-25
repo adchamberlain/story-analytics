@@ -10,6 +10,11 @@ import { AreaChart } from './AreaChart'
 import { BigValue } from './BigValue'
 import { ScatterPlot } from './ScatterPlot'
 import { DataTable } from './DataTable'
+import { BubbleChart } from './BubbleChart'
+import { Histogram } from './Histogram'
+import { FunnelChart } from './FunnelChart'
+import { Heatmap } from './Heatmap'
+import { SankeyDiagram } from './SankeyDiagram'
 
 interface ChartFactoryProps {
   spec: ChartSpec
@@ -40,35 +45,19 @@ export function ChartFactory({ spec, data, columns }: ChartFactoryProps) {
       return <DataTable data={data} config={config} columns={columns} />
 
     case 'Histogram':
-      // Use bar chart for histogram (Plotly handles binning)
-      return <BarChart data={data} config={config} />
+      return <Histogram data={data} config={config} />
 
     case 'BubbleChart':
-      // Bubble chart is scatter with size dimension - use scatter for now
-      return <ScatterPlot data={data} config={config} />
+      return <BubbleChart data={data} config={config} />
 
     case 'FunnelChart':
-    case 'SankeyDiagram':
+      return <FunnelChart data={data} config={config} />
+
     case 'Heatmap':
-      // These require more specialized implementations
-      // Fall back to data table for now
-      return (
-        <div>
-          <div
-            style={{
-              padding: '1rem',
-              background: 'var(--color-gray-100)',
-              borderRadius: 'var(--radius-md)',
-              marginBottom: '1rem',
-              color: 'var(--color-gray-600)',
-              fontSize: '0.875rem',
-            }}
-          >
-            {chartType} visualization coming soon. Showing data table:
-          </div>
-          <DataTable data={data} config={config} columns={columns} />
-        </div>
-      )
+      return <Heatmap data={data} config={config} />
+
+    case 'SankeyDiagram':
+      return <SankeyDiagram data={data} config={config} />
 
     default:
       return (

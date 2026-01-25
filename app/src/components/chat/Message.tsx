@@ -58,58 +58,143 @@ export function Message({
           ) : (
             <>
               {/* Markdown content */}
-              <div className="markdown-content">
+              <div className="markdown-content" style={{ fontFamily: 'var(--font-brand)' }}>
                 <ReactMarkdown
                   components={{
+                    h1: ({ children }) => (
+                      <h1
+                        style={{
+                          fontSize: 'var(--text-base)',
+                          fontWeight: 600,
+                          color: 'var(--color-brand)',
+                          fontFamily: 'var(--font-brand)',
+                          margin: 'var(--space-4) 0 var(--space-2) 0',
+                          textTransform: 'none',
+                          letterSpacing: '0.02em',
+                        }}
+                      >
+                        {children}
+                      </h1>
+                    ),
+                    h2: ({ children }) => (
+                      <h2
+                        style={{
+                          fontSize: 'var(--text-sm)',
+                          fontWeight: 600,
+                          color: 'var(--color-brand-dim)',
+                          fontFamily: 'var(--font-brand)',
+                          margin: 'var(--space-3) 0 var(--space-2) 0',
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.05em',
+                        }}
+                      >
+                        {children}
+                      </h2>
+                    ),
+                    h3: ({ children }) => (
+                      <h3
+                        style={{
+                          fontSize: 'var(--text-sm)',
+                          fontWeight: 600,
+                          color: 'var(--color-gray-700)',
+                          fontFamily: 'var(--font-brand)',
+                          margin: 'var(--space-2) 0 var(--space-1) 0',
+                        }}
+                      >
+                        {children}
+                      </h3>
+                    ),
                     a: ({ href, children }) => (
                       <a
                         href={href}
                         target="_blank"
                         rel="noopener noreferrer"
-                        style={{ color: 'var(--color-primary)' }}
+                        style={{ color: 'var(--color-brand)' }}
                       >
                         {children}
                       </a>
                     ),
                     p: ({ children }) => (
-                      <p style={{ margin: '0 0 var(--space-2) 0' }}>{children}</p>
+                      <p
+                        style={{
+                          margin: '0 0 var(--space-2) 0',
+                          fontSize: 'var(--text-sm)',
+                          lineHeight: 1.6,
+                          color: 'var(--color-gray-700)',
+                        }}
+                      >
+                        {children}
+                      </p>
                     ),
                     ul: ({ children }) => (
                       <ul
                         style={{
                           margin: '0 0 var(--space-2) 0',
-                          paddingLeft: 'var(--space-5)',
+                          paddingLeft: 'var(--space-4)',
+                          fontSize: 'var(--text-sm)',
+                          color: 'var(--color-gray-700)',
                         }}
                       >
                         {children}
                       </ul>
                     ),
                     li: ({ children }) => (
-                      <li style={{ marginBottom: 'var(--space-1)' }}>{children}</li>
+                      <li style={{ marginBottom: 'var(--space-1)', lineHeight: 1.5 }}>{children}</li>
                     ),
                     strong: ({ children }) => (
-                      <strong style={{ fontWeight: 'var(--font-semibold)' as unknown as number }}>
+                      <strong style={{ fontWeight: 600, color: 'var(--color-gray-800)' }}>
                         {children}
                       </strong>
                     ),
-                    code: ({ children }) => (
-                      <code
+                    pre: ({ children }) => (
+                      <pre
                         style={{
-                          fontFamily: 'var(--font-mono)',
-                          backgroundColor: 'var(--color-gray-100)',
-                          padding: '0.125rem 0.25rem',
-                          borderRadius: 'var(--radius-sm)',
-                          fontSize: 'var(--text-sm)',
+                          backgroundColor: 'var(--color-gray-900)',
+                          color: 'var(--color-brand)',
+                          padding: 'var(--space-3)',
+                          borderRadius: 'var(--radius-md)',
+                          margin: 'var(--space-2) 0',
+                          overflow: 'auto',
+                          fontSize: 'var(--text-xs)',
+                          lineHeight: 1.5,
                         }}
                       >
                         {children}
-                      </code>
+                      </pre>
                     ),
+                    code: ({ children, className }) => {
+                      // Check if it's a code block (has language class) or inline code
+                      const isCodeBlock = className?.includes('language-')
+                      if (isCodeBlock) {
+                        return (
+                          <code style={{ fontFamily: 'var(--font-brand)' }}>{children}</code>
+                        )
+                      }
+                      return (
+                        <code
+                          style={{
+                            fontFamily: 'var(--font-brand)',
+                            backgroundColor: 'var(--color-gray-100)',
+                            padding: '0.125rem 0.375rem',
+                            borderRadius: 'var(--radius-sm)',
+                            fontSize: 'var(--text-xs)',
+                            color: 'var(--color-gray-800)',
+                          }}
+                        >
+                          {children}
+                        </code>
+                      )
+                    },
                   }}
                 >
                   {message.content}
                 </ReactMarkdown>
               </div>
+
+              {/* Dashboard Preview */}
+              {message.dashboard_slug && (
+                <DashboardPreview slug={message.dashboard_slug} />
+              )}
 
               {/* Clarifying Options */}
               {message.clarifying_options && message.clarifying_options.length > 0 && (
@@ -205,6 +290,9 @@ function ActionButtons({ buttons, disabled, onClick }: ActionButtonsProps) {
     <div
       style={{
         marginTop: 'var(--space-4)',
+        padding: 'var(--space-3)',
+        backgroundColor: 'var(--color-gray-50)',
+        borderRadius: 'var(--radius-md)',
         display: 'flex',
         flexWrap: 'wrap',
         gap: 'var(--space-2)',
@@ -224,14 +312,15 @@ function ActionButtons({ buttons, disabled, onClick }: ActionButtonsProps) {
             style={{
               padding: 'var(--space-2) var(--space-4)',
               fontSize: 'var(--text-sm)',
-              fontWeight: 'var(--font-medium)' as unknown as number,
+              fontWeight: 500,
+              fontFamily: 'var(--font-brand)',
               borderRadius: 'var(--radius-md)',
               cursor: buttonDisabled ? 'not-allowed' : 'pointer',
               opacity: buttonDisabled ? 0.5 : 1,
               transition: 'all var(--transition-fast)',
               ...(isPrimary
                 ? {
-                    backgroundColor: 'var(--color-primary)',
+                    backgroundColor: 'var(--color-brand)',
                     color: 'white',
                     border: 'none',
                   }
@@ -244,16 +333,16 @@ function ActionButtons({ buttons, disabled, onClick }: ActionButtonsProps) {
             onMouseEnter={(e) => {
               if (!buttonDisabled) {
                 if (isPrimary) {
-                  e.currentTarget.style.backgroundColor = 'var(--color-primary-dark)'
+                  e.currentTarget.style.backgroundColor = 'var(--color-brand-dim)'
                 } else {
-                  e.currentTarget.style.borderColor = 'var(--color-primary)'
-                  e.currentTarget.style.color = 'var(--color-primary)'
+                  e.currentTarget.style.borderColor = 'var(--color-brand)'
+                  e.currentTarget.style.color = 'var(--color-brand)'
                 }
               }
             }}
             onMouseLeave={(e) => {
               if (isPrimary) {
-                e.currentTarget.style.backgroundColor = 'var(--color-primary)'
+                e.currentTarget.style.backgroundColor = 'var(--color-brand)'
               } else {
                 e.currentTarget.style.borderColor = 'var(--color-gray-300)'
                 e.currentTarget.style.color = 'var(--color-gray-700)'
@@ -264,6 +353,66 @@ function ActionButtons({ buttons, disabled, onClick }: ActionButtonsProps) {
           </button>
         )
       })}
+    </div>
+  )
+}
+
+// =============================================================================
+// Dashboard Preview
+// =============================================================================
+
+interface DashboardPreviewProps {
+  slug: string
+}
+
+function DashboardPreview({ slug }: DashboardPreviewProps) {
+  return (
+    <div
+      style={{
+        marginTop: 'var(--space-4)',
+        border: '1px solid var(--color-gray-200)',
+        borderRadius: 'var(--radius-lg)',
+        overflow: 'hidden',
+        backgroundColor: 'white',
+      }}
+    >
+      <div
+        style={{
+          padding: 'var(--space-2) var(--space-3)',
+          backgroundColor: 'var(--color-gray-50)',
+          borderBottom: '1px solid var(--color-gray-200)',
+          fontSize: 'var(--text-xs)',
+          color: 'var(--color-gray-500)',
+          fontFamily: 'var(--font-brand)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+        }}
+      >
+        <span>Preview</span>
+        <a
+          href={`/dashboard/${slug}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            color: 'var(--color-brand)',
+            textDecoration: 'none',
+            fontSize: 'var(--text-xs)',
+          }}
+        >
+          Open full size ↗
+        </a>
+      </div>
+      <iframe
+        src={`/dashboard/${slug}`}
+        title="Dashboard Preview"
+        style={{
+          width: '100%',
+          height: '400px',
+          border: 'none',
+          display: 'block',
+        }}
+      />
     </div>
   )
 }

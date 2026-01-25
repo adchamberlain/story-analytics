@@ -29,9 +29,9 @@ export function VerifyPage() {
         await verifyMagicLink(token)
         setStatus('success')
 
-        // Redirect to chat after a brief moment
+        // Redirect to a new chat after a brief moment
         setTimeout(() => {
-          navigate('/chat')
+          navigate('/chat?new=1')
         }, 1500)
       } catch (err) {
         setStatus('error')
