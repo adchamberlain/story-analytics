@@ -75,6 +75,50 @@ instructions: |
   WRONG: AVG(amount) - this gives average invoice amount, NOT average per customer
   RIGHT: Use CTE to aggregate per customer first, then AVG across customers
 
+  CRITICAL - POINT-IN-TIME METRICS (MRR, ARR, Active Subscribers):
+  When asked for MRR, ARR, active subscriber counts, or similar "snapshot" metrics over time,
+  you MUST use a date spine approach. These metrics count what was ACTIVE at each point in time,
+  NOT what started at that point.
+
+  WRONG approach (counts only NEW subscriptions starting each month):
+  ```sql
+  SELECT DATE_TRUNC('month', START_DATE) as month, SUM(MRR)
+  FROM subscriptions
+  GROUP BY 1
+  ```
+
+  RIGHT approach (counts ALL ACTIVE subscriptions in each month):
+  ```sql
+  WITH months AS (
+    SELECT UNNEST(GENERATE_SERIES(
+      DATE_TRUNC('month', CURRENT_DATE - INTERVAL '16 months'),
+      DATE_TRUNC('month', CURRENT_DATE),
+      INTERVAL '1 month'
+    ))::DATE AS month
+  )
+  SELECT
+    m.month,
+    s.PLAN_TIER,
+    SUM(s.MRR) AS total_mrr
+  FROM months m
+  JOIN snowflake_saas.subscriptions s
+    ON DATE_TRUNC('month', s.START_DATE) <= m.month
+    AND (s.CHURN_DATE IS NULL OR DATE_TRUNC('month', s.CHURN_DATE) > m.month)
+  GROUP BY m.month, s.PLAN_TIER
+  ORDER BY m.month, s.PLAN_TIER
+  ```
+
+  Key differences:
+  - Generate a spine of months using GENERATE_SERIES
+  - JOIN subscriptions where START_DATE <= month (subscription existed)
+  - AND where CHURN_DATE IS NULL OR CHURN_DATE > month (hadn't churned yet)
+  - This gives you the TRUE snapshot of active subscriptions each month
+
+  Use this pattern for:
+  - MRR/ARR over time
+  - Active subscriber counts over time
+  - Any "how many were active at this point" metric
+
   Query structure for different chart types:
 
   LineChart (time series):
@@ -90,6 +134,17 @@ instructions: |
   BigValue (single metric):
   - Single row with the aggregated value
   - No GROUP BY needed
+
+  DualTrendChart (Amazon WBR-style year-over-year health check):
+  - Returns daily or weekly data with date and metric columns
+  - MUST include at least 13 months of data for YoY comparison
+  - The React component handles the aggregation and comparison automatically
+  - Required columns: a date column and a metric column
+  - Example:
+    SELECT date, revenue as metric
+    FROM daily_metrics
+    WHERE date >= CURRENT_DATE - INTERVAL '13 months'
+    ORDER BY date
 
   INTERACTIVE FILTERS:
   If the spec includes interactive filters, you must:
