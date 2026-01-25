@@ -28,7 +28,6 @@ export function Sidebar() {
     loadConversationList,
     loadDashboards,
     loadUser,
-    switchConversation,
     startNewConversation,
     deleteConversation,
     renameConversation,
@@ -53,8 +52,8 @@ export function Sidebar() {
       // For chart conversations, navigate to chart page
       navigate('/charts/new')
     } else {
-      await switchConversation(conv.id)
-      navigate('/chat')
+      // Navigate with session ID to load specific conversation
+      navigate(`/chat?session=${conv.id}`)
     }
   }
 
@@ -63,6 +62,8 @@ export function Sidebar() {
     e.stopPropagation()
     if (confirm('Delete this conversation?')) {
       await deleteConversation(conv.id)
+      // Navigate to fresh chat page
+      navigate('/chat?new=1')
     }
   }
 
@@ -124,7 +125,12 @@ export function Sidebar() {
                 href={item.path}
                 onClick={(e) => {
                   e.preventDefault()
-                  navigate(item.path)
+                  // Chat always starts a new conversation
+                  if (item.path === '/chat') {
+                    navigate('/chat?new=1')
+                  } else {
+                    navigate(item.path)
+                  }
                 }}
                 style={{
                   display: 'flex',
@@ -144,10 +150,10 @@ export function Sidebar() {
                       : 'var(--color-gray-700)',
                 }}
               >
-                <span style={{ color: 'var(--color-warning)', fontFamily: 'var(--font-mono)' }}>
+                <span style={{ color: 'var(--color-warning)', fontFamily: 'var(--font-brand)' }}>
                   {item.icon}
                 </span>
-                <span>{item.label}</span>
+                <span style={{ fontFamily: 'var(--font-brand)' }}>{item.label}</span>
               </a>
             </li>
           ))}
@@ -185,7 +191,7 @@ export function Sidebar() {
               >
                 {'>'}
               </span>
-              <span>Conversations</span>
+              <span style={{ fontFamily: 'var(--font-brand)' }}>Conversations</span>
             </button>
             <button
               onClick={startNewConversation}
@@ -219,6 +225,7 @@ export function Sidebar() {
                     color: 'var(--color-gray-400)',
                     fontSize: 'var(--text-xs)',
                     padding: 'var(--space-1) 0',
+                    fontFamily: 'var(--font-brand)',
                   }}
                 >
                   No conversations yet
@@ -291,6 +298,7 @@ export function Sidebar() {
                               overflow: 'hidden',
                               textOverflow: 'ellipsis',
                               whiteSpace: 'nowrap',
+                              fontFamily: 'var(--font-brand)',
                             }}
                           >
                             {conv.title || 'New conversation'}
@@ -355,7 +363,7 @@ export function Sidebar() {
             >
               {'>'}
             </span>
-            <span>Recent Dashboards</span>
+            <span style={{ fontFamily: 'var(--font-brand)' }}>Recent Dashboards</span>
           </button>
 
           {showDashboards && (

@@ -149,11 +149,12 @@ class DashboardStorage:
         return Dashboard.from_dict(data)
 
     def get_by_slug(self, slug: str) -> Dashboard | None:
-        """Get a dashboard by its URL slug."""
-        for dashboard in self.list_all():
-            if dashboard.slug == slug:
-                return dashboard
-        return None
+        """Get a dashboard by its URL slug. Returns the most recently updated if duplicates exist."""
+        matching = [d for d in self.list_all() if d.slug == slug]
+        if not matching:
+            return None
+        # Return most recently updated
+        return max(matching, key=lambda d: d.updated_at)
 
     def delete(self, dashboard_id: str) -> bool:
         """Delete a dashboard. Returns True if deleted, False if not found."""

@@ -3,7 +3,7 @@
  * Auto-resizing textarea with submit on Enter.
  */
 
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect, useCallback, forwardRef, useImperativeHandle } from 'react'
 
 interface ChatInputProps {
   onSubmit: (message: string) => void
@@ -14,26 +14,30 @@ interface ChatInputProps {
   onPrefillClear?: () => void
 }
 
-export function ChatInput({
-  onSubmit,
-  disabled = false,
-  placeholder = 'Type your message...',
-  loadingMessage = 'Processing...',
-  prefill = '',
-  onPrefillClear,
-}: ChatInputProps) {
+export interface ChatInputHandle {
+  focus: () => void
+}
+
+export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function ChatInput(
+  {
+    onSubmit,
+    disabled = false,
+    placeholder = 'Describe a chart or dashboard, or ask what data is available...',
+    loadingMessage = 'Processing...',
+    prefill = '',
+    onPrefillClear,
+  },
+  ref
+) {
   const [value, setValue] = useState('')
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
-  // Handle prefill
-  useEffect(() => {
-    if (prefill) {
-      setValue(prefill)
-      onPrefillClear?.()
-      // Trigger resize after setting value
-      setTimeout(autoResize, 0)
-    }
-  }, [prefill, onPrefillClear])
+  // Expose focus method to parent
+  useImperativeHandle(ref, () => ({
+    focus: () => {
+      textareaRef.current?.focus()
+    },
+  }))
 
   // Auto-resize textarea
   const autoResize = useCallback(() => {
@@ -43,6 +47,24 @@ export function ChatInput({
       textarea.style.height = `${Math.min(textarea.scrollHeight, 200)}px`
     }
   }, [])
+
+  // Handle prefill
+  useEffect(() => {
+    if (prefill) {
+      setValue(prefill)
+      onPrefillClear?.()
+      // Focus input and trigger resize after setting value
+      setTimeout(() => {
+        autoResize()
+        textareaRef.current?.focus()
+        // Move cursor to end
+        if (textareaRef.current) {
+          textareaRef.current.selectionStart = prefill.length
+          textareaRef.current.selectionEnd = prefill.length
+        }
+      }, 0)
+    }
+  }, [prefill, onPrefillClear, autoResize])
 
   // Handle keydown - Enter to submit, Shift+Enter for newline
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -182,4 +204,4 @@ export function ChatInput({
       `}</style>
     </div>
   )
-}
+})

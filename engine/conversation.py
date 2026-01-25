@@ -88,6 +88,7 @@ class ConversationState:
     intent: str | None = None  # "create" or "edit"
     target_dashboard: str | None = None  # For edit mode
     dashboard_title: str | None = None
+    dashboard_slug: str | None = None  # Slug of created dashboard
     generated_markdown: str | None = None
     created_file: Path | None = None
     original_request: str | None = None  # Store original request for QA
@@ -570,8 +571,24 @@ class ConversationManager:
         )
 
         content = response.content
+        # Clean JSON blocks from response - they shouldn't be shown to users
+        content = self._clean_json_from_response(content)
         self.state.messages.append(Message(role="assistant", content=content))
         return content
+
+    def _clean_json_from_response(self, content: str) -> str:
+        """Remove JSON code blocks from response - they're internal and shouldn't be shown to users."""
+        import re
+        # Remove ```json ... ``` blocks that contain object/array structures
+        # Keep SQL blocks (```sql) as those are useful for users
+        pattern = r'```json\s*\n?\{[\s\S]*?\}\s*\n?```'
+        cleaned = re.sub(pattern, '', content)
+        # Also remove any standalone JSON objects that start with {"queries" or {"charts"
+        pattern2 = r'\{[\s\S]*?"queries"[\s\S]*?\}(?:\s*\n)?'
+        cleaned = re.sub(pattern2, '', cleaned)
+        # Clean up extra whitespace
+        cleaned = re.sub(r'\n{3,}', '\n\n', cleaned)
+        return cleaned.strip()
 
     def _handle_generation_phase(self, user_input: str) -> tuple[str, QAResultData | None, str | None]:
         """Generate the dashboard.
@@ -655,6 +672,8 @@ class ConversationManager:
             Tuple of (response_text, qa_result_data)
         """
         import re
+        from .dashboard_composer import get_composer
+        from .models import Chart, ChartType, ChartConfig, get_chart_storage
 
         qa_result_data = None
 
@@ -667,7 +686,57 @@ class ConversationManager:
 
             # Generate slug from title
             slug = re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")
+            self.state.dashboard_slug = slug
             self.state.phase = ConversationPhase.REFINEMENT
+
+            # Create charts from pipeline results
+            chart_ids = []
+            chart_storage = get_chart_storage()
+
+            if self.state.dashboard_spec and self.state.validated_queries:
+                for viz in self.state.dashboard_spec.visualizations:
+                    # Find the matching query
+                    query = None
+                    for q in self.state.validated_queries.queries:
+                        if q.validation_status == "valid":
+                            query = q
+                            break
+
+                    if query:
+                        # Determine chart type
+                        chart_type_str = viz.type.lower().replace("chart", "").strip()
+                        chart_type = ChartType.from_string(chart_type_str)
+
+                        # Create chart config
+                        config = ChartConfig(
+                            title=viz.title,
+                            x=query.columns[0] if query.columns else None,
+                            y=query.columns[1] if len(query.columns) > 1 else None,
+                        )
+
+                        # Create and save chart
+                        chart = Chart(
+                            title=viz.title,
+                            description=viz.description,
+                            query_name=query.name,
+                            sql=query.sql,
+                            chart_type=chart_type,
+                            config=config,
+                            original_request=self.state.original_request or "",
+                        )
+                        chart_storage.save(chart)
+                        chart_ids.append(chart.id)
+
+            # Save dashboard to storage so render API can find it
+            composer = get_composer()
+            dashboard = composer.create_dashboard(
+                title=title,
+                description=self.state.original_request,
+                chart_ids=chart_ids,
+            )
+            # Update slug to match what composer generated (may differ due to uniqueness)
+            self.state.dashboard_slug = dashboard.slug
+            slug = dashboard.slug
 
             url = f"/dashboard/{slug}"
 

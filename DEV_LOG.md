@@ -799,6 +799,200 @@ Decision: Keep the terminal vibe, sync branding across all touchpoints.
 
 ---
 
+## Session: 2026-01-24 (UX Improvements & Branding)
+
+### Focus: Fix Settings, Streamline UX, and Brand Consistency
+
+### Changes Made
+
+1. **Settings Bug Fix**: API client was calling non-existent `PATCH /auth/me`. Changed to `PUT /auth/preferences`.
+
+2. **Removed Intermediate "Create Chart" Page**: Clicking "Create New Chart" on welcome screen now prefills the chat input instead of navigating to a redundant intermediate page.
+   - `/charts/new` now redirects to `/chat`
+   - Removed unused `NewChartPage` component
+
+3. **Brand Consistency**: Updated colors and fonts to match website (storyanalytics.ai)
+
+### Brand Font Locations (for future reference)
+
+If changing the brand font, update these locations:
+
+**CSS Variables** (`app/src/styles/index.css`):
+- `--font-brand` - The brand monospace font stack
+- `--color-brand` - Brand color #7c9eff
+- `--color-brand-dim` - Dimmed brand color
+- `--color-brand-glow` - Glow effect color
+- Global `h1, h2, h3` styles
+
+**Logo Component** (`app/src/components/brand/Logo.tsx`):
+- Uses `var(--font-brand)` and `var(--color-brand)`
+
+**Sidebar** (`app/src/components/layout/Sidebar.tsx`):
+- Nav item icons and labels
+- "Conversations" section header
+- "Recent Dashboards" section header
+- Conversation list items ("New conversation")
+- "No conversations yet" placeholder
+
+**ChatPage** (`app/src/pages/ChatPage.tsx`):
+- Header title (h2 "New conversation")
+- "Phase: Starting" status text
+- "+ New" button
+- Welcome state: main heading, subheading, section headers (Charts/Dashboards)
+- ActionButtonLarge component
+- Error display
+
+### Files Modified
+
+| File | Change |
+|------|--------|
+| `app/src/api/client.ts` | Changed settings functions from `PATCH /auth/me` to `PUT /auth/preferences` |
+| `app/src/pages/ChatPage.tsx` | Prefill input, hide welcome, error display, brand fonts |
+| `app/src/App.tsx` | `/charts/new` redirects to `/chat`, removed `NewChartPage` |
+| `app/src/styles/index.css` | Added `--color-brand`, `--font-brand`, global h1/h2/h3 styles |
+| `app/src/components/brand/Logo.tsx` | Updated to use CSS variables |
+| `app/src/components/layout/Sidebar.tsx` | Brand font on nav items and headers |
+
+---
+
+## Session: 2026-01-24 (Done Button Fix)
+
+### Focus: Fix "Done" Button After Chart Creation
+
+### Root Cause
+
+After Evidence was removed, the `created_file` property was never being set in the conversation state. The API checked this property to determine if a dashboard was created, so `dashboard_created` was always `False`, and the frontend never populated `lastDashboard`.
+
+Flow before fix:
+1. `_finalize_dashboard()` generates slug but doesn't store it
+2. API checks `manager.state.created_file` → always None
+3. `dashboard_created = False` in API response
+4. Frontend only sets `lastDashboard` when `dashboard_created && dashboard_url`
+5. "Done" button checks `lastDashboard?.url` → null → nothing happens
+
+### Fix Applied
+
+1. **Added `dashboard_slug` to ConversationState** (`engine/conversation.py`):
+   - New property: `dashboard_slug: str | None = None`
+   - Set in `_finalize_dashboard()`: `self.state.dashboard_slug = slug`
+
+2. **Updated API to check `dashboard_slug`** (`api/routers/conversation.py`):
+   - Non-streaming endpoint: Check `manager.state.dashboard_slug` first, fall back to `created_file`
+   - Streaming endpoint: Same logic
+   - `restore_manager_state()`: Restore `dashboard_slug` from linked dashboard
+
+### Files Modified
+
+| File | Change |
+|------|--------|
+| `engine/conversation.py` | Added `dashboard_slug` property, set it in `_finalize_dashboard()` |
+| `api/routers/conversation.py` | Check `dashboard_slug` for dashboard detection, restore it from session |
+
+---
+
+## Session: 2026-01-24 (Login Redirect to New Chat)
+
+### Focus: Always Start New Chat After Login
+
+### Changes Made
+
+1. **Updated Login Verification Flow**:
+   - `VerifyPage.tsx` now redirects to `/chat?new=1` instead of `/chat`
+   - This signals to ChatPage that a fresh conversation should be started
+
+2. **Updated ChatPage to Handle New Chat Parameter**:
+   - Added `useSearchParams` and `useNavigate` hooks
+   - On mount, checks for `?new=1` query parameter
+   - If present, clears the URL parameter and calls `startNewConversation()` instead of `loadConversation()`
+   - Ensures users always get a fresh conversation after login
+
+### Files Modified
+
+| File | Change |
+|------|--------|
+| `app/src/pages/VerifyPage.tsx` | Redirect to `/chat?new=1` after verification |
+| `app/src/pages/ChatPage.tsx` | Check for `new` query param and start fresh conversation |
+
+### Verification
+
+- TypeScript build passes successfully
+- Logic: User logs in → Verify page → Redirect to `/chat?new=1` → ChatPage starts new conversation → URL cleaned to `/chat`
+
+---
+
+## Session: 2026-01-24 (Chat UX Overhaul)
+
+### Focus: Complete overhaul of chat user experience and chart creation flow
+
+### Changes Made
+
+1. **Welcome Screen Flow**:
+   - Chat page now shows welcome cards (Create Chart / Create Dashboard) by default
+   - Chat input hidden until user selects a creation mode
+   - Dynamic placeholder text based on mode ("Describe the chart..." vs "Describe the dashboard...")
+   - Auto-focus on chat input after selecting mode
+
+2. **Login Flow**:
+   - After login, users always redirected to fresh chat page (`/chat?new=1`)
+   - Chat page always starts fresh on direct navigation
+   - Existing conversations loaded via `/chat?session=123` from sidebar
+
+3. **Navigation Improvements**:
+   - "Chat" nav item always starts a new conversation
+   - Delete conversation now redirects to fresh chat page
+   - "Done" button navigates to `/charts` or `/dashboards` based on creation mode
+
+4. **Chat Input Enhancements**:
+   - Changed placeholder from "Type your message..." to helpful guidance
+   - Auto-focus on input after clicking "Modify Plan" or similar actions
+   - Exposed `focus()` method via `forwardRef` on ChatInput component
+
+5. **Phase Indicator**:
+   - Shows "Understanding..." while request is processing instead of static "Starting"
+
+6. **Inline Dashboard Preview**:
+   - Added `DashboardPreview` component showing iframe preview in chat
+   - Messages with `dashboard_slug` show embedded preview with "Open full size" link
+   - Fixed dashboard storage to return most recent dashboard when duplicates exist
+
+7. **Chart Storage Fix**:
+   - `_finalize_dashboard` now creates and saves Chart objects to storage
+   - Charts properly linked to dashboards via `chart_ids`
+   - Fixed `get_by_slug` to return most recently updated dashboard
+
+8. **JSON Cleanup**:
+   - Updated prompts to instruct LLM not to output raw JSON
+   - Added `_clean_json_from_response()` to strip JSON blocks from conversation responses
+
+9. **Conversation Completion**:
+   - "Done" button sends action to backend, marks conversation complete
+   - Chat input hidden when conversation is complete
+   - Buttons greyed out (disabled) when complete
+
+### Files Modified
+
+| File | Change |
+|------|--------|
+| `app/src/pages/ChatPage.tsx` | Welcome flow, creation mode, auto-focus, navigation, completion handling |
+| `app/src/pages/VerifyPage.tsx` | Redirect to `/chat?new=1` |
+| `app/src/components/chat/ChatInput.tsx` | forwardRef with focus() method |
+| `app/src/components/chat/Message.tsx` | DashboardPreview component |
+| `app/src/components/layout/Sidebar.tsx` | Navigation to `/chat?new=1`, session param for existing convos |
+| `app/src/types/conversation.ts` | Added dashboard_url/slug to ExtendedMessage |
+| `app/src/stores/conversationStore.ts` | Include dashboard info in messages |
+| `engine/conversation.py` | Chart storage, JSON cleanup, dashboard creation |
+| `engine/models/storage.py` | get_by_slug returns most recent |
+| `engine/prompts/base.yaml` | No JSON output instruction |
+
+### Issues Resolved
+
+- Welcome cards not showing on fresh navigation (fixed with session param approach)
+- Charts not rendering in preview (fixed chart storage and dashboard lookup)
+- JSON blocks appearing in chat (prompt update + response cleaning)
+- Duplicate dashboards with same slug (return most recent by updated_at)
+
+---
+
 ## Template for Future Sessions
 
 ```markdown

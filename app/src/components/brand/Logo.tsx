@@ -44,10 +44,12 @@ export function Logo({ size = 'md', showTagline = true, dark = false }: LogoProp
     <div>
       <h1
         style={{
-          color: 'var(--color-primary)',
+          color: 'var(--color-brand)',
           fontWeight: 700,
           fontSize: s.fontSize,
-          letterSpacing: '0.1em',
+          fontFamily: 'var(--font-brand)',
+          letterSpacing: '0.3em',
+          textShadow: '0 0 20px var(--color-brand-glow), 0 0 40px var(--color-brand-glow)',
           margin: 0,
           display: 'flex',
           alignItems: 'center',
@@ -60,7 +62,7 @@ export function Logo({ size = 'md', showTagline = true, dark = false }: LogoProp
             display: 'inline-flex',
             alignItems: 'center',
             gap: s.cursorGap,
-            marginLeft: '6px',
+            marginLeft: '0.15em',
             animation: 'blink 1s step-end infinite',
           }}
         >
@@ -70,7 +72,8 @@ export function Logo({ size = 'md', showTagline = true, dark = false }: LogoProp
               display: 'inline-block',
               width: s.cursorWidth,
               height: s.cursorHeight,
-              backgroundColor: 'var(--color-primary)',
+              backgroundColor: 'var(--color-brand)',
+              boxShadow: '0 0 10px var(--color-brand-glow)',
             }}
           />
           {/* Second cursor (AI) */}
@@ -79,7 +82,8 @@ export function Logo({ size = 'md', showTagline = true, dark = false }: LogoProp
               display: 'inline-block',
               width: s.cursorWidth,
               height: s.cursorHeight,
-              backgroundColor: 'var(--color-primary)',
+              backgroundColor: 'var(--color-brand)',
+              boxShadow: '0 0 10px var(--color-brand-glow)',
             }}
           />
         </span>
@@ -87,9 +91,10 @@ export function Logo({ size = 'md', showTagline = true, dark = false }: LogoProp
       {showTagline && (
         <p
           style={{
-            color: dark ? 'var(--color-gray-400)' : 'var(--color-gray-500)',
+            color: dark ? 'var(--color-brand-dim)' : 'var(--color-brand)',
+            fontFamily: 'var(--font-brand)',
             fontSize: s.taglineSize,
-            marginTop: 'var(--space-1)',
+            opacity: dark ? 0.7 : 0.9,
             margin: 0,
             marginTop: '4px',
           }}

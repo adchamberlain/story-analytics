@@ -13,10 +13,10 @@ guidelines: |
   - Do NOT query information_schema or list table schemas unless specifically asked
   - Generate ONLY what the user requested - if they asked for an invoice trends chart, give them that
 
-  When generating charts, output JSON specifications that include:
-  - SQL queries with a descriptive name
-  - Chart configuration (type, x/y columns, title)
-  - Optional filters for interactivity
+  ⚠️ CRITICAL: NEVER output raw JSON to the user. JSON specifications are generated
+  internally but should NOT appear in your conversation responses. Keep responses
+  user-friendly with clear descriptions, SQL queries (in code blocks), and visualization
+  descriptions. No {"queries": [...]} or similar JSON output.
 
   ⚠️ CRITICAL: SQL uses DuckDB syntax, NOT Snowflake/PostgreSQL/MySQL!
   NEVER use: DATEADD, DATEDIFF, TO_CHAR, NVL, IFF - these will cause errors.
