@@ -160,7 +160,7 @@ import type {
 } from '../types/conversation'
 
 /**
- * Send a message to the conversation engine.
+ * Send a message to the dashboard conversation engine.
  */
 export async function sendMessage(
   message: string,
@@ -170,6 +170,51 @@ export async function sendMessage(
     method: 'POST',
     body: JSON.stringify({ message, session_id: sessionId }),
   })
+}
+
+// =============================================================================
+// Chart Conversation API (for chart-first flow)
+// =============================================================================
+
+export interface ChartMessageResponse {
+  response: string
+  phase: string
+  session_id: number
+  title: string | null
+  chart_id: string | null
+  chart_url: string | null
+  chart_title: string | null
+  action_buttons: Array<{
+    id: string
+    label: string
+    style: string
+  }> | null
+  error: string | null
+  // Map to MessageResponse format for compatibility
+  dashboard_created?: boolean
+  dashboard_url?: string | null
+  dashboard_slug?: string | null
+}
+
+/**
+ * Send a message to the chart conversation engine.
+ * Use this for chart creation (not dashboard creation).
+ */
+export async function sendChartMessage(
+  message: string,
+  sessionId?: number
+): Promise<ChartMessageResponse> {
+  return apiFetch('/charts/conversation/message', {
+    method: 'POST',
+    body: JSON.stringify({ message, session_id: sessionId }),
+  })
+}
+
+/**
+ * Start a new chart conversation.
+ */
+export async function newChartConversation(): Promise<ChartMessageResponse> {
+  return apiFetch('/charts/conversation/new', { method: 'POST' })
 }
 
 /**
@@ -444,4 +489,39 @@ export async function getSources(): Promise<SourceInfo[]> {
  */
 export async function deleteDashboard(slug: string): Promise<void> {
   await apiFetch(`/dashboards/${slug}`, { method: 'DELETE' })
+}
+
+// =============================================================================
+// Chart Templates API
+// =============================================================================
+
+export interface ChartTemplate {
+  id: string
+  name: string
+  icon: string
+  chart_type: string
+  description: string
+  prompt: string
+  business_types: string[]
+  category_id: string
+  category_name: string
+}
+
+export interface ChartTemplatesResponse {
+  templates: ChartTemplate[]
+  total: number
+}
+
+/**
+ * Get chart templates for the current user's business type.
+ */
+export async function getChartTemplates(): Promise<ChartTemplatesResponse> {
+  return apiFetch('/templates/charts')
+}
+
+/**
+ * Get all chart templates (across all business types).
+ */
+export async function getAllChartTemplates(): Promise<ChartTemplatesResponse> {
+  return apiFetch('/templates/charts/all')
 }

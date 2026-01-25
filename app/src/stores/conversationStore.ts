@@ -14,6 +14,7 @@ import type {
 } from '../types/conversation'
 import {
   sendMessage as apiSendMessage,
+  sendChartMessage as apiSendChartMessage,
   sendMessageStream,
   listConversations,
   getConversation,
@@ -46,8 +47,13 @@ interface ConversationState {
   loading: boolean
   conversationComplete: boolean
 
-  // Last created dashboard
+  // Creation mode: 'chart' or 'dashboard' (determines which API to use)
+  creationMode: 'chart' | 'dashboard' | null
+
+  // Last created dashboard/chart
   lastDashboard: LastDashboardInfo | null
+  lastChartId: string | null
+  lastChartUrl: string | null
 
   // Conversation list (sidebar)
   conversationList: ConversationSummary[]
@@ -67,6 +73,7 @@ interface ConversationState {
   loadConversationList: () => Promise<void>
   switchConversation: (sessionId: number) => Promise<void>
   startNewConversation: () => Promise<void>
+  setCreationMode: (mode: 'chart' | 'dashboard' | null) => void
   sendMessage: (content: string) => Promise<string>
   deleteConversation: (sessionId: number) => Promise<void>
   renameConversation: (sessionId: number, title: string) => Promise<void>
@@ -84,7 +91,10 @@ export const useConversationStore = create<ConversationState>((set, get) => ({
   phase: 'intent',
   loading: false,
   conversationComplete: false,
+  creationMode: null,
   lastDashboard: null,
+  lastChartId: null,
+  lastChartUrl: null,
   conversationList: [],
   dashboardList: [],
   progressSteps: [],
@@ -93,6 +103,11 @@ export const useConversationStore = create<ConversationState>((set, get) => ({
 
   // Get human-readable step label
   getStepLabel: (step: string) => STEP_LABELS[step] || step,
+
+  // Set creation mode (chart vs dashboard)
+  setCreationMode: (mode: 'chart' | 'dashboard' | null) => {
+    set({ creationMode: mode })
+  },
 
   // Load user info
   loadUser: async () => {
@@ -220,11 +235,11 @@ export const useConversationStore = create<ConversationState>((set, get) => ({
 
   // Send a message
   sendMessage: async (content: string) => {
-    const { currentSessionId } = get()
+    const { currentSessionId, creationMode } = get()
     const isAction = content.startsWith('__action:')
     const useStreaming = shouldUseStreaming(content)
 
-    set({ loading: true, lastDashboard: null })
+    set({ loading: true, lastDashboard: null, lastChartId: null, lastChartUrl: null })
 
     if (useStreaming) {
       set({ progressSteps: [], isStreaming: true })
@@ -237,6 +252,46 @@ export const useConversationStore = create<ConversationState>((set, get) => ({
       }))
     }
 
+    // Use chart API when in chart mode
+    if (creationMode === 'chart') {
+      try {
+        const response = await apiSendChartMessage(content, currentSessionId ?? undefined)
+
+        // Map chart response to conversation format
+        set((state) => ({
+          currentSessionId: response.session_id,
+          currentTitle: response.title || state.currentTitle,
+          messages: [
+            ...state.messages,
+            {
+              role: 'assistant' as const,
+              content: response.response,
+              action_buttons: response.action_buttons?.map(btn => ({
+                id: btn.id,
+                label: btn.label,
+                style: btn.style as 'primary' | 'secondary',
+              })),
+              // Map chart_url to dashboard_url for Message component compatibility
+              dashboard_url: response.chart_url,
+              dashboard_slug: response.chart_id,
+            },
+          ],
+          phase: response.phase,
+          lastChartId: response.chart_id,
+          lastChartUrl: response.chart_url,
+          conversationComplete: checkChartConversationComplete(response.action_buttons),
+          loading: false,
+        }))
+
+        await get().loadConversationList()
+        return response.response
+      } catch (error) {
+        set({ loading: false })
+        throw error
+      }
+    }
+
+    // Dashboard mode (existing flow)
     if (useStreaming) {
       // Use streaming endpoint
       return new Promise<string>((resolve, reject) => {
@@ -363,10 +418,19 @@ function shouldUseStreaming(content: string): boolean {
   return ['generate', 'generate_now', 'retry'].includes(action)
 }
 
-// Helper: Check if conversation is complete
+// Helper: Check if dashboard conversation is complete
 function checkConversationComplete(
   actionButtons: Array<{ id: string }> | null | undefined
 ): boolean {
   if (!actionButtons) return false
   return actionButtons.some((btn) => btn.id.startsWith('view_dashboard:'))
+}
+
+// Helper: Check if chart conversation is complete
+function checkChartConversationComplete(
+  actionButtons: Array<{ id: string }> | null | undefined
+): boolean {
+  if (!actionButtons) return false
+  // Chart is complete when user sees Done button (after chart is created)
+  return actionButtons.some((btn) => btn.id === 'done')
 }

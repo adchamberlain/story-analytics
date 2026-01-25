@@ -28,10 +28,12 @@ export function Sidebar() {
     loadConversationList,
     loadDashboards,
     loadUser,
+    loadConversation,
     startNewConversation,
     deleteConversation,
     renameConversation,
     logout,
+    setCreationMode,
   } = useConversationStore()
 
   const [showConversations, setShowConversations] = useState(true)
@@ -49,11 +51,20 @@ export function Sidebar() {
   // Handle conversation switch
   const handleSwitchConversation = async (conv: ConversationSummary) => {
     if (conv.conversation_type === 'chart') {
-      // For chart conversations, navigate to chart page
-      navigate('/charts/new')
+      // For chart conversations, load conversation and set chart mode
+      setCreationMode('chart')
+      await loadConversation(conv.id)
+      // Navigate to chat page without URL params (avoids race condition)
+      if (location.pathname !== '/chat') {
+        navigate('/chat')
+      }
     } else {
-      // Navigate with session ID to load specific conversation
-      navigate(`/chat?session=${conv.id}`)
+      // For dashboard conversations, load directly without URL params
+      setCreationMode('dashboard')
+      await loadConversation(conv.id)
+      if (location.pathname !== '/chat') {
+        navigate('/chat')
+      }
     }
   }
 

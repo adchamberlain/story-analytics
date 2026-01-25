@@ -9,6 +9,7 @@ import { useConversationStore } from '../stores/conversationStore'
 import { Message } from '../components/chat/Message'
 import { ChatInput, ChatInputHandle } from '../components/chat/ChatInput'
 import { ProgressSteps } from '../components/chat/ProgressSteps'
+import { getChartTemplates, type ChartTemplate } from '../api/client'
 
 // Phase labels for display
 const PHASE_LABELS: Record<string, string> = {
@@ -18,6 +19,7 @@ const PHASE_LABELS: Record<string, string> = {
   refinement: 'Refining',
   complete: 'Complete',
 }
+
 
 export default function ChatPage() {
   const {
@@ -35,6 +37,7 @@ export default function ChatPage() {
     renameConversation,
     currentSessionId,
     getStepLabel,
+    setCreationMode: setStoreCreationMode,
   } = useConversationStore()
 
   const [searchParams] = useSearchParams()
@@ -45,7 +48,13 @@ export default function ChatPage() {
   const [editingTitle, setEditingTitle] = useState('')
   const [prefillInput, setPrefillInput] = useState('')
   const [creationMode, setCreationMode] = useState<'chart' | 'dashboard' | null>(null)
+  const [showTemplates, setShowTemplates] = useState(false)
+  const [chartTemplates, setChartTemplates] = useState<ChartTemplate[]>([])
+  const [templatesLoading, setTemplatesLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // Track if we've initialized this session to avoid re-initializing on navigation
+  const initializedRef = useRef(false)
 
   // Handle conversation loading based on URL params
   useEffect(() => {
@@ -53,19 +62,49 @@ export default function ChatPage() {
     const isNew = searchParams.get('new') === '1'
 
     if (isNew) {
-      // Clear the query param and start fresh
+      // Explicit request for new conversation
       navigate('/chat', { replace: true })
       startNewConversation()
+      // Reset local state to show welcome screen
+      setCreationMode(null)
+      setStoreCreationMode(null)
+      setShowTemplates(false)
+      setChartTemplates([])
+      setPrefillInput('')
+      setError(null)
+      initializedRef.current = true
     } else if (sessionId) {
-      // Load specific session, then clear param
+      // Load specific session from URL param
       navigate('/chat', { replace: true })
       loadConversation(parseInt(sessionId, 10))
-    } else {
-      // Default: start fresh on chat page
+      // Reset local state when loading existing conversation
+      setCreationMode(null)
+      setStoreCreationMode(null)
+      setShowTemplates(false)
+      initializedRef.current = true
+    } else if (!initializedRef.current && !currentSessionId) {
+      // First load with no params and no existing session - start fresh
       startNewConversation()
+      setCreationMode(null)
+      setStoreCreationMode(null)
+      setShowTemplates(false)
+      setChartTemplates([])
+      setPrefillInput('')
+      setError(null)
+      initializedRef.current = true
     }
+    // If we have currentSessionId but no URL params, don't do anything
+    // (this means sidebar already loaded a conversation)
+
     loadConversationList()
-  }, []) // Only run on mount
+  }, [searchParams]) // Re-run when URL params change
+
+  // Reset initializedRef when navigating away (unmount)
+  useEffect(() => {
+    return () => {
+      initializedRef.current = false
+    }
+  }, [])
 
   // Scroll to bottom on new messages
   useEffect(() => {
@@ -133,14 +172,30 @@ export default function ChatPage() {
       return
     }
 
-    // Creation actions - set mode and show chat input
+    // Creation actions - set mode and show templates
     if (id === 'create_chart') {
       setCreationMode('chart')
+      setStoreCreationMode('chart')  // Sync with store for API routing
+      setShowTemplates(true)
+      // Load chart templates
+      setTemplatesLoading(true)
+      getChartTemplates()
+        .then((response) => {
+          setChartTemplates(response.templates)
+        })
+        .catch((err) => {
+          console.error('Failed to load chart templates:', err)
+        })
+        .finally(() => {
+          setTemplatesLoading(false)
+        })
+      // Focus chat input
       setTimeout(() => chatInputRef.current?.focus(), 100)
       return
     }
     if (id === 'create_dashboard') {
       setCreationMode('dashboard')
+      setStoreCreationMode('dashboard')  // Sync with store for API routing
       setTimeout(() => chatInputRef.current?.focus(), 100)
       return
     }
@@ -306,6 +361,16 @@ export default function ChatPage() {
       >
         {messages.length === 0 && !creationMode ? (
           <WelcomeState onActionClick={handleActionClick} />
+        ) : messages.length === 0 && showTemplates && creationMode === 'chart' ? (
+          <ChartTemplatesGrid
+            templates={chartTemplates}
+            loading={templatesLoading}
+            onSelectTemplate={(template) => {
+              setShowTemplates(false)
+              // Send directly to LLM
+              handleSubmit(template.prompt)
+            }}
+          />
         ) : messages.length === 0 ? (
           <EmptyChat creationMode={creationMode} />
         ) : (
@@ -347,7 +412,7 @@ export default function ChatPage() {
         </div>
       )}
 
-      {/* Input - only show when mode is selected or conversation has started, hide when complete */}
+      {/* Input - show when mode is selected or conversation has started, hide when complete */}
       {(creationMode || messages.length > 0) && !conversationComplete && (
         <div
           style={{
@@ -581,6 +646,126 @@ function ActionButtonLarge({ label, primary = false, onClick }: ActionButtonLarg
       }}
     >
       {label}
+    </button>
+  )
+}
+
+// =============================================================================
+// Chart Templates Grid Component
+// =============================================================================
+
+interface ChartTemplatesGridProps {
+  templates: ChartTemplate[]
+  loading: boolean
+  onSelectTemplate: (template: ChartTemplate) => void
+}
+
+function ChartTemplatesGrid({ templates, loading, onSelectTemplate }: ChartTemplatesGridProps) {
+  return (
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'flex-end',
+        height: '100%',
+        padding: 'var(--space-4)',
+        paddingBottom: 'var(--space-2)',
+        textAlign: 'center',
+        fontFamily: 'var(--font-brand)',
+      }}
+    >
+      <p
+        style={{
+          fontSize: 'var(--text-xs)',
+          color: 'var(--color-gray-400)',
+          marginBottom: 'var(--space-4)',
+          textTransform: 'uppercase',
+          letterSpacing: '0.05em',
+        }}
+      >
+        Quick start templates
+      </p>
+
+      {loading ? (
+        <div
+          style={{
+            color: 'var(--color-gray-400)',
+            fontSize: 'var(--text-sm)',
+            padding: 'var(--space-4)',
+          }}
+        >
+          Loading...
+        </div>
+      ) : (
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(4, 1fr)',
+            gap: 'var(--space-3)',
+            maxWidth: '700px',
+            width: '100%',
+          }}
+        >
+          {templates.map((template) => (
+            <ChartTemplateCard
+              key={template.id}
+              template={template}
+              onClick={() => onSelectTemplate(template)}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+interface ChartTemplateCardProps {
+  template: ChartTemplate
+  onClick: () => void
+}
+
+function ChartTemplateCard({ template, onClick }: ChartTemplateCardProps) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 'var(--space-3)',
+        backgroundColor: 'white',
+        border: '1px solid var(--color-gray-200)',
+        borderRadius: 'var(--radius-lg)',
+        cursor: 'pointer',
+        transition: 'all var(--transition-fast)',
+        textAlign: 'center',
+        minHeight: '80px',
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.borderColor = 'var(--color-brand)'
+        e.currentTarget.style.boxShadow = '0 2px 8px rgba(124, 158, 255, 0.15)'
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.borderColor = 'var(--color-gray-200)'
+        e.currentTarget.style.boxShadow = 'none'
+      }}
+      title={template.description}
+    >
+      <span style={{ fontSize: 'var(--text-xl)', marginBottom: 'var(--space-1)' }}>
+        {template.icon}
+      </span>
+      <span
+        style={{
+          fontSize: 'var(--text-xs)',
+          fontFamily: 'var(--font-brand)',
+          color: 'var(--color-gray-700)',
+          lineHeight: 1.3,
+        }}
+      >
+        {template.name}
+      </span>
     </button>
   )
 }

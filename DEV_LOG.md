@@ -4,6 +4,55 @@ This log captures development changes made during each session. Review this at t
 
 ---
 
+## Session: 2026-01-25
+
+### Focus: Fix Chart Creation Flow & Navigation Bugs
+
+**Context**: Two issues reported:
+1. Chart creation says "dashboard created" but no chart is created
+2. Sidebar navigation links to past conversations are buggy
+
+### Root Cause Analysis
+
+**Chart Creation Issue**: The frontend was calling `/conversation/message` (dashboard flow) even when creating charts. Should have called `/charts/conversation/message` (chart flow).
+
+**Navigation Bug**: Race condition in ChatPage - when clicking a sidebar conversation:
+1. Sidebar navigates to `/chat?session=123`
+2. ChatPage effect sees param, clears URL, calls `loadConversation(123)`
+3. URL change triggers effect to re-run with no params
+4. Default case calls `startNewConversation()`, wiping out loaded conversation
+
+### Fixes Applied
+
+1. **API client** (`app/src/api/client.ts`):
+   - Added `sendChartMessage()` function that calls `/charts/conversation/message`
+   - Added `newChartConversation()` function
+   - Added `ChartMessageResponse` interface
+
+2. **Conversation store** (`app/src/stores/conversationStore.ts`):
+   - Added `creationMode` state to track chart vs dashboard mode
+   - Added `setCreationMode` action
+   - Updated `sendMessage` to route to chart API when `creationMode === 'chart'`
+   - Added `lastChartId` and `lastChartUrl` state
+
+3. **ChatPage** (`app/src/pages/ChatPage.tsx`):
+   - Added `setStoreCreationMode` to sync local mode with store
+   - Used `initializedRef` to prevent re-initialization when sidebar loads conversation
+   - Only starts new conversation on first load with no existing session
+
+4. **Sidebar** (`app/src/components/layout/Sidebar.tsx`):
+   - Changed `handleSwitchConversation` to call `loadConversation()` directly
+   - Navigates to `/chat` without URL params (avoids race condition)
+   - Sets `creationMode` based on conversation type
+
+### Files Modified
+- `app/src/api/client.ts` - Added chart message API
+- `app/src/stores/conversationStore.ts` - Added creation mode routing
+- `app/src/pages/ChatPage.tsx` - Fixed navigation race condition
+- `app/src/components/layout/Sidebar.tsx` - Direct conversation loading
+
+---
+
 ## Current Status (2026-01-24)
 
 ### Completed
@@ -990,6 +1039,174 @@ Flow before fix:
 - Charts not rendering in preview (fixed chart storage and dashboard lookup)
 - JSON blocks appearing in chat (prompt update + response cleaning)
 - Duplicate dashboards with same slug (return most recent by updated_at)
+
+---
+
+## Session: 2026-01-24 (Chart Templates)
+
+### Focus: Chart Templates System with Amazon-style Dual Trend Chart
+
+### Context
+
+Built a chart templates system to suggest commonly-needed charts when users click "Create New Chart". Templates are organized by funnel stage (top/middle/bottom) and filtered by business type (SaaS, E-commerce, General).
+
+### Research Conducted
+
+Reviewed product analytics best practices from:
+- Contentsquare, Pendo, Userpilot for product analytics metrics
+- ChartMogul, Phoenix Strategy Group for SaaS metrics visualization
+- Amplitude for cohort analysis patterns
+
+### Implementation Completed
+
+1. **Chart Templates YAML** (`engine/templates/charts.yaml`):
+   - 19 total templates organized by funnel stage
+   - 7 templates per business type (6 unique + 1 shared)
+   - Categories: top-of-funnel, middle-of-funnel, bottom-of-funnel
+   - Each template has: id, name, icon, chart_type, description, prompt, business_types
+
+2. **Dual Trend Chart Type** - Amazon-style WBR chart:
+   - Added `dual-trend` to `engine/components/charts.yaml`
+   - Two-panel layout using Plotly subplots:
+     - Left: Last 6 weeks with year-over-year comparison
+     - Right: Last 12 months with year-over-year comparison
+   - Created `app/src/components/charts/DualTrendChart.tsx`
+   - Updated `ChartFactory.tsx` to include new chart type
+   - Added `DualTrendChart` to `ChartType` union in `types/chart.ts`
+
+3. **Config Loader Methods** (`engine/config_loader.py`):
+   - `get_chart_templates()` - Load chart templates YAML
+   - `get_chart_templates_by_business_type(type)` - Filter by business type
+   - `get_chart_template_categories()` - Get funnel stage categories
+
+4. **API Endpoints** (`api/routers/templates.py`):
+   - `GET /templates/charts` - Charts for user's business type
+   - `GET /templates/charts/all` - All chart templates
+   - `GET /templates/charts/categories` - Funnel stage categories
+
+5. **Frontend Integration**:
+   - Added `getChartTemplates()` to `api/client.ts`
+   - Updated `ChatPage.tsx`:
+     - New `ChartTemplatesGrid` component showing 2x3 grid of cards
+     - Clicking "Create New Chart" loads templates from API
+     - Clicking a template prefills chat input with its prompt
+     - "Describe a custom chart..." option for freeform input
+
+### Templates by Business Type
+
+**SaaS (7 charts):**
+- Signups Trend, Signup Funnel (TOFU)
+- Activation Rate, Feature Adoption (MOFU)
+- MRR Trend, Churn Rate (BOFU)
+- Metric Health Check (shared)
+
+**E-commerce (7 charts):**
+- Visitors Trend, Traffic by Source (TOFU)
+- Cart Abandonment, Product Performance (MOFU)
+- Sales Trend, Customer LTV (BOFU)
+- Metric Health Check (shared)
+
+**General (7 charts):**
+- New Users, Acquisition Channels (TOFU)
+- Active Users, Engagement Rate (MOFU)
+- Revenue Trend, Top Customers (BOFU)
+- Metric Health Check (shared)
+
+### Files Created
+
+| File | Purpose |
+|------|---------|
+| `engine/templates/charts.yaml` | 19 chart template definitions |
+| `app/src/components/charts/DualTrendChart.tsx` | Amazon-style WBR chart component |
+
+### Files Modified
+
+| File | Change |
+|------|--------|
+| `engine/components/charts.yaml` | Added dual-trend chart type |
+| `engine/config_loader.py` | Added chart template methods |
+| `api/routers/templates.py` | Added /templates/charts endpoints |
+| `app/src/types/chart.ts` | Added DualTrendChart to ChartType |
+| `app/src/components/charts/ChartFactory.tsx` | Added DualTrendChart case |
+| `app/src/api/client.ts` | Added getChartTemplates() |
+| `app/src/pages/ChatPage.tsx` | Added ChartTemplatesGrid component |
+
+### Verification
+
+- TypeScript build passes
+- Python config loader loads all 19 templates correctly
+- Templates correctly filter by business type (7 per type)
+- API router loads without errors
+
+### Next Steps
+
+- [x] Test the full flow: login → create chart → select template → generate chart
+- [x] Test the DualTrendChart with real data
+- [ ] Consider adding dashboard templates grid (similar pattern)
+
+---
+
+## Session: 2026-01-24 (DualTrendChart Pipeline Integration)
+
+### Focus: Fix DualTrendChart generation in LLM pipeline
+
+### Root Cause
+
+When users clicked "Metric Health Check" template, the LLM created a generic dashboard with 2 LineCharts instead of a DualTrendChart. The issue was that:
+1. The requirements.yaml didn't include DualTrendChart in the chart type options
+2. The template prompt asked for "2 LineCharts" instead of "DualTrendChart"
+3. The ChartType enum didn't include DUAL_TREND_CHART
+4. The chart pipeline didn't have a config builder case for DualTrendChart
+
+### Fix Applied
+
+1. **Updated requirements.yaml** (`engine/prompts/chart/requirements.yaml`):
+   - Added DualTrendChart to the chart type list with usage triggers
+   - Added Example 4 showing the correct JSON output structure
+   - Added DualTrendChart to the chart type mapping
+
+2. **Updated sql.yaml** (`engine/prompts/chart/sql.yaml`):
+   - Added DualTrendChart query structure documentation
+   - Specified 13-month data requirement for YoY comparison
+
+3. **Updated ChartType enum** (`engine/models/chart.py`):
+   - Added `DUAL_TREND_CHART = "DualTrendChart"`
+   - Added mappings: "dualtrendchart", "dualtrend", "healthcheck", "wbr"
+
+4. **Updated chart pipeline** (`engine/chart_pipeline.py`):
+   - Added `elif spec.chart_type == ChartType.DUAL_TREND_CHART` case in `_build_chart_config`
+   - Sets x (date column) and y (metric column)
+   - Sets metricLabel in extra_props
+
+5. **Fixed template prompt** (`engine/templates/charts.yaml`):
+   - Changed from "Create 2 LineCharts..." to "Create a DualTrendChart..."
+   - Changed chart_type from "line" to "dual-trend"
+
+### Files Modified
+
+| File | Change |
+|------|--------|
+| `engine/prompts/chart/requirements.yaml` | Added DualTrendChart type, example, and mapping |
+| `engine/prompts/chart/sql.yaml` | Added DualTrendChart query structure |
+| `engine/models/chart.py` | Added DUAL_TREND_CHART to ChartType enum |
+| `engine/chart_pipeline.py` | Added config builder case for DualTrendChart |
+| `engine/templates/charts.yaml` | Fixed template prompt to request DualTrendChart |
+
+### Architecture
+
+The DualTrendChart now flows correctly through the pipeline:
+1. User clicks "Metric Health Check" template
+2. Template prompt: "Create a DualTrendChart for revenue..."
+3. RequirementsAgent extracts: chart_type = "DualTrendChart"
+4. SQLAgent generates: daily/weekly data with date and metric columns
+5. Pipeline builds config: x = date column, y = metric column
+6. React frontend: renders DualTrendChart component with Plotly subplots
+
+### Verification
+
+- TypeScript build passes
+- Python pipeline updated
+- Frontend already had DualTrendChart component and ChartFactory case
 
 ---
 

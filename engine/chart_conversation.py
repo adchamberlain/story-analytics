@@ -341,7 +341,7 @@ Keep your response brief and friendly."""
         self.state.dashboard_slug = dashboard.slug
 
         # Build response
-        chart_url = f"{self.config.dev_url}/{dashboard.slug}?embed=true"
+        chart_url = f"{self.config.frontend_url}/{dashboard.slug}?embed=true"
 
         self.state.phase = ChartPhase.VIEWING
 
@@ -431,7 +431,7 @@ What would you like to try?"""
         # Update the dashboard
         dashboard = create_chart_dashboard(stored_chart)
 
-        chart_url = f"{self.config.dev_url}/{dashboard.slug}?embed=true"
+        chart_url = f"{self.config.frontend_url}/{dashboard.slug}?embed=true"
 
         response = f"""Updated: **{chart.spec.title}**
 
@@ -461,7 +461,7 @@ What else would you like to change?"""
     def get_chart_embed_url(self) -> str | None:
         """Get the embed URL for the current chart."""
         if self.state.dashboard_slug:
-            return f"{self.config.dev_url}/{self.state.dashboard_slug}?embed=true"
+            return f"{self.config.frontend_url}/{self.state.dashboard_slug}?embed=true"
         return None
 
 
