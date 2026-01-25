@@ -4,6 +4,104 @@ This log captures development changes made during each session. Review this at t
 
 ---
 
+## Session: 2026-01-25 (Part 2)
+
+### Focus: Chart Quality Validation System
+
+**Context**: User reported quality issues with LLM-generated charts - the LLM was not delivering accurate charts as requested. Analysis revealed the pipeline validated SQL syntax but not semantic correctness.
+
+### Quality Gaps Identified
+
+1. **No semantic validation** - SQL syntax checked but not correctness (aggregation, chart type suitability)
+2. **QA/Vision not used for charts** - Only dashboards got screenshot validation
+3. **No data shape validation** - Empty results, wrong cardinality not caught
+4. **Limited pattern detection** - Only horizontal bars and top-N were detected
+
+### New Quality Validation System
+
+Created comprehensive `ChartQualityValidator` with multiple validation layers:
+
+1. **DataShapeValidator** (`engine/validators/quality_validator.py`)
+   - Checks query returns data (catches empty results)
+   - Validates column count matches expected
+   - Checks cardinality (e.g., bar chart with 100 categories = warning)
+   - Validates column types (numeric for y-axis, date for time series x-axis)
+
+2. **AggregationValidator**
+   - Verifies SQL aggregation matches spec (SUM vs AVG vs COUNT)
+   - Detects missing GROUP BY clauses
+   - Handles special AVG_PER_ENTITY two-level aggregation
+
+3. **ChartTypeValidator**
+   - Detects "over time" / "trend" requests with bar chart → should be line
+   - Detects category comparisons with line chart → should be bar
+   - Suggests BigValue for single-value requests without dimension
+
+4. **SpecVerifier** (optional LLM check)
+   - Quick LLM verification that extracted spec matches user intent
+   - Catches semantic mismatches pattern matching can't detect
+
+5. **Expanded RequestPatternValidator** (`engine/validators/request_patterns.py`)
+   - Added time series patterns → forces LineChart
+   - Added category patterns → forces BarChart
+   - Added single value patterns → suggests BigValue
+   - Added aggregation hints (count, average, median, per-entity)
+   - Added more top-N and horizontal bar patterns
+
+6. **ChartQA** (`engine/qa.py`)
+   - New class for chart-specific screenshot validation
+   - Uses React app's `/chart/{id}` route
+   - Vision-based validation against original request
+
+### Pipeline Integration
+
+Updated `ChartPipeline` to run quality validation at each stage:
+- Stage 1c: Validate spec quality (chart type, intent match)
+- Stage 2c: Validate query quality (data shape, aggregation)
+- Lowered temperature from 0.3 → 0.1 for requirements extraction (more deterministic)
+
+### Configuration Options
+
+New `ChartPipelineConfig` options:
+- `enable_quality_validation` - Master switch
+- `enable_spec_verification` - LLM spec check
+- `enable_data_validation` - Data shape validation
+- `enable_aggregation_check` - SQL aggregation validation
+- `enable_chart_type_check` - Chart type appropriateness
+- `fail_on_quality_warnings` - Treat warnings as errors
+
+### Files Created/Modified
+
+**Created:**
+- `engine/validators/quality_validator.py` - Core quality validation classes
+- `tests/test_quality_validators.py` - 20 unit tests (all passing)
+- `tests/test_pipeline_quality.py` - Integration test script
+
+**Modified:**
+- `engine/validators/request_patterns.py` - Expanded pattern detection
+- `engine/validators/__init__.py` - Exported new validators
+- `engine/chart_pipeline.py` - Integrated quality validation
+- `engine/qa.py` - Added ChartQA class
+
+### Test Results
+
+All 20 unit tests passing:
+- DataShapeValidator: 3 tests
+- AggregationValidator: 4 tests
+- ChartTypeValidator: 3 tests
+- RequestPatternValidator: 6 tests
+- ChartQualityValidator: 3 tests
+- Integration: 1 test
+
+### Next Steps
+
+1. Run full pipeline tests with ANTHROPIC_API_KEY
+2. Consider enabling `fail_on_quality_warnings` for stricter validation
+3. Enable visual QA for charts when app is running
+4. Add more aggregation patterns as issues are discovered
+
+---
+
 ## Session: 2026-01-25
 
 ### Focus: Fix Chart Creation Flow & Navigation Bugs
