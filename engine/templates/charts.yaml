@@ -174,5 +174,5 @@ categories:
         icon: "📊"
         chart_type: dual-trend
         description: "Amazon-style short-term and long-term trend comparison"
-        prompt: "Create a DualTrendChart for revenue showing year-over-year comparison. This is an Amazon WBR-style health check with two panels: the left panel shows the last 6 weeks vs the same weeks last year, and the right panel shows the last 12 months vs the same months last year."
+        prompt: "Create a DualTrendChart for new subscription signups showing year-over-year comparison. This is an Amazon WBR-style health check with two panels: the left panel shows the last 6 weeks vs the same 6 weeks one year ago, and the right panel shows the last 12 months vs the same 12 months one year ago. Use the subscriptions table and count new subscriptions by start_date."
         business_types: [saas, ecommerce, general]

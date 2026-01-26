@@ -210,6 +210,31 @@ class ChartConfig:
     # Styling (using design system)
     color: str | None = None  # Primary color (default: indigo #6366f1)
     fill_color: str | None = None  # Fill/gradient color
+    background_color: str | None = None  # Chart background color
+    grid_color: str | None = None  # Grid line color
+
+    # Typography
+    title_font_size: int | None = None  # Title text size in pixels
+    legend_font_size: int | None = None  # Legend text size in pixels
+    axis_font_size: int | None = None  # Axis labels size in pixels
+
+    # Display options
+    show_legend: bool | None = None  # Show/hide legend
+    show_grid: bool | None = None  # Show/hide grid lines
+    show_values: bool | None = None  # Show data values on chart
+
+    # Line/scatter options
+    line_width: int | None = None  # Line thickness in pixels
+    marker_size: int | None = None  # Data point size in pixels
+
+    # Bar chart options
+    bar_gap: float | None = None  # Gap between bars (0-1)
+    bar_group_gap: float | None = None  # Gap between bar groups (0-1)
+
+    # Axis options
+    tick_angle: int | None = None  # Rotation angle for tick labels
+    y_axis_min: float | None = None  # Y-axis minimum value
+    y_axis_max: float | None = None  # Y-axis maximum value
 
     # Chart-specific options
     sort: bool | str | None = None  # Sort order
@@ -408,8 +433,8 @@ class Chart:
     filters: list[FilterSpec] = field(default_factory=list)
 
     # Metadata
-    created_at: datetime = field(default_factory=datetime.now)
-    updated_at: datetime = field(default_factory=datetime.now)
+    created_at: datetime = field(default_factory=datetime.utcnow)
+    updated_at: datetime = field(default_factory=datetime.utcnow)
     created_by: str | None = None  # User ID if we have auth
 
     # Lineage
@@ -453,8 +478,31 @@ class Chart:
                 "value": self.config.value,
                 "series": self.config.series,
                 "title": self.config.title,
+                "x_axis_title": self.config.x_axis_title,
+                "y_axis_title": self.config.y_axis_title,
+                "color": self.config.color,
+                "fill_color": self.config.fill_color,
+                "background_color": self.config.background_color,
+                "grid_color": self.config.grid_color,
+                "title_font_size": self.config.title_font_size,
+                "legend_font_size": self.config.legend_font_size,
+                "axis_font_size": self.config.axis_font_size,
+                "show_legend": self.config.show_legend,
+                "show_grid": self.config.show_grid,
+                "show_values": self.config.show_values,
+                "line_width": self.config.line_width,
+                "marker_size": self.config.marker_size,
+                "bar_gap": self.config.bar_gap,
+                "bar_group_gap": self.config.bar_group_gap,
+                "tick_angle": self.config.tick_angle,
+                "y_axis_min": self.config.y_axis_min,
+                "y_axis_max": self.config.y_axis_max,
                 "horizontal": self.config.horizontal,
                 "stacked": self.config.stacked,
+                "sort": self.config.sort,
+                "x_fmt": self.config.x_fmt,
+                "y_fmt": self.config.y_fmt,
+                "value_fmt": self.config.value_fmt,
                 "extra_props": self.config.extra_props,
             },
             "filters": [f.to_dict() for f in self.filters],
@@ -472,14 +520,48 @@ class Chart:
         """Deserialize from dictionary."""
         config_data = data.get("config", {})
         config = ChartConfig(
+            # Core data binding
             x=config_data.get("x"),
             y=config_data.get("y"),
             y2=config_data.get("y2"),
             value=config_data.get("value"),
             series=config_data.get("series"),
+            # Formatting
+            x_fmt=config_data.get("x_fmt"),
+            y_fmt=config_data.get("y_fmt"),
+            value_fmt=config_data.get("value_fmt"),
+            # Labels and titles
             title=config_data.get("title"),
+            x_axis_title=config_data.get("x_axis_title"),
+            y_axis_title=config_data.get("y_axis_title"),
+            # Styling
+            color=config_data.get("color"),
+            fill_color=config_data.get("fill_color"),
+            background_color=config_data.get("background_color"),
+            grid_color=config_data.get("grid_color"),
+            # Typography
+            title_font_size=config_data.get("title_font_size"),
+            legend_font_size=config_data.get("legend_font_size"),
+            axis_font_size=config_data.get("axis_font_size"),
+            # Display options
+            show_legend=config_data.get("show_legend"),
+            show_grid=config_data.get("show_grid"),
+            show_values=config_data.get("show_values"),
+            # Line/scatter options
+            line_width=config_data.get("line_width"),
+            marker_size=config_data.get("marker_size"),
+            # Bar chart options
+            bar_gap=config_data.get("bar_gap"),
+            bar_group_gap=config_data.get("bar_group_gap"),
+            # Axis options
+            tick_angle=config_data.get("tick_angle"),
+            y_axis_min=config_data.get("y_axis_min"),
+            y_axis_max=config_data.get("y_axis_max"),
+            # Chart-specific options
             horizontal=config_data.get("horizontal", False),
             stacked=config_data.get("stacked", False),
+            sort=config_data.get("sort"),
+            # Additional props
             extra_props=config_data.get("extra_props", {}),
         )
 
@@ -548,8 +630,8 @@ class Dashboard:
     layout: DashboardLayout = field(default_factory=DashboardLayout)
 
     # Metadata
-    created_at: datetime = field(default_factory=datetime.now)
-    updated_at: datetime = field(default_factory=datetime.now)
+    created_at: datetime = field(default_factory=datetime.utcnow)
+    updated_at: datetime = field(default_factory=datetime.utcnow)
     created_by: str | None = None
 
     def add_chart(self, chart_id: str, section: str | None = None) -> None:

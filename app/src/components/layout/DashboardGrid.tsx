@@ -10,9 +10,15 @@ import { ChartCard } from './ChartCard'
 interface DashboardGridProps {
   charts: ChartRenderData[]
   layout?: DashboardLayout
+  /** Show "View Code" section below each chart */
+  showCode?: boolean
+  /** Chart IDs corresponding to each chart (required for SQL editing) */
+  chartIds?: string[]
+  /** Callback when SQL is updated (triggers chart refresh) */
+  onSqlUpdate?: (chartId: string, newSql: string) => void
 }
 
-export function DashboardGrid({ charts, layout }: DashboardGridProps) {
+export function DashboardGrid({ charts, layout, showCode = false, chartIds, onSqlUpdate }: DashboardGridProps) {
   // If we have sections, render with section headers
   if (layout?.sections && layout.sections.length > 0) {
     return (
@@ -46,9 +52,20 @@ export function DashboardGrid({ charts, layout }: DashboardGridProps) {
                   gap: '1.5rem',
                 }}
               >
-                {sectionCharts.map((chart, index) => (
-                  <ChartCard key={index} chart={chart} />
-                ))}
+                {sectionCharts.map((chart, index) => {
+                  // Calculate the actual chart index in the full charts array
+                  const chartIndex = sectionIndex * section.chartIds.length + index
+                  const chartId = chartIds?.[chartIndex]
+                  return (
+                    <ChartCard
+                      key={chartId || index}
+                      chart={chart}
+                      chartId={chartId}
+                      showCode={showCode}
+                      onSqlUpdate={onSqlUpdate}
+                    />
+                  )
+                })}
               </div>
             </div>
           )
@@ -66,9 +83,18 @@ export function DashboardGrid({ charts, layout }: DashboardGridProps) {
         gap: '1.5rem',
       }}
     >
-      {charts.map((chart, index) => (
-        <ChartCard key={index} chart={chart} />
-      ))}
+      {charts.map((chart, index) => {
+        const chartId = chartIds?.[index]
+        return (
+          <ChartCard
+            key={chartId || index}
+            chart={chart}
+            chartId={chartId}
+            showCode={showCode}
+            onSqlUpdate={onSqlUpdate}
+          />
+        )
+      })}
     </div>
   )
 }

@@ -1,12 +1,14 @@
 /**
  * Sidebar component.
- * Navigation, conversation history, and dashboard list.
+ * Navigation, conversation history, dashboard list, and data sources.
  */
 
 import { useState, useEffect } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useConversationStore } from '../../stores/conversationStore'
+import { useSourceStore } from '../../stores/sourceStore'
 import { Logo } from '../brand'
+import { SchemaBrowser, AddDataSourceWizard } from '../sources'
 import type { ConversationSummary } from '../../types/conversation'
 
 // Navigation items
@@ -38,16 +40,27 @@ export function Sidebar() {
 
   const [showConversations, setShowConversations] = useState(true)
   const [showDashboards, setShowDashboards] = useState(true)
+  const [showDataSources, setShowDataSources] = useState(true)
   const [editingId, setEditingId] = useState<number | null>(null)
   const [editingTitle, setEditingTitle] = useState('')
   const [deletingId, setDeletingId] = useState<number | null>(null)
+  const [showAddSourceWizard, setShowAddSourceWizard] = useState(false)
+
+  // Source store
+  const {
+    sources,
+    loadSources,
+    openSchemaBrowser,
+    schemaBrowserOpen,
+  } = useSourceStore()
 
   // Load data on mount
   useEffect(() => {
     loadUser()
     loadConversationList()
     loadDashboards()
-  }, [loadUser, loadConversationList, loadDashboards])
+    loadSources()
+  }, [loadUser, loadConversationList, loadDashboards, loadSources])
 
   // Handle conversation switch
   const handleSwitchConversation = async (conv: ConversationSummary) => {
@@ -240,7 +253,8 @@ export function Sidebar() {
                 overflowY: 'auto',
               }}
             >
-              {conversationList.length === 0 ? (
+              {/* Only show conversations that have been titled (after first message) */}
+              {conversationList.filter(c => c.title).length === 0 ? (
                 <li
                   style={{
                     color: 'var(--color-gray-400)',
@@ -252,7 +266,7 @@ export function Sidebar() {
                   No conversations yet
                 </li>
               ) : (
-                conversationList.map((conv) => (
+                conversationList.filter(c => c.title).map((conv) => (
                   <li
                     key={conv.id}
                     style={{
@@ -363,7 +377,7 @@ export function Sidebar() {
                               fontFamily: 'var(--font-brand)',
                             }}
                           >
-                            {conv.title || 'New conversation'}
+                            {conv.title}
                           </span>
                         </button>
                         <button
@@ -492,6 +506,123 @@ export function Sidebar() {
             </ul>
           )}
         </div>
+
+        {/* Data Sources */}
+        <div style={{ marginTop: 'var(--space-6)' }}>
+          <button
+            onClick={() => setShowDataSources(!showDataSources)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 'var(--space-2)',
+              color: 'var(--color-gray-500)',
+              fontSize: 'var(--text-sm)',
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              padding: 0,
+              width: '100%',
+              marginBottom: 'var(--space-2)',
+            }}
+          >
+            <span
+              style={{
+                transform: showDataSources ? 'rotate(90deg)' : 'none',
+                transition: 'transform var(--transition-fast)',
+              }}
+            >
+              {'>'}
+            </span>
+            <span style={{ fontFamily: 'var(--font-brand)' }}>Data Sources</span>
+          </button>
+
+          {showDataSources && (
+            <ul
+              style={{
+                listStyle: 'none',
+                margin: 0,
+                padding: 0,
+                marginLeft: 'var(--space-4)',
+              }}
+            >
+              {sources.map((source) => (
+                <li key={source.name}>
+                  <button
+                    onClick={() => openSchemaBrowser(source.name)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 'var(--space-2)',
+                      width: '100%',
+                      textAlign: 'left',
+                      fontSize: 'var(--text-sm)',
+                      color: 'var(--color-gray-400)',
+                      padding: 'var(--space-1) 0',
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                    }}
+                    title={`${source.name} - Click to browse schema`}
+                  >
+                    <span
+                      style={{
+                        color: source.connected
+                          ? 'var(--color-success)'
+                          : 'var(--color-gray-600)',
+                        fontSize: 'var(--text-xs)',
+                      }}
+                    >
+                      {source.connected ? '\u25CF' : '\u25CB'}
+                    </span>
+                    <span
+                      style={{
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                        fontFamily: 'var(--font-brand)',
+                      }}
+                    >
+                      {source.name}
+                    </span>
+                    {source.table_count !== null && source.table_count > 0 && (
+                      <span
+                        style={{
+                          fontSize: 'var(--text-xs)',
+                          color: 'var(--color-gray-500)',
+                          marginLeft: 'auto',
+                        }}
+                      >
+                        {source.table_count} tables
+                      </span>
+                    )}
+                  </button>
+                </li>
+              ))}
+              {/* Add Data Source button */}
+              <li style={{ marginTop: 'var(--space-2)' }}>
+                <button
+                  onClick={() => setShowAddSourceWizard(true)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 'var(--space-2)',
+                    width: '100%',
+                    textAlign: 'left',
+                    fontSize: 'var(--text-sm)',
+                    color: 'var(--color-primary)',
+                    padding: 'var(--space-1) 0',
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <span style={{ fontSize: 'var(--text-xs)' }}>+</span>
+                  <span style={{ fontFamily: 'var(--font-brand)' }}>Add Data Source</span>
+                </button>
+              </li>
+            </ul>
+          )}
+        </div>
       </nav>
 
       {/* User info */}
@@ -550,6 +681,15 @@ export function Sidebar() {
           </div>
         </div>
       )}
+
+      {/* Schema Browser Modal */}
+      {schemaBrowserOpen && <SchemaBrowser />}
+
+      {/* Add Data Source Wizard Modal */}
+      <AddDataSourceWizard
+        isOpen={showAddSourceWizard}
+        onClose={() => setShowAddSourceWizard(false)}
+      />
 
     </aside>
   )

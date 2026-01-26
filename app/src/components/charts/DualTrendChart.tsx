@@ -19,16 +19,32 @@ interface DualTrendChartProps {
   config: ChartConfig
 }
 
-// Chart colors
-const CURRENT_YEAR_COLOR = '#6366f1'  // Indigo (solid line)
-const PRIOR_YEAR_COLOR = '#a5b4fc'    // Light indigo (dashed line)
+// Default chart colors
+const DEFAULT_CURRENT_YEAR_COLOR = '#6366f1'  // Indigo (solid line)
+const DEFAULT_PRIOR_YEAR_COLOR = '#a5b4fc'    // Light indigo (dashed line)
 
 export function DualTrendChart({ data, config }: DualTrendChartProps) {
+  // Data binding
   const metricColumn = config.value || config.y as string || 'metric'
   const dateColumn = config.x || 'date'
   const title = config.title || 'Metric Health Check'
   const metricLabel = config.yAxisTitle || metricColumn
   const valueFormat = config.valueFormat || 'number'
+
+  // Use config color or default
+  const currentYearColor = config.color || DEFAULT_CURRENT_YEAR_COLOR
+  // Derive lighter color for prior year (add transparency)
+  const priorYearColor = config.fillColor || DEFAULT_PRIOR_YEAR_COLOR
+
+  // Config options with defaults
+  const showLegend = config.showLegend ?? true
+  const showGrid = config.showGrid ?? true
+  const titleFontSize = config.titleFontSize || 16
+  const legendFontSize = config.legendFontSize || 11
+  const axisFontSize = config.axisFontSize || 10
+  const lineWidth = config.lineWidth || 2.5
+  const markerSize = config.markerSize || 8
+  const gridColor = config.gridColor || 'rgba(229, 231, 235, 0.5)'
 
   // Process data into weekly and monthly aggregations with YoY comparison
   const { weeklyData, monthlyData } = useMemo(() => {
@@ -48,14 +64,14 @@ export function DualTrendChart({ data, config }: DualTrendChartProps) {
         xaxis: 'x',
         yaxis: 'y',
         line: {
-          color: CURRENT_YEAR_COLOR,
-          width: 2.5,
+          color: currentYearColor,
+          width: lineWidth,
           shape: 'spline',
           smoothing: 0.8,
         },
         marker: {
-          size: 8,
-          color: CURRENT_YEAR_COLOR,
+          size: markerSize,
+          color: currentYearColor,
         },
         hovertemplate: `<b>This Year</b><br>Week %{x}<br>${metricLabel}: %{y:,.0f}<extra></extra>`,
       },
@@ -69,20 +85,20 @@ export function DualTrendChart({ data, config }: DualTrendChartProps) {
         xaxis: 'x',
         yaxis: 'y',
         line: {
-          color: PRIOR_YEAR_COLOR,
-          width: 2,
+          color: priorYearColor,
+          width: lineWidth * 0.8,
           dash: 'dash',
           shape: 'spline',
           smoothing: 0.8,
         },
         marker: {
-          size: 6,
-          color: PRIOR_YEAR_COLOR,
+          size: markerSize * 0.75,
+          color: priorYearColor,
         },
         hovertemplate: `<b>Last Year</b><br>Week %{x}<br>${metricLabel}: %{y:,.0f}<extra></extra>`,
       },
     ]
-  }, [weeklyData, metricLabel])
+  }, [weeklyData, metricLabel, currentYearColor, priorYearColor, lineWidth, markerSize])
 
   // Create traces for the monthly panel (right)
   const monthlyTraces: Data[] = useMemo(() => {
@@ -97,14 +113,14 @@ export function DualTrendChart({ data, config }: DualTrendChartProps) {
         xaxis: 'x2',
         yaxis: 'y2',
         line: {
-          color: CURRENT_YEAR_COLOR,
-          width: 2.5,
+          color: currentYearColor,
+          width: lineWidth,
           shape: 'spline',
           smoothing: 0.8,
         },
         marker: {
-          size: 8,
-          color: CURRENT_YEAR_COLOR,
+          size: markerSize,
+          color: currentYearColor,
         },
         showlegend: false,
         hovertemplate: `<b>This Year</b><br>%{x}<br>${metricLabel}: %{y:,.0f}<extra></extra>`,
@@ -119,21 +135,21 @@ export function DualTrendChart({ data, config }: DualTrendChartProps) {
         xaxis: 'x2',
         yaxis: 'y2',
         line: {
-          color: PRIOR_YEAR_COLOR,
-          width: 2,
+          color: priorYearColor,
+          width: lineWidth * 0.8,
           dash: 'dash',
           shape: 'spline',
           smoothing: 0.8,
         },
         marker: {
-          size: 6,
-          color: PRIOR_YEAR_COLOR,
+          size: markerSize * 0.75,
+          color: priorYearColor,
         },
         showlegend: false,
         hovertemplate: `<b>Last Year</b><br>%{x}<br>${metricLabel}: %{y:,.0f}<extra></extra>`,
       },
     ]
-  }, [monthlyData, metricLabel])
+  }, [monthlyData, metricLabel, currentYearColor, priorYearColor, lineWidth, markerSize])
 
   // Combine all traces
   const traces: Data[] = [...weeklyTraces, ...monthlyTraces]
@@ -156,7 +172,7 @@ export function DualTrendChart({ data, config }: DualTrendChartProps) {
   const layout: Partial<Layout> = {
     title: {
       text: title,
-      font: { size: 16, color: '#374151' },
+      font: { size: titleFontSize, color: '#374151' },
       x: 0.5,
       xanchor: 'center',
     },
@@ -165,8 +181,8 @@ export function DualTrendChart({ data, config }: DualTrendChartProps) {
       size: 12,
       color: '#374151',
     },
-    paper_bgcolor: 'transparent',
-    plot_bgcolor: 'transparent',
+    paper_bgcolor: config.backgroundColor || 'transparent',
+    plot_bgcolor: config.backgroundColor || 'transparent',
     margin: { l: 60, r: 60, t: 60, b: 80 },
 
     // Grid layout: 2 columns
@@ -180,52 +196,52 @@ export function DualTrendChart({ data, config }: DualTrendChartProps) {
     // Left panel (weekly) - x axis
     xaxis: {
       domain: [0, 0.45],
-      title: { text: 'Last 6 Weeks', font: { size: 11, color: '#6b7280' } },
-      gridcolor: 'rgba(229, 231, 235, 0.5)',
+      title: { text: 'Last 6 Weeks', font: { size: axisFontSize + 1, color: '#6b7280' } },
+      gridcolor: gridColor,
       linecolor: '#d1d5db',
-      tickfont: { size: 10, color: '#6b7280' },
-      showgrid: true,
+      tickfont: { size: axisFontSize, color: '#6b7280' },
+      showgrid: showGrid,
     },
     // Left panel - y axis
     yaxis: {
       range: [yMin, yMax],
       tickformat: yTickFormat,
-      gridcolor: 'rgba(229, 231, 235, 0.5)',
+      gridcolor: gridColor,
       linecolor: '#d1d5db',
-      tickfont: { size: 10, color: '#6b7280' },
-      showgrid: true,
-      title: { text: metricLabel, font: { size: 11, color: '#6b7280' } },
+      tickfont: { size: axisFontSize, color: '#6b7280' },
+      showgrid: showGrid,
+      title: { text: metricLabel, font: { size: axisFontSize + 1, color: '#6b7280' } },
     },
 
     // Right panel (monthly) - x axis
     xaxis2: {
       domain: [0.55, 1],
-      title: { text: 'Last 12 Months', font: { size: 11, color: '#6b7280' } },
-      gridcolor: 'rgba(229, 231, 235, 0.5)',
+      title: { text: 'Last 12 Months', font: { size: axisFontSize + 1, color: '#6b7280' } },
+      gridcolor: gridColor,
       linecolor: '#d1d5db',
-      tickfont: { size: 10, color: '#6b7280' },
-      showgrid: true,
-      tickangle: -45,
+      tickfont: { size: axisFontSize, color: '#6b7280' },
+      showgrid: showGrid,
+      tickangle: config.tickAngle ?? -45,
     },
     // Right panel - y axis
     yaxis2: {
       range: [yMin, yMax],
       tickformat: yTickFormat,
-      gridcolor: 'rgba(229, 231, 235, 0.5)',
+      gridcolor: gridColor,
       linecolor: '#d1d5db',
-      tickfont: { size: 10, color: '#6b7280' },
-      showgrid: true,
+      tickfont: { size: axisFontSize, color: '#6b7280' },
+      showgrid: showGrid,
       anchor: 'x2',
     },
 
     // Legend
-    showlegend: true,
+    showlegend: showLegend,
     legend: {
       orientation: 'h',
       x: 0.5,
       xanchor: 'center',
       y: -0.2,
-      font: { size: 11, color: '#4b5563' },
+      font: { size: legendFontSize, color: '#4b5563' },
       bgcolor: 'transparent',
     },
 

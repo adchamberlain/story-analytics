@@ -12,8 +12,10 @@ This decomposed approach gives each agent focused context and clear responsibili
 
 from dataclasses import dataclass
 from enum import Enum
+from pathlib import Path
 
 from ..schema import get_schema_context
+from ..semantic import SemanticLayer
 from ..sql_validator import validate_dashboard_sql, SQLValidator
 from ..progress import (
     ProgressEmitter,
@@ -80,9 +82,11 @@ class DashboardPipeline:
     for intelligent retry behavior.
     """
 
-    def __init__(self, config: PipelineConfig | None = None):
+    def __init__(self, config: PipelineConfig | None = None, source_name: str = "snowflake_saas"):
         self.config = config or PipelineConfig()
+        self.source_name = source_name
         self._schema_context: str | None = None
+        self._semantic_layer: SemanticLayer | None = None
         self._sql_validator: SQLValidator | None = None
 
         # Initialize agents
@@ -94,10 +98,25 @@ class DashboardPipeline:
         )
         self.layout_agent = LayoutAgent(self.config.provider_name)
 
+    def get_semantic_layer(self) -> SemanticLayer | None:
+        """Load and cache the semantic layer for the source."""
+        if self._semantic_layer is None:
+            semantic_path = Path(__file__).parent.parent.parent / "sources" / self.source_name / "semantic.yaml"
+            if semantic_path.exists():
+                try:
+                    self._semantic_layer = SemanticLayer.load(str(semantic_path))
+                    if self.config.verbose:
+                        print(f"[DashboardPipeline] Loaded semantic layer: {self._semantic_layer.business_context.domain}")
+                except Exception as e:
+                    if self.config.verbose:
+                        print(f"[DashboardPipeline] Warning: Could not load semantic layer: {e}")
+        return self._semantic_layer
+
     def get_schema_context(self) -> str:
-        """Get cached schema context."""
+        """Get cached schema context with semantic layer enrichment."""
         if self._schema_context is None:
-            self._schema_context = get_schema_context()
+            semantic_layer = self.get_semantic_layer()
+            self._schema_context = get_schema_context(semantic_layer)
         return self._schema_context
 
     def _emit_progress(

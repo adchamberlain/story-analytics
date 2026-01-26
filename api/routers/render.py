@@ -123,18 +123,48 @@ def _chart_to_render_spec(chart) -> dict[str, Any]:
         "queryName": chart.query_name,
         "sql": chart.sql,
         "config": {
+            # Core data binding
             "x": chart.config.x,
             "y": chart.config.y,
             "y2": chart.config.y2,
             "value": chart.config.value,
             "series": chart.config.series,
+            # Formatting
+            "xFmt": chart.config.x_fmt,
+            "yFmt": chart.config.y_fmt,
+            "valueFmt": chart.config.value_fmt,
+            # Labels and titles
             "title": chart.config.title,
             "xAxisTitle": chart.config.x_axis_title,
             "yAxisTitle": chart.config.y_axis_title,
-            "horizontal": chart.config.horizontal,
-            "stacked": chart.config.stacked,
+            # Styling
             "color": chart.config.color,
             "fillColor": chart.config.fill_color,
+            "backgroundColor": chart.config.background_color,
+            "gridColor": chart.config.grid_color,
+            # Typography
+            "titleFontSize": chart.config.title_font_size,
+            "legendFontSize": chart.config.legend_font_size,
+            "axisFontSize": chart.config.axis_font_size,
+            # Display options
+            "showLegend": chart.config.show_legend,
+            "showGrid": chart.config.show_grid,
+            "showValues": chart.config.show_values,
+            # Line/scatter options
+            "lineWidth": chart.config.line_width,
+            "markerSize": chart.config.marker_size,
+            # Bar chart options
+            "barGap": chart.config.bar_gap,
+            "barGroupGap": chart.config.bar_group_gap,
+            # Axis options
+            "tickAngle": chart.config.tick_angle,
+            "yAxisMin": chart.config.y_axis_min,
+            "yAxisMax": chart.config.y_axis_max,
+            # Chart-specific options
+            "horizontal": chart.config.horizontal,
+            "stacked": chart.config.stacked,
+            "sort": chart.config.sort,
+            # Additional props
             "extraProps": chart.config.extra_props,
         },
         "filters": [

@@ -100,10 +100,11 @@ class ChartCreateResponse(BaseModel):
 
 
 class ChartUpdateRequest(BaseModel):
-    """Schema for updating a chart's metadata."""
+    """Schema for updating a chart's metadata or SQL."""
 
     title: str | None = None
     description: str | None = None
+    sql: str | None = None
 
 
 class ChartUpdateResponse(BaseModel):
@@ -198,3 +199,57 @@ class DashboardReorderChartsRequest(BaseModel):
     """Schema for reordering charts in a dashboard."""
 
     chart_ids: list[str]  # New order
+
+
+class DashboardContextChartInfo(BaseModel):
+    """Schema for chart info used in context generation."""
+
+    title: str
+    description: str
+
+
+class DashboardGenerateContextRequest(BaseModel):
+    """Schema for generating dashboard context via AI."""
+
+    title: str
+    charts: list[DashboardContextChartInfo]
+
+
+class DashboardGenerateContextResponse(BaseModel):
+    """Schema for dashboard context generation response."""
+
+    context: str
+
+
+# =============================================================================
+# Chart Config Editor Schemas
+# =============================================================================
+
+
+class ChartConfigUpdateRequest(BaseModel):
+    """Schema for updating a chart's visual configuration."""
+
+    config: dict  # Partial ChartConfig - only fields to update
+
+
+class ChartConfigUpdateResponse(BaseModel):
+    """Schema for chart config update response."""
+
+    success: bool
+    chart: ChartSchema | None = None
+    error: str | None = None
+
+
+class AIConfigSuggestionRequest(BaseModel):
+    """Schema for requesting an AI-powered config suggestion."""
+
+    current_config: dict  # Current ChartConfig
+    chart_type: str  # The chart type (e.g., "BarChart", "LineChart")
+    user_request: str  # Natural language request like "make the bars horizontal"
+
+
+class AIConfigSuggestionResponse(BaseModel):
+    """Schema for AI config suggestion response."""
+
+    suggested_config: dict  # Partial ChartConfig with suggested changes
+    explanation: str  # Human-readable explanation of the changes

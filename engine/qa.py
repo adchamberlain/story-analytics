@@ -359,6 +359,7 @@ def auto_fix_dashboard(
     from .config_loader import get_config_loader
     from .llm.claude import get_provider
     from .schema import get_schema_context
+    from .semantic import SemanticLayer
 
     config_loader = get_config_loader()
     llm = get_provider(provider_name)
@@ -377,9 +378,13 @@ def auto_fix_dashboard(
     if schema_context:
         system_prompt += f"\n\nDATABASE SCHEMA:\n{schema_context}"
     else:
-        # Get schema context if not provided
+        # Get schema context with semantic layer enrichment if available
         try:
-            schema = get_schema_context()
+            semantic_layer = None
+            semantic_path = Path(__file__).parent.parent / "sources" / "snowflake_saas" / "semantic.yaml"
+            if semantic_path.exists():
+                semantic_layer = SemanticLayer.load(str(semantic_path))
+            schema = get_schema_context(semantic_layer)
             system_prompt += f"\n\nDATABASE SCHEMA:\n{schema}"
         except Exception:
             pass  # Continue without schema if unavailable

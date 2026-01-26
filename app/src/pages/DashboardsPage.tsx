@@ -108,7 +108,7 @@ export function DashboardsPage() {
 
           {/* New Dashboard */}
           <button
-            onClick={() => navigate('/chat')}
+            onClick={() => navigate('/dashboards/new')}
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -211,11 +211,12 @@ export function DashboardsPage() {
                 >
                   {/* Dashboard info */}
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <a
-                      href={dashboard.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
+                    <button
+                      onClick={() => navigate(`/dashboards/view/${dashboard.slug}`)}
                       style={{
+                        background: 'none',
+                        border: 'none',
+                        padding: 0,
                         color: 'var(--color-primary)',
                         fontWeight: 500,
                         textDecoration: 'none',
@@ -223,6 +224,10 @@ export function DashboardsPage() {
                         overflow: 'hidden',
                         textOverflow: 'ellipsis',
                         whiteSpace: 'nowrap',
+                        cursor: 'pointer',
+                        fontSize: 'inherit',
+                        textAlign: 'left',
+                        width: '100%',
                       }}
                       onMouseEnter={(e) => {
                         e.currentTarget.style.textDecoration = 'underline'
@@ -232,7 +237,7 @@ export function DashboardsPage() {
                       }}
                     >
                       {dashboard.title}
-                    </a>
+                    </button>
                     <p
                       style={{
                         margin: 'var(--space-1) 0 0 0',
@@ -262,29 +267,8 @@ export function DashboardsPage() {
                       flexShrink: 0,
                     }}
                   >
-                    <a
-                      href={dashboard.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      style={{
-                        color: 'var(--color-gray-400)',
-                        fontSize: 'var(--text-sm)',
-                        textDecoration: 'none',
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.color = 'var(--color-gray-200)'
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.color = 'var(--color-gray-400)'
-                      }}
-                    >
-                      Open
-                    </a>
-
-                    <span style={{ color: 'var(--color-gray-700)' }}>|</span>
-
                     <button
-                      onClick={() => navigate(`/dashboard/${dashboard.slug}`)}
+                      onClick={() => navigate(`/dashboards/view/${dashboard.slug}`)}
                       style={{
                         background: 'none',
                         border: 'none',
@@ -295,7 +279,7 @@ export function DashboardsPage() {
                         padding: 0,
                       }}
                     >
-                      View in React
+                      View
                     </button>
 
                     <span style={{ color: 'var(--color-gray-700)' }}>|</span>

@@ -26,6 +26,10 @@ export function LineChart({ data, config }: LineChartProps) {
   // Determine axis labels for hover template
   const xLabel = config.xAxisTitle || xColumn
 
+  // Get line styling from config
+  const lineWidth = config.lineWidth ?? defaultLineStyle.line?.width ?? 2
+  const markerSize = config.markerSize ?? defaultLineStyle.marker?.size ?? 6
+
   if (seriesColumn) {
     // Group by series column - handle case-insensitive column matching
     // Find the actual column name in the data (may differ in case)
@@ -50,7 +54,7 @@ export function LineChart({ data, config }: LineChartProps) {
         const xValues = seriesData.map(row => row[xColumn])
         const yValues = seriesData.map(row => row[yColumn])
 
-        traces.push({
+        const trace: Data = {
           type: 'scatter',
           mode: 'lines+markers',
           name: yColumns.length > 1 ? `${seriesValue} - ${yColumn}` : seriesValue,
@@ -58,63 +62,116 @@ export function LineChart({ data, config }: LineChartProps) {
           y: yValues as Plotly.Datum[],
           line: {
             ...defaultLineStyle.line,
+            width: lineWidth,
             color: seriesColors[i % seriesColors.length],
           },
           marker: {
             ...defaultLineStyle.marker,
+            size: markerSize,
             color: seriesColors[i % seriesColors.length],
           },
           hovertemplate: createHoverTemplate(xLabel, yColumn, {
             showName: seriesValues.length > 1 || yColumns.length > 1,
           }),
-        })
+        }
+
+        // Apply showValues config
+        if (config.showValues) {
+          trace.text = yValues as string[]
+          trace.textposition = 'top center'
+          trace.mode = 'lines+markers+text'
+        }
+
+        traces.push(trace)
       }
     }
   } else {
     // No series grouping - one trace per y column
+    const customColor = config.color
     for (const yColumn of yColumns) {
-      traces.push({
+      const yValues = data.map(row => row[yColumn])
+
+      const trace: Data = {
         type: 'scatter',
         mode: 'lines+markers',
         name: yColumn,
         x: data.map(row => row[xColumn]) as Plotly.Datum[],
-        y: data.map(row => row[yColumn]) as Plotly.Datum[],
-        ...defaultLineStyle,
+        y: yValues as Plotly.Datum[],
+        line: {
+          ...defaultLineStyle.line,
+          width: lineWidth,
+          color: customColor || defaultLineStyle.line?.color,
+        },
+        marker: {
+          ...defaultLineStyle.marker,
+          size: markerSize,
+          color: customColor || defaultLineStyle.marker?.color,
+        },
         hovertemplate: createHoverTemplate(xLabel, yColumn, {
           showName: yColumns.length > 1,
         }),
-      })
+      }
+
+      // Apply showValues config
+      if (config.showValues) {
+        trace.text = yValues as string[]
+        trace.textposition = 'top center'
+        trace.mode = 'lines+markers+text'
+      }
+
+      traces.push(trace)
     }
   }
+
+  // Build layout with all config options
+  const axisFontSize = config.axisFontSize || 12
+  const tickAngle = config.tickAngle ?? 0
+  const showGrid = config.showGrid !== false
+  const gridColor = config.gridColor || '#e5e7eb'
 
   const layout: Partial<Layout> = {
     title: config.title
       ? {
           text: config.title,
-          font: { size: 14, color: '#374151' },
+          font: {
+            size: config.titleFontSize || 14,
+            color: '#374151',
+          },
           x: 0.02,
           xanchor: 'left',
         }
       : undefined,
     xaxis: {
       title: config.xAxisTitle
-        ? { text: config.xAxisTitle, font: { size: 12 } }
+        ? { text: config.xAxisTitle, font: { size: axisFontSize } }
         : undefined,
+      tickangle: tickAngle,
+      tickfont: { size: axisFontSize },
+      showgrid: showGrid,
+      gridcolor: gridColor,
     },
     yaxis: {
       title: config.yAxisTitle
-        ? { text: config.yAxisTitle, font: { size: 12 } }
+        ? { text: config.yAxisTitle, font: { size: axisFontSize } }
+        : undefined,
+      tickfont: { size: axisFontSize },
+      showgrid: showGrid,
+      gridcolor: gridColor,
+      range: config.yAxisMin != null || config.yAxisMax != null
+        ? [config.yAxisMin ?? undefined, config.yAxisMax ?? undefined]
         : undefined,
     },
-    showlegend: traces.length > 1,
+    showlegend: config.showLegend ?? traces.length > 1,
     legend: {
       orientation: 'h',
       y: -0.15,
       x: 0.5,
       xanchor: 'center',
-      font: { size: 11 },
+      font: { size: config.legendFontSize || 11 },
     },
     hovermode: 'x unified',
+    paper_bgcolor: config.backgroundColor || 'transparent',
+    plot_bgcolor: config.backgroundColor || 'transparent',
   }
 
   return <PlotlyChart data={traces} layout={layout} />
