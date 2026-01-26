@@ -526,20 +526,20 @@ export async function deleteChart(chartId: string): Promise<void> {
 }
 
 /**
- * Update a chart's title and/or description.
+ * Update a chart's title, description, and/or SQL.
  */
 export async function updateChart(
   chartId: string,
-  data: { title?: string; description?: string }
-): Promise<ChartLibraryItem> {
-  const response = await apiFetch<{ success: boolean; chart: ChartLibraryItem }>(
+  data: { title?: string; description?: string; sql?: string }
+): Promise<{ success: boolean; chart?: ChartLibraryItem; error?: string }> {
+  const response = await apiFetch<{ success: boolean; chart?: ChartLibraryItem; error?: string }>(
     `/charts/library/${chartId}`,
     {
       method: 'PATCH',
       body: JSON.stringify(data),
     }
   )
-  return response.chart
+  return response
 }
 
 /**
@@ -705,5 +705,289 @@ export async function createDashboardFromCharts(
       description,
       chart_ids: chartIds,
     }),
+  })
+}
+
+/**
+ * Generate a context block for a dashboard using AI.
+ */
+export async function generateDashboardContext(
+  title: string,
+  charts: Array<{ title: string; description: string }>
+): Promise<{ context: string }> {
+  return apiFetch('/charts/dashboards/generate-context', {
+    method: 'POST',
+    body: JSON.stringify({ title, charts }),
+  })
+}
+
+/**
+ * Update a dashboard's description/context.
+ */
+export async function updateDashboardDescription(
+  dashboardId: string,
+  description: string
+): Promise<{ success: boolean }> {
+  return apiFetch(`/charts/dashboards/${dashboardId}/description`, {
+    method: 'PUT',
+    body: JSON.stringify({ description }),
+  })
+}
+
+// =============================================================================
+// Chart Config Editor API
+// =============================================================================
+
+import type { ChartConfig } from '../types/chart'
+
+export interface ConfigSuggestionResponse {
+  suggested_config: Partial<ChartConfig>
+  explanation: string
+}
+
+/**
+ * Update a chart's visual configuration.
+ * Only updates the specified config fields, leaving others unchanged.
+ */
+export async function updateChartConfig(
+  chartId: string,
+  config: Partial<ChartConfig>
+): Promise<{ success: boolean; chart?: ChartLibraryItem; error?: string }> {
+  return apiFetch(`/charts/library/${chartId}/config`, {
+    method: 'PATCH',
+    body: JSON.stringify({ config }),
+  })
+}
+
+/**
+ * Get an AI-powered suggestion for config changes.
+ * Takes the current config and a natural language request.
+ */
+export async function getConfigSuggestion(
+  chartId: string,
+  currentConfig: Partial<ChartConfig>,
+  chartType: string,
+  userRequest: string
+): Promise<ConfigSuggestionResponse> {
+  return apiFetch(`/charts/library/${chartId}/suggest-config`, {
+    method: 'POST',
+    body: JSON.stringify({
+      current_config: currentConfig,
+      chart_type: chartType,
+      user_request: userRequest,
+    }),
+  })
+}
+
+// =============================================================================
+// Semantic Layer API
+// =============================================================================
+
+export interface ColumnSemantic {
+  name: string
+  type: string
+  nullable: boolean
+  description: string | null
+  role: string | null
+  aggregation_hint: string | null
+  business_meaning: string | null
+  format_hint: string | null
+  references: string | null
+}
+
+export interface TableSemantic {
+  name: string
+  description: string | null
+  business_role: string | null
+  columns: ColumnSemantic[]
+  row_count: number | null
+  typical_questions: string[] | null
+}
+
+export interface RelationshipSchema {
+  from_table: string
+  from_column: string
+  to_table: string
+  to_column: string
+  type: string
+  description: string | null
+}
+
+export interface BusinessContext {
+  description: string | null
+  domain: string | null
+  key_metrics: string[] | null
+  key_dimensions: string[] | null
+  business_glossary: Record<string, string> | null
+}
+
+export interface SemanticLayerResponse {
+  source_name: string
+  has_semantic_layer: boolean
+  tables: TableSemantic[]
+  relationships: RelationshipSchema[]
+  business_context: BusinessContext | null
+  schema_hash: string | null
+  generated_at: string | null
+}
+
+export interface SourceInfoExtended {
+  name: string
+  type: string
+  connected: boolean
+  database: string | null
+  schema_name: string | null
+  has_semantic_layer: boolean
+  table_count: number | null
+}
+
+export interface SemanticUpdateRequest {
+  table_name?: string
+  column_name?: string
+  updates: Record<string, unknown>
+}
+
+/**
+ * Get list of data sources with semantic layer status.
+ */
+export async function fetchSourcesExtended(): Promise<SourceInfoExtended[]> {
+  return apiFetch('/sources')
+}
+
+/**
+ * Get semantic layer for a source.
+ */
+export async function fetchSemanticLayer(sourceName: string): Promise<SemanticLayerResponse> {
+  return apiFetch(`/sources/${encodeURIComponent(sourceName)}/semantic`)
+}
+
+/**
+ * Update semantic layer metadata.
+ */
+export async function updateSemanticLayer(
+  sourceName: string,
+  request: SemanticUpdateRequest
+): Promise<{ success: boolean; message: string }> {
+  return apiFetch(`/sources/${encodeURIComponent(sourceName)}/semantic`, {
+    method: 'PATCH',
+    body: JSON.stringify(request),
+  })
+}
+
+export interface SemanticGenerateRequest {
+  provider?: string // claude, openai, gemini
+  force?: boolean
+}
+
+export interface SemanticGenerateResponse {
+  success: boolean
+  message: string
+  tables_count: number | null
+  relationships_count: number | null
+  domain: string | null
+}
+
+/**
+ * Generate semantic layer using AI analysis.
+ */
+export async function generateSemanticLayer(
+  sourceName: string,
+  options?: SemanticGenerateRequest
+): Promise<SemanticGenerateResponse> {
+  return apiFetch(`/sources/${encodeURIComponent(sourceName)}/semantic/generate`, {
+    method: 'POST',
+    body: JSON.stringify(options || {}),
+  })
+}
+
+// =============================================================================
+// Semantic Layer Enhancement API
+// =============================================================================
+
+export interface SemanticEnhanceRequest {
+  user_context: string // User's business context (any format)
+  preview?: boolean // If true, return proposed changes without applying
+}
+
+export interface SemanticChange {
+  path: string // e.g., "tables.CUSTOMERS.description"
+  action: 'add' | 'update' | 'enhance'
+  current_value: unknown | null
+  new_value: unknown
+}
+
+export interface SemanticEnhanceSummary {
+  metrics_added?: number
+  terms_added?: number
+  columns_enhanced?: number
+  patterns_added?: number
+  tables_enhanced?: string[]
+}
+
+export interface SemanticEnhanceResponse {
+  success: boolean
+  message: string
+  changes: SemanticChange[] | null
+  summary: SemanticEnhanceSummary | null
+  applied: boolean
+}
+
+/**
+ * Enhance semantic layer with user-provided business context.
+ *
+ * Accepts various formats: YAML, JSON, markdown, plain text, SQL with comments.
+ * Set preview=true (default) to see proposed changes before applying.
+ */
+export async function enhanceSemanticLayer(
+  sourceName: string,
+  request: SemanticEnhanceRequest
+): Promise<SemanticEnhanceResponse> {
+  return apiFetch(`/sources/${encodeURIComponent(sourceName)}/semantic/enhance`, {
+    method: 'POST',
+    body: JSON.stringify(request),
+  })
+}
+
+// =============================================================================
+// Data Source Connection API
+// =============================================================================
+
+export interface SnowflakeConnectionRequest {
+  account: string
+  username: string
+  password: string
+  warehouse: string
+  database: string
+  schema_name: string
+}
+
+export interface ConnectionTestResponse {
+  success: boolean
+  message: string
+  tables: string[] | null
+}
+
+/**
+ * Test a Snowflake connection.
+ */
+export async function testSnowflakeConnection(
+  connection: SnowflakeConnectionRequest
+): Promise<ConnectionTestResponse> {
+  return apiFetch('/sources/snowflake/test', {
+    method: 'POST',
+    body: JSON.stringify(connection),
+  })
+}
+
+/**
+ * Save a Snowflake connection.
+ */
+export async function saveSnowflakeConnection(
+  connection: SnowflakeConnectionRequest,
+  sourceName: string
+): Promise<{ message: string }> {
+  return apiFetch(`/sources/snowflake/save?source_name=${encodeURIComponent(sourceName)}`, {
+    method: 'POST',
+    body: JSON.stringify(connection),
   })
 }

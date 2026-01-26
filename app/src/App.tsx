@@ -7,6 +7,7 @@ import { LoginPage } from './pages/LoginPage'
 import { VerifyPage } from './pages/VerifyPage'
 import { ChartsPage } from './pages/ChartsPage'
 import { DashboardsPage } from './pages/DashboardsPage'
+import { NewDashboardPage } from './pages/NewDashboardPage'
 import { SettingsPage } from './pages/SettingsPage'
 import { AppLayout } from './components/layout/AppLayout'
 import { ProtectedRoute } from './components/auth/ProtectedRoute'
@@ -35,6 +36,8 @@ function App() {
         <Route path="/charts" element={<ChartsPage />} />
         <Route path="/charts/new" element={<Navigate to="/chat" replace />} />
         <Route path="/dashboards" element={<DashboardsPage />} />
+        <Route path="/dashboards/new" element={<NewDashboardPage />} />
+        <Route path="/dashboards/view/:slug" element={<DashboardView />} />
         <Route path="/settings" element={<SettingsPage />} />
       </Route>
     </Routes>

@@ -26,6 +26,7 @@ from .progress import (
 )
 from .qa import DashboardQA, QAResult, run_qa_with_auto_fix
 from .schema import get_schema_context
+from .semantic import SemanticLayer
 
 
 class ConversationPhase(Enum):
@@ -122,6 +123,7 @@ class ConversationManager:
         self.parser = DashboardParser()
         self.state = ConversationState()
         self._schema_context: str | None = None
+        self._semantic_layer: SemanticLayer | None = None
         self._default_source = source_name or "snowflake_saas"
         self._progress_emitter = progress_emitter
 
@@ -130,7 +132,7 @@ class ConversationManager:
             provider_name=provider_name,
             verbose=True,
             progress_emitter=progress_emitter,
-        ))
+        ), source_name=self._default_source)
 
         print(f"[LLM] Using provider: {self.llm.name}, model: {self.llm.model}")
         print(f"[Mode] Generation mode: pipeline")
@@ -150,10 +152,19 @@ class ConversationManager:
         """Reset conversation state."""
         self.state = ConversationState()
 
+    def get_semantic_layer(self) -> SemanticLayer | None:
+        """Load and cache the semantic layer for the source."""
+        if self._semantic_layer is None:
+            semantic_path = Path(__file__).parent.parent / "sources" / self._default_source / "semantic.yaml"
+            if semantic_path.exists():
+                self._semantic_layer = SemanticLayer.load(str(semantic_path))
+        return self._semantic_layer
+
     def get_schema_context(self) -> str:
-        """Get cached schema context."""
+        """Get cached schema context with semantic layer enrichment."""
         if self._schema_context is None:
-            self._schema_context = get_schema_context()
+            semantic_layer = self.get_semantic_layer()
+            self._schema_context = get_schema_context(semantic_layer)
         return self._schema_context
 
     def _is_vague_input(self, user_input: str) -> bool:

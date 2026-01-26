@@ -26,6 +26,7 @@ from .llm.base import Message
 from .llm.claude import get_fast_provider, get_provider
 from .models import Chart, ChartConfig, ChartSpec, ChartType, FilterSpec, FilterType, ValidatedChart
 from .schema import get_schema_context
+from .semantic import SemanticLayer
 from .sql_validator import validate_query
 from .config_loader import get_config_loader
 from .validators import ChartSpecValidator
@@ -425,9 +426,11 @@ class ChartPipeline:
     3. Assemble the chart (trivial)
     """
 
-    def __init__(self, config: ChartPipelineConfig | None = None):
+    def __init__(self, config: ChartPipelineConfig | None = None, source_name: str = "snowflake_saas"):
         self.config = config or ChartPipelineConfig()
+        self.source_name = source_name
         self._schema_context: str | None = None
+        self._semantic_layer: SemanticLayer | None = None
 
         # Initialize agents
         self.requirements_agent = ChartRequirementsAgent(self.config.provider_name)
@@ -449,10 +452,25 @@ class ChartPipeline:
         else:
             self.quality_validator = None
 
+    def get_semantic_layer(self) -> SemanticLayer | None:
+        """Load and cache the semantic layer for the source."""
+        if self._semantic_layer is None:
+            semantic_path = Path(__file__).parent.parent / "sources" / self.source_name / "semantic.yaml"
+            if semantic_path.exists():
+                try:
+                    self._semantic_layer = SemanticLayer.load(str(semantic_path))
+                    if self.config.verbose:
+                        print(f"[ChartPipeline] Loaded semantic layer: {self._semantic_layer.business_context.domain}")
+                except Exception as e:
+                    if self.config.verbose:
+                        print(f"[ChartPipeline] Warning: Could not load semantic layer: {e}")
+        return self._semantic_layer
+
     def get_schema_context(self) -> str:
-        """Get cached schema context."""
+        """Get cached schema context with semantic layer enrichment."""
         if self._schema_context is None:
-            self._schema_context = get_schema_context()
+            semantic_layer = self.get_semantic_layer()
+            self._schema_context = get_schema_context(semantic_layer)
         return self._schema_context
 
     def run(self, user_request: str) -> ChartPipelineResult:

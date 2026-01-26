@@ -8,10 +8,11 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useChartStore } from '../stores/chartStore'
 import { ChartFactory } from '../components/charts/ChartFactory'
 import { fetchChartRenderData, updateChart, duplicateChart } from '../api/client'
-import type { ChartRenderData } from '../types/chart'
+import type { ChartRenderData, ChartType } from '../types/chart'
 import { createDashboardFromCharts } from '../api/client'
 import { useConversationStore } from '../stores/conversationStore'
 import { CreateDashboardModal } from '../components/modals'
+import { ChartConfigEditor } from '../components/editors'
 import type { ChartLibraryItem } from '../types/conversation'
 
 const CHART_TYPES = [
@@ -227,6 +228,7 @@ function formatLongFunctionCall(str: string, indent: string = '    '): string {
   return `${funcName}(\n${indent}  ${formattedArgs.join(',\n' + indent + '  ')}\n${indent})${suffix || ''}`
 }
 
+
 /**
  * Split a string by commas, but ignore commas inside parentheses.
  */
@@ -264,7 +266,11 @@ const CHART_ICONS: Record<string, string> = {
   BigValue: '*',
   DataTable: '=',
   ScatterPlot: '.',
-  default: '#',
+  DualTrendChart: '~',
+  Histogram: '#',
+  FunnelChart: 'v',
+  Heatmap: '%',
+  default: '~',
 }
 
 export function ChartsPage() {
@@ -303,6 +309,15 @@ export function ChartsPage() {
   const [isRenaming, setIsRenaming] = useState(false)
   const [renameTitle, setRenameTitle] = useState('')
   const [isDuplicating, setIsDuplicating] = useState(false)
+
+  // SQL editing state
+  const [isEditingSQL, setIsEditingSQL] = useState(false)
+  const [editedSQL, setEditedSQL] = useState('')
+  const [isSavingSQL, setIsSavingSQL] = useState(false)
+  const [sqlSaveError, setSqlSaveError] = useState<string | null>(null)
+
+  // Config editor state
+  const [showConfigEditor, setShowConfigEditor] = useState(false)
 
   // Get conversation store for edit functionality
   const { setCreationMode } = useConversationStore()
@@ -439,16 +454,20 @@ export function ChartsPage() {
     if (!previewChart || !renameTitle.trim()) return
 
     try {
-      const updated = await updateChart(previewChart.id, { title: renameTitle.trim() })
-      // Update the chart in the list
-      loadCharts()
-      // Update previewChart state (close and reopen to refresh)
-      closePreview()
-      // Find and open the updated chart
-      setTimeout(() => {
-        const chart = { ...previewChart, title: updated.title }
-        openPreview(chart)
-      }, 100)
+      const result = await updateChart(previewChart.id, { title: renameTitle.trim() })
+      if (result.success && result.chart) {
+        // Update the chart in the list
+        loadCharts()
+        // Update previewChart state (close and reopen to refresh)
+        closePreview()
+        // Find and open the updated chart
+        setTimeout(() => {
+          const chart = { ...previewChart, title: result.chart!.title }
+          openPreview(chart)
+        }, 100)
+      } else {
+        alert(result.error || 'Failed to rename chart')
+      }
     } catch (err) {
       console.error('Failed to rename chart:', err)
       alert('Failed to rename chart')
@@ -494,6 +513,68 @@ export function ChartsPage() {
       alert('Failed to duplicate chart')
     } finally {
       setIsDuplicating(false)
+    }
+  }
+
+  // Handle starting SQL edit
+  const handleStartSQLEdit = () => {
+    if (previewChart) {
+      setEditedSQL(previewChart.sql)
+      setSqlSaveError(null)
+      setIsEditingSQL(true)
+    }
+  }
+
+  // Handle canceling SQL edit
+  const handleCancelSQLEdit = () => {
+    setEditedSQL('')
+    setSqlSaveError(null)
+    setIsEditingSQL(false)
+  }
+
+  // Handle saving SQL edit
+  const handleSaveSQLEdit = async () => {
+    if (!previewChart) return
+
+    setIsSavingSQL(true)
+    setSqlSaveError(null)
+
+    try {
+      const result = await updateChart(previewChart.id, { sql: editedSQL })
+      if (result.success) {
+        // Refresh the chart list
+        await loadCharts()
+        // Reload the preview data
+        setPreviewLoading(true)
+        const data = await fetchChartRenderData(previewChart.id)
+        setPreviewRenderData(data)
+        setPreviewLoading(false)
+        setIsEditingSQL(false)
+      } else {
+        setSqlSaveError(result.error || 'Failed to save SQL')
+      }
+    } catch (err) {
+      setSqlSaveError(err instanceof Error ? err.message : 'Failed to save SQL')
+    } finally {
+      setIsSavingSQL(false)
+    }
+  }
+
+  // Handle config editor save
+  const handleConfigEditorSave = async () => {
+    // Refresh the chart list
+    await loadCharts()
+    // Reload the preview data
+    if (previewChart) {
+      setPreviewLoading(true)
+      try {
+        const data = await fetchChartRenderData(previewChart.id)
+        setPreviewRenderData(data)
+      } catch (err) {
+        console.error('Failed to reload preview:', err)
+      } finally {
+        setPreviewLoading(false)
+      }
     }
   }
 
@@ -651,7 +732,7 @@ export function ChartsPage() {
 
               {/* Build Dashboard */}
               <button
-                onClick={() => navigate('/chat')}
+                onClick={() => navigate('/dashboards/new')}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -997,7 +1078,12 @@ export function ChartsPage() {
       {/* Preview Modal */}
       {previewChart && (
         <div
-          onClick={closePreview}
+          onClick={() => {
+            setIsRenaming(false)
+            setIsEditingSQL(false)
+            setSqlSaveError(null)
+            closePreview()
+          }}
           style={{
             position: 'fixed',
             top: 0,
@@ -1100,6 +1186,8 @@ export function ChartsPage() {
               <button
                 onClick={() => {
                   setIsRenaming(false)
+                  setIsEditingSQL(false)
+                  setSqlSaveError(null)
                   closePreview()
                 }}
                 style={{
@@ -1225,39 +1313,212 @@ export function ChartsPage() {
                 >
                   {isDuplicating ? 'Duplicating...' : 'Duplicate'}
                 </button>
+                <button
+                  onClick={() => setShowConfigEditor(true)}
+                  style={{
+                    padding: 'var(--space-2) var(--space-3)',
+                    backgroundColor: 'var(--color-primary)',
+                    border: 'none',
+                    borderRadius: 'var(--radius-md)',
+                    color: 'white',
+                    fontSize: 'var(--text-sm)',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Edit Config
+                </button>
               </div>
 
-              {/* Description and SQL */}
-              <div style={{ maxHeight: '150px', overflow: 'auto' }}>
-                <p
+              {/* Description */}
+              <p
+                style={{
+                  margin: '0 0 var(--space-3) 0',
+                  color: 'var(--color-gray-400)',
+                  fontSize: 'var(--text-sm)',
+                }}
+              >
+                {previewChart.description}
+              </p>
+
+              {/* Code Tabs */}
+              <div
+                style={{
+                  backgroundColor: 'var(--color-gray-900)',
+                  borderRadius: 'var(--radius-md)',
+                  overflow: 'hidden',
+                }}
+              >
+                {/* Header */}
+                <div
                   style={{
-                    margin: '0 0 var(--space-3) 0',
-                    color: 'var(--color-gray-400)',
-                    fontSize: 'var(--text-sm)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: 'var(--space-2) var(--space-4)',
+                    borderBottom: '1px solid var(--color-gray-700)',
                   }}
                 >
-                  {previewChart.description}
-                </p>
-                <pre
+                  <span
+                    style={{
+                      fontSize: 'var(--text-sm)',
+                      color: 'var(--color-gray-400)',
+                      fontWeight: 500,
+                    }}
+                  >
+                    SQL
+                  </span>
+                  {!isEditingSQL && (
+                    <button
+                      onClick={() => navigator.clipboard.writeText(previewChart.sql)}
+                      style={{
+                        padding: 'var(--space-1) var(--space-3)',
+                        backgroundColor: 'var(--color-gray-700)',
+                        border: 'none',
+                        borderRadius: 'var(--radius-sm)',
+                        color: 'var(--color-gray-300)',
+                        fontSize: 'var(--text-xs)',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 'var(--space-1)',
+                      }}
+                    >
+                      Copy
+                    </button>
+                  )}
+                </div>
+
+                {/* Code content or edit textarea */}
+                {isEditingSQL ? (
+                  <div style={{ padding: 'var(--space-3)' }}>
+                    <textarea
+                      value={editedSQL}
+                      onChange={(e) => setEditedSQL(e.target.value)}
+                      style={{
+                        width: '100%',
+                        minHeight: '150px',
+                        padding: 'var(--space-3)',
+                        backgroundColor: 'var(--color-gray-800)',
+                        border: '1px solid var(--color-gray-600)',
+                        borderRadius: 'var(--radius-md)',
+                        color: 'var(--color-gray-200)',
+                        fontFamily: 'var(--font-mono)',
+                        fontSize: 'var(--text-xs)',
+                        lineHeight: 1.5,
+                        resize: 'vertical',
+                      }}
+                    />
+                    {sqlSaveError && (
+                      <p
+                        style={{
+                          margin: 'var(--space-2) 0 0 0',
+                          color: 'var(--color-error)',
+                          fontSize: 'var(--text-xs)',
+                        }}
+                      >
+                        {sqlSaveError}
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <div style={{ maxHeight: '150px', overflow: 'auto' }}>
+                    <pre
+                      style={{
+                        margin: 0,
+                        padding: 'var(--space-3)',
+                        fontSize: 'var(--text-xs)',
+                        color: 'var(--color-gray-400)',
+                        whiteSpace: 'pre-wrap',
+                        wordBreak: 'break-word',
+                        lineHeight: 1.5,
+                      }}
+                    >
+                      {formatSQL(previewChart.sql)}
+                    </pre>
+                  </div>
+                )}
+
+                {/* Action buttons for SQL editing */}
+                <div
                   style={{
-                    margin: 0,
-                    padding: 'var(--space-3)',
-                    backgroundColor: 'var(--color-gray-900)',
-                    borderRadius: 'var(--radius-md)',
-                    fontSize: 'var(--text-xs)',
-                    color: 'var(--color-gray-400)',
-                    overflow: 'auto',
-                    whiteSpace: 'pre-wrap',
-                    wordBreak: 'break-word',
-                    lineHeight: 1.5,
+                    padding: 'var(--space-2) var(--space-3)',
+                    borderTop: '1px solid var(--color-gray-700)',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
                   }}
                 >
-                  {formatSQL(previewChart.sql)}
-                </pre>
+                  {isEditingSQL ? (
+                    <>
+                      <div />
+                      <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+                        <button
+                          onClick={handleCancelSQLEdit}
+                          style={{
+                            padding: 'var(--space-1) var(--space-3)',
+                            backgroundColor: 'var(--color-gray-700)',
+                            border: 'none',
+                            borderRadius: 'var(--radius-sm)',
+                            color: 'var(--color-gray-300)',
+                            fontSize: 'var(--text-xs)',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={handleSaveSQLEdit}
+                          disabled={isSavingSQL}
+                          style={{
+                            padding: 'var(--space-1) var(--space-3)',
+                            backgroundColor: 'var(--color-primary)',
+                            border: 'none',
+                            borderRadius: 'var(--radius-sm)',
+                            color: 'white',
+                            fontSize: 'var(--text-xs)',
+                            cursor: isSavingSQL ? 'not-allowed' : 'pointer',
+                            opacity: isSavingSQL ? 0.7 : 1,
+                          }}
+                        >
+                          {isSavingSQL ? 'Saving...' : 'Save & Run'}
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        onClick={handleStartSQLEdit}
+                        style={{
+                          padding: 'var(--space-1) var(--space-3)',
+                          backgroundColor: 'transparent',
+                          border: '1px solid var(--color-gray-600)',
+                          borderRadius: 'var(--radius-sm)',
+                          color: 'var(--color-gray-400)',
+                          fontSize: 'var(--text-xs)',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        Edit SQL
+                      </button>
+                      <div />
+                    </>
+                  )}
+                </div>
               </div>
             </div>
           </div>
         </div>
+      )}
+
+      {/* Config Editor Modal */}
+      {showConfigEditor && previewChart && previewRenderData && (
+        <ChartConfigEditor
+          chartId={previewChart.id}
+          chartType={previewChart.chart_type as ChartType}
+          initialConfig={previewRenderData.spec.config}
+          onClose={() => setShowConfigEditor(false)}
+          onSave={handleConfigEditorSave}
+        />
       )}
 
       {/* Create Dashboard Modal */}

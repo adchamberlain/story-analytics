@@ -214,9 +214,8 @@ export default function ChatPage() {
       return
     }
     if (id === 'create_dashboard') {
-      setCreationMode('dashboard')
-      setStoreCreationMode('dashboard')  // Sync with store for API routing
-      setTimeout(() => chatInputRef.current?.focus(), 100)
+      // Navigate to the new dashboard creation wizard
+      navigate('/dashboards/new')
       return
     }
     if (id === 'find_chart') {

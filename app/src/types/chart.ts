@@ -90,6 +90,31 @@ export interface ChartConfig {
   /** Styling */
   color?: string
   fillColor?: string
+  backgroundColor?: string
+  gridColor?: string
+
+  /** Typography */
+  titleFontSize?: number
+  legendFontSize?: number
+  axisFontSize?: number
+
+  /** Display options */
+  showLegend?: boolean
+  showGrid?: boolean
+  showValues?: boolean
+
+  /** Line/scatter chart options */
+  lineWidth?: number
+  markerSize?: number
+
+  /** Bar chart options */
+  barGap?: number
+  barGroupGap?: number
+
+  /** Axis options */
+  tickAngle?: number
+  yAxisMin?: number
+  yAxisMax?: number
 
   /** Chart-specific options */
   sort?: boolean | string

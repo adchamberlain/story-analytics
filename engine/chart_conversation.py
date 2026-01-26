@@ -24,7 +24,7 @@ from .llm.base import Message
 from .llm.claude import get_fast_provider
 from .models import Chart, ValidatedChart, get_chart_storage
 from .progress import ProgressEmitter, ProgressStatus
-from .schema import get_schema_context
+from .semantic import SemanticLayer
 
 
 class ChartPhase(Enum):
@@ -304,7 +304,8 @@ Respond with EXACTLY one word: chart_request, data_question, or unclear"""
 
     def _handle_data_question(self, user_input: str) -> ChartConversationResult:
         """Answer a question about the available data or system capabilities."""
-        schema_context = get_schema_context()
+        # Use pipeline's schema context which includes semantic layer
+        schema_context = self._pipeline.get_schema_context()
 
         system_prompt = f"""You are a helpful assistant for a chart creation tool.
 The user is asking about the data or system. Answer their question concisely.

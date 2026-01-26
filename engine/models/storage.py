@@ -105,7 +105,7 @@ class ChartStorage:
             target_type = ChartType.from_string(chart_type)
             charts = [c for c in charts if c.chart_type == target_type]
 
-        # Sort by updated_at descending (most recent first)
+        # Sort by updated_at descending (most recently touched first)
         charts.sort(key=lambda c: c.updated_at, reverse=True)
 
         return charts[:limit]

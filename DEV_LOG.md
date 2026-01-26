@@ -4,6 +4,611 @@ This log captures development changes made during each session. Review this at t
 
 ---
 
+## Session: 2026-01-25 (Part 13)
+
+### Focus: Complete Data Source Onboarding Flow
+
+**Context**: User asked about the onboarding experience for new users adding a new database. We extended the schema browser to include:
+1. AI-powered semantic layer generation
+2. Add Data Source wizard for connecting new databases
+
+### Implementation
+
+#### 1. Semantic Generation API (`api/routers/sources.py`)
+
+Added endpoint to trigger AI-powered semantic layer generation:
+- `POST /sources/{source_name}/semantic/generate` - Generates semantic layer using LLM analysis
+- Calls `SemanticGenerator` from `engine/semantic_generator.py`
+- Analyzes schema + sample data to generate descriptions, roles, relationships
+- Returns table count, relationship count, and detected domain
+
+Request body:
+```python
+class SemanticGenerateRequest(BaseModel):
+    provider: str | None = None  # claude, openai, gemini
+    force: bool = False  # Force regeneration even if not stale
+```
+
+#### 2. Frontend API Functions (`app/src/api/client.ts`)
+
+Added new API functions:
+- `generateSemanticLayer(sourceName, options)` - Trigger semantic generation
+- `testSnowflakeConnection(connection)` - Test database connection
+- `saveSnowflakeConnection(connection, sourceName)` - Save connection config
+
+#### 3. Source Store Updates (`app/src/stores/sourceStore.ts`)
+
+Added generation state and action:
+- `generating: boolean` - Loading state during generation
+- `generateError: string | null` - Error message if generation fails
+- `generateSemantic(provider?, force?)` - Action to trigger generation
+
+#### 4. Schema Browser: Generate Button (`app/src/components/sources/SchemaBrowser.tsx`)
+
+When a source has no semantic layer:
+- Shows "Generate Semantic Layer" prompt with feature list
+- "Generate with AI" button triggers generation
+- Loading spinner during generation
+- Error display if generation fails
+
+#### 5. Add Data Source Wizard (`app/src/components/sources/AddDataSourceWizard.tsx`)
+
+Multi-step wizard modal for new database connections:
+
+**Step 1: Connection Details**
+- Source name input
+- Snowflake connection fields (account, username, password, warehouse, database, schema)
+- "Test Connection" button
+
+**Step 2: Generate Semantic Layer**
+- Shows connection success with table list
+- "Generate Semantic Layer" button
+- AI analyzes schema and sample data
+
+**Step 3: Complete**
+- Shows generation results (table count, domain)
+- "Browse Schema" button opens schema browser
+
+#### 6. Sidebar Integration
+
+Updated Data Sources section:
+- "Add Data Source" button at bottom of sources list
+- Opens AddDataSourceWizard modal
+- After completion, opens schema browser for new source
+
+### Files Created
+
+| File | Purpose |
+|------|---------|
+| `app/src/components/sources/AddDataSourceWizard.tsx` | Multi-step connection wizard |
+
+### Files Modified
+
+| File | Change |
+|------|--------|
+| `api/routers/sources.py` | Added `POST /sources/{source_name}/semantic/generate` endpoint |
+| `app/src/api/client.ts` | Added generation and connection API functions |
+| `app/src/stores/sourceStore.ts` | Added `generating`, `generateError`, `generateSemantic()` |
+| `app/src/components/sources/SchemaBrowser.tsx` | Added generate prompt and loading states |
+| `app/src/components/sources/index.ts` | Export AddDataSourceWizard |
+| `app/src/components/layout/Sidebar.tsx` | Added "Add Data Source" button and wizard modal |
+
+### Complete Onboarding Flow
+
+```
+User clicks "Add Data Source" in sidebar
+          ↓
+┌─────────────────────────────────────┐
+│  Step 1: Connection Details          │
+│  - Enter source name                 │
+│  - Enter Snowflake credentials       │
+│  - Click "Test Connection"           │
+└─────────────────────────────────────┘
+          ↓
+┌─────────────────────────────────────┐
+│  Step 2: Generate Semantic Layer     │
+│  - Shows tables found                │
+│  - Click "Generate Semantic Layer"   │
+│  - AI analyzes schema + samples      │
+└─────────────────────────────────────┘
+          ↓
+┌─────────────────────────────────────┐
+│  Step 3: Complete                    │
+│  - Shows tables documented, domain   │
+│  - Click "Browse Schema"             │
+│  → Opens Schema Browser              │
+└─────────────────────────────────────┘
+          ↓
+User can view/edit semantic layer in Schema Browser
+```
+
+### Verification
+
+- TypeScript compiles without errors for new code
+- Python router imports successfully
+- All components properly exported and imported
+
+### Next Steps
+
+- [ ] Add support for other database types (PostgreSQL, MySQL, BigQuery)
+- [ ] Add progress streaming during semantic generation (SSE)
+- [ ] Add "Regenerate" button in Schema Browser header for existing sources
+
+---
+
+## Session: 2026-01-25 (Part 12)
+
+### Focus: Data Sources in Sidebar with Schema Browser
+
+**Context**: User requested a "Data Sources" section in the sidebar that shows connected sources, their tables/columns, and allows editing the semantic layer metadata.
+
+### Implementation
+
+#### 1. Backend Schemas (`api/schemas/source.py`)
+
+Created new Pydantic schemas for semantic layer API:
+- `ColumnSemantic` - Column with semantic metadata (role, description, business_meaning, etc.)
+- `TableSemantic` - Table with columns and metadata
+- `RelationshipSchema` - Foreign key relationships
+- `BusinessContextSchema` - Domain description, key metrics, glossary
+- `SemanticLayerResponse` - Full semantic layer response
+- `SemanticUpdateRequest` - Partial update request
+- `SourceInfoExtended` - Source info with semantic layer status
+
+#### 2. Backend API Endpoints (`api/routers/sources.py`)
+
+Enhanced existing `/sources` endpoint and added semantic layer endpoints:
+- `GET /sources` - Now includes `has_semantic_layer` and `table_count`
+- `GET /sources/{source_name}/semantic` - Get full semantic layer with tables, columns, relationships
+- `PATCH /sources/{source_name}/semantic` - Update table/column descriptions and roles
+
+The semantic endpoint:
+- Parses `semantic.yaml` files from sources directory
+- Merges with column type info from cached parquet files
+- Returns structured response for frontend consumption
+
+#### 3. Frontend API Client (`app/src/api/client.ts`)
+
+Added TypeScript interfaces and functions:
+- `ColumnSemantic`, `TableSemantic`, `RelationshipSchema`, etc.
+- `fetchSourcesExtended()` - Get sources with semantic status
+- `fetchSemanticLayer(sourceName)` - Get semantic layer
+- `updateSemanticLayer(sourceName, request)` - Update metadata
+
+#### 4. Source Store (`app/src/stores/sourceStore.ts`)
+
+Created Zustand store for source state management:
+- Sources list with loading/error states
+- Selected source and semantic layer
+- Schema browser modal state
+- Pending changes tracking for edits
+- Actions: loadSources, selectSource, loadSemanticLayer, selectTable
+- Save/discard changes functionality
+- `getMergedTableData()` helper for combining original data with pending changes
+
+#### 5. SchemaBrowser Component (`app/src/components/sources/SchemaBrowser.tsx`)
+
+Full-featured schema browser modal:
+- **Header**: Source selector dropdown, close button
+- **Business Context**: Collapsible section showing domain, key metrics, key dimensions
+- **Table List**: Left sidebar with table names and column counts
+- **Table Details**: Editable fields for description and business role
+- **Column Grid**: Expandable rows showing:
+  - Column name, type, role badge
+  - Editable description
+  - Role selector (primary_key, foreign_key, dimension, measure, date, identifier)
+  - Business meaning textarea
+  - Aggregation hint (for measures)
+  - References display (for foreign keys)
+- **Footer**: Save/discard buttons when changes are pending
+
+#### 6. Sidebar Integration (`app/src/components/layout/Sidebar.tsx`)
+
+Added "Data Sources" collapsible section:
+- Shows list of configured sources
+- Connection status indicator (green/gray dot)
+- Table count badge
+- Click to open schema browser for that source
+- Renders SchemaBrowser modal when open
+
+### Files Created
+
+| File | Purpose |
+|------|---------|
+| `api/schemas/source.py` | Semantic layer Pydantic schemas |
+| `app/src/stores/sourceStore.ts` | Source state management |
+| `app/src/components/sources/SchemaBrowser.tsx` | Schema browser modal |
+| `app/src/components/sources/index.ts` | Barrel export |
+
+### Files Modified
+
+| File | Change |
+|------|--------|
+| `api/routers/sources.py` | Added semantic layer endpoints, enhanced list_sources |
+| `app/src/api/client.ts` | Added semantic layer types and functions |
+| `app/src/stores/index.ts` | Export sourceStore |
+| `app/src/components/layout/Sidebar.tsx` | Added Data Sources section |
+
+### User Flow
+
+1. User sees "Data Sources" section in sidebar
+2. Clicking a source opens the schema browser modal
+3. Table list on left, details on right
+4. Click a table to view/edit its metadata
+5. Expand columns to edit descriptions and roles
+6. Changes tracked as pending, save button appears
+7. Click "Save Changes" to persist to `semantic.yaml`
+
+### Verification
+
+- TypeScript compiles without errors for new code
+- Python router imports successfully
+- Schema browser modal renders correctly
+- Edits are saved to YAML file
+
+### Next Steps
+
+- [ ] Test full flow with dev server running
+- [ ] Add visual indicators for tables/columns with missing documentation
+- [ ] Consider adding "Generate with AI" button to auto-document columns
+
+---
+
+## Session: 2026-01-25 (Part 11)
+
+### Focus: Expanded Chart Configuration Options
+
+**Context**: User requested many more config options in the chart config editor, not just a basic subset.
+
+### Implementation
+
+Added comprehensive config options across the entire stack:
+
+#### 1. Python Model (`engine/models/chart.py`)
+
+Expanded `ChartConfig` dataclass with new fields:
+- **Styling**: `background_color`, `grid_color`
+- **Typography**: `title_font_size`, `legend_font_size`, `axis_font_size`
+- **Display Options**: `show_legend`, `show_grid`, `show_values`
+- **Line/Scatter**: `line_width`, `marker_size`
+- **Bar Chart**: `bar_gap`, `bar_group_gap`
+- **Axis Options**: `tick_angle`, `y_axis_min`, `y_axis_max`
+
+Updated `to_dict()` and `from_dict()` to serialize/deserialize all fields.
+
+#### 2. API Router (`api/routers/chart.py`)
+
+- Extended `field_mapping` dict with all new camelCase→snake_case mappings
+- Updated `_get_allowed_config_fields()` with chart-type-specific options
+
+#### 3. Render Endpoint (`api/routers/render.py`)
+
+Updated `_chart_to_render_spec()` to include all new config fields in the response.
+
+#### 4. TypeScript Types (`app/src/types/chart.ts`)
+
+Already had the expanded fields (added in previous partial work).
+
+#### 5. ConfigFormPanel (`app/src/components/editors/ConfigFormPanel.tsx`)
+
+Expanded form with organized sections:
+- **Labels**: title, xAxisTitle, yAxisTitle
+- **Colors**: color, fillColor, backgroundColor, gridColor
+- **Typography**: titleFontSize, legendFontSize, axisFontSize
+- **Display Options**: showLegend, showGrid, showValues toggles
+- **Axis Options**: tickAngle, yAxisMin, yAxisMax
+- **Bar Options**: horizontal, stacked, sort, barGap, barGroupGap
+- **Line Options**: stacked, lineWidth, markerSize
+- **BigValue Options**: valueFormat, positiveIsGood, showTrend, sparklineType
+
+Added `NumberInput` component for numeric fields.
+
+#### 6. Chart Components
+
+Updated to use new config options:
+- **BarChart.tsx**: bargap, bargroupgap, tickAngle, yAxisMin/Max, showLegend, showGrid, showValues, font sizes, background/grid colors
+- **LineChart.tsx**: lineWidth, markerSize, showLegend, showGrid, showValues, tickAngle, yAxisMin/Max, font sizes, background/grid colors
+- **AreaChart.tsx**: lineWidth, fillColor, showLegend, showGrid, showValues, tickAngle, yAxisMin/Max, font sizes, background/grid colors
+
+#### 7. AI Prompt (`engine/prompts/config_edit.yaml`)
+
+Expanded with all new options organized by category:
+- Documented all available fields with types
+- Added examples for new options (hide legend, bigger title, rotate labels, thicker lines, show values, set axis range)
+- Added white/black to color mappings
+
+### Files Modified
+
+| File | Change |
+|------|--------|
+| `engine/models/chart.py` | Added 15 new config fields, updated to_dict/from_dict |
+| `api/routers/chart.py` | Extended field_mapping and allowed_config_fields |
+| `api/routers/render.py` | Include all config fields in render spec |
+| `app/src/components/editors/ConfigFormPanel.tsx` | Full form with all option sections |
+| `app/src/components/charts/BarChart.tsx` | Apply all config options to Plotly layout |
+| `app/src/components/charts/LineChart.tsx` | Apply all config options to Plotly layout |
+| `app/src/components/charts/AreaChart.tsx` | Apply all config options to Plotly layout |
+| `engine/prompts/config_edit.yaml` | Document all config options and examples |
+
+### Config Options Summary
+
+| Category | Options |
+|----------|---------|
+| Labels & Titles | title, xAxisTitle, yAxisTitle |
+| Colors | color, fillColor, backgroundColor, gridColor |
+| Typography | titleFontSize, legendFontSize, axisFontSize |
+| Display | showLegend, showGrid, showValues |
+| Line/Scatter | lineWidth, markerSize |
+| Bar | horizontal, stacked, sort, barGap, barGroupGap |
+| Axis | tickAngle, yAxisMin, yAxisMax |
+| BigValue | valueFormat, positiveIsGood, showTrend, sparklineType |
+
+---
+
+## Session: 2026-01-25 (Part 10)
+
+### Focus: Chart Configuration Editor with AI Assistance
+
+**Context**: User requested a visual configuration editor for charts that combines form controls for common options with an AI assistant for natural language requests like "make the bars horizontal" or "change colors to blue".
+
+### Implementation
+
+#### 1. Backend Schemas (`api/schemas/chart.py`)
+
+Added new schemas for config editing:
+- `ChartConfigUpdateRequest` - Partial ChartConfig for updates
+- `ChartConfigUpdateResponse` - Response with updated chart
+- `AIConfigSuggestionRequest` - Request for AI-powered suggestion
+- `AIConfigSuggestionResponse` - Suggested config with explanation
+
+#### 2. Backend Endpoints (`api/routers/chart.py`)
+
+Added two new endpoints:
+- `PATCH /charts/library/{chart_id}/config` - Update chart config directly
+- `POST /charts/library/{chart_id}/suggest-config` - Get AI suggestion for config changes
+
+Helper function `_get_allowed_config_fields()` validates fields by chart type.
+
+#### 3. AI Prompt (`engine/prompts/config_edit.yaml`)
+
+Created comprehensive prompt for AI-assisted config changes:
+- Documents all available config fields by chart type
+- Provides color name to hex mappings (blue → #3b82f6, etc.)
+- Includes output format specification (JSON with suggested_config and explanation)
+- Provides examples for common requests
+
+#### 4. Frontend API Client (`app/src/api/client.ts`)
+
+Added functions:
+- `updateChartConfig(chartId, config)` - Update chart config
+- `getConfigSuggestion(chartId, currentConfig, chartType, userRequest)` - Get AI suggestion
+
+#### 5. Editor Components (`app/src/components/editors/`)
+
+**Control Components** (`controls/`):
+- `ToggleOption.tsx` - Boolean toggle with label and description
+- `ColorPicker.tsx` - Hex input with color preview and preset palette
+- `TextInput.tsx` - Text input for titles
+- `SelectInput.tsx` - Dropdown for format selection
+
+**Panel Components**:
+- `ConfigFormPanel.tsx` - Renders appropriate controls based on chart type
+  - All charts: title, xAxisTitle, yAxisTitle, color
+  - BarChart: horizontal, stacked toggles
+  - LineChart/AreaChart: stacked toggle
+  - BigValue: valueFormat, positiveIsGood, showTrend, sparklineType
+- `ConfigAIAssistant.tsx` - Natural language input with example chips
+  - Shows suggestion with explanation before applying
+  - Chart-type-specific example chips
+- `ChartConfigEditor.tsx` - Main editor modal
+  - Split view: live preview on left, config panel on right
+  - Real-time preview updates as config changes
+  - Cancel/Apply Changes buttons
+
+#### 6. ChartsPage Integration (`app/src/pages/ChartsPage.tsx`)
+
+- Added "Edit Config" button in preview modal footer
+- Added state for showing config editor (`showConfigEditor`)
+- Renders `ChartConfigEditor` when active
+- Handles save: refreshes chart list and preview data
+
+### Files Created
+
+| File | Purpose |
+|------|---------|
+| `engine/prompts/config_edit.yaml` | AI prompt for config suggestions |
+| `app/src/components/editors/controls/ToggleOption.tsx` | Boolean toggle control |
+| `app/src/components/editors/controls/ColorPicker.tsx` | Color picker with presets |
+| `app/src/components/editors/controls/TextInput.tsx` | Text input control |
+| `app/src/components/editors/controls/SelectInput.tsx` | Dropdown select control |
+| `app/src/components/editors/controls/index.ts` | Barrel export |
+| `app/src/components/editors/ConfigFormPanel.tsx` | Form panel by chart type |
+| `app/src/components/editors/ConfigAIAssistant.tsx` | AI assistant panel |
+| `app/src/components/editors/ChartConfigEditor.tsx` | Main editor component |
+| `app/src/components/editors/index.ts` | Barrel export |
+
+### Files Modified
+
+| File | Change |
+|------|--------|
+| `api/schemas/chart.py` | Added config update schemas |
+| `api/routers/chart.py` | Added PATCH config and POST suggest-config endpoints |
+| `app/src/api/client.ts` | Added updateChartConfig, getConfigSuggestion functions |
+| `app/src/pages/ChartsPage.tsx` | Added Edit Config button and editor integration |
+
+### User Flow
+
+1. User opens chart preview modal on Charts page
+2. Clicks "Edit Config" button
+3. Config editor opens as overlay with:
+   - Live preview on left (updates in real-time)
+   - Form controls on right (varies by chart type)
+   - AI assistant below form controls
+4. User can:
+   - Use form controls to change settings directly
+   - Type natural language request (e.g., "make horizontal")
+   - Click example chips for quick changes
+   - See AI explanation before applying
+5. Changes preview live before saving
+6. Click "Apply Changes" to save or "Cancel" to discard
+
+### Verification
+
+- TypeScript build passes
+- Python API imports successfully
+- All components follow existing dark theme styling
+
+### Next Steps
+
+- [ ] Add support for additional chart types as needed
+- [ ] Consider adding undo/redo for config changes
+- [ ] Add validation feedback for invalid combinations
+
+---
+
+## Session: 2026-01-25 (Part 8)
+
+### Focus: New Dashboard Creation Wizard
+
+**Context**: User requested a new dashboard creation flow where "New Dashboard" button takes users to a manual chart selection wizard instead of starting an LLM conversation.
+
+### Changes Made
+
+#### 1. New Dashboard Creation Page
+
+Created `/dashboards/new` route with a 3-step wizard:
+
+**Step 1: Select Charts**
+- Grid view of all available charts (same as Charts page)
+- Click to select/deselect charts
+- Shows selection count
+- Visual checkbox indicators on selected cards
+
+**Step 2: Order Charts**
+- List view of selected charts
+- Up/down buttons to reorder
+- Position numbers displayed
+- Preserves chart info (title, type icon)
+
+**Step 3: Details**
+- Title input (required)
+- Context block textarea
+- "Generate with AI" button - calls LLM to write a summary paragraph
+- Preview of selected charts in order
+
+#### 2. API Endpoint for Context Generation
+
+Added `POST /charts/dashboards/generate-context`:
+- Takes dashboard title and list of chart titles/descriptions
+- Uses LLM to generate a 2-3 sentence context paragraph
+- Falls back to simple description if LLM fails
+
+#### 3. Navigation Updates
+
+- "New Dashboard" button on DashboardsPage → `/dashboards/new` (was: `/chat`)
+- "Create New Dashboard" button on ChatPage welcome → `/dashboards/new` (was: start chat)
+- Back button on NewDashboardPage → `/dashboards`
+
+### Files Created
+
+| File | Purpose |
+|------|---------|
+| `app/src/pages/NewDashboardPage.tsx` | 3-step dashboard creation wizard |
+
+### Files Modified
+
+| File | Change |
+|------|--------|
+| `app/src/App.tsx` | Added NewDashboardPage import and `/dashboards/new` route |
+| `app/src/pages/DashboardsPage.tsx` | "New Dashboard" navigates to `/dashboards/new` |
+| `app/src/pages/ChatPage.tsx` | "Create New Dashboard" navigates to `/dashboards/new` |
+| `app/src/api/client.ts` | Added `generateDashboardContext()` function |
+| `api/schemas/chart.py` | Added context generation request/response schemas |
+| `api/routers/chart.py` | Added generate-context endpoint |
+
+### User Flow
+
+1. User clicks "New Dashboard" on Dashboards page or Chat welcome
+2. Step 1: Select which charts to include (click to select)
+3. Step 2: Arrange the order (up/down buttons)
+4. Step 3: Enter title, optionally generate AI context
+5. Click "Create Dashboard" → navigates to new dashboard view
+
+### Design Decisions
+
+- **Manual selection over LLM**: User explicitly picks charts instead of describing what they want
+- **Explicit ordering**: Up/down buttons instead of drag-and-drop (simpler, more accessible)
+- **Optional AI context**: Context is helpful but not required - can be empty or hand-written
+- **Reuses existing infrastructure**: Uses same `createDashboardFromCharts` API as ChartsPage selection mode
+
+---
+
+## Session: 2026-01-25 (Part 9)
+
+### Focus: Dashboard View Inside App + View Code Feature
+
+**Context**: Dashboards rendered at `/dashboard/{slug}` were standalone pages with no navigation back to the app. Also, data scientists requested ability to see the SQL and Python code behind each chart.
+
+### Changes Made
+
+#### 1. In-App Dashboard View
+
+Added `/dashboards/view/:slug` route inside the app layout (with sidebar):
+
+- **DashboardView.tsx**: Updated to work in two modes:
+  - Standalone mode (`/dashboard/:slug`) - Full page, no navigation (for sharing)
+  - In-app mode (`/dashboards/view/:slug`) - With sidebar, back button, edit button
+- Dark theme styling when in-app mode
+- Context block displayed with left border accent
+- "Edit" button navigates to new dashboard wizard
+
+#### 2. View Code Feature
+
+Added collapsible "View Code" section below each chart in in-app dashboard view:
+
+- **ChartCard.tsx**: Added `showCode` prop
+  - Toggle button to expand/collapse code section
+  - Tabbed view: SQL | Python
+  - Syntax-highlighted code display (dark theme)
+  - Copy button for easy clipboard access
+  - Python snippet includes DuckDB boilerplate
+
+- **DashboardGrid.tsx**: Added `showCode` prop, passes to ChartCard
+
+#### 3. Dashboard List Links
+
+- Updated DashboardsPage "View" button to navigate to `/dashboards/view/:slug`
+- Updated NewDashboardPage to navigate to in-app view after creation
+
+#### 4. Fixed Dashboard Not Saving to List
+
+**Root Cause**: Two different storage systems were in use:
+- File storage: `.story-analytics/dashboards/*.json` (where dashboards were created)
+- Database: SQLAlchemy `Dashboard` model (where list endpoint reads from)
+
+**Fix**: Updated `POST /charts/dashboards` endpoint to also create a database record after saving to file storage.
+
+### Files Modified
+
+| File | Change |
+|------|--------|
+| `app/src/App.tsx` | Added `/dashboards/view/:slug` route inside AppLayout |
+| `app/src/pages/DashboardView.tsx` | Dual-mode rendering (standalone vs in-app), dark theme |
+| `app/src/components/layout/DashboardGrid.tsx` | Added `showCode` prop |
+| `app/src/components/layout/ChartCard.tsx` | Added View Code section with SQL/Python tabs |
+| `app/src/pages/DashboardsPage.tsx` | "View" links to `/dashboards/view/:slug` |
+| `app/src/pages/NewDashboardPage.tsx` | Navigate to in-app view after creation |
+| `api/routers/chart.py` | Save dashboard to database in addition to file storage |
+
+### Verification
+
+- TypeScript build passes
+- Python API imports successfully
+- Dashboards now appear in list after creation
+- Code view shows SQL and Python with copy functionality
+
+---
+
 ## Session: 2026-01-25 (Part 7)
 
 ### Focus: Dark Theme Consistency & Chart Management Features
@@ -1781,6 +2386,199 @@ The DualTrendChart now flows correctly through the pipeline:
 - TypeScript build passes
 - Python pipeline updated
 - Frontend already had DualTrendChart component and ChartFactory case
+
+---
+
+## Session: 2026-01-25 (Part 6)
+
+### Focus: Semantic Layer Integration into All AI Features
+
+### Context
+
+The semantic layer infrastructure (business descriptions, column roles, relationships) existed but wasn't being used in the LLM prompts. Every call to `get_schema_context()` was passing no semantic layer, meaning all the rich business context was being ignored when generating SQL and designing charts.
+
+### Problem Identified
+
+Traced through the codebase and found that:
+- `get_schema_context()` accepts an optional `semantic_layer` parameter
+- When passed, it enriches prompts with business context, column descriptions, relationships
+- BUT every call was WITHOUT the semantic layer parameter
+- The semantic layer infrastructure existed but wasn't connected
+
+### Solution: Connect Semantic Layer to All AI Entry Points
+
+Implemented a consistent pattern across all LLM-using components:
+
+1. **Added `get_semantic_layer()` method** to each pipeline class that:
+   - Loads semantic.yaml from `sources/{source_name}/semantic.yaml`
+   - Caches the result for subsequent calls
+   - Returns `None` gracefully if semantic.yaml doesn't exist
+
+2. **Updated `get_schema_context()` method** in each class to:
+   - Call `get_semantic_layer()` first
+   - Pass the semantic layer to the base `get_schema_context()` function
+   - Cache the enriched result
+
+### Files Modified
+
+| File | Change |
+|------|--------|
+| `engine/chart_pipeline.py` | Added `get_semantic_layer()`, updated `get_schema_context()` to use semantic layer |
+| `engine/chart_conversation.py` | Now uses pipeline's enriched `get_schema_context()` |
+| `engine/conversation.py` | Added `_semantic_layer` field, `get_semantic_layer()`, updated `get_schema_context()` |
+| `engine/pipeline/pipeline.py` | Added `get_semantic_layer()`, updated `get_schema_context()` for DashboardPipeline |
+| `engine/qa.py` | Updated `auto_fix_dashboard()` fallback to use semantic layer |
+| `api/routers/chart.py` | Enhanced dashboard context generation with business domain info |
+
+### Impact
+
+Now when AI generates:
+- **SQL queries**: Gets column descriptions, roles, and relationships for better joins
+- **Chart specs**: Understands business terminology (MRR, churn, etc.)
+- **Dashboard context**: Uses domain info to write relevant business context paragraphs
+- **QA auto-fixes**: Has full business context when fixing issues
+
+### Example Enhancement
+
+When generating a chart for "Show MRR by customer segment", the LLM now receives:
+
+```
+CUSTOMERS table:
+  - CUSTOMER_ID (Primary Key): Unique identifier for each customer
+  - PLAN_TIER (Dimension): Customer's subscription tier
+  - Purpose: Core customer records for SaaS business analysis
+
+Relationships:
+  - SUBSCRIPTIONS.CUSTOMER_ID → CUSTOMERS.CUSTOMER_ID
+
+Business Context:
+  Domain: B2B SaaS
+  Key Metrics: MRR, ARR, Churn Rate, Customer Count
+```
+
+Instead of just raw column names with no context.
+
+### Verification
+
+```bash
+python -m py_compile engine/conversation.py engine/qa.py engine/chart_pipeline.py engine/pipeline/pipeline.py
+# Python syntax OK
+```
+
+### Next Steps
+
+- [ ] Test chart generation quality improvement with semantic context enabled
+- [ ] Add automatic semantic layer regeneration when schema changes
+- [ ] Consider adding semantic layer diff detection for staleness alerts
+
+---
+
+## Session: 2026-01-25 (Part 7)
+
+### Focus: Enhance Semantic Layer with User Business Context
+
+### Context
+
+Companies often have existing business definitions:
+- dbt semantic layer definitions
+- Looker LookML models
+- Data dictionaries in Confluence/Notion
+- "Golden SQL" queries defining canonical metric calculations
+- Internal glossaries with business term definitions
+
+Previously, users had to manually re-enter all this information into the Schema Browser. This feature allows users to paste their existing business context and have the LLM intelligently merge it.
+
+### Implementation
+
+#### 1. Backend API Endpoint (`api/routers/sources.py`)
+
+New endpoint: `POST /sources/{source_name}/semantic/enhance`
+
+```python
+class SemanticEnhanceRequest(BaseModel):
+    user_context: str  # User's business context (any format)
+    preview: bool = True  # If True, return proposed changes without applying
+
+class SemanticEnhanceResponse(BaseModel):
+    success: bool
+    message: str
+    changes: list[SemanticChange] | None = None
+    summary: dict | None = None
+    applied: bool = False
+```
+
+Features:
+- Accepts business context in any format (YAML, JSON, markdown, SQL, plain text)
+- Preview mode shows proposed changes before applying
+- LLM parses input and generates structured changes
+- Applies changes intelligently with merge strategy
+
+#### 2. LLM Prompt (`engine/prompts/semantic/enhance.yaml`)
+
+New prompt that instructs the LLM to:
+- Auto-detect input format (dbt, Looker, markdown, SQL, etc.)
+- Extract metric definitions, business terms, column descriptions
+- Map user terminology to existing schema structure
+- Output only changes (not full semantic layer)
+- Follow merge rules: User input > Existing manual edits > Auto-generated
+
+#### 3. Frontend Modal (`app/src/components/sources/EnhanceSemanticModal.tsx`)
+
+Three-step flow:
+1. **Input**: Textarea for pasting business context with format hints
+2. **Preview**: Shows proposed changes with summary (metrics added, terms added, etc.)
+3. **Apply**: Saves changes and reloads semantic layer
+
+#### 4. SchemaBrowser Integration
+
+Added "Enhance with Context" button to header (only shown when semantic layer exists).
+
+### Files Created
+
+| File | Purpose |
+|------|---------|
+| `engine/prompts/semantic/enhance.yaml` | LLM prompt for parsing and merging business context |
+| `app/src/components/sources/EnhanceSemanticModal.tsx` | Modal component for enhancement flow |
+
+### Files Modified
+
+| File | Change |
+|------|--------|
+| `api/routers/sources.py` | Added `/semantic/enhance` endpoint with preview/apply logic |
+| `app/src/api/client.ts` | Added `enhanceSemanticLayer()` function and types |
+| `app/src/components/sources/SchemaBrowser.tsx` | Added "Enhance with Context" button and modal integration |
+| `app/src/components/sources/index.ts` | Exported new component |
+
+### User Flow
+
+1. User opens Schema Browser for a data source
+2. Clicks "Enhance with Context" button in header
+3. Pastes existing business definitions (any format)
+4. Clicks "Preview Changes" - sees what will be added/updated
+5. Reviews changes (expandable to see current vs new values)
+6. Clicks "Apply Changes" to save
+7. Semantic layer is updated and reloaded
+
+### Merge Strategy
+
+- **ADD**: New information that doesn't exist
+- **ENHANCE**: Improve existing descriptions with more detail
+- **PRESERVE**: Keep existing content unless user explicitly provides replacement
+- **NEVER DELETE**: Existing documentation is preserved
+
+### Verification
+
+```bash
+python -m py_compile api/routers/sources.py  # OK
+npx tsc --noEmit  # No errors in modified files
+```
+
+### Next Steps
+
+- [ ] Test with real dbt semantic layer YAML
+- [ ] Test with Looker LookML files
+- [ ] Add support for URL import (fetch from Confluence/Notion)
+- [ ] Consider adding history/undo for semantic layer changes
 
 ---
 
