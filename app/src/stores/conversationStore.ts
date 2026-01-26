@@ -502,7 +502,7 @@ function checkConversationComplete(
 
 // Helper: Check if chart conversation is complete
 function checkChartConversationComplete(
-  actionButtons: Array<{ id: string }> | null | undefined,
+  _actionButtons: Array<{ id: string }> | null | undefined,
   phase?: string
 ): boolean {
   // Chart is complete only when user has clicked Done (phase is 'complete')

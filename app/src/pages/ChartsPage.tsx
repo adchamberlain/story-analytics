@@ -6,6 +6,9 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useChartStore } from '../stores/chartStore'
+import { ChartFactory } from '../components/charts/ChartFactory'
+import { fetchChartRenderData } from '../api/client'
+import type { ChartRenderData } from '../types/chart'
 import { createDashboardFromCharts } from '../api/client'
 import { CreateDashboardModal } from '../components/modals'
 import type { ChartLibraryItem } from '../types/conversation'
@@ -18,6 +21,240 @@ const CHART_TYPES = [
   { value: 'BigValue', label: 'KPI' },
   { value: 'DataTable', label: 'Table' },
 ]
+
+/**
+ * Format SQL for display with proper line breaks and indentation.
+ * Puts each SELECT column on its own line for readability.
+ */
+function formatSQL(sql: string): string {
+  if (!sql) return ''
+
+  let formatted = sql.trim()
+
+  // Normalize whitespace first
+  formatted = formatted.replace(/\s+/g, ' ')
+
+  // Handle CTEs first - separate them from the main query
+  // Match WITH ... AS (...) and mark the boundary before main SELECT
+  formatted = formatted.replace(
+    /\bWITH\s+(\w+)\s+AS\s*\((.+?)\)\s*SELECT\b/gi,
+    (_match, cteName, cteBody) => {
+      // Format the CTE body - split SELECT columns if present
+      let formattedCte = cteBody.trim()
+
+      // Check if CTE has SELECT ... FROM
+      const cteSelectMatch = formattedCte.match(/^SELECT\s+(.+?)\s+FROM\s+(.+)$/i)
+      if (cteSelectMatch) {
+        const [, cols, rest] = cteSelectMatch
+        const cteCols = splitByCommaOutsideParens(cols)
+        if (cteCols.length > 1) {
+          formattedCte = `SELECT\n    ${cteCols.map(c => c.trim()).join(',\n    ')}\n  FROM ${rest}`
+        }
+      } else {
+        // CTE without FROM - check if it's a single SELECT with long function call
+        const selectMatch = formattedCte.match(/^SELECT\s+(.+)$/i)
+        if (selectMatch) {
+          const selectBody = selectMatch[1]
+          // If it contains a function with multiple args, format it
+          formattedCte = `SELECT\n    ${formatLongFunctionCall(selectBody)}`
+        }
+      }
+
+      return `WITH ${cteName} AS (\n  ${formattedCte}\n)\n\nSELECT`
+    }
+  )
+
+  // Now split SELECT columns for the main query (after CTE handling)
+  // Look for SELECT ... FROM where SELECT is either at start or after newlines
+  formatted = formatted.replace(
+    /(\n\n?SELECT|\bSELECT)\s+(.+?)\s+FROM\b/gi,
+    (_match, selectPart, columns) => {
+      const cols = splitByCommaOutsideParens(columns.trim())
+      const prefix = selectPart.includes('\n') ? selectPart : 'SELECT'
+      if (cols.length > 1) {
+        const indentedCols = cols.map(c => '  ' + c.trim()).join(',\n')
+        return `${prefix}\n${indentedCols}\nFROM`
+      }
+      return `${prefix} ${columns.trim()}\nFROM`
+    }
+  )
+
+  // Protect multi-word keywords with placeholders
+  const multiWordKeywords = [
+    { search: /\bLEFT\s+OUTER\s+JOIN\b/gi, placeholder: '___LEFT_OUTER_JOIN___', restore: 'LEFT OUTER JOIN' },
+    { search: /\bRIGHT\s+OUTER\s+JOIN\b/gi, placeholder: '___RIGHT_OUTER_JOIN___', restore: 'RIGHT OUTER JOIN' },
+    { search: /\bFULL\s+OUTER\s+JOIN\b/gi, placeholder: '___FULL_OUTER_JOIN___', restore: 'FULL OUTER JOIN' },
+    { search: /\bLEFT\s+JOIN\b/gi, placeholder: '___LEFT_JOIN___', restore: 'LEFT JOIN' },
+    { search: /\bRIGHT\s+JOIN\b/gi, placeholder: '___RIGHT_JOIN___', restore: 'RIGHT JOIN' },
+    { search: /\bINNER\s+JOIN\b/gi, placeholder: '___INNER_JOIN___', restore: 'INNER JOIN' },
+    { search: /\bOUTER\s+JOIN\b/gi, placeholder: '___OUTER_JOIN___', restore: 'OUTER JOIN' },
+    { search: /\bCROSS\s+JOIN\b/gi, placeholder: '___CROSS_JOIN___', restore: 'CROSS JOIN' },
+    { search: /\bFULL\s+JOIN\b/gi, placeholder: '___FULL_JOIN___', restore: 'FULL JOIN' },
+    { search: /\bGROUP\s+BY\b/gi, placeholder: '___GROUP_BY___', restore: 'GROUP BY' },
+    { search: /\bORDER\s+BY\b/gi, placeholder: '___ORDER_BY___', restore: 'ORDER BY' },
+  ]
+
+  for (const { search, placeholder } of multiWordKeywords) {
+    formatted = formatted.replace(search, placeholder)
+  }
+
+  // Add line breaks before keywords
+  const lineBreakKeywords = [
+    '___LEFT_OUTER_JOIN___', '___RIGHT_OUTER_JOIN___', '___FULL_OUTER_JOIN___',
+    '___LEFT_JOIN___', '___RIGHT_JOIN___', '___INNER_JOIN___', '___OUTER_JOIN___',
+    '___CROSS_JOIN___', '___FULL_JOIN___', 'JOIN',
+    '___GROUP_BY___', '___ORDER_BY___',
+    'WHERE', 'HAVING', 'LIMIT', 'UNION', 'INTERSECT', 'EXCEPT'
+  ]
+
+  for (const keyword of lineBreakKeywords) {
+    const regex = new RegExp(`\\s+(${keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi')
+    formatted = formatted.replace(regex, '\n$1')
+  }
+
+  // Add line breaks before AND/OR with indent (only at top level, not inside parentheses)
+  // Use a smarter approach: only break AND/OR that aren't inside parentheses
+  formatted = formatAndOr(formatted)
+
+  // Restore multi-word keywords from placeholders
+  for (const { placeholder, restore } of multiWordKeywords) {
+    formatted = formatted.replace(new RegExp(placeholder, 'g'), restore)
+  }
+
+  // Clean up multiple line breaks
+  formatted = formatted.replace(/\n{3,}/g, '\n\n')
+
+  // Normalize spaces after newlines
+  formatted = formatted
+    .split('\n')
+    .map(line => {
+      const trimmed = line.trimEnd()
+      if (trimmed.startsWith('  ')) return trimmed
+      return trimmed.trimStart()
+    })
+    .filter((line, i, arr) => line.length > 0 || (i > 0 && arr[i-1].length > 0))
+    .join('\n')
+
+  return formatted.trim()
+}
+
+/**
+ * Add line breaks before AND/OR only when they're not inside parentheses.
+ */
+function formatAndOr(sql: string): string {
+  let result = ''
+  let depth = 0
+  let i = 0
+
+  while (i < sql.length) {
+    const char = sql[i]
+
+    if (char === '(') {
+      depth++
+      result += char
+      i++
+    } else if (char === ')') {
+      depth--
+      result += char
+      i++
+    } else if (depth === 0) {
+      // Check for AND or OR at top level
+      const remaining = sql.slice(i)
+      const andMatch = remaining.match(/^(\s+)(AND)(\s+)/i)
+      const orMatch = remaining.match(/^(\s+)(OR)(\s+)/i)
+
+      if (andMatch) {
+        result += '\n  AND '
+        i += andMatch[0].length
+      } else if (orMatch) {
+        result += '\n  OR '
+        i += orMatch[0].length
+      } else {
+        result += char
+        i++
+      }
+    } else {
+      result += char
+      i++
+    }
+  }
+
+  return result
+}
+
+/**
+ * Format long function calls by putting each argument on its own line.
+ * Only formats if the total length exceeds a threshold.
+ */
+function formatLongFunctionCall(str: string, indent: string = '    '): string {
+  const LINE_LENGTH_THRESHOLD = 80
+
+  if (str.length <= LINE_LENGTH_THRESHOLD) {
+    return str
+  }
+
+  // Find the outermost function call with arguments
+  // Pattern: FUNC_NAME(args)suffix where suffix might be ::TYPE AS alias
+  const funcMatch = str.match(/^(\w+)\((.+)\)((::\w+)?(\s+AS\s+\w+)?)$/i)
+  if (!funcMatch) {
+    return str
+  }
+
+  const [, funcName, argsStr, suffix] = funcMatch
+  const args = splitByCommaOutsideParens(argsStr)
+
+  // Recursively format nested function calls in arguments
+  const formattedArgs = args.map(arg => {
+    const trimmed = arg.trim()
+    if (trimmed.length > LINE_LENGTH_THRESHOLD) {
+      return formatLongFunctionCall(trimmed, indent + '  ')
+    }
+    return trimmed
+  })
+
+  // If only 1 argument but it was reformatted (contains newlines), still format the outer call
+  if (args.length === 1) {
+    const formattedArg = formattedArgs[0]
+    if (formattedArg.includes('\n')) {
+      return `${funcName}(\n${indent}  ${formattedArg}\n${indent})${suffix || ''}`
+    }
+    // Single arg, not reformatted, return as-is
+    return str
+  }
+
+  // Multiple arguments - format each on its own line
+  return `${funcName}(\n${indent}  ${formattedArgs.join(',\n' + indent + '  ')}\n${indent})${suffix || ''}`
+}
+
+/**
+ * Split a string by commas, but ignore commas inside parentheses.
+ */
+function splitByCommaOutsideParens(str: string): string[] {
+  const result: string[] = []
+  let current = ''
+  let depth = 0
+
+  for (const char of str) {
+    if (char === '(') {
+      depth++
+      current += char
+    } else if (char === ')') {
+      depth--
+      current += char
+    } else if (char === ',' && depth === 0) {
+      result.push(current)
+      current = ''
+    } else {
+      current += char
+    }
+  }
+
+  if (current.trim()) {
+    result.push(current)
+  }
+
+  return result
+}
 
 const CHART_ICONS: Record<string, string> = {
   LineChart: '~',
@@ -38,7 +275,6 @@ export function ChartsPage() {
     searchQuery,
     filterType,
     previewChart,
-    previewUrl,
     selectionMode,
     selectedChartIds,
     loadCharts,
@@ -52,6 +288,10 @@ export function ChartsPage() {
     closePreview,
   } = useChartStore()
 
+  // Local state for direct chart rendering in preview modal
+  const [previewRenderData, setPreviewRenderData] = useState<ChartRenderData | null>(null)
+  const [previewLoading, setPreviewLoading] = useState(false)
+
   const [localSearch, setLocalSearch] = useState(searchQuery)
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
   const [showCreateModal, setShowCreateModal] = useState(false)
@@ -64,6 +304,26 @@ export function ChartsPage() {
   useEffect(() => {
     loadCharts()
   }, [loadCharts])
+
+  // Load chart render data when preview opens
+  useEffect(() => {
+    if (previewChart) {
+      setPreviewLoading(true)
+      setPreviewRenderData(null)
+      fetchChartRenderData(previewChart.id)
+        .then((data) => {
+          setPreviewRenderData(data)
+        })
+        .catch((err) => {
+          console.error('Failed to load chart preview:', err)
+        })
+        .finally(() => {
+          setPreviewLoading(false)
+        })
+    } else {
+      setPreviewRenderData(null)
+    }
+  }, [previewChart])
 
   // Debounced search
   useEffect(() => {
@@ -715,17 +975,27 @@ export function ChartsPage() {
                 flex: 1,
                 overflow: 'hidden',
                 minHeight: '400px',
+                padding: 'var(--space-4)',
+                backgroundColor: 'white',
               }}
             >
-              {previewUrl ? (
-                <iframe
-                  src={previewUrl}
-                  title={previewChart.title}
+              {previewLoading ? (
+                <div
                   style={{
-                    width: '100%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
                     height: '100%',
-                    border: 'none',
+                    color: 'var(--color-gray-400)',
                   }}
+                >
+                  Loading preview...
+                </div>
+              ) : previewRenderData ? (
+                <ChartFactory
+                  spec={previewRenderData.spec}
+                  data={previewRenderData.data}
+                  columns={previewRenderData.columns}
                 />
               ) : (
                 <div
@@ -737,7 +1007,7 @@ export function ChartsPage() {
                     color: 'var(--color-gray-400)',
                   }}
                 >
-                  Loading preview...
+                  Failed to load preview
                 </div>
               )}
             </div>
@@ -767,12 +1037,14 @@ export function ChartsPage() {
                   backgroundColor: 'var(--color-gray-900)',
                   borderRadius: 'var(--radius-md)',
                   fontSize: 'var(--text-xs)',
-                  color: 'var(--color-gray-500)',
+                  color: 'var(--color-gray-400)',
                   overflow: 'auto',
                   whiteSpace: 'pre-wrap',
+                  wordBreak: 'break-word',
+                  lineHeight: 1.5,
                 }}
               >
-                {previewChart.sql}
+                {formatSQL(previewChart.sql)}
               </pre>
             </div>
           </div>
