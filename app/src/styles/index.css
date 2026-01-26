@@ -142,8 +142,8 @@ html, body {
 /* Error state */
 .error-message {
   color: var(--color-error);
-  background: #fef2f2;
-  border: 1px solid #fecaca;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid var(--color-error);
   border-radius: var(--radius-md);
   padding: 16px;
   margin: 16px;
@@ -165,9 +165,9 @@ html, body {
 .skeleton {
   background: linear-gradient(
     90deg,
-    var(--color-gray-100) 0%,
-    var(--color-gray-50) 50%,
-    var(--color-gray-100) 100%
+    var(--color-gray-800) 0%,
+    var(--color-gray-700) 50%,
+    var(--color-gray-800) 100%
   );
   background-size: 200% 100%;
   animation: shimmer 1.5s ease-in-out infinite;

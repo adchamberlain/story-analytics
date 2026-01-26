@@ -29,6 +29,9 @@ from ..schemas.chart import (
     ChartListResponse,
     ChartCreateRequest,
     ChartCreateResponse,
+    ChartUpdateRequest,
+    ChartUpdateResponse,
+    ChartDuplicateResponse,
     DashboardSchema,
     DashboardLayoutSchema,
     DashboardLayoutSection,
@@ -552,6 +555,81 @@ async def delete_chart(
     return {"success": True, "deleted_id": chart_id}
 
 
+@router.patch("/library/{chart_id}", response_model=ChartUpdateResponse)
+async def update_chart(
+    chart_id: str,
+    request: ChartUpdateRequest,
+    current_user: User = Depends(get_current_user),
+):
+    """Update a chart's title and/or description."""
+    storage = get_chart_storage()
+    chart = storage.get(chart_id)
+
+    if not chart:
+        raise HTTPException(status_code=404, detail="Chart not found")
+
+    # Update fields if provided
+    if request.title is not None:
+        chart.title = request.title
+    if request.description is not None:
+        chart.description = request.description
+
+    # Update timestamp
+    chart.updated_at = datetime.utcnow()
+
+    # Save changes
+    storage.save(chart)
+
+    return ChartUpdateResponse(
+        success=True,
+        chart=_chart_to_schema(chart),
+    )
+
+
+@router.post("/library/{chart_id}/duplicate", response_model=ChartDuplicateResponse)
+async def duplicate_chart(
+    chart_id: str,
+    current_user: User = Depends(get_current_user),
+):
+    """Create a duplicate of an existing chart."""
+    storage = get_chart_storage()
+    original = storage.get(chart_id)
+
+    if not original:
+        raise HTTPException(status_code=404, detail="Chart not found")
+
+    # Create a new chart with copied data
+    import uuid
+
+    new_chart = Chart(
+        id=str(uuid.uuid4()),
+        title=f"{original.title} (Copy)",
+        description=original.description,
+        query_name=f"{original.query_name}_copy",
+        sql=original.sql,
+        chart_type=original.chart_type,
+        config=original.config,
+        original_request=original.original_request,
+        is_valid=original.is_valid,
+        created_at=datetime.utcnow(),
+        updated_at=datetime.utcnow(),
+    )
+
+    # Save the duplicate
+    storage.save(new_chart)
+
+    # Create preview dashboard for the new chart
+    from engine.dashboard_composer import create_chart_dashboard
+
+    create_chart_dashboard(new_chart)
+
+    return ChartDuplicateResponse(
+        success=True,
+        chart=_chart_to_schema(new_chart),
+        chart_url=f"/chart/{new_chart.id}",
+    )
+
+
 @router.post("/library/create", response_model=ChartCreateResponse)
 async def create_chart(
     request: ChartCreateRequest,
@@ -667,6 +745,34 @@ async def get_chart_preview_url(
         "chart_id": chart_id,
         "url": f"/chart/{chart_id}",
         "dashboard_slug": dashboard.slug,
+    }
+
+
+@router.get("/library/{chart_id}/session")
+async def get_chart_session(
+    chart_id: str,
+    current_user: User = Depends(get_current_user),
+    db: DBSession = Depends(get_db),
+):
+    """Get the conversation session associated with a chart."""
+    # Find session linked to this chart
+    session = (
+        db.query(ConversationSession)
+        .filter(
+            ConversationSession.chart_id == chart_id,
+            ConversationSession.user_id == current_user.id,
+        )
+        .first()
+    )
+
+    if not session:
+        raise HTTPException(status_code=404, detail="No session found for this chart")
+
+    return {
+        "chart_id": chart_id,
+        "session_id": session.id,
+        "title": session.title,
+        "phase": session.phase,
     }
 
 

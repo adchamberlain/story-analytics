@@ -99,6 +99,30 @@ class ChartCreateResponse(BaseModel):
     error: str | None = None
 
 
+class ChartUpdateRequest(BaseModel):
+    """Schema for updating a chart's metadata."""
+
+    title: str | None = None
+    description: str | None = None
+
+
+class ChartUpdateResponse(BaseModel):
+    """Schema for chart update response."""
+
+    success: bool
+    chart: ChartSchema | None = None
+    error: str | None = None
+
+
+class ChartDuplicateResponse(BaseModel):
+    """Schema for chart duplication response."""
+
+    success: bool
+    chart: ChartSchema | None = None
+    chart_url: str | None = None
+    error: str | None = None
+
+
 # =============================================================================
 # Dashboard Composition Schemas
 # =============================================================================

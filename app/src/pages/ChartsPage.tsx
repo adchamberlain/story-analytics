@@ -4,12 +4,13 @@
  */
 
 import { useEffect, useState, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useChartStore } from '../stores/chartStore'
 import { ChartFactory } from '../components/charts/ChartFactory'
-import { fetchChartRenderData } from '../api/client'
+import { fetchChartRenderData, updateChart, duplicateChart } from '../api/client'
 import type { ChartRenderData } from '../types/chart'
 import { createDashboardFromCharts } from '../api/client'
+import { useConversationStore } from '../stores/conversationStore'
 import { CreateDashboardModal } from '../components/modals'
 import type { ChartLibraryItem } from '../types/conversation'
 
@@ -268,6 +269,7 @@ const CHART_ICONS: Record<string, string> = {
 
 export function ChartsPage() {
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const {
     charts,
     loading,
@@ -297,6 +299,14 @@ export function ChartsPage() {
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [isCreating, setIsCreating] = useState(false)
 
+  // Modal action state
+  const [isRenaming, setIsRenaming] = useState(false)
+  const [renameTitle, setRenameTitle] = useState('')
+  const [isDuplicating, setIsDuplicating] = useState(false)
+
+  // Get conversation store for edit functionality
+  const { setCreationMode } = useConversationStore()
+
   // Get selected chart objects for the modal
   const selectedCharts = charts.filter((c) => selectedChartIds.includes(c.id))
 
@@ -304,6 +314,20 @@ export function ChartsPage() {
   useEffect(() => {
     loadCharts()
   }, [loadCharts])
+
+  // Handle preview query param - auto-open modal if chart ID is in URL
+  useEffect(() => {
+    const previewId = searchParams.get('preview')
+    if (previewId && charts.length > 0 && !previewChart) {
+      const chartToPreview = charts.find((c) => c.id === previewId)
+      if (chartToPreview) {
+        openPreview(chartToPreview)
+        // Clear the preview param from URL to avoid re-opening on refresh
+        searchParams.delete('preview')
+        setSearchParams(searchParams, { replace: true })
+      }
+    }
+  }, [searchParams, setSearchParams, charts, previewChart, openPreview])
 
   // Load chart render data when preview opens
   useEffect(() => {
@@ -399,6 +423,77 @@ export function ChartsPage() {
       toggleChartSelection(chart.id)
     } else {
       openPreview(chart)
+    }
+  }
+
+  // Handle starting rename mode
+  const handleStartRename = () => {
+    if (previewChart) {
+      setRenameTitle(previewChart.title)
+      setIsRenaming(true)
+    }
+  }
+
+  // Handle saving the rename
+  const handleSaveRename = async () => {
+    if (!previewChart || !renameTitle.trim()) return
+
+    try {
+      const updated = await updateChart(previewChart.id, { title: renameTitle.trim() })
+      // Update the chart in the list
+      loadCharts()
+      // Update previewChart state (close and reopen to refresh)
+      closePreview()
+      // Find and open the updated chart
+      setTimeout(() => {
+        const chart = { ...previewChart, title: updated.title }
+        openPreview(chart)
+      }, 100)
+    } catch (err) {
+      console.error('Failed to rename chart:', err)
+      alert('Failed to rename chart')
+    } finally {
+      setIsRenaming(false)
+      setRenameTitle('')
+    }
+  }
+
+  // Handle cancel rename
+  const handleCancelRename = () => {
+    setIsRenaming(false)
+    setRenameTitle('')
+  }
+
+  // Handle edit chart (navigate to chat with chart context)
+  const handleEditChart = async () => {
+    if (!previewChart) return
+
+    // Navigate to chat page with chart edit mode
+    // The chart conversation should already exist, find it
+    setCreationMode('chart')
+    closePreview()
+    navigate(`/chat?editChart=${previewChart.id}`)
+  }
+
+  // Handle duplicate chart
+  const handleDuplicateChart = async () => {
+    if (!previewChart) return
+
+    setIsDuplicating(true)
+    try {
+      const result = await duplicateChart(previewChart.id)
+      // Refresh the chart list
+      await loadCharts()
+      // Close current preview and open the new chart
+      closePreview()
+      setTimeout(() => {
+        openPreview(result.chart)
+      }, 100)
+    } catch (err) {
+      console.error('Failed to duplicate chart:', err)
+      alert('Failed to duplicate chart')
+    } finally {
+      setIsDuplicating(false)
     }
   }
 
@@ -940,17 +1035,73 @@ export function ChartsPage() {
                 borderBottom: '1px solid var(--color-gray-700)',
               }}
             >
-              <h2
-                style={{
-                  margin: 0,
-                  fontSize: 'var(--text-xl)',
-                  color: 'var(--color-gray-200)',
-                }}
-              >
-                {previewChart.title}
-              </h2>
+              {isRenaming ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', flex: 1 }}>
+                  <input
+                    type="text"
+                    value={renameTitle}
+                    onChange={(e) => setRenameTitle(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') handleSaveRename()
+                      if (e.key === 'Escape') handleCancelRename()
+                    }}
+                    autoFocus
+                    style={{
+                      flex: 1,
+                      padding: 'var(--space-2) var(--space-3)',
+                      fontSize: 'var(--text-lg)',
+                      backgroundColor: 'var(--color-gray-900)',
+                      border: '1px solid var(--color-primary)',
+                      borderRadius: 'var(--radius-md)',
+                      color: 'var(--color-gray-200)',
+                      outline: 'none',
+                    }}
+                  />
+                  <button
+                    onClick={handleSaveRename}
+                    style={{
+                      padding: 'var(--space-2) var(--space-3)',
+                      backgroundColor: 'var(--color-primary)',
+                      border: 'none',
+                      borderRadius: 'var(--radius-md)',
+                      color: 'white',
+                      fontSize: 'var(--text-sm)',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Save
+                  </button>
+                  <button
+                    onClick={handleCancelRename}
+                    style={{
+                      padding: 'var(--space-2) var(--space-3)',
+                      backgroundColor: 'var(--color-gray-700)',
+                      border: 'none',
+                      borderRadius: 'var(--radius-md)',
+                      color: 'var(--color-gray-300)',
+                      fontSize: 'var(--text-sm)',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <h2
+                  style={{
+                    margin: 0,
+                    fontSize: 'var(--text-xl)',
+                    color: 'var(--color-gray-200)',
+                  }}
+                >
+                  {previewChart.title}
+                </h2>
+              )}
               <button
-                onClick={closePreview}
+                onClick={() => {
+                  setIsRenaming(false)
+                  closePreview()
+                }}
                 style={{
                   width: '32px',
                   height: '32px',
@@ -963,6 +1114,7 @@ export function ChartsPage() {
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
+                  marginLeft: 'var(--space-2)',
                 }}
               >
                 &times;
@@ -1017,35 +1169,92 @@ export function ChartsPage() {
               style={{
                 padding: 'var(--space-4) var(--space-6)',
                 borderTop: '1px solid var(--color-gray-700)',
-                maxHeight: '200px',
-                overflow: 'auto',
               }}
             >
-              <p
+              {/* Action buttons */}
+              <div
                 style={{
-                  margin: '0 0 var(--space-3) 0',
-                  color: 'var(--color-gray-400)',
-                  fontSize: 'var(--text-sm)',
+                  display: 'flex',
+                  gap: 'var(--space-2)',
+                  marginBottom: 'var(--space-4)',
                 }}
               >
-                {previewChart.description}
-              </p>
-              <pre
-                style={{
-                  margin: 0,
-                  padding: 'var(--space-3)',
-                  backgroundColor: 'var(--color-gray-900)',
-                  borderRadius: 'var(--radius-md)',
-                  fontSize: 'var(--text-xs)',
-                  color: 'var(--color-gray-400)',
-                  overflow: 'auto',
-                  whiteSpace: 'pre-wrap',
-                  wordBreak: 'break-word',
-                  lineHeight: 1.5,
-                }}
-              >
-                {formatSQL(previewChart.sql)}
-              </pre>
+                <button
+                  onClick={handleStartRename}
+                  disabled={isRenaming}
+                  style={{
+                    padding: 'var(--space-2) var(--space-3)',
+                    backgroundColor: 'var(--color-gray-700)',
+                    border: '1px solid var(--color-gray-600)',
+                    borderRadius: 'var(--radius-md)',
+                    color: 'var(--color-gray-200)',
+                    fontSize: 'var(--text-sm)',
+                    cursor: isRenaming ? 'not-allowed' : 'pointer',
+                    opacity: isRenaming ? 0.5 : 1,
+                  }}
+                >
+                  Rename
+                </button>
+                <button
+                  onClick={handleEditChart}
+                  style={{
+                    padding: 'var(--space-2) var(--space-3)',
+                    backgroundColor: 'var(--color-gray-700)',
+                    border: '1px solid var(--color-gray-600)',
+                    borderRadius: 'var(--radius-md)',
+                    color: 'var(--color-gray-200)',
+                    fontSize: 'var(--text-sm)',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Edit
+                </button>
+                <button
+                  onClick={handleDuplicateChart}
+                  disabled={isDuplicating}
+                  style={{
+                    padding: 'var(--space-2) var(--space-3)',
+                    backgroundColor: 'var(--color-gray-700)',
+                    border: '1px solid var(--color-gray-600)',
+                    borderRadius: 'var(--radius-md)',
+                    color: 'var(--color-gray-200)',
+                    fontSize: 'var(--text-sm)',
+                    cursor: isDuplicating ? 'not-allowed' : 'pointer',
+                    opacity: isDuplicating ? 0.5 : 1,
+                  }}
+                >
+                  {isDuplicating ? 'Duplicating...' : 'Duplicate'}
+                </button>
+              </div>
+
+              {/* Description and SQL */}
+              <div style={{ maxHeight: '150px', overflow: 'auto' }}>
+                <p
+                  style={{
+                    margin: '0 0 var(--space-3) 0',
+                    color: 'var(--color-gray-400)',
+                    fontSize: 'var(--text-sm)',
+                  }}
+                >
+                  {previewChart.description}
+                </p>
+                <pre
+                  style={{
+                    margin: 0,
+                    padding: 'var(--space-3)',
+                    backgroundColor: 'var(--color-gray-900)',
+                    borderRadius: 'var(--radius-md)',
+                    fontSize: 'var(--text-xs)',
+                    color: 'var(--color-gray-400)',
+                    overflow: 'auto',
+                    whiteSpace: 'pre-wrap',
+                    wordBreak: 'break-word',
+                    lineHeight: 1.5,
+                  }}
+                >
+                  {formatSQL(previewChart.sql)}
+                </pre>
+              </div>
             </div>
           </div>
         </div>

@@ -121,8 +121,8 @@ export function Sidebar() {
       style={{
         width: '256px',
         height: '100%',
-        backgroundColor: 'var(--color-gray-50)',
-        borderRight: '1px solid var(--color-gray-200)',
+        backgroundColor: 'var(--color-gray-900)',
+        borderRight: '1px solid var(--color-gray-700)',
         display: 'flex',
         flexDirection: 'column',
       }}
@@ -131,7 +131,7 @@ export function Sidebar() {
       <div
         style={{
           padding: 'var(--space-4)',
-          borderBottom: '1px solid var(--color-gray-200)',
+          borderBottom: '1px solid var(--color-gray-700)',
         }}
       >
         <Logo size="md" showTagline={true} />
@@ -163,12 +163,12 @@ export function Sidebar() {
                   transition: 'all var(--transition-fast)',
                   backgroundColor:
                     location.pathname === item.path
-                      ? 'var(--color-gray-200)'
+                      ? 'var(--color-gray-800)'
                       : 'transparent',
                   color:
                     location.pathname === item.path
                       ? 'var(--color-primary)'
-                      : 'var(--color-gray-700)',
+                      : 'var(--color-gray-300)',
                 }}
               >
                 <span style={{ color: 'var(--color-warning)', fontFamily: 'var(--font-brand)' }}>
@@ -273,7 +273,8 @@ export function Sidebar() {
                           fontSize: 'var(--text-sm)',
                           padding: '2px 4px',
                           flex: 1,
-                          backgroundColor: 'white',
+                          backgroundColor: 'var(--color-gray-800)',
+                          color: 'var(--color-gray-200)',
                           border: '1px solid var(--color-primary)',
                           borderRadius: 'var(--radius-sm)',
                           outline: 'none',
@@ -498,7 +499,7 @@ export function Sidebar() {
         <div
           style={{
             padding: 'var(--space-4)',
-            borderTop: '1px solid var(--color-gray-200)',
+            borderTop: '1px solid var(--color-gray-700)',
           }}
         >
           <div
@@ -512,7 +513,7 @@ export function Sidebar() {
               <p
                 style={{
                   fontSize: 'var(--text-sm)',
-                  color: 'var(--color-gray-700)',
+                  color: 'var(--color-gray-300)',
                   margin: 0,
                   overflow: 'hidden',
                   textOverflow: 'ellipsis',
@@ -538,7 +539,7 @@ export function Sidebar() {
               onClick={logout}
               style={{
                 fontSize: 'var(--text-xs)',
-                color: 'var(--color-gray-400)',
+                color: 'var(--color-gray-500)',
                 background: 'none',
                 border: 'none',
                 cursor: 'pointer',

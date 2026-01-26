@@ -526,11 +526,49 @@ export async function deleteChart(chartId: string): Promise<void> {
 }
 
 /**
+ * Update a chart's title and/or description.
+ */
+export async function updateChart(
+  chartId: string,
+  data: { title?: string; description?: string }
+): Promise<ChartLibraryItem> {
+  const response = await apiFetch<{ success: boolean; chart: ChartLibraryItem }>(
+    `/charts/library/${chartId}`,
+    {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }
+  )
+  return response.chart
+}
+
+/**
+ * Duplicate an existing chart.
+ */
+export async function duplicateChart(
+  chartId: string
+): Promise<{ chart: ChartLibraryItem; chart_url: string }> {
+  const response = await apiFetch<{
+    success: boolean
+    chart: ChartLibraryItem
+    chart_url: string
+  }>(`/charts/library/${chartId}/duplicate`, { method: 'POST' })
+  return { chart: response.chart, chart_url: response.chart_url }
+}
+
+/**
  * Get preview URL for a chart.
  */
 export async function getChartPreviewUrl(chartId: string): Promise<string> {
   const response = await apiFetch<{ url: string }>(`/charts/library/${chartId}/preview-url`)
   return response.url
+}
+
+/**
+ * Get the conversation session ID for a chart.
+ */
+export async function getChartSession(chartId: string): Promise<{ session_id: number; title: string | null }> {
+  return apiFetch(`/charts/library/${chartId}/session`)
 }
 
 // =============================================================================

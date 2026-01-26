@@ -9,7 +9,7 @@ import { useConversationStore } from '../stores/conversationStore'
 import { Message } from '../components/chat/Message'
 import { ChatInput, ChatInputHandle } from '../components/chat/ChatInput'
 import { ProgressSteps } from '../components/chat/ProgressSteps'
-import { getChartTemplates, type ChartTemplate } from '../api/client'
+import { getChartTemplates, getChartSession, type ChartTemplate } from '../api/client'
 
 // Phase labels for display
 const PHASE_LABELS: Record<string, string> = {
@@ -63,6 +63,7 @@ export default function ChatPage() {
   useEffect(() => {
     const sessionId = searchParams.get('session')
     const isNew = searchParams.get('new') === '1'
+    const editChartId = searchParams.get('editChart')
 
     if (isNew) {
       // Explicit request for new conversation
@@ -76,6 +77,22 @@ export default function ChatPage() {
       setPrefillInput('')
       setError(null)
       initializedRef.current = true
+    } else if (editChartId) {
+      // Edit existing chart - find and load its session
+      navigate('/chat', { replace: true })
+      getChartSession(editChartId)
+        .then((result) => {
+          setCreationMode('chart')
+          setStoreCreationMode('chart')
+          loadConversation(result.session_id)
+          initializedRef.current = true
+        })
+        .catch((err) => {
+          console.error('Failed to load chart session:', err)
+          setError('Could not find the conversation for this chart. It may have been created without a session.')
+          startNewConversation()
+          initializedRef.current = true
+        })
     } else if (sessionId) {
       // Load specific session from URL param
       navigate('/chat', { replace: true })
@@ -257,7 +274,7 @@ export default function ChatPage() {
         display: 'flex',
         flexDirection: 'column',
         height: '100%',
-        backgroundColor: 'white',
+        backgroundColor: 'var(--color-gray-900)',
       }}
     >
       {/* Header */}
@@ -267,7 +284,7 @@ export default function ChatPage() {
           alignItems: 'center',
           justifyContent: 'space-between',
           padding: 'var(--space-3) var(--space-4)',
-          borderBottom: '1px solid var(--color-gray-200)',
+          borderBottom: '1px solid var(--color-gray-700)',
         }}
       >
         <div
@@ -290,7 +307,7 @@ export default function ChatPage() {
               style={{
                 fontWeight: 'var(--font-bold)' as unknown as number,
                 color: 'var(--color-primary)',
-                backgroundColor: 'white',
+                backgroundColor: 'var(--color-gray-800)',
                 border: '1px solid var(--color-primary)',
                 borderRadius: 'var(--radius-sm)',
                 padding: '2px 8px',
@@ -344,7 +361,7 @@ export default function ChatPage() {
             marginLeft: 'var(--space-2)',
           }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.color = 'var(--color-gray-700)'
+            e.currentTarget.style.color = 'var(--color-gray-300)'
           }}
           onMouseLeave={(e) => {
             e.currentTarget.style.color = 'var(--color-gray-500)'
@@ -404,8 +421,8 @@ export default function ChatPage() {
         <div
           style={{
             padding: 'var(--space-3) var(--space-4)',
-            backgroundColor: '#fef2f2',
-            borderTop: '1px solid #fecaca',
+            backgroundColor: 'rgba(239, 68, 68, 0.1)',
+            borderTop: '1px solid var(--color-error)',
             color: 'var(--color-error)',
             fontSize: 'var(--text-sm)',
             fontFamily: 'var(--font-brand)',
@@ -420,7 +437,7 @@ export default function ChatPage() {
         <div
           style={{
             padding: 'var(--space-4)',
-            borderTop: '1px solid var(--color-gray-200)',
+            borderTop: '1px solid var(--color-gray-700)',
           }}
         >
           <ChatInput
@@ -534,9 +551,9 @@ function WelcomeState({ onActionClick }: WelcomeStateProps) {
           style={{
             flex: 1,
             padding: 'var(--space-4)',
-            border: '1px solid var(--color-gray-200)',
+            border: '1px solid var(--color-gray-700)',
             borderRadius: 'var(--radius-lg)',
-            backgroundColor: 'var(--color-gray-50)',
+            backgroundColor: 'var(--color-gray-800)',
           }}
         >
           <h3
@@ -568,9 +585,9 @@ function WelcomeState({ onActionClick }: WelcomeStateProps) {
           style={{
             flex: 1,
             padding: 'var(--space-4)',
-            border: '1px solid var(--color-gray-200)',
+            border: '1px solid var(--color-gray-700)',
             borderRadius: 'var(--radius-lg)',
-            backgroundColor: 'var(--color-gray-50)',
+            backgroundColor: 'var(--color-gray-800)',
           }}
         >
           <h3
@@ -626,9 +643,9 @@ function ActionButtonLarge({ label, primary = false, onClick }: ActionButtonLarg
               border: 'none',
             }
           : {
-              backgroundColor: 'white',
-              color: 'var(--color-gray-700)',
-              border: '1px solid var(--color-gray-300)',
+              backgroundColor: 'var(--color-gray-800)',
+              color: 'var(--color-gray-300)',
+              border: '1px solid var(--color-gray-600)',
             }),
       }}
       onMouseEnter={(e) => {
@@ -643,8 +660,8 @@ function ActionButtonLarge({ label, primary = false, onClick }: ActionButtonLarg
         if (primary) {
           e.currentTarget.style.backgroundColor = 'var(--color-brand)'
         } else {
-          e.currentTarget.style.borderColor = 'var(--color-gray-300)'
-          e.currentTarget.style.color = 'var(--color-gray-700)'
+          e.currentTarget.style.borderColor = 'var(--color-gray-600)'
+          e.currentTarget.style.color = 'var(--color-gray-300)'
         }
       }}
     >
@@ -738,8 +755,8 @@ function ChartTemplateCard({ template, onClick }: ChartTemplateCardProps) {
         alignItems: 'center',
         justifyContent: 'center',
         padding: 'var(--space-3)',
-        backgroundColor: 'white',
-        border: '1px solid var(--color-gray-200)',
+        backgroundColor: 'var(--color-gray-800)',
+        border: '1px solid var(--color-gray-700)',
         borderRadius: 'var(--radius-lg)',
         cursor: 'pointer',
         transition: 'all var(--transition-fast)',
@@ -748,10 +765,10 @@ function ChartTemplateCard({ template, onClick }: ChartTemplateCardProps) {
       }}
       onMouseEnter={(e) => {
         e.currentTarget.style.borderColor = 'var(--color-brand)'
-        e.currentTarget.style.boxShadow = '0 2px 8px rgba(124, 158, 255, 0.15)'
+        e.currentTarget.style.boxShadow = '0 2px 8px rgba(124, 158, 255, 0.25)'
       }}
       onMouseLeave={(e) => {
-        e.currentTarget.style.borderColor = 'var(--color-gray-200)'
+        e.currentTarget.style.borderColor = 'var(--color-gray-700)'
         e.currentTarget.style.boxShadow = 'none'
       }}
       title={template.description}
@@ -763,7 +780,7 @@ function ChartTemplateCard({ template, onClick }: ChartTemplateCardProps) {
         style={{
           fontSize: 'var(--text-xs)',
           fontFamily: 'var(--font-brand)',
-          color: 'var(--color-gray-700)',
+          color: 'var(--color-gray-300)',
           lineHeight: 1.3,
         }}
       >
