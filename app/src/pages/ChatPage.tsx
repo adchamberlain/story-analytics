@@ -15,7 +15,10 @@ import { getChartTemplates, type ChartTemplate } from '../api/client'
 const PHASE_LABELS: Record<string, string> = {
   intent: 'Starting',
   context: 'Understanding context',
+  proposing: 'Reviewing proposal',
   generation: 'Generating',
+  generating: 'Generating',
+  viewing: 'Chart ready',
   refinement: 'Refining',
   complete: 'Complete',
 }

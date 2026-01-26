@@ -15,6 +15,7 @@ import { Histogram } from './Histogram'
 import { FunnelChart } from './FunnelChart'
 import { Heatmap } from './Heatmap'
 import { SankeyDiagram } from './SankeyDiagram'
+import { DualTrendChart } from './DualTrendChart'
 
 interface ChartFactoryProps {
   spec: ChartSpec
@@ -58,6 +59,9 @@ export function ChartFactory({ spec, data, columns }: ChartFactoryProps) {
 
     case 'SankeyDiagram':
       return <SankeyDiagram data={data} config={config} />
+
+    case 'DualTrendChart':
+      return <DualTrendChart data={data} config={config} />
 
     default:
       return (

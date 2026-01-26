@@ -147,6 +147,7 @@ class ChartType(Enum):
     HEATMAP = "Heatmap"
     DATA_TABLE = "DataTable"
     BIG_VALUE = "BigValue"
+    DUAL_TREND_CHART = "DualTrendChart"
 
     @classmethod
     def from_string(cls, s: str) -> ChartType:
@@ -175,6 +176,10 @@ class ChartType(Enum):
             "bigvalue": cls.BIG_VALUE,
             "kpi": cls.BIG_VALUE,
             "metric": cls.BIG_VALUE,
+            "dualtrendchart": cls.DUAL_TREND_CHART,
+            "dualtrend": cls.DUAL_TREND_CHART,
+            "healthcheck": cls.DUAL_TREND_CHART,
+            "wbr": cls.DUAL_TREND_CHART,
         }
         return mapping.get(normalized, cls.BAR_CHART)
 
@@ -285,6 +290,12 @@ class ChartSpec:
     # Tables to use (from schema)
     relevant_tables: list[str] = field(default_factory=list)
 
+    # Explicit column mappings (LLM-specified, not heuristic-guessed)
+    # These tell the chart renderer exactly how to use each SQL output column
+    x_column: str | None = None  # Column for X-axis (e.g., "month", "date")
+    y_column: str | list[str] | None = None  # Column(s) for Y-axis metrics (e.g., "revenue", ["revenue", "count"])
+    series_column: str | None = None  # Column for grouping/coloring (e.g., "plan_tier", "segment")
+
     def to_prompt_context(self) -> str:
         """Format the spec for inclusion in an LLM prompt."""
         lines = [
@@ -310,6 +321,18 @@ class ChartSpec:
                 lines.append(f"    - {f.filter_type.value}: {f.name} on {f.options_column or f.date_column}")
         if self.relevant_tables:
             lines.append(f"  Tables: {', '.join(self.relevant_tables)}")
+
+        # Include explicit column mappings if specified
+        if self.x_column or self.y_column or self.series_column:
+            lines.append("")
+            lines.append("COLUMN MAPPINGS:")
+            if self.x_column:
+                lines.append(f"  X-axis: {self.x_column}")
+            if self.y_column:
+                y_str = self.y_column if isinstance(self.y_column, str) else ", ".join(self.y_column)
+                lines.append(f"  Y-axis: {y_str}")
+            if self.series_column:
+                lines.append(f"  Series (grouping): {self.series_column}")
 
         lines.append("")
         lines.append(f"Original Request: {self.original_request}")

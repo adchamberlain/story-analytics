@@ -3,9 +3,9 @@
  * Reads token from URL, verifies with API, redirects to app.
  */
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useSearchParams, useNavigate, Link } from 'react-router-dom'
-import { verifyMagicLink } from '../api/client'
+import { verifyMagicLink, isAuthenticated } from '../api/client'
 
 type VerifyStatus = 'verifying' | 'success' | 'error'
 
@@ -15,7 +15,21 @@ export function VerifyPage() {
   const [status, setStatus] = useState<VerifyStatus>('verifying')
   const [error, setError] = useState('')
 
+  // Track if verification has been attempted (prevents double-run in Strict Mode)
+  const verificationAttempted = useRef(false)
+
   useEffect(() => {
+    // Prevent double verification in React Strict Mode
+    if (verificationAttempted.current) {
+      // If already authenticated (from first run), just redirect
+      if (isAuthenticated()) {
+        setStatus('success')
+        setTimeout(() => navigate('/chat?new=1'), 500)
+      }
+      return
+    }
+    verificationAttempted.current = true
+
     const token = searchParams.get('token')
 
     if (!token) {
@@ -34,6 +48,12 @@ export function VerifyPage() {
           navigate('/chat?new=1')
         }, 1500)
       } catch (err) {
+        // If we're already authenticated, this is just the double-run issue
+        if (isAuthenticated()) {
+          setStatus('success')
+          setTimeout(() => navigate('/chat?new=1'), 500)
+          return
+        }
         setStatus('error')
         setError(err instanceof Error ? err.message : 'Verification failed')
       }

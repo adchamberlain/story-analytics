@@ -37,6 +37,7 @@ class ChartMessageResponse(BaseModel):
     chart_id: str | None = None
     chart_url: str | None = None  # URL with ?embed=true
     chart_title: str | None = None
+    dashboard_slug: str | None = None  # Slug of the preview dashboard
     action_buttons: list[ChartActionButton] | None = None
     error: str | None = None
 

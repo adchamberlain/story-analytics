@@ -40,6 +40,7 @@ export function Sidebar() {
   const [showDashboards, setShowDashboards] = useState(true)
   const [editingId, setEditingId] = useState<number | null>(null)
   const [editingTitle, setEditingTitle] = useState('')
+  const [deletingId, setDeletingId] = useState<number | null>(null)
 
   // Load data on mount
   useEffect(() => {
@@ -68,14 +69,23 @@ export function Sidebar() {
     }
   }
 
-  // Handle delete
-  const handleDelete = async (e: React.MouseEvent, conv: ConversationSummary) => {
+  // Handle delete - show inline confirmation
+  const handleDeleteClick = (e: React.MouseEvent, convId: number) => {
     e.stopPropagation()
-    if (confirm('Delete this conversation?')) {
-      await deleteConversation(conv.id)
-      // Navigate to fresh chat page
-      navigate('/chat?new=1')
-    }
+    setDeletingId(convId)
+  }
+
+  const handleDeleteConfirm = async (e: React.MouseEvent, convId: number) => {
+    e.stopPropagation()
+    await deleteConversation(convId)
+    setDeletingId(null)
+    // Navigate to fresh chat page
+    navigate('/chat?new=1')
+  }
+
+  const handleDeleteCancel = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    setDeletingId(null)
   }
 
   // Handle rename
@@ -269,6 +279,46 @@ export function Sidebar() {
                           outline: 'none',
                         }}
                       />
+                    ) : deletingId === conv.id ? (
+                      /* Inline delete confirmation */
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 'var(--space-2)',
+                          flex: 1,
+                          fontSize: 'var(--text-xs)',
+                          color: 'var(--color-gray-500)',
+                          padding: 'var(--space-1) 0',
+                        }}
+                      >
+                        <span style={{ fontFamily: 'var(--font-brand)' }}>Delete?</span>
+                        <button
+                          onClick={(e) => handleDeleteConfirm(e, conv.id)}
+                          style={{
+                            color: 'var(--color-error)',
+                            background: 'none',
+                            border: 'none',
+                            cursor: 'pointer',
+                            fontSize: 'var(--text-xs)',
+                            fontWeight: 600,
+                          }}
+                        >
+                          Yes
+                        </button>
+                        <button
+                          onClick={handleDeleteCancel}
+                          style={{
+                            color: 'var(--color-gray-500)',
+                            background: 'none',
+                            border: 'none',
+                            cursor: 'pointer',
+                            fontSize: 'var(--text-xs)',
+                          }}
+                        >
+                          No
+                        </button>
+                      </div>
                     ) : (
                       <>
                         <button
@@ -316,7 +366,7 @@ export function Sidebar() {
                           </span>
                         </button>
                         <button
-                          onClick={(e) => handleDelete(e, conv)}
+                          onClick={(e) => handleDeleteClick(e, conv.id)}
                           style={{
                             color: 'var(--color-gray-400)',
                             fontSize: 'var(--text-xs)',

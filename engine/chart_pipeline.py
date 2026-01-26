@@ -194,6 +194,13 @@ class ChartRequirementsAgent:
             )
             interactive_filters.append(filter_spec)
 
+        # Parse y_column - can be string or list
+        y_column = data.get("y_column")
+        if isinstance(y_column, str):
+            y_column = y_column.lower()  # Normalize to lowercase
+        elif isinstance(y_column, list):
+            y_column = [c.lower() for c in y_column]  # Normalize all to lowercase
+
         return ChartSpec(
             title=data.get("title", "Chart"),
             description=data.get("description", ""),
@@ -206,6 +213,10 @@ class ChartRequirementsAgent:
             chart_type=ChartType.from_string(data.get("chart_type", "BarChart")),
             horizontal=data.get("horizontal", False),
             relevant_tables=data.get("relevant_tables", []),
+            # Explicit column mappings (normalized to lowercase)
+            x_column=data.get("x_column", "").lower() if data.get("x_column") else None,
+            y_column=y_column,
+            series_column=data.get("series_column", "").lower() if data.get("series_column") else None,
         )
 
 
@@ -432,7 +443,7 @@ class ChartPipeline:
                 enable_spec_verification=self.config.enable_spec_verification,
                 enable_aggregation_check=self.config.enable_aggregation_check,
                 enable_chart_type_check=self.config.enable_chart_type_check,
-                enable_visual_qa=False,  # Visual QA requires running app
+                enable_visual_qa=True,  # Screenshot-based validation
                 provider_name=self.config.provider_name,
             )
         else:
@@ -605,7 +616,11 @@ class ChartPipeline:
         )
 
     def _build_chart_config(self, spec: ChartSpec, columns: list[str]) -> ChartConfig:
-        """Build chart configuration based on spec and columns."""
+        """Build chart configuration based on spec and columns.
+
+        IMPORTANT: This method uses explicit column mappings from the LLM-generated spec
+        when available. Falls back to heuristic detection only if mappings are not provided.
+        """
         config = ChartConfig()
         config_loader = get_config_loader()
 
@@ -613,28 +628,57 @@ class ChartPipeline:
         chart_defaults = config_loader.get_chart_defaults()
         base_options = config_loader.get_base_echarts_options()
 
+        # Normalize column names to lowercase (data returned by API uses lowercase)
+        columns_lower = [c.lower() for c in columns]
+
+        # Helper to check if explicit mappings are available
+        has_explicit_mappings = spec.x_column is not None or spec.y_column is not None
+
         # Set up based on chart type
         if spec.chart_type == ChartType.BIG_VALUE:
             # BigValue: just needs the value column
-            if columns:
-                config.value = columns[-1]  # Usually the aggregated value is last
+            if spec.y_column:
+                # Use explicit mapping
+                config.value = spec.y_column if isinstance(spec.y_column, str) else spec.y_column[0]
+            elif columns_lower:
+                config.value = columns_lower[-1]  # Usually the aggregated value is last
             config.title = spec.title
 
         elif spec.chart_type in (ChartType.LINE_CHART, ChartType.AREA_CHART):
             # Time series: x is date/time, y is metric(s)
-            if len(columns) >= 2:
-                config.x = columns[0]  # Date column
-                y_columns = columns[1:]
+            if has_explicit_mappings:
+                # USE EXPLICIT LLM-SPECIFIED MAPPINGS (preferred, reliable)
+                if spec.x_column and spec.x_column in columns_lower:
+                    config.x = spec.x_column
+                elif columns_lower:
+                    config.x = columns_lower[0]
+
+                if spec.y_column:
+                    config.y = spec.y_column
+                elif len(columns_lower) >= 2:
+                    # Fallback: all non-x columns are y
+                    y_cols = [c for c in columns_lower if c != config.x]
+                    config.y = y_cols[0] if len(y_cols) == 1 else y_cols
+
+                if spec.series_column and spec.series_column in columns_lower:
+                    config.series = spec.series_column
+
+                if self.config.verbose:
+                    print(f"[ChartPipeline]   Using explicit column mappings: x={config.x}, y={config.y}, series={config.series}")
+
+            elif len(columns_lower) >= 2:
+                # FALLBACK: Heuristic detection (less reliable, only used if LLM didn't specify)
+                config.x = columns_lower[0]  # Date column
+                y_columns = columns_lower[1:]
 
                 # Detect if any column is a categorical "series" column (for multi-line charts)
                 # Keywords that indicate a grouping/category column, not a metric
-                series_keywords = ["type", "category", "segment", "group", "status", "event", "name", "label"]
+                series_keywords = ["type", "category", "segment", "group", "status", "event", "name", "label", "product", "tier", "plan", "region", "channel", "source"]
                 series_col = None
                 metric_cols = []
 
                 for col in y_columns:
-                    col_lower = col.lower()
-                    if any(kw in col_lower for kw in series_keywords):
+                    if any(kw in col for kw in series_keywords):
                         series_col = col
                     else:
                         metric_cols.append(col)
@@ -667,6 +711,10 @@ class ChartPipeline:
                         config.y = y_columns
                 else:
                     config.y = y_columns if len(y_columns) > 1 else y_columns[0]
+
+                if self.config.verbose:
+                    print(f"[ChartPipeline]   Using heuristic column detection (no explicit mappings)")
+
             config.title = spec.title
 
             # Apply design system defaults for line charts
@@ -681,19 +729,39 @@ class ChartPipeline:
 
         elif spec.chart_type == ChartType.BAR_CHART:
             # Category comparison: x is category, y is metric(s)
-            if len(columns) >= 2:
-                config.x = columns[0]
-                y_columns = columns[1:]
+            if has_explicit_mappings:
+                # USE EXPLICIT LLM-SPECIFIED MAPPINGS (preferred, reliable)
+                if spec.x_column and spec.x_column in columns_lower:
+                    config.x = spec.x_column
+                elif columns_lower:
+                    config.x = columns_lower[0]
+
+                if spec.y_column:
+                    config.y = spec.y_column
+                elif len(columns_lower) >= 2:
+                    # Fallback: all non-x columns are y
+                    y_cols = [c for c in columns_lower if c != config.x]
+                    config.y = y_cols[0] if len(y_cols) == 1 else y_cols
+
+                if spec.series_column and spec.series_column in columns_lower:
+                    config.series = spec.series_column
+
+                if self.config.verbose:
+                    print(f"[ChartPipeline]   Using explicit column mappings: x={config.x}, y={config.y}, series={config.series}")
+
+            elif len(columns_lower) >= 2:
+                # FALLBACK: Heuristic detection (less reliable, only used if LLM didn't specify)
+                config.x = columns_lower[0]
+                y_columns = columns_lower[1:]
 
                 # Detect if any column is a categorical "series" column (for grouped bar charts)
                 # Keywords that indicate a grouping/category column, not a metric
-                series_keywords = ["type", "category", "segment", "group", "status", "event", "name", "label", "tier", "plan"]
+                series_keywords = ["type", "category", "segment", "group", "status", "event", "name", "label", "product", "tier", "plan", "region", "channel", "source"]
                 series_col = None
                 metric_cols = []
 
                 for col in y_columns:
-                    col_lower = col.lower()
-                    if any(kw in col_lower for kw in series_keywords):
+                    if any(kw in col for kw in series_keywords):
                         series_col = col
                     else:
                         metric_cols.append(col)
@@ -705,6 +773,10 @@ class ChartPipeline:
                 else:
                     # No series column found, use all columns as Y values
                     config.y = y_columns if len(y_columns) > 1 else y_columns[0]
+
+                if self.config.verbose:
+                    print(f"[ChartPipeline]   Using heuristic column detection (no explicit mappings)")
+
             config.title = spec.title
 
             # Check if horizontal bar chart was requested
@@ -725,13 +797,62 @@ class ChartPipeline:
             # DataTable: no specific config needed
             config.title = spec.title
 
+        elif spec.chart_type == ChartType.DUAL_TREND_CHART:
+            # DualTrendChart: needs date column and metric column
+            # The React component handles the dual-panel layout and YoY comparison
+            if has_explicit_mappings:
+                # USE EXPLICIT LLM-SPECIFIED MAPPINGS
+                if spec.x_column and spec.x_column in columns_lower:
+                    config.x = spec.x_column
+                elif columns_lower:
+                    config.x = columns_lower[0]
+
+                if spec.y_column:
+                    config.y = spec.y_column if isinstance(spec.y_column, str) else spec.y_column[0]
+                elif len(columns_lower) >= 2:
+                    config.y = columns_lower[1]
+
+                if self.config.verbose:
+                    print(f"[ChartPipeline]   Using explicit column mappings: x={config.x}, y={config.y}")
+            elif len(columns_lower) >= 2:
+                config.x = columns_lower[0]  # Date column
+                config.y = columns_lower[1]  # Metric column
+            elif len(columns_lower) == 1:
+                # If only one column, assume it's the metric and date is implicit
+                config.y = columns_lower[0]
+
+            config.title = spec.title
+            config.extra_props = {
+                "metricLabel": spec.metric.replace("_", " ").title(),
+                "chartAreaHeight": 350,
+            }
+
         else:
             # Default: assume x/y from columns
-            if len(columns) >= 2:
-                config.x = columns[0]
+            if has_explicit_mappings:
+                # USE EXPLICIT LLM-SPECIFIED MAPPINGS
+                if spec.x_column and spec.x_column in columns_lower:
+                    config.x = spec.x_column
+                elif columns_lower:
+                    config.x = columns_lower[0]
+
+                if spec.y_column:
+                    config.y = spec.y_column
+                elif len(columns_lower) >= 2:
+                    y_cols = [c for c in columns_lower if c != config.x]
+                    config.y = y_cols[0] if len(y_cols) == 1 else y_cols
+
+                if spec.series_column and spec.series_column in columns_lower:
+                    config.series = spec.series_column
+
+                if self.config.verbose:
+                    print(f"[ChartPipeline]   Using explicit column mappings: x={config.x}, y={config.y}, series={config.series}")
+            elif len(columns_lower) >= 2:
+                config.x = columns_lower[0]
                 # Use all remaining columns as Y-axis values
-                y_columns = columns[1:]
+                y_columns = columns_lower[1:]
                 config.y = y_columns if len(y_columns) > 1 else y_columns[0]
+
             config.title = spec.title
             config.extra_props = {
                 "fillColor": "#6366f1",  # Indigo primary

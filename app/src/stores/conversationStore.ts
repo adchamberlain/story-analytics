@@ -15,6 +15,7 @@ import type {
 import {
   sendMessage as apiSendMessage,
   sendChartMessage as apiSendChartMessage,
+  sendChartMessageStream,
   sendMessageStream,
   listConversations,
   getConversation,
@@ -31,9 +32,9 @@ const STEP_LABELS: Record<string, string> = {
   requirements: 'Analyzing request',
   feasibility: 'Checking data availability',
   sql: 'Generating SQL',
-  layout: 'Building layout',
-  validation: 'Validating',
-  writing: 'Creating file',
+  layout: 'Building chart',
+  validation: 'Validating data',
+  writing: 'Saving chart',
   qa: 'Quality check',
   complete: 'Complete',
 }
@@ -254,6 +255,79 @@ export const useConversationStore = create<ConversationState>((set, get) => ({
 
     // Use chart API when in chart mode
     if (creationMode === 'chart') {
+      // Use streaming for chart requests and generate action (shows progress)
+      // Skip streaming for simple actions like 'done', 'modify', 'new_chart'
+      const simpleActions = ['done', 'modify', 'new_chart', 'show_examples', 'show_data', 'modify_plan']
+      const isSimpleAction = content.startsWith('__action:') &&
+        simpleActions.some(a => content.toLowerCase().includes(a))
+      const useChartStreaming = !isSimpleAction
+
+      if (useChartStreaming) {
+        set({ progressSteps: [], isStreaming: true })
+
+        return new Promise<string>((resolve, reject) => {
+          sendChartMessageStream(content, currentSessionId ?? undefined, {
+            onProgress: (event) => {
+              set((state) => {
+                const existingIndex = state.progressSteps.findIndex(
+                  (s) => s.step === event.step
+                )
+                const newStep: ProgressStep = {
+                  step: event.step,
+                  status: event.status,
+                  message: event.message,
+                  details: event.details,
+                }
+
+                if (existingIndex >= 0) {
+                  const updated = [...state.progressSteps]
+                  updated[existingIndex] = newStep
+                  return { progressSteps: updated }
+                }
+                return { progressSteps: [...state.progressSteps, newStep] }
+              })
+            },
+            onComplete: async (response) => {
+              set((state) => ({
+                isStreaming: false,
+                currentSessionId: response.session_id,
+                currentTitle: response.title || state.currentTitle,
+                messages: [
+                  ...state.messages,
+                  {
+                    role: 'assistant' as const,
+                    content: response.response,
+                    action_buttons: response.action_buttons?.map(btn => ({
+                      id: btn.id,
+                      label: btn.label,
+                      style: btn.style as 'primary' | 'secondary',
+                    })),
+                    dashboard_url: response.chart_url,
+                    dashboard_slug: response.dashboard_slug,
+                  },
+                ],
+                phase: response.phase,
+                lastChartId: response.chart_id,
+                lastChartUrl: response.chart_url,
+                conversationComplete: checkChartConversationComplete(response.action_buttons, response.phase),
+                loading: false,
+              }))
+
+              // Clear progress after delay
+              setTimeout(() => set({ progressSteps: [] }), 2000)
+
+              await get().loadConversationList()
+              resolve(response.response)
+            },
+            onError: (error) => {
+              set({ isStreaming: false, progressSteps: [], loading: false })
+              reject(new Error(error))
+            },
+          })
+        })
+      }
+
+      // Non-streaming chart message
       try {
         const response = await apiSendChartMessage(content, currentSessionId ?? undefined)
 
@@ -271,15 +345,15 @@ export const useConversationStore = create<ConversationState>((set, get) => ({
                 label: btn.label,
                 style: btn.style as 'primary' | 'secondary',
               })),
-              // Map chart_url to dashboard_url for Message component compatibility
+              // Map chart response to Message component format
               dashboard_url: response.chart_url,
-              dashboard_slug: response.chart_id,
+              dashboard_slug: response.dashboard_slug,
             },
           ],
           phase: response.phase,
           lastChartId: response.chart_id,
           lastChartUrl: response.chart_url,
-          conversationComplete: checkChartConversationComplete(response.action_buttons),
+          conversationComplete: checkChartConversationComplete(response.action_buttons, response.phase),
           loading: false,
         }))
 
@@ -428,9 +502,11 @@ function checkConversationComplete(
 
 // Helper: Check if chart conversation is complete
 function checkChartConversationComplete(
-  actionButtons: Array<{ id: string }> | null | undefined
+  actionButtons: Array<{ id: string }> | null | undefined,
+  phase?: string
 ): boolean {
-  if (!actionButtons) return false
-  // Chart is complete when user sees Done button (after chart is created)
-  return actionButtons.some((btn) => btn.id === 'done')
+  // Chart is complete only when user has clicked Done (phase is 'complete')
+  // NOT when the Done button is merely visible
+  if (phase === 'complete') return true
+  return false
 }

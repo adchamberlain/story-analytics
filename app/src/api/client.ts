@@ -218,6 +218,107 @@ export async function newChartConversation(): Promise<ChartMessageResponse> {
 }
 
 /**
+ * Callbacks for streaming chart message response.
+ */
+export interface ChartStreamCallbacks {
+  onProgress?: (event: ProgressEvent) => void
+  onComplete?: (response: ChartMessageResponse) => void
+  onError?: (error: string) => void
+}
+
+/**
+ * Send a chart message with streaming progress updates via SSE.
+ * Returns an abort function.
+ */
+export function sendChartMessageStream(
+  message: string,
+  sessionId: number | undefined,
+  callbacks: ChartStreamCallbacks
+): () => void {
+  const token = getAuthToken()
+  const abortController = new AbortController()
+
+  const fetchStream = async () => {
+    try {
+      const response = await fetch(`${API_BASE}/charts/conversation/message/stream`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ message, session_id: sessionId }),
+        signal: abortController.signal,
+      })
+
+      if (response.status === 401) {
+        localStorage.removeItem('token')
+        window.location.href = '/login'
+        return
+      }
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ detail: 'Unknown error' }))
+        callbacks.onError?.(error.detail || `HTTP ${response.status}`)
+        return
+      }
+
+      const reader = response.body?.getReader()
+      if (!reader) {
+        callbacks.onError?.('No response body')
+        return
+      }
+
+      const decoder = new TextDecoder()
+      let buffer = ''
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        buffer += decoder.decode(value, { stream: true })
+
+        // Process complete SSE events
+        const lines = buffer.split('\n')
+        buffer = lines.pop() || ''
+
+        let eventType = ''
+        let eventData = ''
+
+        for (const line of lines) {
+          if (line.startsWith('event: ')) {
+            eventType = line.slice(7).trim()
+          } else if (line.startsWith('data: ')) {
+            eventData = line.slice(6)
+          } else if (line === '' && eventType && eventData) {
+            try {
+              const data = JSON.parse(eventData)
+              if (eventType === 'progress') {
+                callbacks.onProgress?.(data as ProgressEvent)
+              } else if (eventType === 'complete') {
+                callbacks.onComplete?.(data as ChartMessageResponse)
+              } else if (eventType === 'error') {
+                callbacks.onError?.(data.error || 'Unknown error')
+              }
+            } catch (e) {
+              console.error('Failed to parse SSE data:', e)
+            }
+            eventType = ''
+            eventData = ''
+          }
+        }
+      }
+    } catch (e) {
+      if ((e as Error).name !== 'AbortError') {
+        callbacks.onError?.((e as Error).message || 'Stream error')
+      }
+    }
+  }
+
+  fetchStream()
+  return () => abortController.abort()
+}
+
+/**
  * Callbacks for streaming message response.
  */
 export interface StreamCallbacks {
@@ -524,4 +625,47 @@ export async function getChartTemplates(): Promise<ChartTemplatesResponse> {
  */
 export async function getAllChartTemplates(): Promise<ChartTemplatesResponse> {
   return apiFetch('/templates/charts/all')
+}
+
+// =============================================================================
+// Dashboard Composition API
+// =============================================================================
+
+export interface DashboardCreateRequest {
+  title: string
+  description: string | null
+  chart_ids: string[]
+}
+
+export interface DashboardCreateResponse {
+  success: boolean
+  dashboard: {
+    id: string
+    slug: string
+    title: string
+    description: string | null
+    chart_ids: string[]
+    created_at: string
+    updated_at: string
+  } | null
+  dashboard_url: string | null
+  error: string | null
+}
+
+/**
+ * Create a dashboard from selected charts.
+ */
+export async function createDashboardFromCharts(
+  title: string,
+  description: string | null,
+  chartIds: string[]
+): Promise<DashboardCreateResponse> {
+  return apiFetch('/charts/dashboards', {
+    method: 'POST',
+    body: JSON.stringify({
+      title,
+      description,
+      chart_ids: chartIds,
+    }),
+  })
 }

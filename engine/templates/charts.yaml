@@ -1,0 +1,178 @@
+# Chart templates organized by funnel stage
+# Templates are shown to users based on their business_type setting.
+# The metric-health-check template appears in all business types.
+
+categories:
+  - id: top-of-funnel
+    name: "Top of Funnel"
+    description: "Acquisition and awareness metrics"
+    templates:
+      # SaaS templates
+      - id: signups-trend
+        name: "Signups Trend"
+        icon: "📈"
+        chart_type: line
+        description: "Track new signups over time"
+        prompt: "Create a line chart showing new signups over time for the last 12 months"
+        business_types: [saas]
+
+      - id: signup-funnel
+        name: "Signup Funnel"
+        icon: "🔻"
+        chart_type: funnel
+        description: "Visitor to signup to activation conversion"
+        prompt: "Create a funnel chart showing the conversion from visitors to signups to activated users"
+        business_types: [saas]
+
+      # E-commerce templates
+      - id: visitors-trend
+        name: "Visitors Trend"
+        icon: "👥"
+        chart_type: line
+        description: "Website traffic over time"
+        prompt: "Create a line chart showing website visitors over time for the last 12 months"
+        business_types: [ecommerce]
+
+      - id: traffic-sources
+        name: "Traffic by Source"
+        icon: "🔗"
+        chart_type: bar
+        description: "Visitors by acquisition channel"
+        prompt: "Create a horizontal bar chart showing visitors by traffic source or channel, sorted by volume"
+        business_types: [ecommerce]
+
+      # General templates
+      - id: new-users
+        name: "New Users"
+        icon: "➕"
+        chart_type: line
+        description: "New users or customers over time"
+        prompt: "Create a line chart showing new users or customers acquired over the last 12 months"
+        business_types: [general]
+
+      - id: acquisition-channels
+        name: "Acquisition Channels"
+        icon: "📊"
+        chart_type: bar
+        description: "Users by acquisition source"
+        prompt: "Create a horizontal bar chart showing users by acquisition channel or source"
+        business_types: [general]
+
+  - id: middle-of-funnel
+    name: "Middle of Funnel"
+    description: "Engagement and activation metrics"
+    templates:
+      # SaaS templates
+      - id: activation-rate
+        name: "Activation Rate"
+        icon: "⚡"
+        chart_type: line
+        description: "Percentage of trials completing key action"
+        prompt: "Create a line chart showing the activation rate (percentage of new users who complete a key action) over time"
+        business_types: [saas]
+
+      - id: feature-adoption
+        name: "Feature Adoption"
+        icon: "🎯"
+        chart_type: bar
+        description: "Top features by usage rate"
+        prompt: "Create a horizontal bar chart showing the top features by adoption rate or usage count"
+        business_types: [saas]
+
+      # E-commerce templates
+      - id: cart-abandonment
+        name: "Cart Abandonment"
+        icon: "🛒"
+        chart_type: funnel
+        description: "Add to cart to purchase conversion"
+        prompt: "Create a funnel chart showing the conversion from product view to add to cart to checkout to purchase"
+        business_types: [ecommerce]
+
+      - id: product-performance
+        name: "Product Performance"
+        icon: "📦"
+        chart_type: bar
+        description: "Top products by views or sales"
+        prompt: "Create a horizontal bar chart showing the top 10 products by revenue or units sold"
+        business_types: [ecommerce]
+
+      # General templates
+      - id: active-users
+        name: "Active Users"
+        icon: "👤"
+        chart_type: line
+        description: "Daily, weekly, or monthly active users"
+        prompt: "Create a line chart showing active users over time (daily or monthly)"
+        business_types: [general]
+
+      - id: engagement-rate
+        name: "Engagement Rate"
+        icon: "💫"
+        chart_type: line
+        description: "User engagement over time"
+        prompt: "Create a line chart showing user engagement rate or activity level over time"
+        business_types: [general]
+
+  - id: bottom-of-funnel
+    name: "Bottom of Funnel"
+    description: "Conversion and retention metrics"
+    templates:
+      # SaaS templates
+      - id: mrr-trend
+        name: "MRR Trend"
+        icon: "💰"
+        chart_type: area
+        description: "Monthly recurring revenue over time"
+        prompt: "Create an area chart showing monthly recurring revenue (MRR) over the last 12 months"
+        business_types: [saas]
+
+      - id: churn-rate
+        name: "Churn Rate"
+        icon: "📉"
+        chart_type: line
+        description: "Customer churn percentage over time"
+        prompt: "Create a line chart showing the customer churn rate as a percentage over the last 12 months"
+        business_types: [saas]
+
+      # E-commerce templates
+      - id: sales-trend
+        name: "Sales Trend"
+        icon: "💵"
+        chart_type: area
+        description: "Sales revenue over time"
+        prompt: "Create an area chart showing total sales revenue over the last 12 months"
+        business_types: [ecommerce]
+
+      - id: customer-ltv
+        name: "Customer LTV"
+        icon: "💎"
+        chart_type: histogram
+        description: "Customer lifetime value distribution"
+        prompt: "Create a histogram showing the distribution of customer lifetime value"
+        business_types: [ecommerce]
+
+      # General templates
+      - id: revenue-trend
+        name: "Revenue Trend"
+        icon: "💲"
+        chart_type: area
+        description: "Revenue over time"
+        prompt: "Create an area chart showing total revenue over the last 12 months"
+        business_types: [general]
+
+      - id: top-customers
+        name: "Top Customers"
+        icon: "🏆"
+        chart_type: bar
+        description: "Highest-value customers by revenue"
+        prompt: "Create a horizontal bar chart showing the top 10 customers by total revenue"
+        business_types: [general]
+
+      # Universal template - appears for all business types
+      - id: metric-health-check
+        name: "Metric Health Check"
+        icon: "📊"
+        chart_type: dual-trend
+        description: "Amazon-style short-term and long-term trend comparison"
+        prompt: "Create a DualTrendChart for revenue showing year-over-year comparison. This is an Amazon WBR-style health check with two panels: the left panel shows the last 6 weeks vs the same weeks last year, and the right panel shows the last 12 months vs the same months last year."
+        business_types: [saas, ecommerce, general]

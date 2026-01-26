@@ -165,6 +165,46 @@ class ConversationManager:
         word_count = len(user_input.split())
         return word_count < threshold
 
+    def _response_is_asking_question(self, response: str) -> bool:
+        """
+        Detect if the LLM response is asking the user a question.
+
+        This catches cases where the LLM asks a natural question without
+        using the formal [CLARIFYING_QUESTION] markup.
+        """
+        # Common question patterns that indicate LLM wants user input
+        question_indicators = [
+            "which metric",
+            "what metric",
+            "which would you",
+            "what would you",
+            "would you like",
+            "do you want",
+            "which one",
+            "what type",
+            "once you choose",
+            "let me know",
+            "please specify",
+            "please choose",
+        ]
+
+        response_lower = response.lower()
+
+        # Check for question indicators
+        for indicator in question_indicators:
+            if indicator in response_lower:
+                return True
+
+        # Check if response ends with a question (last meaningful line ends with ?)
+        lines = [line.strip() for line in response.strip().split('\n') if line.strip()]
+        if lines:
+            # Check last few lines for questions
+            for line in lines[-3:]:
+                if line.endswith('?'):
+                    return True
+
+        return False
+
     def _should_ask_clarifying(self) -> bool:
         """Check if we're in a phase where clarifying questions are allowed."""
         if not self.config_loader.is_clarifying_enabled():
@@ -331,11 +371,18 @@ class ConversationManager:
         cleaned_response, clarifying_options = self._parse_clarifying_options(response)
 
         # Determine action buttons based on resulting phase and error state
+        # Don't show action buttons if LLM is asking a clarifying question
         if error_context:
             action_buttons = [
                 ActionButton(id="retry", label="Try Again", style="primary"),
                 ActionButton(id="simplify", label="Simplify Request", style="secondary"),
             ]
+        elif clarifying_options:
+            # LLM is asking a formatted question - wait for user to respond
+            action_buttons = None
+        elif self._response_is_asking_question(cleaned_response):
+            # LLM is asking a natural question - wait for user to respond
+            action_buttons = None
         else:
             action_buttons = self._get_action_buttons_for_phase(pre_message_count)
 
