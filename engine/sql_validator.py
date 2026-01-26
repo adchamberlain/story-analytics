@@ -431,3 +431,60 @@ def validate_dashboard_sql(markdown: str) -> ValidationReport:
 def validate_query(query: str, query_name: str = "query") -> SQLValidationResult:
     """Validate a single SQL query."""
     return get_validator().validate_query(query, query_name)
+
+
+@dataclass
+class QueryExecutionResult:
+    """Result of executing a SQL query."""
+
+    query_name: str
+    data: list[dict]
+    columns: list[str]
+    row_count: int
+    error: str | None = None
+
+
+def execute_query(query: str, query_name: str = "query", limit: int = 100) -> QueryExecutionResult:
+    """
+    Execute a SQL query and return the data.
+
+    Args:
+        query: The SQL query to execute
+        query_name: A name for the query (for error reporting)
+        limit: Maximum number of rows to return
+
+    Returns:
+        QueryExecutionResult with data rows as list of dicts
+    """
+    validator = get_validator()
+    conn = validator._get_connection()
+
+    # Strip trailing semicolons
+    query = query.strip().rstrip(';').strip()
+
+    # Replace Evidence template variables with placeholder values
+    test_query = validator._replace_template_variables(query)
+
+    try:
+        # Execute with limit
+        result = conn.execute(f"SELECT * FROM ({test_query}) AS subq LIMIT {limit}")
+        columns = [desc[0] for desc in result.description]
+        rows = result.fetchall()
+
+        # Convert to list of dicts
+        data = [dict(zip(columns, row)) for row in rows]
+
+        return QueryExecutionResult(
+            query_name=query_name,
+            data=data,
+            columns=columns,
+            row_count=len(data),
+        )
+    except Exception as e:
+        return QueryExecutionResult(
+            query_name=query_name,
+            data=[],
+            columns=[],
+            row_count=0,
+            error=str(e),
+        )

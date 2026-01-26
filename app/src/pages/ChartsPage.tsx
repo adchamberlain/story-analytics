@@ -6,6 +6,8 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useChartStore } from '../stores/chartStore'
+import { createDashboardFromCharts } from '../api/client'
+import { CreateDashboardModal } from '../components/modals'
 import type { ChartLibraryItem } from '../types/conversation'
 
 const CHART_TYPES = [
@@ -37,16 +39,26 @@ export function ChartsPage() {
     filterType,
     previewChart,
     previewUrl,
+    selectionMode,
+    selectedChartIds,
     loadCharts,
     deleteChart,
     setSearchQuery,
     setFilterType,
+    toggleSelectionMode,
+    toggleChartSelection,
+    clearSelection,
     openPreview,
     closePreview,
   } = useChartStore()
 
   const [localSearch, setLocalSearch] = useState(searchQuery)
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
+  const [showCreateModal, setShowCreateModal] = useState(false)
+  const [isCreating, setIsCreating] = useState(false)
+
+  // Get selected chart objects for the modal
+  const selectedCharts = charts.filter((c) => selectedChartIds.includes(c.id))
 
   // Load charts on mount
   useEffect(() => {
@@ -95,6 +107,41 @@ export function ChartsPage() {
 
   const getChartIcon = (type: string) => CHART_ICONS[type] || CHART_ICONS.default
 
+  // Handle dashboard creation
+  const handleCreateDashboard = async (title: string, description: string | null) => {
+    setIsCreating(true)
+    try {
+      const response = await createDashboardFromCharts(title, description, selectedChartIds)
+      if (response.success && response.dashboard_url) {
+        // Clear selection and close modal
+        clearSelection()
+        toggleSelectionMode()
+        setShowCreateModal(false)
+        // Navigate to the new dashboard
+        navigate(response.dashboard_url)
+      } else {
+        throw new Error(response.error || 'Failed to create dashboard')
+      }
+    } finally {
+      setIsCreating(false)
+    }
+  }
+
+  // Handle canceling selection mode
+  const handleCancelSelection = () => {
+    clearSelection()
+    toggleSelectionMode()
+  }
+
+  // Handle chart card click in selection mode
+  const handleCardClick = (chart: ChartLibraryItem) => {
+    if (selectionMode) {
+      toggleChartSelection(chart.id)
+    } else {
+      openPreview(chart)
+    }
+  }
+
   return (
     <div
       style={{
@@ -128,83 +175,166 @@ export function ChartsPage() {
         </h1>
 
         <div style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'center' }}>
-          {/* Search */}
-          <input
-            type="text"
-            placeholder="Search charts..."
-            value={localSearch}
-            onChange={(e) => setLocalSearch(e.target.value)}
-            style={{
-              padding: 'var(--space-2) var(--space-3)',
-              backgroundColor: 'var(--color-gray-800)',
-              border: '1px solid var(--color-gray-700)',
-              borderRadius: 'var(--radius-md)',
-              color: 'var(--color-gray-200)',
-              fontSize: 'var(--text-sm)',
-              width: '200px',
-            }}
-          />
+          {selectionMode ? (
+            <>
+              {/* Cancel Selection */}
+              <button
+                onClick={handleCancelSelection}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 'var(--space-2)',
+                  padding: 'var(--space-2) var(--space-4)',
+                  backgroundColor: 'var(--color-gray-700)',
+                  border: '1px solid var(--color-gray-600)',
+                  borderRadius: 'var(--radius-md)',
+                  color: 'var(--color-gray-200)',
+                  fontSize: 'var(--text-sm)',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                }}
+              >
+                Cancel
+              </button>
 
-          {/* Filter */}
-          <select
-            value={filterType}
-            onChange={(e) => handleFilterChange(e.target.value)}
-            style={{
-              padding: 'var(--space-2) var(--space-3)',
-              backgroundColor: 'var(--color-gray-800)',
-              border: '1px solid var(--color-gray-700)',
-              borderRadius: 'var(--radius-md)',
-              color: 'var(--color-gray-200)',
-              fontSize: 'var(--text-sm)',
-              cursor: 'pointer',
-            }}
-          >
-            {CHART_TYPES.map((type) => (
-              <option key={type.value} value={type.value}>
-                {type.label}
-              </option>
-            ))}
-          </select>
+              {/* Selection Count */}
+              <span
+                style={{
+                  padding: 'var(--space-2) var(--space-3)',
+                  backgroundColor: 'var(--color-gray-800)',
+                  borderRadius: 'var(--radius-md)',
+                  color: 'var(--color-gray-300)',
+                  fontSize: 'var(--text-sm)',
+                }}
+              >
+                {selectedChartIds.length} selected
+              </span>
 
-          {/* Build Dashboard */}
-          <button
-            onClick={() => navigate('/chat')}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 'var(--space-2)',
-              padding: 'var(--space-2) var(--space-4)',
-              backgroundColor: 'var(--color-gray-700)',
-              border: '1px solid var(--color-gray-600)',
-              borderRadius: 'var(--radius-md)',
-              color: 'var(--color-gray-200)',
-              fontSize: 'var(--text-sm)',
-              fontWeight: 500,
-              cursor: 'pointer',
-            }}
-          >
-            Build Dashboard
-          </button>
+              {/* Create Dashboard */}
+              <button
+                onClick={() => setShowCreateModal(true)}
+                disabled={selectedChartIds.length === 0}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 'var(--space-2)',
+                  padding: 'var(--space-2) var(--space-4)',
+                  backgroundColor: 'var(--color-primary)',
+                  border: 'none',
+                  borderRadius: 'var(--radius-md)',
+                  color: 'white',
+                  fontSize: 'var(--text-sm)',
+                  fontWeight: 500,
+                  cursor: selectedChartIds.length === 0 ? 'not-allowed' : 'pointer',
+                  opacity: selectedChartIds.length === 0 ? 0.5 : 1,
+                }}
+              >
+                Create Dashboard
+              </button>
+            </>
+          ) : (
+            <>
+              {/* Select Charts */}
+              <button
+                onClick={toggleSelectionMode}
+                disabled={charts.length === 0}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 'var(--space-2)',
+                  padding: 'var(--space-2) var(--space-4)',
+                  backgroundColor: 'var(--color-gray-700)',
+                  border: '1px solid var(--color-gray-600)',
+                  borderRadius: 'var(--radius-md)',
+                  color: 'var(--color-gray-200)',
+                  fontSize: 'var(--text-sm)',
+                  fontWeight: 500,
+                  cursor: charts.length === 0 ? 'not-allowed' : 'pointer',
+                  opacity: charts.length === 0 ? 0.5 : 1,
+                }}
+              >
+                Select Charts
+              </button>
 
-          {/* New Chart */}
-          <button
-            onClick={() => navigate('/charts/new')}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 'var(--space-2)',
-              padding: 'var(--space-2) var(--space-4)',
-              backgroundColor: 'var(--color-primary)',
-              border: 'none',
-              borderRadius: 'var(--radius-md)',
-              color: 'white',
-              fontSize: 'var(--text-sm)',
-              fontWeight: 500,
-              cursor: 'pointer',
-            }}
-          >
-            + New Chart
-          </button>
+              {/* Search */}
+              <input
+                type="text"
+                placeholder="Search charts..."
+                value={localSearch}
+                onChange={(e) => setLocalSearch(e.target.value)}
+                style={{
+                  padding: 'var(--space-2) var(--space-3)',
+                  backgroundColor: 'var(--color-gray-800)',
+                  border: '1px solid var(--color-gray-700)',
+                  borderRadius: 'var(--radius-md)',
+                  color: 'var(--color-gray-200)',
+                  fontSize: 'var(--text-sm)',
+                  width: '200px',
+                }}
+              />
+
+              {/* Filter */}
+              <select
+                value={filterType}
+                onChange={(e) => handleFilterChange(e.target.value)}
+                style={{
+                  padding: 'var(--space-2) var(--space-3)',
+                  backgroundColor: 'var(--color-gray-800)',
+                  border: '1px solid var(--color-gray-700)',
+                  borderRadius: 'var(--radius-md)',
+                  color: 'var(--color-gray-200)',
+                  fontSize: 'var(--text-sm)',
+                  cursor: 'pointer',
+                }}
+              >
+                {CHART_TYPES.map((type) => (
+                  <option key={type.value} value={type.value}>
+                    {type.label}
+                  </option>
+                ))}
+              </select>
+
+              {/* Build Dashboard */}
+              <button
+                onClick={() => navigate('/chat')}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 'var(--space-2)',
+                  padding: 'var(--space-2) var(--space-4)',
+                  backgroundColor: 'var(--color-gray-700)',
+                  border: '1px solid var(--color-gray-600)',
+                  borderRadius: 'var(--radius-md)',
+                  color: 'var(--color-gray-200)',
+                  fontSize: 'var(--text-sm)',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                }}
+              >
+                Build Dashboard
+              </button>
+
+              {/* New Chart */}
+              <button
+                onClick={() => navigate('/charts/new')}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 'var(--space-2)',
+                  padding: 'var(--space-2) var(--space-4)',
+                  backgroundColor: 'var(--color-primary)',
+                  border: 'none',
+                  borderRadius: 'var(--radius-md)',
+                  color: 'white',
+                  fontSize: 'var(--text-sm)',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                }}
+              >
+                + New Chart
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -297,27 +427,68 @@ export function ChartsPage() {
               gap: 'var(--space-4)',
             }}
           >
-            {charts.map((chart) => (
+            {charts.map((chart) => {
+              const isSelected = selectedChartIds.includes(chart.id)
+              return (
               <div
                 key={chart.id}
-                onClick={() => openPreview(chart)}
+                onClick={() => handleCardClick(chart)}
                 style={{
                   backgroundColor: 'var(--color-gray-800)',
-                  border: '1px solid var(--color-gray-700)',
+                  border: `2px solid ${isSelected ? 'var(--color-primary)' : 'var(--color-gray-700)'}`,
                   borderRadius: 'var(--radius-lg)',
                   padding: 'var(--space-4)',
                   cursor: 'pointer',
                   transition: 'all var(--transition-fast)',
+                  position: 'relative',
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.borderColor = 'var(--color-primary)'
+                  if (!isSelected) {
+                    e.currentTarget.style.borderColor = 'var(--color-primary)'
+                  }
                   e.currentTarget.style.transform = 'translateY(-2px)'
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.borderColor = 'var(--color-gray-700)'
+                  if (!isSelected) {
+                    e.currentTarget.style.borderColor = 'var(--color-gray-700)'
+                  }
                   e.currentTarget.style.transform = 'none'
                 }}
               >
+                {/* Selection checkbox overlay */}
+                {selectionMode && (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: 'var(--space-2)',
+                      left: 'var(--space-2)',
+                      width: '20px',
+                      height: '20px',
+                      borderRadius: 'var(--radius-sm)',
+                      border: `2px solid ${isSelected ? 'var(--color-primary)' : 'var(--color-gray-500)'}`,
+                      backgroundColor: isSelected ? 'var(--color-primary)' : 'transparent',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      transition: 'all var(--transition-fast)',
+                    }}
+                  >
+                    {isSelected && (
+                      <svg
+                        width="12"
+                        height="12"
+                        viewBox="0 0 12 12"
+                        fill="none"
+                        stroke="white"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <path d="M2 6l3 3 5-6" />
+                      </svg>
+                    )}
+                  </div>
+                )}
                 {/* Card header */}
                 <div
                   style={{
@@ -462,7 +633,8 @@ export function ChartsPage() {
                   </div>
                 </div>
               </div>
-            ))}
+            )})}
+
           </div>
         )}
       </div>
@@ -605,6 +777,16 @@ export function ChartsPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Create Dashboard Modal */}
+      {showCreateModal && (
+        <CreateDashboardModal
+          selectedCharts={selectedCharts}
+          onClose={() => setShowCreateModal(false)}
+          onSubmit={handleCreateDashboard}
+          isLoading={isCreating}
+        />
       )}
 
       {/* Spin animation */}

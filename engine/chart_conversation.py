@@ -23,6 +23,7 @@ from .dashboard_composer import create_chart_dashboard, get_composer
 from .llm.base import Message
 from .llm.claude import get_fast_provider
 from .models import Chart, ValidatedChart, get_chart_storage
+from .progress import ProgressEmitter, ProgressStatus
 from .schema import get_schema_context
 
 
@@ -30,6 +31,7 @@ class ChartPhase(Enum):
     """Phases of chart creation conversation."""
 
     WAITING = "waiting"  # Waiting for user input
+    PROPOSING = "proposing"  # Showing proposal with SQL and data preview
     GENERATING = "generating"  # Generating the chart
     VIEWING = "viewing"  # Chart is ready, user can view/refine
     COMPLETE = "complete"  # User is done
@@ -52,6 +54,7 @@ class ChartConversationResult:
     action_buttons: list[ChartActionButton] | None = None
     chart_url: str | None = None  # URL to view the chart (with ?embed=true)
     chart_id: str | None = None  # ID of the created chart
+    dashboard_slug: str | None = None  # Slug of the preview dashboard
     error: str | None = None
 
 
@@ -62,7 +65,13 @@ class ChartConversationState:
     phase: ChartPhase = ChartPhase.WAITING
     messages: list[Message] = field(default_factory=list)
 
-    # Current chart
+    # Proposal state (before chart is generated)
+    proposed_spec: Any | None = None  # ChartSpec from requirements extraction
+    proposed_sql: str | None = None
+    proposed_columns: list[str] | None = None
+    proposed_data_preview: list[dict] | None = None
+
+    # Current chart (after generation)
     current_chart: ValidatedChart | None = None
     current_chart_id: str | None = None
     dashboard_slug: str | None = None
@@ -85,6 +94,7 @@ class ChartConversationManager:
     def __init__(
         self,
         provider_name: str | None = None,
+        progress_emitter: ProgressEmitter | None = None,
     ):
         self.config = get_config()
         # Use fast model (Haiku) for intent classification and simple responses
@@ -93,6 +103,7 @@ class ChartConversationManager:
         self.state = ChartConversationState()
         self.chart_storage = get_chart_storage()
         self.composer = get_composer()
+        self.progress_emitter = progress_emitter
 
         # Initialize chart pipeline
         self._pipeline = ChartPipeline(
@@ -103,6 +114,17 @@ class ChartConversationManager:
         )
 
         print(f"[ChartConversation] Using provider: {self.llm.name}")
+
+    def _emit_progress(
+        self,
+        step: str,
+        status: ProgressStatus,
+        message: str,
+        details: str | None = None,
+    ):
+        """Emit a progress event if emitter is configured."""
+        if self.progress_emitter:
+            self.progress_emitter.emit(step, status, message, details)
 
     def reset(self):
         """Reset conversation state."""
@@ -137,6 +159,11 @@ class ChartConversationManager:
                 return self._handle_data_question(user_input)
             else:  # "unclear" or other
                 return self._handle_clarification_needed(user_input)
+
+        elif self.state.phase == ChartPhase.PROPOSING:
+            # User wants to modify the proposal - regenerate with their feedback
+            modified_request = f"{self.state.original_request}\n\nModification: {user_input}"
+            return self._handle_new_chart_request(modified_request)
 
         elif self.state.phase == ChartPhase.VIEWING:
             return self._handle_refinement_request(user_input)
@@ -198,6 +225,20 @@ Just describe what you want to see!"""
         elif action_id == "show_data":
             # Delegate to the data question handler
             return self._handle_data_question("What data tables and columns are available?")
+
+        elif action_id == "generate":
+            # User approved the proposal - generate the chart
+            return self._handle_generate_chart()
+
+        elif action_id == "modify_plan":
+            # User wants to modify the proposal
+            return ChartConversationResult(
+                response="What would you like to change about the proposed chart?",
+                action_buttons=[
+                    ChartActionButton(id="generate", label="Generate", style="primary"),
+                    ChartActionButton(id="modify_plan", label="Modify Plan", style="secondary"),
+                ],
+            )
 
         else:
             return ChartConversationResult(
@@ -305,49 +346,333 @@ Keep your response brief and friendly."""
         )
 
     def _handle_new_chart_request(self, user_input: str) -> ChartConversationResult:
-        """Handle a request for a new chart."""
+        """Handle a request for a new chart - creates a PROPOSAL first."""
         self.state.original_request = user_input
-        self.state.phase = ChartPhase.GENERATING
 
-        print(f"[ChartConversation] Generating chart for: {user_input[:50]}...")
+        print(f"[ChartConversation] Creating proposal for: {user_input[:50]}...")
 
-        # Run the chart pipeline
-        result = self._pipeline.run(user_input)
-
-        if not result.success:
+        # Stage 1: Extract requirements
+        self._emit_progress("requirements", ProgressStatus.IN_PROGRESS, "Analyzing request...")
+        schema = self._pipeline.get_schema_context()
+        try:
+            spec = self._pipeline.requirements_agent.extract_spec(user_input, schema)
+            # Validate and correct spec
+            from .validators import ChartSpecValidator
+            spec = ChartSpecValidator.validate_spec(spec)
+            self._emit_progress("requirements", ProgressStatus.COMPLETED, "Request analyzed")
+        except Exception as e:
+            print(f"[ChartConversation] Requirements extraction failed: {e}")
+            self._emit_progress("requirements", ProgressStatus.FAILED, f"Failed: {e}")
             self.state.phase = ChartPhase.WAITING
-            # Log the technical error for debugging
-            print(f"[ChartConversation] Pipeline error: {result.error}")
-            # Show user-friendly message
             return ChartConversationResult(
-                response="I couldn't create that chart. This might be because the request doesn't match our available data.\n\nTry describing a chart using business metrics like revenue, customers, subscriptions, or user signups.",
-                error=result.error,
+                response="I couldn't understand that chart request. Could you try rephrasing it?",
+                error=str(e),
                 action_buttons=[
                     ChartActionButton(id="show_examples", label="Show Examples", style="primary"),
                     ChartActionButton(id="show_data", label="What Data Is Available?", style="secondary"),
                 ],
             )
 
+        # Stage 2: Generate SQL
+        self._emit_progress("sql", ProgressStatus.IN_PROGRESS, "Generating SQL query...")
+        try:
+            query_name, sql, columns, filter_queries, error = self._pipeline.sql_agent.generate_query(spec, schema)
+            if error:
+                raise Exception(error)
+            self._emit_progress("sql", ProgressStatus.COMPLETED, "SQL generated")
+        except Exception as e:
+            print(f"[ChartConversation] SQL generation failed: {e}")
+            self._emit_progress("sql", ProgressStatus.FAILED, f"SQL failed: {e}")
+            self.state.phase = ChartPhase.WAITING
+            return ChartConversationResult(
+                response=f"I couldn't generate valid SQL for that request. Error: {e}",
+                error=str(e),
+                action_buttons=[
+                    ChartActionButton(id="show_examples", label="Show Examples", style="primary"),
+                    ChartActionButton(id="show_data", label="What Data Is Available?", style="secondary"),
+                ],
+            )
+
+        # Stage 3: Get data preview
+        self._emit_progress("validation", ProgressStatus.IN_PROGRESS, "Validating data...")
+        data_preview = []
+        row_count = 0
+        try:
+            from .sql_validator import execute_query
+            print(f"[ChartConversation] Executing preview query: {sql[:100]}...")
+            result = execute_query(sql, query_name, limit=100)
+            if result.error:
+                print(f"[ChartConversation] Data preview query error: {result.error}")
+                self._emit_progress("validation", ProgressStatus.COMPLETED, "Query validated (no preview)")
+            elif result.data:
+                row_count = result.row_count
+                # Get first 5 rows for preview
+                data_preview = result.data[:5]
+                print(f"[ChartConversation] Got {row_count} rows, preview has {len(data_preview)} rows")
+                self._emit_progress("validation", ProgressStatus.COMPLETED, f"Found {row_count} rows")
+            else:
+                print(f"[ChartConversation] Query returned no data")
+                self._emit_progress("validation", ProgressStatus.COMPLETED, "Query returned no data")
+        except Exception as e:
+            import traceback
+            print(f"[ChartConversation] Data preview failed: {e}")
+            traceback.print_exc()
+            self._emit_progress("validation", ProgressStatus.COMPLETED, "Query validated (no preview)")
+            # Continue without preview - not a blocking error
+
+        # Store proposal in state
+        self.state.proposed_spec = spec
+        self.state.proposed_sql = sql
+        self.state.proposed_columns = columns
+        self.state.proposed_data_preview = data_preview
+        self.state.phase = ChartPhase.PROPOSING
+
+        # Build proposal response
+        response = self._build_proposal_response(spec, sql, columns, data_preview, row_count)
+
+        self.state.messages.append(Message(role="assistant", content=response))
+
+        return ChartConversationResult(
+            response=response,
+            action_buttons=[
+                ChartActionButton(id="generate", label="Generate", style="primary"),
+                ChartActionButton(id="modify_plan", label="Modify Plan", style="secondary"),
+            ],
+        )
+
+    def _format_sql(self, sql: str) -> str:
+        """Format SQL for better readability with proper line wrapping."""
+        import re
+
+        formatted = sql.strip()
+
+        # First, normalize whitespace
+        formatted = re.sub(r'\s+', ' ', formatted)
+
+        # Add newlines before major keywords
+        keywords = [
+            'SELECT', 'FROM', 'WHERE', 'AND', 'OR',
+            'GROUP BY', 'ORDER BY', 'HAVING', 'LIMIT',
+            'LEFT JOIN', 'RIGHT JOIN', 'INNER JOIN', 'JOIN',
+            'ON', 'UNION', 'WITH'
+        ]
+
+        for kw in keywords:
+            # Add newline before keyword (case insensitive)
+            pattern = f'(?i)\\s+({kw})\\b'
+            formatted = re.sub(pattern, f'\n{kw}', formatted)
+
+        # Handle CTE: "WITH name AS (" should put the SELECT on new line
+        formatted = re.sub(r'(?i)(WITH\s+\w+\s+AS\s*\()', r'\1\n', formatted)
+
+        # Break SELECT columns: add newline after each comma in SELECT clause
+        # Find SELECT ... FROM and break on commas
+        def break_select_columns(match):
+            select_part = match.group(1)
+            # Split by comma and rejoin with newlines
+            parts = select_part.split(',')
+            if len(parts) > 1:
+                return 'SELECT\n  ' + ',\n  '.join(p.strip() for p in parts) + '\nFROM'
+            return match.group(0)
+
+        formatted = re.sub(
+            r'(?i)SELECT\s+(.+?)\s+FROM',
+            break_select_columns,
+            formatted,
+            flags=re.DOTALL
+        )
+
+        # Close paren should be on its own line before SELECT in CTE
+        formatted = re.sub(r'\)\s*SELECT', ')\nSELECT', formatted)
+
+        # Clean up and indent
+        lines = formatted.split('\n')
+        result_lines = []
+        indent = 0
+
+        for line in lines:
+            line = line.strip()
+            if not line:
+                continue
+
+            # Decrease indent for lines starting with )
+            if line.startswith(')'):
+                indent = max(0, indent - 1)
+
+            # Add the line with current indent
+            result_lines.append('  ' * indent + line)
+
+            # Increase indent after ( at end of line (CTE, subquery)
+            if line.rstrip().endswith('('):
+                indent += 1
+
+        return '\n'.join(result_lines)
+
+    def _build_proposal_response(
+        self,
+        spec,
+        sql: str,
+        columns: list[str],
+        data_preview: list[dict],
+        row_count: int,
+    ) -> str:
+        """Build the proposal response with SQL and data preview."""
+        # Format SQL for readability
+        formatted_sql = self._format_sql(sql)
+
+        lines = [
+            f"## PROPOSED CHART",
+            "",
+            f"**{spec.title}**",
+            "",
+            spec.description,
+            "",
+            f"**Chart Type:** {spec.chart_type.value}",
+            "",
+            "### SQL QUERY",
+            "",
+            "```sql",
+            formatted_sql,
+            "```",
+            "",
+        ]
+
+        # Add data preview if available
+        if data_preview:
+            lines.extend([
+                f"### DATA PREVIEW ({row_count} total rows)",
+                "",
+            ])
+
+            # Build a simple text table (more reliable than markdown tables)
+            headers = list(data_preview[0].keys())
+
+            # Calculate column widths
+            col_widths = {}
+            for h in headers:
+                col_widths[h] = len(h)
+                for row in data_preview[:5]:
+                    val = str(row.get(h, ""))[:20]  # Truncate long values
+                    col_widths[h] = max(col_widths[h], len(val))
+
+            # Build table using code block for fixed-width formatting
+            lines.append("```")
+
+            # Header row
+            header_row = "  ".join(h.ljust(col_widths[h]) for h in headers)
+            lines.append(header_row)
+
+            # Separator
+            sep_row = "  ".join("-" * col_widths[h] for h in headers)
+            lines.append(sep_row)
+
+            # Data rows
+            for row in data_preview[:5]:
+                values = [str(row.get(h, ""))[:20].ljust(col_widths[h]) for h in headers]
+                lines.append("  ".join(values))
+
+            lines.append("```")
+            lines.append("")
+        else:
+            lines.extend([
+                "### DATA PREVIEW",
+                "",
+                "_Could not generate preview - query will be validated on generation._",
+                "",
+            ])
+
+        lines.extend([
+            "---",
+            "",
+            "Click **Generate** to create the chart, or **Modify Plan** to make changes.",
+        ])
+
+        return "\n".join(lines)
+
+    def _handle_generate_chart(self) -> ChartConversationResult:
+        """Generate the chart from the approved proposal."""
+        if not self.state.proposed_spec or not self.state.proposed_sql:
+            return ChartConversationResult(
+                response="No proposal to generate. Please describe the chart you want first.",
+                error="No proposal in state",
+            )
+
+        print(f"[ChartConversation] Generating chart from proposal...")
+        self.state.phase = ChartPhase.GENERATING
+        self._emit_progress("layout", ProgressStatus.IN_PROGRESS, "Building chart configuration...")
+
+        spec = self.state.proposed_spec
+        sql = self.state.proposed_sql
+        columns = self.state.proposed_columns or []
+
+        # Build chart config
+        config = self._pipeline._build_chart_config(spec, columns)
+
+        # Build filters
+        filter_queries = []  # We don't store these in proposal, regenerate if needed
+        filters = self._pipeline._build_filters(spec, filter_queries)
+
+        # Create validated chart
+        validated_chart = ValidatedChart(
+            spec=spec,
+            query_name=spec.title.lower().replace(" ", "_")[:50],
+            sql=sql,
+            columns=columns,
+            config=config,
+            filters=filters,
+            validation_status="valid",
+        )
+
+        self._emit_progress("layout", ProgressStatus.COMPLETED, "Chart configured")
+        self._emit_progress("writing", ProgressStatus.IN_PROGRESS, "Saving chart...")
+
         # Store the chart
-        chart = result.chart
-        stored_chart = Chart.from_validated(chart)
+        stored_chart = Chart.from_validated(validated_chart)
         self.chart_storage.save(stored_chart)
 
-        self.state.current_chart = chart
+        self.state.current_chart = validated_chart
         self.state.current_chart_id = stored_chart.id
 
         # Create a preview dashboard for viewing
         dashboard = create_chart_dashboard(stored_chart)
         self.state.dashboard_slug = dashboard.slug
 
+        self._emit_progress("writing", ProgressStatus.COMPLETED, "Chart saved")
+
+        # Run visual QA if pipeline has quality validator enabled
+        qa_result = None
+        if self._pipeline.quality_validator and self._pipeline.quality_validator.enable_visual_qa:
+            self._emit_progress("qa", ProgressStatus.IN_PROGRESS, "Running quality check...")
+            try:
+                qa_result = self._pipeline.quality_validator.validate_chart(
+                    validated_chart,
+                    original_request=self.state.original_request or "",
+                    chart_slug=f"/chart/{stored_chart.id}",
+                )
+                if qa_result.passed:
+                    self._emit_progress("qa", ProgressStatus.COMPLETED, "Quality check passed")
+                else:
+                    issues = len(qa_result.critical_issues) if qa_result.critical_issues else 0
+                    self._emit_progress("qa", ProgressStatus.COMPLETED, f"Quality check found {issues} issues")
+            except Exception as e:
+                print(f"[ChartConversation] QA validation failed: {e}")
+                self._emit_progress("qa", ProgressStatus.COMPLETED, "Quality check skipped")
+
         # Build response - use /chart/{id} route for React app
         chart_url = f"{self.config.frontend_url}/chart/{stored_chart.id}"
 
         self.state.phase = ChartPhase.VIEWING
+        self._emit_progress("complete", ProgressStatus.COMPLETED, "Chart ready!")
 
-        response = f"""Created: **{chart.spec.title}**
+        # Clear proposal state
+        self.state.proposed_spec = None
+        self.state.proposed_sql = None
+        self.state.proposed_columns = None
+        self.state.proposed_data_preview = None
 
-{chart.spec.description}
+        response = f"""Created: **{spec.title}**
+
+{spec.description}
 
 View your chart at: {chart_url}
 
@@ -359,6 +684,7 @@ What would you like to do next?"""
             response=response,
             chart_url=chart_url,
             chart_id=stored_chart.id,
+            dashboard_slug=dashboard.slug,
             action_buttons=[
                 ChartActionButton(id="done", label="Done", style="primary"),
                 ChartActionButton(id="modify", label="Modify", style="secondary"),
@@ -445,6 +771,7 @@ What else would you like to change?"""
             response=response,
             chart_url=chart_url,
             chart_id=stored_chart.id,
+            dashboard_slug=dashboard.slug,
             action_buttons=[
                 ChartActionButton(id="done", label="Done", style="primary"),
                 ChartActionButton(id="modify", label="Modify", style="secondary"),

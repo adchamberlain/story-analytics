@@ -1,0 +1,341 @@
+# Story Analytics - Chart Types Configuration
+# This is the single source of truth for all supported chart types.
+# Used by: LLM prompts, config_loader.py, React ChartFactory
+
+charts:
+  # =============================================================================
+  # Time Series & Trends
+  # =============================================================================
+
+  line:
+    name: LineChart
+    description: "Line chart for time series data and trends over time"
+    plotly_type: scatter
+    plotly_mode: lines+markers
+    best_for:
+      - trends over time
+      - time series data
+      - comparing multiple series over time
+      - showing continuous data
+    required_config:
+      - x: "Column for x-axis (typically date/time)"
+      - y: "Column(s) for y-axis values"
+    optional_config:
+      - series: "Column to split into multiple lines"
+      - title: "Chart title"
+      - xAxisTitle: "X-axis label"
+      - yAxisTitle: "Y-axis label"
+    example_sql: |
+      SELECT date, revenue, cost
+      FROM metrics
+      WHERE date >= CURRENT_DATE - INTERVAL '12 months'
+      ORDER BY date
+
+  area:
+    name: AreaChart
+    description: "Area chart for showing cumulative values or parts of a whole over time"
+    plotly_type: scatter
+    plotly_mode: lines
+    plotly_fill: tozeroy
+    best_for:
+      - cumulative totals over time
+      - showing volume or magnitude
+      - stacked comparisons over time
+    required_config:
+      - x: "Column for x-axis (typically date/time)"
+      - y: "Column(s) for y-axis values"
+    optional_config:
+      - series: "Column to split into stacked areas"
+      - stacked: "Whether to stack areas (default: true)"
+      - title: "Chart title"
+    example_sql: |
+      SELECT month, channel, revenue
+      FROM revenue_by_channel
+      ORDER BY month, channel
+
+  # =============================================================================
+  # Categorical Comparisons
+  # =============================================================================
+
+  bar:
+    name: BarChart
+    description: "Bar chart for comparing categories or rankings"
+    plotly_type: bar
+    best_for:
+      - comparing categories
+      - rankings and leaderboards
+      - showing distribution across groups
+      - before/after comparisons
+    required_config:
+      - x: "Column for categories (or values if horizontal)"
+      - y: "Column for values (or categories if horizontal)"
+    optional_config:
+      - horizontal: "Use horizontal bars (default: false)"
+      - stacked: "Stack bars for grouped data"
+      - series: "Column to group bars by"
+      - sort: "Sort bars by value"
+      - title: "Chart title"
+    example_sql: |
+      SELECT customer_name, total_revenue
+      FROM customers
+      ORDER BY total_revenue DESC
+      LIMIT 10
+
+  # =============================================================================
+  # Relationships & Distributions
+  # =============================================================================
+
+  scatter:
+    name: ScatterPlot
+    description: "Scatter plot for showing relationships between two variables"
+    plotly_type: scatter
+    plotly_mode: markers
+    best_for:
+      - correlation analysis
+      - relationship between two metrics
+      - identifying outliers
+      - clustering patterns
+    required_config:
+      - x: "Column for x-axis values"
+      - y: "Column for y-axis values"
+    optional_config:
+      - series: "Column to color points by category"
+      - size: "Column for bubble size (makes it a bubble chart)"
+      - title: "Chart title"
+    example_sql: |
+      SELECT revenue, num_employees, industry
+      FROM companies
+
+  bubble:
+    name: BubbleChart
+    description: "Bubble chart - scatter plot with size dimension for three variables"
+    plotly_type: scatter
+    plotly_mode: markers
+    best_for:
+      - three-dimensional comparisons
+      - market analysis (x=metric1, y=metric2, size=metric3)
+      - portfolio visualization
+    required_config:
+      - x: "Column for x-axis"
+      - y: "Column for y-axis"
+      - size: "Column for bubble size"
+    optional_config:
+      - series: "Column to color bubbles by"
+      - title: "Chart title"
+    example_sql: |
+      SELECT region, avg_deal_size, num_deals, total_revenue
+      FROM sales_by_region
+
+  histogram:
+    name: Histogram
+    description: "Histogram for showing distribution of a single variable"
+    plotly_type: histogram
+    best_for:
+      - distribution analysis
+      - frequency of values
+      - understanding data spread
+      - identifying skewness
+    required_config:
+      - x: "Column to analyze distribution"
+    optional_config:
+      - bins: "Number of bins (default: auto)"
+      - series: "Column to overlay multiple distributions"
+      - title: "Chart title"
+    example_sql: |
+      SELECT deal_value
+      FROM deals
+      WHERE status = 'closed_won'
+
+  heatmap:
+    name: Heatmap
+    description: "Heatmap for showing intensity across two dimensions"
+    plotly_type: heatmap
+    best_for:
+      - correlation matrices
+      - activity by day/hour
+      - geographic intensity
+      - cohort analysis
+    required_config:
+      - x: "Column for x-axis categories"
+      - y: "Column for y-axis categories"
+      - value: "Column for color intensity"
+    optional_config:
+      - colorScale: "Color scheme (default: blues)"
+      - title: "Chart title"
+    example_sql: |
+      SELECT day_of_week, hour_of_day, num_orders
+      FROM orders_by_time
+      GROUP BY day_of_week, hour_of_day
+
+  # =============================================================================
+  # Funnel & Flow
+  # =============================================================================
+
+  funnel:
+    name: FunnelChart
+    description: "Funnel chart for showing conversion through stages"
+    plotly_type: funnel
+    best_for:
+      - conversion funnels
+      - sales pipeline stages
+      - user journey steps
+      - drop-off analysis
+    required_config:
+      - x: "Column for stage names"
+      - y: "Column for values at each stage"
+    optional_config:
+      - title: "Chart title"
+    example_sql: |
+      SELECT stage, num_users
+      FROM conversion_funnel
+      ORDER BY stage_order
+
+  sankey:
+    name: SankeyDiagram
+    description: "Sankey diagram for showing flow between categories"
+    plotly_type: sankey
+    best_for:
+      - flow between categories
+      - source-destination analysis
+      - budget allocation
+      - user flow paths
+    required_config:
+      - source: "Column for source nodes"
+      - target: "Column for target nodes"
+      - value: "Column for flow magnitude"
+    optional_config:
+      - title: "Chart title"
+    example_sql: |
+      SELECT source_channel, destination_page, num_visits
+      FROM user_flows
+
+  # =============================================================================
+  # KPIs & Single Values
+  # =============================================================================
+
+  bigvalue:
+    name: BigValue
+    description: "Single KPI metric display with optional comparison and trend"
+    plotly_type: null  # Custom component, not Plotly
+    best_for:
+      - key metrics and KPIs
+      - single important numbers
+      - metrics with comparison to prior period
+      - dashboard headlines
+    required_config:
+      - value: "Column containing the main value"
+    optional_config:
+      - comparisonValue: "Column for comparison (e.g., prior period)"
+      - comparisonLabel: "Label for comparison (e.g., 'vs last month')"
+      - valueFormat: "Format hint: 'currency', 'percent', or 'number'"
+      - title: "Metric label"
+      - sparklineX: "Column for sparkline x-axis"
+      - sparklineY: "Column for sparkline y-axis"
+      - positiveIsGood: "Whether increase is good (default: true)"
+    example_sql: |
+      SELECT
+        SUM(revenue) as value,
+        SUM(CASE WHEN month = 'prior' THEN revenue END) as comparison_value
+      FROM monthly_revenue
+
+  # =============================================================================
+  # Tables
+  # =============================================================================
+
+  table:
+    name: DataTable
+    description: "Data table for detailed records and drill-down data"
+    plotly_type: null  # Custom component, not Plotly
+    best_for:
+      - detailed record lists
+      - drill-down data
+      - when exact values matter
+      - exportable data
+    required_config: []  # All columns from query are displayed
+    optional_config:
+      - columns: "Specific columns to display (default: all)"
+      - title: "Table title"
+      - pageSize: "Rows per page (default: 10)"
+    example_sql: |
+      SELECT customer_name, email, plan, mrr, signup_date
+      FROM customers
+      ORDER BY mrr DESC
+      LIMIT 100
+
+  # =============================================================================
+  # Composite / Multi-Panel Charts
+  # =============================================================================
+
+  dual-trend:
+    name: DualTrendChart
+    description: "Amazon-style WBR chart with two panels: 6-week short-term view and 12-month long-term view, each with year-over-year comparison lines"
+    plotly_type: scatter
+    plotly_subplots: true
+    best_for:
+      - monitoring key metrics over time
+      - year-over-year comparison
+      - spotting short and long term trends
+      - weekly business reviews (WBR)
+      - executive dashboards
+    required_config:
+      - metric: "Column containing the metric value"
+      - date: "Column containing the date"
+    optional_config:
+      - title: "Chart title (e.g., 'Revenue Health Check')"
+      - metricLabel: "Label for the metric (e.g., 'Revenue')"
+      - valueFormat: "Format hint: 'currency', 'percent', or 'number'"
+    example_sql: |
+      -- Query should return daily or weekly data for the metric
+      -- The component will aggregate and compare year-over-year
+      SELECT
+        date,
+        revenue as metric
+      FROM daily_metrics
+      WHERE date >= CURRENT_DATE - INTERVAL '13 months'
+      ORDER BY date
+
+# =============================================================================
+# Chart Selection Guide (for LLM)
+# =============================================================================
+
+selection_guide:
+  time_series:
+    keywords: ["over time", "trend", "by month", "by week", "by day", "historical", "timeline"]
+    default: line
+    alternatives:
+      - area: "when showing cumulative or stacked values"
+      - bar: "when comparing discrete time periods"
+
+  comparison:
+    keywords: ["compare", "ranking", "top", "bottom", "by category", "breakdown"]
+    default: bar
+    alternatives:
+      - horizontal bar: "when category names are long"
+      - table: "when exact values are important"
+
+  distribution:
+    keywords: ["distribution", "spread", "histogram", "frequency"]
+    default: histogram
+    alternatives:
+      - scatter: "when comparing two distributions"
+
+  relationship:
+    keywords: ["correlation", "relationship", "vs", "against"]
+    default: scatter
+    alternatives:
+      - bubble: "when there's a third dimension (size)"
+      - heatmap: "when showing intensity matrix"
+
+  funnel:
+    keywords: ["funnel", "conversion", "pipeline", "stages", "drop-off"]
+    default: funnel
+
+  flow:
+    keywords: ["flow", "from/to", "source/destination", "paths"]
+    default: sankey
+
+  single_metric:
+    keywords: ["total", "count", "sum", "average", "KPI", "metric"]
+    default: bigvalue
+    alternatives:
+      - table: "when showing multiple metrics"

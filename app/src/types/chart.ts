@@ -18,6 +18,7 @@ export type ChartType =
   | 'Heatmap'
   | 'DataTable'
   | 'BigValue'
+  | 'DualTrendChart'
 
 export type FilterType =
   | 'Dropdown'

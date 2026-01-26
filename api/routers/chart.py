@@ -7,9 +7,14 @@ Provides:
 - Dashboard composition endpoints
 """
 
+import asyncio
+import json
 from datetime import datetime
+from queue import Queue, Empty
+from threading import Thread
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session as DBSession
 
 from ..database import get_db
@@ -277,6 +282,7 @@ async def send_chart_message(
             chart_title=manager.state.current_chart.spec.title
             if manager.state.current_chart
             else None,
+            dashboard_slug=result.dashboard_slug,
             action_buttons=action_buttons,
             error=result.error,
         )
@@ -289,6 +295,131 @@ async def send_chart_message(
             title=session.title,
             error=str(e),
         )
+
+
+@router.post("/conversation/message/stream")
+async def send_chart_message_stream(
+    request: ChartMessageRequest,
+    current_user: User = Depends(get_current_user),
+    db: DBSession = Depends(get_db),
+):
+    """
+    Send a message in a chart conversation with streaming progress updates.
+
+    Uses Server-Sent Events to stream progress during chart generation.
+
+    Event types:
+    - progress: Progress updates during generation
+    - complete: Final response with full message data
+    - error: Error occurred during processing
+    """
+    session, manager = _get_or_create_chart_session(db, current_user, request.session_id)
+
+    # Track if this is the first user message (for title generation)
+    is_first_message = len([m for m in (session.messages or []) if m.get("role") == "user"]) == 0
+
+    # Queue to collect progress events from the background thread
+    progress_queue: Queue = Queue()
+    result_holder = {"result": None, "error": None}
+
+    def process_message_with_progress():
+        """Process message in a background thread, emitting progress to queue."""
+        try:
+            from engine.progress import ProgressEmitter
+
+            # Create progress emitter that pushes to queue
+            emitter = ProgressEmitter()
+            emitter.add_callback(lambda event: progress_queue.put(("progress", event)))
+
+            # Set emitter on manager
+            manager.progress_emitter = emitter
+
+            # Process the message
+            result = manager.process_message(request.message)
+
+            # Save updated state to database
+            _save_chart_manager_state(manager, session)
+
+            # Update chart_id if a chart was created
+            if result.chart_id:
+                session.chart_id = result.chart_id
+
+            # Generate title after first user message (skip action messages)
+            if is_first_message and not request.message.startswith("__action:") and not session.title:
+                session.title = _generate_chart_title(request.message, current_user.preferred_provider)
+
+            db.commit()
+
+            # Convert action buttons
+            action_buttons = None
+            if result.action_buttons:
+                action_buttons = [
+                    {"id": btn.id, "label": btn.label, "style": btn.style}
+                    for btn in result.action_buttons
+                ]
+
+            # Build response data
+            response_data = {
+                "response": result.response,
+                "phase": manager.state.phase.value,
+                "session_id": session.id,
+                "title": session.title,
+                "chart_id": result.chart_id,
+                "chart_url": result.chart_url,
+                "chart_title": manager.state.current_chart.spec.title
+                if manager.state.current_chart
+                else None,
+                "dashboard_slug": result.dashboard_slug,
+                "action_buttons": action_buttons,
+                "error": result.error,
+            }
+
+            result_holder["result"] = response_data
+
+        except Exception as e:
+            result_holder["error"] = str(e)
+
+        # Signal completion
+        progress_queue.put(("done", None))
+
+    async def event_generator():
+        """Generate SSE events from the progress queue."""
+        # Start processing in background thread
+        thread = Thread(target=process_message_with_progress)
+        thread.start()
+
+        try:
+            while True:
+                # Check queue with timeout
+                try:
+                    event_type, event_data = await asyncio.get_event_loop().run_in_executor(
+                        None, lambda: progress_queue.get(timeout=0.1)
+                    )
+                except Empty:
+                    continue
+
+                if event_type == "done":
+                    # Send final result or error
+                    if result_holder["error"]:
+                        yield f"event: error\ndata: {json.dumps({'error': result_holder['error']})}\n\n"
+                    else:
+                        yield f"event: complete\ndata: {json.dumps(result_holder['result'])}\n\n"
+                    break
+                elif event_type == "progress":
+                    yield f"event: progress\ndata: {json.dumps(event_data.to_dict())}\n\n"
+
+        finally:
+            thread.join(timeout=1.0)
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 @router.post("/conversation/new", response_model=ChartMessageResponse)

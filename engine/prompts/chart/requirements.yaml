@@ -48,6 +48,11 @@ instructions: |
      - BigValue: Single key metric/KPI
      - ScatterPlot: Correlation between two metrics
      - Histogram: Distribution of values
+     - DualTrendChart: Amazon-style health check with TWO side-by-side panels
+       - Left panel: Last 6 weeks vs same weeks last year
+       - Right panel: Last 12 months vs same months last year
+       - Use when user says: "health check", "WBR", "vs last year", "year-over-year comparison", "monitoring trends"
+       - IMPORTANT: DualTrendChart is a SPECIAL chart type that only needs a metric and date column
 
   5b. HORIZONTAL BAR CHARTS:
      CRITICAL: If the user mentions ANY of these phrases, you MUST set horizontal: true:
@@ -68,6 +73,24 @@ instructions: |
 
      IMPORTANT: Time periods like "past year" or "last 12 months" are STATIC filters,
      NOT interactive filters. They should go in the "filters" array, not "interactive_filters".
+
+  9. COLUMN MAPPINGS (CRITICAL - You MUST specify these):
+     Based on the query you would write, specify exactly which columns serve which roles:
+
+     - x_column: The column that will be the X-axis (dimension/time axis)
+       Examples: "month", "date", "customer_segment", "product_name"
+
+     - y_column: The column(s) that will be plotted on the Y-axis (metrics/values)
+       Can be a single column name OR a list of column names for multi-metric charts.
+       Examples: "revenue", "count", ["revenue", "customer_count"]
+
+     - series_column: The column used to create multiple lines/bars (grouping/coloring)
+       Only specify this for multi-line/grouped charts where you want to split by a category.
+       Examples: "plan_tier", "region", "product_category"
+       Set to null if the chart doesn't need grouping.
+
+     IMPORTANT: These column names should match EXACTLY what the SQL query will output.
+     Use lowercase names (e.g., "plan_tier" not "PLAN_TIER") since SQL output is normalized to lowercase.
 
   8. INTERACTIVE FILTERS: Does the user want USER-CONTROLLABLE filter controls?
      ONLY add interactive filters when the user EXPLICITLY requests a UI control.
@@ -105,7 +128,7 @@ instructions: |
 output_format: |
   Respond with a JSON object in exactly this format:
 
-  Example 1 - Simple chart with NO interactive filters (most common):
+  Example 1 - Simple line chart with column mappings (REQUIRED):
   ```json
   {
     "title": "Monthly Revenue Trend",
@@ -117,11 +140,34 @@ output_format: |
     "horizontal": false,
     "relevant_tables": ["invoices"],
     "filters": ["past year"],
-    "interactive_filters": []
+    "interactive_filters": [],
+    "x_column": "month",
+    "y_column": "revenue",
+    "series_column": null
   }
   ```
 
-  Example 2 - Chart WITH DateRange filter (only when user explicitly requests controls):
+  Example 2 - Multi-line chart grouped by a category (IMPORTANT: series_column):
+  ```json
+  {
+    "title": "Monthly MRR by Product",
+    "description": "How has MRR trended for each product tier?",
+    "metric": "mrr",
+    "aggregation": "SUM",
+    "dimension": "month",
+    "chart_type": "LineChart",
+    "horizontal": false,
+    "relevant_tables": ["subscriptions"],
+    "filters": ["last 16 months"],
+    "interactive_filters": [],
+    "x_column": "month",
+    "y_column": "mrr",
+    "series_column": "plan_tier"
+  }
+  ```
+  NOTE: series_column creates multiple lines - one per unique value in that column.
+
+  Example 3 - Chart WITH DateRange filter (only when user explicitly requests controls):
   ```json
   {
     "title": "Revenue by Region",
@@ -142,11 +188,14 @@ output_format: |
         "table": "invoices",
         "default_value": "Last 12 Months"
       }
-    ]
+    ],
+    "x_column": "region",
+    "y_column": "revenue",
+    "series_column": null
   }
   ```
 
-  Example 3 - Chart WITH Dropdown filter (note: NO default_value for Dropdown):
+  Example 4 - Chart WITH Dropdown filter (note: NO default_value for Dropdown):
   ```json
   {
     "title": "Monthly Revenue",
@@ -166,10 +215,39 @@ output_format: |
         "column": "year",
         "table": "invoices"
       }
-    ]
+    ],
+    "x_column": "month",
+    "y_column": "revenue",
+    "series_column": null
   }
   ```
   NOTE: Dropdown filters should NOT have a default_value - the dropdown will auto-select the first option.
+
+  Example 5 - DualTrendChart for year-over-year health check (Amazon WBR style):
+  Use this when user asks for "health check", "WBR", "vs last year", "year-over-year", or "monitoring trends".
+  ```json
+  {
+    "title": "Revenue Health Check",
+    "description": "How is revenue trending vs last year?",
+    "metric": "revenue",
+    "aggregation": "SUM",
+    "dimension": "date",
+    "chart_type": "DualTrendChart",
+    "horizontal": false,
+    "relevant_tables": ["invoices"],
+    "filters": ["last 13 months"],
+    "interactive_filters": [],
+    "x_column": "date",
+    "y_column": "revenue",
+    "series_column": null
+  }
+  ```
+  IMPORTANT for DualTrendChart:
+  - chart_type MUST be exactly "DualTrendChart" (not LineChart or multiple charts)
+  - The component automatically creates two panels with YoY comparison
+  - dimension should be "date" or a date column
+  - SQL should return daily/weekly data with date and metric columns
+  - Use filter "last 13 months" to ensure enough data for year-over-year comparison
 
   IMPORTANT for horizontal field:
   - Set horizontal: true ONLY when user explicitly requests "horizontal bar chart"
@@ -182,6 +260,7 @@ output_format: |
   - Data exploration → "DataTable"
   - Volume over time → "AreaChart"
   - Correlations → "ScatterPlot"
+  - Year-over-year trends, health check, WBR, "vs last year" → "DualTrendChart"
 
   IMPORTANT:
   - Output ONLY the JSON, no other text
@@ -193,3 +272,10 @@ output_format: |
   - Only add interactive_filters when user says things like "add a filter", "with a dropdown", "let me select"
   - For "per entity" metrics like "avg revenue per customer", use aggregation: "AVG_PER_ENTITY"
     to indicate two-level aggregation is needed
+
+  CRITICAL - Column mappings are REQUIRED:
+  - x_column: ALWAYS specify the X-axis column (use lowercase)
+  - y_column: ALWAYS specify the Y-axis metric column(s) (use lowercase)
+  - series_column: Specify the grouping column for multi-line/grouped charts, or null if none
+  - Column names MUST be lowercase (e.g., "plan_tier" not "PLAN_TIER")
+  - These mappings tell the chart renderer exactly how to use the SQL output columns
