@@ -27,20 +27,43 @@ export function LineChart({ data, config }: LineChartProps) {
   const xLabel = config.xAxisTitle || xColumn
 
   if (seriesColumn) {
-    // Group by series column
-    const seriesValues = [...new Set(data.map(row => String(row[seriesColumn])))]
+    // Group by series column - handle case-insensitive column matching
+    // Find the actual column name in the data (may differ in case)
+    const firstRow = data[0] || {}
+    const actualSeriesColumn = Object.keys(firstRow).find(
+      key => key.toLowerCase() === seriesColumn.toLowerCase()
+    ) || seriesColumn
 
-    for (const seriesValue of seriesValues) {
-      const seriesData = data.filter(row => String(row[seriesColumn]) === seriesValue)
+    const seriesValues = [...new Set(data.map(row => {
+      const val = row[actualSeriesColumn]
+      return val != null ? String(val) : null
+    }).filter((v): v is string => v !== null && v !== 'null' && v !== 'undefined'))]
+
+    // Explicit colors for each series to ensure visibility
+    const seriesColors = ['#6366f1', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4']
+
+    for (let i = 0; i < seriesValues.length; i++) {
+      const seriesValue = seriesValues[i]
+      const seriesData = data.filter(row => String(row[actualSeriesColumn]) === seriesValue)
 
       for (const yColumn of yColumns) {
+        const xValues = seriesData.map(row => row[xColumn])
+        const yValues = seriesData.map(row => row[yColumn])
+
         traces.push({
           type: 'scatter',
           mode: 'lines+markers',
           name: yColumns.length > 1 ? `${seriesValue} - ${yColumn}` : seriesValue,
-          x: seriesData.map(row => row[xColumn]) as Plotly.Datum[],
-          y: seriesData.map(row => row[yColumn]) as Plotly.Datum[],
-          ...defaultLineStyle,
+          x: xValues as Plotly.Datum[],
+          y: yValues as Plotly.Datum[],
+          line: {
+            ...defaultLineStyle.line,
+            color: seriesColors[i % seriesColors.length],
+          },
+          marker: {
+            ...defaultLineStyle.marker,
+            color: seriesColors[i % seriesColors.length],
+          },
           hovertemplate: createHoverTemplate(xLabel, yColumn, {
             showName: seriesValues.length > 1 || yColumns.length > 1,
           }),

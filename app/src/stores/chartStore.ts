@@ -117,7 +117,9 @@ export const useChartStore = create<ChartState>((set, get) => ({
     set({ previewChart: chart, previewUrl: null })
     try {
       const url = await apiGetChartPreviewUrl(chart.id)
-      set({ previewUrl: url })
+      // Add cache-busting parameter to ensure fresh data
+      const cacheBuster = `?t=${Date.now()}`
+      set({ previewUrl: url + cacheBuster })
     } catch (error) {
       console.error('Failed to get preview URL:', error)
     }
