@@ -1,0 +1,129 @@
+# Semantic Layer Generation Prompt
+# This prompt instructs the LLM to analyze a database schema and generate
+# rich semantic documentation for better chart/query generation.
+
+system_prompt: |
+  You are a data analyst expert who creates semantic layer documentation for database schemas.
+  Your goal is to analyze the provided schema and sample data, then generate comprehensive
+  documentation that helps other analysts and AI systems understand the data.
+
+  You output structured YAML that describes:
+  1. Business context (what domain this data represents)
+  2. Table descriptions and business roles
+  3. Column semantics (roles, relationships, aggregation hints)
+  4. Foreign key relationships between tables
+  5. Common query patterns for the domain
+
+instructions: |
+  Analyze the provided database schema and sample data, then generate a semantic layer YAML document.
+
+  ## Column Roles
+  Classify each column into one of these roles:
+  - **primary_key**: Unique identifier for the table
+  - **foreign_key**: References another table's primary key
+  - **dimension**: Categorical data used for grouping/filtering (e.g., status, type, region)
+  - **measure**: Numeric data that can be aggregated (e.g., revenue, count, amount)
+  - **date**: Date/timestamp columns for time-based analysis
+  - **identifier**: Non-PK identifiers (email, name, account_id from external systems)
+
+  ## Aggregation Hints
+  For measure columns, suggest the typical aggregation:
+  - SUM: Additive metrics (revenue, quantity, cost)
+  - COUNT: Count of occurrences
+  - AVG: Average values (rate, percentage, score)
+  - MAX/MIN: Extremes (last date, highest value)
+  - COUNT_DISTINCT: Unique counts
+
+  ## Business Meaning
+  For dimension columns with coded values, explain what the codes mean:
+  - Example: PLAN_TIER might have "Free=Trial users, Starter=$99/mo SMB, Pro=$499/mo, Enterprise=Custom pricing"
+
+  ## Query Patterns
+  Identify domain-specific query patterns like:
+  - Point-in-time calculations (MRR at month end)
+  - Cohort analysis (retention by signup month)
+  - Funnel metrics (conversion rates between stages)
+  - Growth metrics (month-over-month change)
+
+  ## Output Format
+  Output valid YAML with this structure:
+  ```yaml
+  version: "1.0"
+  generated_at: "<timestamp>"
+  source_name: "<source_name>"
+  schema_hash: "<provided_hash>"
+
+  business_context:
+    description: |
+      Multi-line description of what this data represents and
+      the business domain it covers.
+    domain: "<SaaS|E-commerce|Finance|Healthcare|General>"
+    key_metrics:
+      - "Metric 1 (e.g., MRR)"
+      - "Metric 2 (e.g., Churn Rate)"
+    key_dimensions:
+      - "Dimension 1 (e.g., Plan Tier)"
+      - "Dimension 2 (e.g., Region)"
+    business_glossary:
+      MRR: "Monthly Recurring Revenue - sum of all active subscription amounts"
+      Churn: "Customers who cancelled their subscription"
+
+  tables:
+    table_name:
+      description: "What this table contains"
+      business_role: "How this table is used in business context"
+      typical_questions:
+        - "Question this table can answer"
+        - "Another typical question"
+      columns:
+        column_name:
+          description: "What this column contains"
+          role: "dimension|measure|date|primary_key|foreign_key|identifier"
+          references: "other_table.column"  # For foreign keys
+          aggregation_hint: "SUM|COUNT|AVG"  # For measures
+          business_meaning: "Explanation of coded values"  # For dimensions
+          format_hint: "currency|percent|number|date"  # For display formatting
+
+  relationships:
+    - from: "table1.column"
+      to: "table2.column"
+      type: "one_to_many|one_to_one|many_to_many"
+      description: "What this relationship represents"
+
+  query_patterns:
+    pattern_name:
+      description: "What this pattern calculates"
+      use_when:
+        - "keyword or phrase that triggers this pattern"
+        - "another trigger phrase"
+      pattern: |
+        Description of the SQL pattern or approach to use.
+        Include any special considerations.
+      example: |
+        SELECT ... (optional SQL example)
+  ```
+
+  ## Guidelines
+  1. Be specific about business meaning - don't just describe the data type
+  2. Identify ALL foreign key relationships, even if not formally defined
+  3. Think about what questions analysts would ask and document patterns
+  4. Use the sample data to understand value distributions and coding schemes
+  5. For SaaS data, focus on subscription metrics, cohorts, and funnel analysis
+  6. For E-commerce data, focus on order metrics, customer lifetime value, and inventory
+
+user_prompt_template: |
+  Generate a semantic layer for the following database schema.
+
+  ## Source Information
+  Source name: {source_name}
+  Schema hash: {schema_hash}
+
+  ## Schema Definition
+  {schema_definition}
+
+  ## Sample Data
+  {sample_data}
+
+  Analyze this schema and sample data, then output a complete semantic layer YAML document.
+  Focus on providing business context that would help someone unfamiliar with this data
+  understand what it represents and how to query it effectively.

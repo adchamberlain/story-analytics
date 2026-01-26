@@ -26,9 +26,11 @@ class ConfigLoader:
         self._qa_rules_cache: dict | None = None
         self._dialect_cache: dict[str, dict] = {}
         self._templates_cache: dict | None = None
+        self._chart_templates_cache: dict | None = None
         self._suggestions_cache: dict | None = None
         self._clarifying_cache: dict | None = None
         self._chart_defaults_cache: dict | None = None
+        self._semantic_layer_cache: dict[str, Any] = {}
 
     def _load_yaml(self, path: Path) -> dict:
         """Load a YAML file."""
@@ -287,6 +289,53 @@ class ConfigLoader:
             for cat in categories
         ]
 
+    # --- Chart Templates ---
+
+    def get_chart_templates(self) -> dict:
+        """Load the chart templates configuration."""
+        if self._chart_templates_cache is None:
+            path = self.engine_dir / "templates" / "charts.yaml"
+            self._chart_templates_cache = self._load_yaml(path)
+        return self._chart_templates_cache
+
+    def get_chart_templates_by_business_type(self, business_type: str | None = None) -> list[dict]:
+        """
+        Get chart templates filtered by business type.
+
+        Args:
+            business_type: Business type (saas, ecommerce, general) or None for all
+
+        Returns:
+            List of template dicts matching the business type
+        """
+        templates_config = self.get_chart_templates()
+        categories = templates_config.get("categories", [])
+
+        result = []
+        for cat in categories:
+            for template in cat.get("templates", []):
+                # Check if template applies to this business type
+                business_types = template.get("business_types", [])
+                if business_type is None or business_type in business_types:
+                    result.append(
+                        {
+                            **template,
+                            "category_id": cat.get("id"),
+                            "category_name": cat.get("name"),
+                        }
+                    )
+
+        return result
+
+    def get_chart_template_categories(self) -> list[dict]:
+        """Get list of chart template categories (funnel stages)."""
+        templates_config = self.get_chart_templates()
+        categories = templates_config.get("categories", [])
+        return [
+            {"id": cat.get("id"), "name": cat.get("name"), "description": cat.get("description")}
+            for cat in categories
+        ]
+
     # --- Suggestions ---
 
     def get_suggestions(self) -> dict:
@@ -427,6 +476,71 @@ class ConfigLoader:
         ]
 
         return "\n".join(lines)
+
+    # --- Semantic Layer ---
+
+    def get_semantic_layer(self, source_name: str) -> Any | None:
+        """
+        Load the semantic layer for a data source.
+
+        Args:
+            source_name: Name of the source (e.g., 'snowflake_saas')
+
+        Returns:
+            SemanticLayer object if found, None otherwise
+        """
+        if source_name in self._semantic_layer_cache:
+            return self._semantic_layer_cache[source_name]
+
+        path = self.project_root / "sources" / source_name / "semantic.yaml"
+        if not path.exists():
+            self._semantic_layer_cache[source_name] = None
+            return None
+
+        try:
+            # Import here to avoid circular imports
+            from .semantic import SemanticLayer
+
+            semantic_layer = SemanticLayer.load(str(path))
+            self._semantic_layer_cache[source_name] = semantic_layer
+            return semantic_layer
+        except Exception as e:
+            print(f"[ConfigLoader] Failed to load semantic layer for {source_name}: {e}")
+            self._semantic_layer_cache[source_name] = None
+            return None
+
+    def get_semantic_prompt(self, source_name: str) -> str:
+        """
+        Get the semantic layer formatted for LLM prompts.
+
+        Args:
+            source_name: Name of the source (e.g., 'snowflake_saas')
+
+        Returns:
+            Formatted string with business context, or empty string if not found
+        """
+        semantic_layer = self.get_semantic_layer(source_name)
+        if semantic_layer is None:
+            return ""
+
+        return semantic_layer.to_prompt_context()
+
+    def has_semantic_layer(self, source_name: str) -> bool:
+        """Check if a semantic layer exists for a source."""
+        path = self.project_root / "sources" / source_name / "semantic.yaml"
+        return path.exists()
+
+    def clear_semantic_cache(self, source_name: str | None = None) -> None:
+        """
+        Clear the semantic layer cache.
+
+        Args:
+            source_name: Specific source to clear, or None to clear all
+        """
+        if source_name is None:
+            self._semantic_layer_cache.clear()
+        elif source_name in self._semantic_layer_cache:
+            del self._semantic_layer_cache[source_name]
 
 
 # Global instance

@@ -2,12 +2,19 @@
 Database schema introspection for Snowflake.
 """
 
+from __future__ import annotations
+
+import hashlib
+import json
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import snowflake.connector
 
 from .config import get_config
+
+if TYPE_CHECKING:
+    from .semantic import SemanticLayer
 
 
 @dataclass
@@ -59,26 +66,146 @@ class Schema:
             "tables": [table.to_dict() for table in self.tables],
         }
 
-    def to_prompt_context(self) -> str:
-        """Convert schema to a string suitable for LLM context."""
+    def get_schema_hash(self) -> str:
+        """
+        Generate a deterministic hash of the schema structure.
+
+        Used for detecting schema changes and semantic layer staleness.
+        The hash is based on table names, column names, and column types.
+        Sample values are NOT included (they may change without schema changes).
+        """
+        hash_data = {
+            "database": self.database,
+            "schema": self.schema_name,
+            "tables": [],
+        }
+
+        for table in sorted(self.tables, key=lambda t: t.name):
+            table_data = {
+                "name": table.name,
+                "columns": [
+                    {"name": col.name, "type": col.data_type, "nullable": col.nullable}
+                    for col in sorted(table.columns, key=lambda c: c.name)
+                ],
+            }
+            hash_data["tables"].append(table_data)
+
+        # Create deterministic JSON and hash it
+        json_str = json.dumps(hash_data, sort_keys=True)
+        return hashlib.sha256(json_str.encode()).hexdigest()[:12]
+
+    def to_prompt_context(self, semantic_layer: SemanticLayer | None = None) -> str:
+        """
+        Convert schema to a string suitable for LLM context.
+
+        Args:
+            semantic_layer: Optional semantic layer to merge in for richer context.
+                           If provided, includes business context, column descriptions,
+                           relationships, and query patterns.
+
+        Returns:
+            Formatted string for inclusion in LLM prompts.
+        """
         lines = [f"Source: snowflake_saas (Snowflake: {self.database}.{self.schema_name})", ""]
         lines.append("IMPORTANT: In SQL queries, reference tables as 'snowflake_saas.tablename'")
+        lines.append("")
+
+        # Add business context if semantic layer is available
+        if semantic_layer:
+            lines.append("## Business Context")
+            lines.append("")
+            lines.append(semantic_layer.business_context.description)
+            lines.append("")
+
+            if semantic_layer.business_context.key_metrics:
+                lines.append(f"Key Metrics: {', '.join(semantic_layer.business_context.key_metrics)}")
+            if semantic_layer.business_context.key_dimensions:
+                lines.append(f"Key Dimensions: {', '.join(semantic_layer.business_context.key_dimensions)}")
+            lines.append("")
+
+            # Business glossary
+            if semantic_layer.business_context.business_glossary:
+                lines.append("### Business Glossary")
+                for term, definition in semantic_layer.business_context.business_glossary.items():
+                    lines.append(f"- **{term}**: {definition}")
+                lines.append("")
+
+        # Tables section
+        lines.append("## Tables")
         lines.append("")
 
         for table in self.tables:
             row_info = f" ({table.row_count:,} rows)" if table.row_count else ""
             # Show full reference path
-            lines.append(f"Table: snowflake_saas.{table.name.lower()}{row_info}")
+            lines.append(f"### Table: snowflake_saas.{table.name.lower()}{row_info}")
 
+            # Add table semantic info if available
+            table_semantic = None
+            if semantic_layer and table.name.lower() in {k.lower() for k in semantic_layer.tables}:
+                # Case-insensitive lookup
+                for tname, tsem in semantic_layer.tables.items():
+                    if tname.lower() == table.name.lower():
+                        table_semantic = tsem
+                        break
+
+            if table_semantic:
+                lines.append(f"*{table_semantic.description}*")
+                lines.append(f"Business role: {table_semantic.business_role}")
+                lines.append("")
+
+            lines.append("Columns:")
             for col in table.columns:
                 nullable = "NULL" if col.nullable else "NOT NULL"
-                lines.append(f"  - {col.name}: {col.data_type} {nullable}")
 
-                if col.sample_values:
-                    samples = ", ".join(str(v) for v in col.sample_values[:5])
-                    lines.append(f"    Sample values: {samples}")
+                # Get column semantic info if available
+                col_semantic = None
+                if table_semantic and col.name.lower() in {k.lower() for k in table_semantic.columns}:
+                    for cname, csem in table_semantic.columns.items():
+                        if cname.lower() == col.name.lower():
+                            col_semantic = csem
+                            break
+
+                if col_semantic:
+                    role_tag = f"[{col_semantic.role}]"
+                    lines.append(f"  - {col.name}: {col.data_type} {nullable} {role_tag}")
+                    lines.append(f"    Description: {col_semantic.description}")
+                    if col_semantic.business_meaning:
+                        lines.append(f"    Business meaning: {col_semantic.business_meaning}")
+                    if col_semantic.aggregation_hint:
+                        lines.append(f"    Typical aggregation: {col_semantic.aggregation_hint}")
+                    if col_semantic.references:
+                        lines.append(f"    References: {col_semantic.references}")
+                else:
+                    lines.append(f"  - {col.name}: {col.data_type} {nullable}")
+                    if col.sample_values:
+                        samples = ", ".join(str(v) for v in col.sample_values[:5])
+                        lines.append(f"    Sample values: {samples}")
 
             lines.append("")
+
+        # Add relationships if semantic layer is available
+        if semantic_layer and semantic_layer.relationships:
+            lines.append("## Relationships")
+            lines.append("")
+            for rel in semantic_layer.relationships:
+                desc = f" - {rel.description}" if rel.description else ""
+                lines.append(
+                    f"- {rel.from_table}.{rel.from_column} → {rel.to_table}.{rel.to_column} ({rel.type}){desc}"
+                )
+            lines.append("")
+
+        # Add query patterns if semantic layer is available
+        if semantic_layer and semantic_layer.query_patterns:
+            lines.append("## Common Query Patterns")
+            lines.append("")
+            for pattern_name, pattern in semantic_layer.query_patterns.items():
+                lines.append(f"### {pattern_name}")
+                lines.append(pattern.description)
+                lines.append(f"Use when: {', '.join(pattern.use_when)}")
+                lines.append(f"Pattern: {pattern.pattern}")
+                if pattern.example:
+                    lines.append(f"Example: {pattern.example}")
+                lines.append("")
 
         return "\n".join(lines)
 
@@ -234,6 +361,19 @@ def get_schema(include_samples: bool = True) -> Schema:
     return _introspector.get_schema(include_samples)
 
 
-def get_schema_context() -> str:
-    """Get schema as a string for LLM context."""
-    return get_schema().to_prompt_context()
+def get_schema_context(semantic_layer: SemanticLayer | None = None) -> str:
+    """
+    Get schema as a string for LLM context.
+
+    Args:
+        semantic_layer: Optional semantic layer to include for richer context.
+
+    Returns:
+        Formatted schema string suitable for LLM prompts.
+    """
+    return get_schema().to_prompt_context(semantic_layer)
+
+
+def get_schema_hash() -> str:
+    """Get a hash of the current schema structure."""
+    return get_schema().get_schema_hash()
