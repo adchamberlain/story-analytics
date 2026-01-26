@@ -99,8 +99,8 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
           display: 'flex',
           alignItems: 'flex-start',
           gap: 'var(--space-2)',
-          backgroundColor: 'var(--color-gray-50)',
-          border: '1px solid var(--color-gray-200)',
+          backgroundColor: 'var(--color-gray-800)',
+          border: '1px solid var(--color-gray-700)',
           borderRadius: 'var(--radius-md)',
           padding: 'var(--space-3) var(--space-4)',
         }}
@@ -136,7 +136,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
             fontFamily: 'var(--font-mono)',
             fontSize: 'var(--text-base)',
             lineHeight: 1.5,
-            color: 'var(--color-gray-800)',
+            color: 'var(--color-gray-200)',
           }}
         />
 

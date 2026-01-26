@@ -4,6 +4,79 @@ This log captures development changes made during each session. Review this at t
 
 ---
 
+## Session: 2026-01-25 (Part 7)
+
+### Focus: Dark Theme Consistency & Chart Management Features
+
+**Context**: Continued UI polish and added chart management capabilities to the preview modal.
+
+### Changes Made
+
+#### 1. Dark Theme Consistency
+
+Made the entire app consistently dark-themed (Homebrew Terminal style):
+
+- **Sidebar.tsx**: Changed from light (`gray-50`) to dark (`gray-900`) background
+- **ChatPage.tsx**: Updated welcome screen, cards, and buttons to dark variants
+- **ChatInput.tsx**: Dark input background with light text
+- **Message.tsx**: Dark markdown content colors and button backgrounds
+- **ProgressSteps.tsx**: Fixed streaming status updates showing white background - now uses `gray-800`
+
+#### 2. View Chart Button
+
+Added a "View Chart" button to chat messages instead of plain URL links:
+
+- **Message.tsx**: Added `ViewChartButton` component that extracts chart ID and navigates to `/charts?preview={chartId}`
+- **ChartsPage.tsx**: Added `useSearchParams` handling to auto-open preview modal when `preview` param is present
+
+#### 3. Chart Management Actions in Preview Modal
+
+Added Rename, Edit, and Duplicate functionality to the Charts page preview modal:
+
+**Backend (api/routers/chart.py)**:
+- `PATCH /charts/library/{chart_id}` - Update chart title/description
+- `POST /charts/library/{chart_id}/duplicate` - Create a copy of a chart
+- `GET /charts/library/{chart_id}/session` - Get conversation session for a chart
+
+**Schemas (api/schemas/chart.py)**:
+- Added `ChartUpdateRequest`, `ChartUpdateResponse`, `ChartDuplicateResponse`
+
+**Frontend (app/src/api/client.ts)**:
+- `updateChart(chartId, { title?, description? })`
+- `duplicateChart(chartId)`
+- `getChartSession(chartId)`
+
+**UI (app/src/pages/ChartsPage.tsx)**:
+- **Rename**: Inline title editing in modal header with Save/Cancel
+- **Edit**: Navigates to `/chat?editChart={chartId}` to load the chart's conversation
+- **Duplicate**: Creates a copy with "(Copy)" suffix and opens it
+
+**ChatPage.tsx**:
+- Added handling for `editChart` query param to load chart's linked conversation session
+
+### Files Modified
+
+| File | Change |
+|------|--------|
+| `app/src/components/layout/Sidebar.tsx` | Dark theme colors |
+| `app/src/pages/ChatPage.tsx` | Dark theme + editChart param handling |
+| `app/src/components/chat/ChatInput.tsx` | Dark theme colors |
+| `app/src/components/chat/Message.tsx` | Dark theme + ViewChartButton |
+| `app/src/components/chat/ProgressSteps.tsx` | Dark background for streaming status |
+| `app/src/pages/ChartsPage.tsx` | Preview modal actions (Rename/Edit/Duplicate) |
+| `app/src/api/client.ts` | updateChart, duplicateChart, getChartSession functions |
+| `api/routers/chart.py` | PATCH, duplicate, and session endpoints |
+| `api/schemas/chart.py` | Update/duplicate request/response schemas |
+
+### User Flow
+
+1. **View Chart**: Click "View Chart" button in chat → navigates to Charts page with preview modal open
+2. **Rename**: Click Rename → edit title inline → Save
+3. **Edit**: Click Edit → loads original conversation → continue modifying chart
+4. **Duplicate**: Click Duplicate → creates copy → opens copy in preview
+
+---
+
 ## Session: 2026-01-25 (Part 6)
 
 ### Focus: Semantic Layer for Data Sources

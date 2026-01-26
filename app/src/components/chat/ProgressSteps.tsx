@@ -21,8 +21,8 @@ export function ProgressSteps({ steps, isStreaming, getStepLabel }: ProgressStep
       className="fade-in"
       style={{
         padding: 'var(--space-3) var(--space-4)',
-        borderTop: '1px solid var(--color-gray-200)',
-        backgroundColor: 'var(--color-gray-50)',
+        borderTop: '1px solid var(--color-gray-700)',
+        backgroundColor: 'var(--color-gray-800)',
       }}
     >
       <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>

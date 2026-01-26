@@ -3,6 +3,7 @@
  * Renders user and assistant messages with markdown support.
  */
 
+import { useNavigate } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
 import type { ExtendedMessage, ActionButton, ClarifyingOption } from '../../types/conversation'
 
@@ -50,7 +51,7 @@ export function Message({
               style={{
                 margin: 0,
                 whiteSpace: 'pre-wrap',
-                color: 'var(--color-gray-800)',
+                color: 'var(--color-gray-200)',
               }}
             >
               {message.content}
@@ -96,7 +97,7 @@ export function Message({
                         style={{
                           fontSize: 'var(--text-sm)',
                           fontWeight: 600,
-                          color: 'var(--color-gray-700)',
+                          color: 'var(--color-gray-300)',
                           fontFamily: 'var(--font-brand)',
                           margin: 'var(--space-2) 0 var(--space-1) 0',
                         }}
@@ -120,7 +121,7 @@ export function Message({
                           margin: '0 0 var(--space-2) 0',
                           fontSize: 'var(--text-sm)',
                           lineHeight: 1.6,
-                          color: 'var(--color-gray-700)',
+                          color: 'var(--color-gray-300)',
                         }}
                       >
                         {children}
@@ -132,7 +133,7 @@ export function Message({
                           margin: '0 0 var(--space-2) 0',
                           paddingLeft: 'var(--space-4)',
                           fontSize: 'var(--text-sm)',
-                          color: 'var(--color-gray-700)',
+                          color: 'var(--color-gray-300)',
                         }}
                       >
                         {children}
@@ -142,7 +143,7 @@ export function Message({
                       <li style={{ marginBottom: 'var(--space-1)', lineHeight: 1.5 }}>{children}</li>
                     ),
                     strong: ({ children }) => (
-                      <strong style={{ fontWeight: 600, color: 'var(--color-gray-800)' }}>
+                      <strong style={{ fontWeight: 600, color: 'var(--color-gray-200)' }}>
                         {children}
                       </strong>
                     ),
@@ -174,11 +175,11 @@ export function Message({
                         <code
                           style={{
                             fontFamily: 'var(--font-brand)',
-                            backgroundColor: 'var(--color-gray-100)',
+                            backgroundColor: 'var(--color-gray-800)',
                             padding: '0.125rem 0.375rem',
                             borderRadius: 'var(--radius-sm)',
                             fontSize: 'var(--text-xs)',
-                            color: 'var(--color-gray-800)',
+                            color: 'var(--color-brand)',
                           }}
                         >
                           {children}
@@ -194,6 +195,11 @@ export function Message({
               {/* Dashboard Preview */}
               {message.dashboard_slug && (
                 <DashboardPreview slug={message.dashboard_slug} />
+              )}
+
+              {/* View Chart Button - for chart conversations */}
+              {message.dashboard_url && message.dashboard_url.includes('/chart/') && (
+                <ViewChartButton url={message.dashboard_url} />
               )}
 
               {/* Clarifying Options */}
@@ -254,8 +260,9 @@ function ClarifyingOptionsButtons({
           style={{
             padding: 'var(--space-2) var(--space-3)',
             fontSize: 'var(--text-sm)',
-            backgroundColor: 'white',
-            border: '1px solid var(--color-gray-300)',
+            backgroundColor: 'var(--color-gray-800)',
+            color: 'var(--color-gray-300)',
+            border: '1px solid var(--color-gray-600)',
             borderRadius: 'var(--radius-md)',
             cursor: disabled ? 'not-allowed' : 'pointer',
             opacity: disabled ? 0.5 : 1,
@@ -268,8 +275,8 @@ function ClarifyingOptionsButtons({
             }
           }}
           onMouseLeave={(e) => {
-            e.currentTarget.style.borderColor = 'var(--color-gray-300)'
-            e.currentTarget.style.color = 'inherit'
+            e.currentTarget.style.borderColor = 'var(--color-gray-600)'
+            e.currentTarget.style.color = 'var(--color-gray-300)'
           }}
         >
           {option.label}
@@ -291,7 +298,7 @@ function ActionButtons({ buttons, disabled, onClick }: ActionButtonsProps) {
       style={{
         marginTop: 'var(--space-4)',
         padding: 'var(--space-3)',
-        backgroundColor: 'var(--color-gray-50)',
+        backgroundColor: 'var(--color-gray-800)',
         borderRadius: 'var(--radius-md)',
         display: 'flex',
         flexWrap: 'wrap',
@@ -325,9 +332,9 @@ function ActionButtons({ buttons, disabled, onClick }: ActionButtonsProps) {
                     border: 'none',
                   }
                 : {
-                    backgroundColor: 'white',
-                    color: 'var(--color-gray-700)',
-                    border: '1px solid var(--color-gray-300)',
+                    backgroundColor: 'var(--color-gray-700)',
+                    color: 'var(--color-gray-300)',
+                    border: '1px solid var(--color-gray-600)',
                   }),
             }}
             onMouseEnter={(e) => {
@@ -344,8 +351,8 @@ function ActionButtons({ buttons, disabled, onClick }: ActionButtonsProps) {
               if (isPrimary) {
                 e.currentTarget.style.backgroundColor = 'var(--color-brand)'
               } else {
-                e.currentTarget.style.borderColor = 'var(--color-gray-300)'
-                e.currentTarget.style.color = 'var(--color-gray-700)'
+                e.currentTarget.style.borderColor = 'var(--color-gray-600)'
+                e.currentTarget.style.color = 'var(--color-gray-300)'
               }
             }}
           >
@@ -353,6 +360,66 @@ function ActionButtons({ buttons, disabled, onClick }: ActionButtonsProps) {
           </button>
         )
       })}
+    </div>
+  )
+}
+
+// =============================================================================
+// View Chart Button
+// =============================================================================
+
+interface ViewChartButtonProps {
+  url: string
+}
+
+function ViewChartButton({ url }: ViewChartButtonProps) {
+  const navigate = useNavigate()
+
+  // Extract chart ID from URL like "/chart/abc123"
+  const chartId = url.split('/chart/')[1]?.split('?')[0]
+
+  if (!chartId) return null
+
+  const handleClick = () => {
+    navigate(`/charts?preview=${chartId}`)
+  }
+
+  return (
+    <div
+      style={{
+        marginTop: 'var(--space-4)',
+        display: 'flex',
+        gap: 'var(--space-2)',
+      }}
+    >
+      <button
+        type="button"
+        onClick={handleClick}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 'var(--space-2)',
+          padding: 'var(--space-2) var(--space-4)',
+          fontSize: 'var(--text-sm)',
+          fontWeight: 500,
+          fontFamily: 'var(--font-brand)',
+          backgroundColor: 'var(--color-brand)',
+          color: 'white',
+          border: 'none',
+          borderRadius: 'var(--radius-md)',
+          cursor: 'pointer',
+          transition: 'all var(--transition-fast)',
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.backgroundColor = 'var(--color-brand-dim)'
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.backgroundColor = 'var(--color-brand)'
+        }}
+      >
+        <span style={{ fontFamily: 'var(--font-mono)' }}>~</span>
+        View Chart
+      </button>
     </div>
   )
 }
@@ -370,19 +437,19 @@ function DashboardPreview({ slug }: DashboardPreviewProps) {
     <div
       style={{
         marginTop: 'var(--space-4)',
-        border: '1px solid var(--color-gray-200)',
+        border: '1px solid var(--color-gray-700)',
         borderRadius: 'var(--radius-lg)',
         overflow: 'hidden',
-        backgroundColor: 'white',
+        backgroundColor: 'var(--color-gray-800)',
       }}
     >
       <div
         style={{
           padding: 'var(--space-2) var(--space-3)',
-          backgroundColor: 'var(--color-gray-50)',
-          borderBottom: '1px solid var(--color-gray-200)',
+          backgroundColor: 'var(--color-gray-800)',
+          borderBottom: '1px solid var(--color-gray-700)',
           fontSize: 'var(--text-xs)',
-          color: 'var(--color-gray-500)',
+          color: 'var(--color-gray-400)',
           fontFamily: 'var(--font-brand)',
           display: 'flex',
           alignItems: 'center',
