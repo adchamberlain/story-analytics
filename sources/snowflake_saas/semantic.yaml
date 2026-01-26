@@ -1,0 +1,339 @@
+version: '1.0'
+generated_at: '2024-01-15T10:30:00Z'
+source_name: snowflake_saas
+schema_hash: f4637ed3d700
+business_context:
+  description: 'This is a B2B SaaS platform database containing customer subscription
+    data,
+
+    user activity tracking, and billing information. The platform offers tiered
+
+    subscription plans (Free, Starter, Professional, Enterprise) to companies
+
+    across various industries and regions. The data supports analysis of customer
+
+    acquisition, retention, revenue metrics, and product usage patterns.
+
+    '
+  domain: SaaS
+  key_metrics:
+  - MRR (Monthly Recurring Revenue)
+  - Customer Churn Rate
+  - Customer Lifetime Value (CLV)
+  - User Engagement Score
+  - Revenue per Customer
+  - Invoice Collection Rate
+  key_dimensions:
+  - Plan Tier (Free, Starter, Professional, Enterprise)
+  - Industry Vertical
+  - Geographic Region
+  - Company Size (Employee Count)
+  - User Role
+  business_glossary:
+    MRR: Monthly Recurring Revenue - predictable monthly subscription revenue from
+      active customers
+    Churn: Customers who cancelled their subscription (have a churn_date)
+    ARR: Annual Recurring Revenue - MRR multiplied by 12
+    CAC: Customer Acquisition Cost - cost to acquire a new customer
+    LTV: Customer Lifetime Value - total revenue expected from a customer
+tables:
+  CUSTOMERS:
+    description: Master table of all companies/organizations using the SaaS platform
+    business_role: Central entity for customer segmentation, cohort analysis, and
+      account-level metrics
+    typical_questions:
+    - Which industries have the highest conversion to paid plans?
+    - What's the distribution of customers by region and plan tier?
+    - How does company size correlate with plan selection?
+    columns:
+      CUSTOMER_ID:
+        description: Unique identifier for each customer company
+        role: primary_key
+      COMPANY_NAME:
+        description: Name of the customer company
+        role: identifier
+      INDUSTRY:
+        description: Business sector of the customer
+        role: dimension
+        business_meaning: Services, Retail, Manufacturing, Finance, Technology, Healthcare
+          - used for vertical analysis
+      PLAN_TIER:
+        description: Current subscription plan level
+        role: dimension
+        business_meaning: Free=Trial/freemium users, Starter=Basic paid plan, Professional=Mid-tier
+          plan, Enterprise=High-value enterprise customers
+      EMPLOYEE_COUNT:
+        description: Number of employees at the customer company
+        role: measure
+        aggregation_hint: AVG
+        business_meaning: Company size indicator - ranges from small businesses (23
+          employees) to large enterprises (4000+ employees)
+      SIGNUP_DATE:
+        description: Date when the customer first signed up
+        role: date
+        business_meaning: Used for cohort analysis and customer acquisition tracking
+      REGION:
+        description: Geographic region of the customer
+        role: dimension
+        business_meaning: North America, Europe, Asia Pacific, Latin America - used
+          for regional performance analysis
+  SUBSCRIPTIONS:
+    description: Active and historical subscription records with revenue data
+    business_role: Core table for MRR calculations, churn analysis, and subscription
+      lifecycle tracking
+    typical_questions:
+    - What's the current MRR by plan tier?
+    - Which customers churned this month?
+    - What's the average subscription duration by plan?
+    columns:
+      SUBSCRIPTION_ID:
+        description: Unique identifier for each subscription
+        role: primary_key
+      CUSTOMER_ID:
+        description: Links to the customer who owns this subscription
+        role: foreign_key
+        references: CUSTOMERS.CUSTOMER_ID
+      PLAN_TIER:
+        description: Subscription plan level
+        role: dimension
+        business_meaning: Free=$0 MRR, Starter=~$60-90, Professional=~$300-400, Enterprise=$1000+
+      MRR:
+        description: Monthly recurring revenue for this subscription
+        role: measure
+        aggregation_hint: SUM
+        business_meaning: Key SaaS metric - sum across active subscriptions gives
+          total company MRR
+        format_hint: currency
+      START_DATE:
+        description: When the subscription began
+        role: date
+        business_meaning: Used for subscription age calculations and cohort analysis
+      CHURN_DATE:
+        description: When the subscription was cancelled (NULL if active)
+        role: date
+        business_meaning: NULL indicates active subscription, populated date indicates
+          churned customer
+  USERS:
+    description: Individual users within customer organizations
+    business_role: Tracks user adoption, engagement, and role-based usage patterns
+      within customer accounts
+    typical_questions:
+    - How many users per customer on average?
+    - Which user roles are most active?
+    - What's the user growth rate within existing customers?
+    columns:
+      USER_ID:
+        description: Unique identifier for each user
+        role: primary_key
+      CUSTOMER_ID:
+        description: Links to the customer organization this user belongs to
+        role: foreign_key
+        references: CUSTOMERS.CUSTOMER_ID
+      EMAIL:
+        description: User's email address
+        role: identifier
+      ROLE:
+        description: User's permission level within the platform
+        role: dimension
+        business_meaning: Viewer=Read-only, Editor=Can modify, Analyst=Advanced features,
+          Developer=API access, Admin=Full control
+      CREATED_AT:
+        description: When the user account was created
+        role: date
+        business_meaning: Used for user adoption tracking and onboarding analysis
+      LAST_ACTIVE_AT:
+        description: Most recent user activity timestamp
+        role: date
+        business_meaning: Used for engagement scoring and identifying inactive users
+  EVENTS:
+    description: User activity and behavior tracking events
+    business_role: Product analytics data for understanding feature usage, engagement
+      patterns, and user journey
+    typical_questions:
+    - Which features are used most frequently?
+    - What's the user engagement trend over time?
+    - How does feature usage vary by plan tier?
+    columns:
+      EVENT_ID:
+        description: Unique identifier for each event
+        role: primary_key
+      USER_ID:
+        description: User who performed the action
+        role: foreign_key
+        references: USERS.USER_ID
+      EVENT_TYPE:
+        description: Type of action performed
+        role: dimension
+        business_meaning: login=User sessions, feature_used=Core product engagement,
+          report_generated=Value-driving actions, dashboard_created=Advanced usage
+      EVENT_TIMESTAMP:
+        description: When the event occurred
+        role: date
+        business_meaning: Used for time-series analysis of user behavior and engagement
+          trends
+      PROPERTIES:
+        description: Additional event metadata in JSON format
+        role: dimension
+        business_meaning: Contains event-specific details like feature names, report
+          types, etc.
+  INVOICES:
+    description: Billing and payment records for customer subscriptions
+    business_role: Financial data for revenue recognition, cash flow analysis, and
+      payment behavior tracking
+    typical_questions:
+    - What's the average time to payment?
+    - Which customers have overdue invoices?
+    - What's the monthly cash collection rate?
+    columns:
+      INVOICE_ID:
+        description: Unique identifier for each invoice
+        role: primary_key
+      CUSTOMER_ID:
+        description: Customer being billed
+        role: foreign_key
+        references: CUSTOMERS.CUSTOMER_ID
+      AMOUNT:
+        description: Invoice amount in dollars
+        role: measure
+        aggregation_hint: SUM
+        business_meaning: Billed amount - may differ from MRR due to prorations, discounts,
+          or one-time charges
+        format_hint: currency
+      INVOICE_DATE:
+        description: When the invoice was generated
+        role: date
+        business_meaning: Used for revenue recognition and aging analysis
+      PAID_DATE:
+        description: When the invoice was paid (NULL if unpaid)
+        role: date
+        business_meaning: Used to calculate days sales outstanding (DSO) and payment
+          behavior
+      STATUS:
+        description: Current invoice status
+        role: dimension
+        business_meaning: paid=Collected revenue, pending=Outstanding receivables
+relationships:
+- from: SUBSCRIPTIONS.CUSTOMER_ID
+  to: CUSTOMERS.CUSTOMER_ID
+  type: many_to_one
+  description: Each customer can have multiple subscriptions (upgrades, downgrades,
+    renewals)
+- from: USERS.CUSTOMER_ID
+  to: CUSTOMERS.CUSTOMER_ID
+  type: many_to_one
+  description: Each customer organization can have multiple user accounts
+- from: EVENTS.USER_ID
+  to: USERS.USER_ID
+  type: many_to_one
+  description: Each user generates multiple activity events
+- from: INVOICES.CUSTOMER_ID
+  to: CUSTOMERS.CUSTOMER_ID
+  type: many_to_one
+  description: Each customer receives multiple invoices over time
+query_patterns:
+  current_mrr_analysis:
+    description: Calculate current Monthly Recurring Revenue by various dimensions
+    use_when:
+    - current MRR
+    - monthly recurring revenue
+    - active subscriptions
+    pattern: 'Sum MRR from SUBSCRIPTIONS where CHURN_DATE IS NULL (active subscriptions).
+
+      Join with CUSTOMERS for segmentation by plan_tier, industry, region.
+
+      Use MAX(START_DATE) to get most recent subscription per customer.
+
+      '
+    example: "SELECT \n  c.PLAN_TIER,\n  SUM(s.MRR) as current_mrr,\n  COUNT(*) as\
+      \ active_customers\nFROM SUBSCRIPTIONS s\nJOIN CUSTOMERS c ON s.CUSTOMER_ID\
+      \ = c.CUSTOMER_ID\nWHERE s.CHURN_DATE IS NULL\nGROUP BY c.PLAN_TIER\n"
+  churn_analysis:
+    description: Analyze customer churn patterns and rates
+    use_when:
+    - churn rate
+    - customer retention
+    - cancelled subscriptions
+    pattern: 'Use CHURN_DATE to identify churned customers. Calculate churn rate as
+
+      churned customers / total customers in a time period. Consider subscription
+
+      duration (CHURN_DATE - START_DATE) for churn timing analysis.
+
+      '
+    example: "SELECT \n  DATE_TRUNC('month', CHURN_DATE) as churn_month,\n  COUNT(*)\
+      \ as churned_customers,\n  AVG(DATEDIFF('day', START_DATE, CHURN_DATE)) as avg_subscription_days\n\
+      FROM SUBSCRIPTIONS\nWHERE CHURN_DATE IS NOT NULL\nGROUP BY DATE_TRUNC('month',\
+      \ CHURN_DATE)\n"
+  cohort_analysis:
+    description: Track customer behavior by signup cohorts
+    use_when:
+    - cohort analysis
+    - signup cohort
+    - customer lifetime
+    pattern: 'Group customers by SIGNUP_DATE month/quarter. Track their subscription
+
+      and revenue behavior over time. Join SUBSCRIPTIONS to see plan evolution
+
+      and churn timing by cohort.
+
+      '
+    example: "SELECT \n  DATE_TRUNC('month', c.SIGNUP_DATE) as signup_cohort,\n  COUNT(DISTINCT\
+      \ c.CUSTOMER_ID) as cohort_size,\n  SUM(CASE WHEN s.CHURN_DATE IS NULL THEN\
+      \ s.MRR ELSE 0 END) as current_mrr\nFROM CUSTOMERS c\nLEFT JOIN SUBSCRIPTIONS\
+      \ s ON c.CUSTOMER_ID = s.CUSTOMER_ID\nGROUP BY DATE_TRUNC('month', c.SIGNUP_DATE)\n"
+  user_engagement_scoring:
+    description: Calculate user and customer engagement metrics
+    use_when:
+    - user engagement
+    - product usage
+    - feature adoption
+    pattern: 'Count events per user/customer over time periods. Weight different
+
+      EVENT_TYPEs by value (login=1, feature_used=3, report_generated=5).
+
+      Use LAST_ACTIVE_AT to identify inactive users.
+
+      '
+    example: "SELECT \n  u.CUSTOMER_ID,\n  COUNT(DISTINCT u.USER_ID) as total_users,\n\
+      \  COUNT(DISTINCT e.EVENT_ID) as total_events,\n  COUNT(DISTINCT CASE WHEN e.EVENT_TYPE\
+      \ = 'feature_used' THEN e.EVENT_ID END) as feature_events\nFROM USERS u\nLEFT\
+      \ JOIN EVENTS e ON u.USER_ID = e.USER_ID\nWHERE e.EVENT_TIMESTAMP >= CURRENT_DATE\
+      \ - 30\nGROUP BY u.CUSTOMER_ID\n"
+  revenue_recognition:
+    description: Track billed vs collected revenue and payment timing
+    use_when:
+    - revenue recognition
+    - cash collection
+    - accounts receivable
+    pattern: 'Compare INVOICE_DATE (when revenue is recognized) vs PAID_DATE (when
+      cash
+
+      is collected). Calculate DSO (Days Sales Outstanding) and aging buckets
+
+      for outstanding invoices.
+
+      '
+    example: "SELECT \n  DATE_TRUNC('month', INVOICE_DATE) as invoice_month,\n  SUM(AMOUNT)\
+      \ as billed_revenue,\n  SUM(CASE WHEN STATUS = 'paid' THEN AMOUNT ELSE 0 END)\
+      \ as collected_revenue,\n  AVG(DATEDIFF('day', INVOICE_DATE, COALESCE(PAID_DATE,\
+      \ CURRENT_DATE))) as avg_dso\nFROM INVOICES\nGROUP BY DATE_TRUNC('month', INVOICE_DATE)\n"
+  customer_health_scoring:
+    description: Combine subscription, usage, and payment data for customer health
+    use_when:
+    - customer health
+    - at-risk customers
+    - expansion opportunities
+    pattern: 'Join all tables to create comprehensive customer view. Consider factors:
+
+      MRR trend, user activity (from EVENTS), payment behavior (from INVOICES),
+
+      user growth within account, feature adoption depth.
+
+      '
+    example: "SELECT \n  c.CUSTOMER_ID,\n  c.COMPANY_NAME,\n  s.MRR,\n  COUNT(DISTINCT\
+      \ u.USER_ID) as user_count,\n  MAX(u.LAST_ACTIVE_AT) as last_activity,\n  COUNT(DISTINCT\
+      \ e.EVENT_ID) as recent_events\nFROM CUSTOMERS c\nJOIN SUBSCRIPTIONS s ON c.CUSTOMER_ID\
+      \ = s.CUSTOMER_ID\nLEFT JOIN USERS u ON c.CUSTOMER_ID = u.CUSTOMER_ID\nLEFT\
+      \ JOIN EVENTS e ON u.USER_ID = e.USER_ID AND e.EVENT_TIMESTAMP >= CURRENT_DATE\
+      \ - 30\nWHERE s.CHURN_DATE IS NULL\nGROUP BY c.CUSTOMER_ID, c.COMPANY_NAME,\
+      \ s.MRR"

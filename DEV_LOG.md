@@ -4,6 +4,409 @@ This log captures development changes made during each session. Review this at t
 
 ---
 
+## Session: 2026-01-25 (Part 6)
+
+### Focus: Semantic Layer for Data Sources
+
+**Context**: Implemented a semantic layer feature that generates LLM-powered documentation for database schemas. This documentation provides business context, column descriptions, relationships, and common query patterns - enabling more reliable chart generation.
+
+### Why This Matters
+
+**Before (raw schema)**: LLM sees columns and must guess meanings each time
+```
+- PLAN_TIER: VARCHAR NULL
+  Sample values: Pro, Starter, Enterprise
+```
+
+**After (with semantic layer)**: LLM gets rich business context
+```
+- PLAN_TIER: VARCHAR NULL [dimension]
+  Description: Current subscription plan level
+  Business meaning: Free=Trial users, Starter=$99/mo, Pro=$499/mo, Enterprise=Custom
+```
+
+### Implementation Completed
+
+1. **Semantic Layer Data Structures** (`engine/semantic.py`):
+   - `ColumnSemantic`: Role, description, aggregation hints, business meaning
+   - `TableSemantic`: Description, business role, typical questions
+   - `Relationship`: Foreign key relationships between tables
+   - `QueryPattern`: Common SQL patterns for the domain
+   - `BusinessContext`: Domain description, key metrics, glossary
+   - `SemanticLayer`: Complete semantic documentation with YAML serialization
+
+2. **LLM Generator** (`engine/semantic_generator.py`):
+   - `SemanticGenerator` class that:
+     - Introspects database schema
+     - Samples data from each table
+     - Sends schema + samples to LLM for analysis
+     - Parses response into SemanticLayer object
+   - Schema hash for staleness detection
+   - `generate_semantic_layer()` convenience function
+
+3. **Generation Prompt** (`engine/prompts/semantic/generate.yaml`):
+   - Detailed instructions for LLM to generate semantic layer
+   - Column role classification (primary_key, foreign_key, dimension, measure, date)
+   - Aggregation hints (SUM, COUNT, AVG)
+   - Business meaning explanations
+   - Query pattern identification
+
+4. **CLI Commands** (`engine/cli/semantic.py`):
+   - `generate`: Create semantic layer for a data source
+   - `status`: Check if semantic layer exists and is up to date
+   - `show`: Display semantic layer in YAML or prompt format
+   - Supports `--force` and `--provider` flags
+
+5. **Schema Integration** (`engine/schema.py`):
+   - `get_schema_hash()`: Deterministic hash for staleness detection
+   - Enhanced `to_prompt_context(semantic_layer)`: Merges semantic info with schema
+   - Module-level `get_schema_hash()` function
+
+6. **Config Loader** (`engine/config_loader.py`):
+   - `get_semantic_layer(source_name)`: Load semantic layer from YAML
+   - `get_semantic_prompt(source_name)`: Format for LLM context
+   - `has_semantic_layer(source_name)`: Check if exists
+   - `clear_semantic_cache()`: Cache management
+
+### Files Created
+
+| File | Purpose |
+|------|---------|
+| `engine/semantic.py` | SemanticLayer and related dataclasses |
+| `engine/semantic_generator.py` | LLM-powered generation |
+| `engine/prompts/semantic/generate.yaml` | Generation prompt |
+| `engine/cli/__init__.py` | CLI package init |
+| `engine/cli/semantic.py` | CLI commands |
+| `sources/snowflake_saas/semantic.yaml` | Generated semantic layer |
+
+### Files Modified
+
+| File | Change |
+|------|--------|
+| `engine/schema.py` | Added `get_schema_hash()`, enhanced `to_prompt_context()` |
+| `engine/config_loader.py` | Added semantic layer methods and cache |
+
+### Generated Semantic Layer Summary
+
+For `snowflake_saas`:
+- **Tables**: 5 (CUSTOMERS, SUBSCRIPTIONS, USERS, EVENTS, INVOICES)
+- **Relationships**: 4 (all foreign keys properly documented)
+- **Query Patterns**: 6 (MRR analysis, churn, cohorts, engagement, revenue, customer health)
+- **Domain**: SaaS
+- **Key Metrics**: MRR, Churn Rate, CLV, Engagement Score, Revenue per Customer
+
+### Usage
+
+```bash
+# Generate semantic layer
+python -m engine.cli.semantic generate snowflake_saas
+
+# Check status
+python -m engine.cli.semantic status snowflake_saas
+
+# View formatted for prompts
+python -m engine.cli.semantic show snowflake_saas
+
+# Force regeneration
+python -m engine.cli.semantic generate snowflake_saas --force
+```
+
+### Integration with Chart Pipeline
+
+The semantic layer can now be loaded and merged with schema context:
+
+```python
+from engine.config_loader import get_config_loader
+from engine.schema import get_schema_context
+
+loader = get_config_loader()
+semantic_layer = loader.get_semantic_layer('snowflake_saas')
+context = get_schema_context(semantic_layer)  # Rich context for LLM
+```
+
+### Next Steps
+
+- [ ] Integrate semantic layer into chart pipeline's SQL generation
+- [ ] Add automatic semantic layer regeneration when schema changes
+- [ ] Consider adding dashboard-level semantic documentation
+- [ ] Test chart generation quality improvement with semantic context
+
+---
+
+## Session: 2026-01-25 (Part 5)
+
+### Focus: Explicit Column Mapping Refactoring (AI-Native Fix)
+
+**Context**: User experienced unreliable chart generation where the same request (MRR by product over time) worked sometimes and failed other times. Root cause was systemic: the pipeline used heuristic keyword matching to guess column roles instead of having the LLM explicitly specify them.
+
+### The Problem
+
+The `_build_chart_config()` method in `chart_pipeline.py` used fragile heuristics:
+
+```python
+# OLD APPROACH: Fragile keyword matching
+series_keywords = ["type", "category", "segment", "group", "status", ...]
+for col in y_columns:
+    if any(kw in col for kw in series_keywords):
+        series_col = col
+```
+
+Issues with this approach:
+1. Column names might not contain expected keywords
+2. Case sensitivity mismatches (PLAN_TIER vs plan_tier)
+3. Different naming conventions across projects
+4. Throws away LLM's understanding of the data
+
+### The Solution: Explicit LLM Column Mappings
+
+Following the project's AI-native philosophy, we now have the LLM explicitly specify column roles.
+
+**1. Added column mapping fields to ChartSpec** (`engine/models/chart.py`):
+```python
+@dataclass
+class ChartSpec:
+    # ... existing fields ...
+
+    # Explicit column mappings (LLM-specified, not heuristic-guessed)
+    x_column: str | None = None      # Column for X-axis (e.g., "month")
+    y_column: str | list[str] | None = None  # Y-axis metric(s)
+    series_column: str | None = None # Grouping column (e.g., "plan_tier")
+```
+
+**2. Updated requirements prompt** (`engine/prompts/chart/requirements.yaml`):
+- Added instruction section 9 requiring explicit column mappings
+- Updated all JSON examples to include x_column, y_column, series_column
+- Emphasized lowercase column names for consistency
+
+**3. Updated parsing logic** (`engine/chart_pipeline.py`):
+- `_parse_response()` extracts new fields and normalizes to lowercase
+- `_build_chart_config()` uses explicit mappings when available
+- Falls back to heuristics only if mappings not provided (backward compatibility)
+
+### Example: Before vs After
+
+**Request**: "Show me MRR by product over time"
+
+**Before (heuristic, unreliable)**:
+- SQL returns columns: `month`, `plan_tier`, `mrr`
+- Heuristic scans for keywords... might or might not detect `plan_tier`
+- Result: Sometimes works, sometimes broken
+
+**After (explicit, reliable)**:
+- LLM returns: `{"x_column": "month", "y_column": "mrr", "series_column": "plan_tier"}`
+- Pipeline uses exact mappings
+- Result: Consistently correct
+
+### Files Modified
+
+| File | Change |
+|------|--------|
+| `engine/models/chart.py` | Added x_column, y_column, series_column fields to ChartSpec |
+| `engine/prompts/chart/requirements.yaml` | Added column mapping instructions and examples |
+| `engine/chart_pipeline.py` | Extract column mappings, use explicit mappings in _build_chart_config() |
+
+### Verification
+
+```bash
+# Test explicit mapping extraction
+python -c "
+from engine.chart_pipeline import ChartRequirementsAgent
+agent = ChartRequirementsAgent()
+spec = agent._parse_response('...json with mappings...', 'request')
+print(f'x_column: {spec.x_column}')  # month
+print(f'y_column: {spec.y_column}')  # mrr
+print(f'series_column: {spec.series_column}')  # plan_tier
+"
+
+# Test config builder uses explicit mappings
+# Output: "[ChartPipeline]   Using explicit column mappings: x=month, y=mrr, series=plan_tier"
+```
+
+### Design Philosophy Note
+
+This change aligns with the project's AI-native philosophy documented in CLAUDE.md:
+> "Never use naive string/keyword matching for intent detection or control flow."
+
+The LLM now explicitly communicates column roles rather than the pipeline guessing from keywords.
+
+### Next Steps
+
+- [ ] Test full chart creation flow with explicit mappings
+- [ ] Monitor for any edge cases where LLM doesn't provide mappings
+- [ ] Consider adding validation that column names exist in SQL output
+
+---
+
+## Session: 2026-01-25 (Part 4)
+
+### Focus: Chart Creation Quality & UX Improvements
+
+**Context**: User experienced 20+ chart creation failures with incorrect outputs. Root causes identified:
+1. Series column detection was missing common keywords like "product", "tier", "plan"
+2. Charts were generated immediately without user review of SQL/data
+3. Visual QA was disabled for charts
+4. No progress feedback during generation
+
+### Bug Fix: Multiline Chart Series Detection
+
+**Problem**: A request for "MRR by product over time" produced a broken chart where "product" was plotted as a Y-axis value instead of being used as a series grouper.
+
+**Root Cause**: In `chart_pipeline.py`, the `series_keywords` list was missing common categorical column names.
+
+**Fix** (`engine/chart_pipeline.py`):
+```python
+# Before
+series_keywords = ["type", "category", "segment", "group", "status", "event", "name", "label"]
+
+# After
+series_keywords = ["type", "category", "segment", "group", "status", "event", "name", "label", "product", "tier", "plan", "region", "channel", "source"]
+```
+
+### Feature 1: Chart Proposal Step
+
+Added a proposal phase to chart creation where users can review SQL and data preview before generating the chart.
+
+**New Flow**:
+1. User describes chart
+2. System shows PROPOSED CHART with:
+   - Chart title and description
+   - SQL query (formatted in code block)
+   - Data preview table (first 5 rows)
+3. User clicks "Generate" to proceed or "Modify Plan" to adjust
+
+**Changes**:
+- Added `PROPOSING` phase to `ChartPhase` enum
+- Added proposal state to `ChartConversationState` (proposed_spec, proposed_sql, proposed_columns, proposed_data_preview)
+- New `_build_proposal_response()` method formats proposal as markdown with data table
+- New `_handle_generate_chart()` method creates chart from approved proposal
+- Updated `process_message()` to handle PROPOSING phase
+- Updated frontend PHASE_LABELS
+
+### Feature 2: Visual QA for Charts
+
+Enabled screenshot-based QA validation for chart creation.
+
+**Change** (`engine/chart_pipeline.py:435`):
+```python
+# Before
+enable_visual_qa=False,  # Visual QA requires running app
+
+# After
+enable_visual_qa=True,  # Screenshot-based validation
+```
+
+QA now runs during `_handle_generate_chart()` if visual QA is enabled.
+
+### Feature 3: Streaming Progress for Chart Creation
+
+Added SSE streaming to show users progress during chart generation.
+
+**Backend** (`api/routers/chart.py`):
+- New endpoint: `POST /charts/conversation/message/stream`
+- Uses same pattern as dashboard streaming
+- Emits progress events: requirements, sql, validation, layout, writing, qa, complete
+
+**Engine** (`engine/chart_conversation.py`):
+- Added `progress_emitter` parameter to `ChartConversationManager`
+- Added `_emit_progress()` helper method
+- Progress emissions throughout `_handle_new_chart_request()` and `_handle_generate_chart()`
+
+**Frontend**:
+- Added `sendChartMessageStream()` function to API client
+- Updated `conversationStore` to use streaming for `__action:generate`
+- Progress steps displayed in ChatPage (reuses existing progress UI)
+
+### Files Modified
+
+| File | Change |
+|------|--------|
+| `engine/chart_pipeline.py` | Added series keywords, enabled visual QA |
+| `engine/chart_conversation.py` | Added proposal phase, progress emission, QA integration |
+| `api/routers/chart.py` | Added streaming endpoint |
+| `app/src/api/client.ts` | Added `sendChartMessageStream()` function |
+| `app/src/stores/conversationStore.ts` | Use streaming for chart generate action |
+| `app/src/pages/ChatPage.tsx` | Updated PHASE_LABELS for chart phases |
+
+### Verification
+
+- TypeScript build should pass
+- Chart creation now shows proposal before generation
+- Progress indicator appears during chart generation
+- Visual QA validates charts against original request
+
+### Next Steps
+
+- [ ] Test full chart creation flow with proposal + QA
+- [ ] Monitor QA pass rate and tune if needed
+- [ ] Consider adding retry with fixes when QA fails
+
+---
+
+## Session: 2026-01-25 (Part 3)
+
+### Focus: Dashboard Composition from Existing Charts
+
+**Context**: Implemented a feature allowing users to select charts from their library and compose them into a new dashboard. The chartStore already had selection infrastructure that was unused.
+
+### Implementation Completed
+
+1. **API Client Function** (`app/src/api/client.ts`):
+   - Added `createDashboardFromCharts(title, description, chartIds)` function
+   - Calls existing `POST /charts/dashboards` endpoint
+   - Returns dashboard URL for navigation on success
+
+2. **CreateDashboardModal Component** (`app/src/components/modals/CreateDashboardModal.tsx`):
+   - New modal component for dashboard creation
+   - Title input (required), description textarea (optional)
+   - Shows list of selected chart titles for confirmation
+   - Loading state with spinner during creation
+   - Error handling and display
+
+3. **ChartsPage Selection Mode** (`app/src/pages/ChartsPage.tsx`):
+   - Added "Select Charts" toggle button in header
+   - Selection mode shows:
+     - Checkboxes on each chart card (top-left corner with checkmark SVG)
+     - Selection count indicator
+     - "Create Dashboard" button (disabled when 0 selected)
+     - "Cancel" button to exit selection mode
+   - Selected cards have highlighted border (brand color)
+   - Click card to toggle selection (replaces preview behavior in selection mode)
+   - After successful creation, navigates to new dashboard
+
+### Files Created
+
+| File | Purpose |
+|------|---------|
+| `app/src/components/modals/CreateDashboardModal.tsx` | Modal for title/description input |
+| `app/src/components/modals/index.ts` | Barrel export |
+
+### Files Modified
+
+| File | Change |
+|------|--------|
+| `app/src/api/client.ts` | Added `createDashboardFromCharts()` function |
+| `app/src/pages/ChartsPage.tsx` | Added selection mode UI, checkboxes, modal integration |
+
+### Existing Infrastructure Used (No Changes Needed)
+
+- `app/src/stores/chartStore.ts` - Already had `selectionMode`, `selectedChartIds`, `toggleSelectionMode`, `toggleChartSelection`, `clearSelection`
+- `api/routers/chart.py` - `POST /charts/dashboards` endpoint already existed
+- `api/schemas/chart.py` - `DashboardCreateRequest/Response` schemas already existed
+- `engine/dashboard_composer.py` - `create_dashboard(chart_ids)` already worked
+
+### Verification
+
+- TypeScript build passes successfully
+- Selection mode UI toggles correctly
+- Modal shows selected charts and validates required fields
+
+### Next Steps
+
+- [ ] Test full flow: select charts → create dashboard → navigate to dashboard view
+- [ ] Verify dashboard renders all selected charts correctly
+
+---
+
 ## Session: 2026-01-25 (Part 2)
 
 ### Focus: Chart Quality Validation System
