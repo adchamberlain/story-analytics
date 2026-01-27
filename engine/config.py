@@ -92,6 +92,22 @@ class Config:
 
         return options
 
+    @property
+    def source_name(self) -> str:
+        """Get the source name from the connection configuration file.
+
+        This is the 'name' field in connection.yaml, used for table references
+        in SQL queries (e.g., 'olist_ecommerce.orders').
+        """
+        conn_file = self.snowflake_connection_file
+        if not conn_file.exists():
+            return "snowflake_saas"  # Default fallback
+
+        with open(conn_file) as f:
+            config = yaml.safe_load(f)
+
+        return config.get("name", "snowflake_saas")
+
 
 # Global config instance
 _config: Config | None = None
@@ -103,3 +119,12 @@ def get_config() -> Config:
     if _config is None:
         _config = Config()
     return _config
+
+
+def clear_config_cache() -> None:
+    """Clear the cached config.
+
+    Call this when switching data sources or reloading configuration.
+    """
+    global _config
+    _config = None

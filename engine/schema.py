@@ -94,7 +94,7 @@ class Schema:
         json_str = json.dumps(hash_data, sort_keys=True)
         return hashlib.sha256(json_str.encode()).hexdigest()[:12]
 
-    def to_prompt_context(self, semantic_layer: SemanticLayer | None = None) -> str:
+    def to_prompt_context(self, semantic_layer: SemanticLayer | None = None, source_name: str | None = None) -> str:
         """
         Convert schema to a string suitable for LLM context.
 
@@ -102,12 +102,21 @@ class Schema:
             semantic_layer: Optional semantic layer to merge in for richer context.
                            If provided, includes business context, column descriptions,
                            relationships, and query patterns.
+            source_name: The source name to use for table references (e.g., 'olist_ecommerce').
+                        If not provided, defaults to semantic layer source_name or 'snowflake_saas'.
 
         Returns:
             Formatted string for inclusion in LLM prompts.
         """
-        lines = [f"Source: snowflake_saas (Snowflake: {self.database}.{self.schema_name})", ""]
-        lines.append("IMPORTANT: In SQL queries, reference tables as 'snowflake_saas.tablename'")
+        # Determine source name: explicit > semantic layer > default
+        if source_name is None:
+            if semantic_layer and hasattr(semantic_layer, 'source_name') and semantic_layer.source_name:
+                source_name = semantic_layer.source_name
+            else:
+                source_name = "snowflake_saas"
+
+        lines = [f"Source: {source_name} (Snowflake: {self.database}.{self.schema_name})", ""]
+        lines.append(f"IMPORTANT: In SQL queries, reference tables as '{source_name}.tablename'")
         lines.append("")
 
         # Add business context if semantic layer is available
@@ -137,7 +146,7 @@ class Schema:
         for table in self.tables:
             row_info = f" ({table.row_count:,} rows)" if table.row_count else ""
             # Show full reference path
-            lines.append(f"### Table: snowflake_saas.{table.name.lower()}{row_info}")
+            lines.append(f"### Table: {source_name}.{table.name.lower()}{row_info}")
 
             # Add table semantic info if available
             table_semantic = None
@@ -361,19 +370,31 @@ def get_schema(include_samples: bool = True) -> Schema:
     return _introspector.get_schema(include_samples)
 
 
-def get_schema_context(semantic_layer: SemanticLayer | None = None) -> str:
+def get_schema_context(semantic_layer: SemanticLayer | None = None, source_name: str | None = None) -> str:
     """
     Get schema as a string for LLM context.
 
     Args:
         semantic_layer: Optional semantic layer to include for richer context.
+        source_name: The source name to use for table references.
 
     Returns:
         Formatted schema string suitable for LLM prompts.
     """
-    return get_schema().to_prompt_context(semantic_layer)
+    return get_schema().to_prompt_context(semantic_layer, source_name)
 
 
 def get_schema_hash() -> str:
     """Get a hash of the current schema structure."""
     return get_schema().get_schema_hash()
+
+
+def clear_schema_cache() -> None:
+    """Clear the cached schema introspector.
+
+    Call this when switching data sources or when the schema may have changed.
+    """
+    global _introspector
+    if _introspector is not None:
+        _introspector.close()
+        _introspector = None

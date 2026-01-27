@@ -426,8 +426,12 @@ class ChartPipeline:
     3. Assemble the chart (trivial)
     """
 
-    def __init__(self, config: ChartPipelineConfig | None = None, source_name: str = "snowflake_saas"):
+    def __init__(self, config: ChartPipelineConfig | None = None, source_name: str | None = None):
         self.config = config or ChartPipelineConfig()
+        # Get source_name from global config if not explicitly provided
+        if source_name is None:
+            from .config import get_config
+            source_name = get_config().source_name
         self.source_name = source_name
         self._schema_context: str | None = None
         self._semantic_layer: SemanticLayer | None = None
@@ -470,7 +474,7 @@ class ChartPipeline:
         """Get cached schema context with semantic layer enrichment."""
         if self._schema_context is None:
             semantic_layer = self.get_semantic_layer()
-            self._schema_context = get_schema_context(semantic_layer)
+            self._schema_context = get_schema_context(semantic_layer, self.source_name)
         return self._schema_context
 
     def run(self, user_request: str) -> ChartPipelineResult:
@@ -655,11 +659,17 @@ class ChartPipeline:
         # Set up based on chart type
         if spec.chart_type == ChartType.BIG_VALUE:
             # BigValue: just needs the value column
-            if spec.y_column:
-                # Use explicit mapping
-                config.value = spec.y_column if isinstance(spec.y_column, str) else spec.y_column[0]
+            # Validate that the specified column exists in SQL output
+            y_col_str = spec.y_column if isinstance(spec.y_column, str) else (spec.y_column[0] if spec.y_column else None)
+            y_col_valid = y_col_str and y_col_str in columns_lower
+
+            if y_col_valid:
+                config.value = y_col_str
             elif columns_lower:
-                config.value = columns_lower[-1]  # Usually the aggregated value is last
+                # Fallback: use the last column (usually the aggregated value)
+                config.value = columns_lower[-1]
+                if self.config.verbose and spec.y_column:
+                    print(f"[ChartPipeline]   WARNING: BigValue spec.y_column '{spec.y_column}' not in SQL columns {columns_lower}, using fallback: {config.value}")
             config.title = spec.title
 
         elif spec.chart_type in (ChartType.LINE_CHART, ChartType.AREA_CHART):
@@ -671,12 +681,22 @@ class ChartPipeline:
                 elif columns_lower:
                     config.x = columns_lower[0]
 
+                # Validate y_column exists in actual SQL output columns
+                y_col_valid = False
                 if spec.y_column:
+                    if isinstance(spec.y_column, str):
+                        y_col_valid = spec.y_column in columns_lower
+                    elif isinstance(spec.y_column, list):
+                        y_col_valid = all(c in columns_lower for c in spec.y_column)
+
+                if spec.y_column and y_col_valid:
                     config.y = spec.y_column
                 elif len(columns_lower) >= 2:
-                    # Fallback: all non-x columns are y
+                    # Fallback: use columns from SQL output (more reliable than spec guess)
                     y_cols = [c for c in columns_lower if c != config.x]
                     config.y = y_cols[0] if len(y_cols) == 1 else y_cols
+                    if self.config.verbose and spec.y_column:
+                        print(f"[ChartPipeline]   WARNING: spec.y_column '{spec.y_column}' not in SQL columns {columns_lower}, using fallback: {config.y}")
 
                 if spec.series_column and spec.series_column in columns_lower:
                     config.series = spec.series_column
@@ -754,12 +774,22 @@ class ChartPipeline:
                 elif columns_lower:
                     config.x = columns_lower[0]
 
+                # Validate y_column exists in actual SQL output columns
+                y_col_valid = False
                 if spec.y_column:
+                    if isinstance(spec.y_column, str):
+                        y_col_valid = spec.y_column in columns_lower
+                    elif isinstance(spec.y_column, list):
+                        y_col_valid = all(c in columns_lower for c in spec.y_column)
+
+                if spec.y_column and y_col_valid:
                     config.y = spec.y_column
                 elif len(columns_lower) >= 2:
-                    # Fallback: all non-x columns are y
+                    # Fallback: use columns from SQL output (more reliable than spec guess)
                     y_cols = [c for c in columns_lower if c != config.x]
                     config.y = y_cols[0] if len(y_cols) == 1 else y_cols
+                    if self.config.verbose and spec.y_column:
+                        print(f"[ChartPipeline]   WARNING: spec.y_column '{spec.y_column}' not in SQL columns {columns_lower}, using fallback: {config.y}")
 
                 if spec.series_column and spec.series_column in columns_lower:
                     config.series = spec.series_column
@@ -845,6 +875,120 @@ class ChartPipeline:
                 "chartAreaHeight": 350,
             }
 
+        elif spec.chart_type == ChartType.HEATMAP:
+            # Heatmap: needs x, y, and value columns
+            # x = column dimension (e.g., month)
+            # y = row dimension (e.g., segment) - should be a CATEGORY, not a metric!
+            # value = color intensity value (numeric metric)
+
+            # For 3-column results, columns are typically: [time, category, metric]
+            # LLMs sometimes confuse y_column (should be category) with the metric
+            if len(columns_lower) >= 3:
+                # Smart detection: assume pattern is [x_dimension, y_dimension, value]
+                # The value is typically the last column (the aggregated metric)
+                x_col = columns_lower[0]  # First column (usually time/date)
+                y_col = columns_lower[1]  # Second column (usually category)
+                value_col = columns_lower[2]  # Third column (usually the metric)
+
+                # If LLM provided x_column, use it
+                if spec.x_column and spec.x_column in columns_lower:
+                    x_col = spec.x_column
+
+                # If LLM provided y_column, check if it's actually a metric (third column)
+                # If so, it was confused - use the second column instead
+                if spec.y_column:
+                    if spec.y_column == columns_lower[2]:
+                        # LLM confused y_column with the value - use second column
+                        y_col = columns_lower[1]
+                        value_col = spec.y_column
+                        if self.config.verbose:
+                            print(f"[ChartPipeline]   Heatmap: corrected y_column from metric '{spec.y_column}' to category '{y_col}'")
+                    else:
+                        y_col = spec.y_column
+
+                config.x = x_col
+                config.y = y_col
+                config.value = value_col
+
+                if self.config.verbose:
+                    print(f"[ChartPipeline]   Heatmap mappings: x={config.x}, y={config.y}, value={config.value}")
+
+            elif len(columns_lower) == 2:
+                # If only 2 columns, use first as x, second as both y and value
+                config.x = columns_lower[0]
+                config.y = columns_lower[1]
+                config.value = columns_lower[1]
+
+            config.title = spec.title
+            config.extra_props = {
+                "chartAreaHeight": 350,
+            }
+
+        elif spec.chart_type == ChartType.FUNNEL_CHART:
+            # FunnelChart: needs stage/category and value columns
+            if has_explicit_mappings:
+                if spec.x_column and spec.x_column in columns_lower:
+                    config.x = spec.x_column  # Stage names
+                elif columns_lower:
+                    config.x = columns_lower[0]
+
+                if spec.y_column:
+                    config.y = spec.y_column if isinstance(spec.y_column, str) else spec.y_column[0]
+                elif len(columns_lower) >= 2:
+                    config.y = columns_lower[1]  # Values
+
+                if self.config.verbose:
+                    print(f"[ChartPipeline]   Funnel mappings: x={config.x}, y={config.y}")
+            elif len(columns_lower) >= 2:
+                config.x = columns_lower[0]  # Stage/category
+                config.y = columns_lower[1]  # Value/count
+
+            config.title = spec.title
+            config.extra_props = {
+                "chartAreaHeight": 350,
+            }
+
+        elif spec.chart_type == ChartType.HISTOGRAM:
+            # Histogram: needs value column for distribution
+            if has_explicit_mappings:
+                if spec.x_column and spec.x_column in columns_lower:
+                    config.x = spec.x_column
+                elif columns_lower:
+                    config.x = columns_lower[0]
+                if self.config.verbose:
+                    print(f"[ChartPipeline]   Histogram mapping: x={config.x}")
+            elif columns_lower:
+                config.x = columns_lower[0]  # Value column for binning
+
+            config.title = spec.title
+            config.extra_props = {
+                "chartAreaHeight": 350,
+            }
+
+        elif spec.chart_type == ChartType.SCATTER_PLOT:
+            # ScatterPlot: needs x metric and y metric
+            if has_explicit_mappings:
+                if spec.x_column and spec.x_column in columns_lower:
+                    config.x = spec.x_column
+                elif columns_lower:
+                    config.x = columns_lower[0]
+
+                if spec.y_column:
+                    config.y = spec.y_column if isinstance(spec.y_column, str) else spec.y_column[0]
+                elif len(columns_lower) >= 2:
+                    config.y = columns_lower[1]
+
+                if self.config.verbose:
+                    print(f"[ChartPipeline]   Scatter mappings: x={config.x}, y={config.y}")
+            elif len(columns_lower) >= 2:
+                config.x = columns_lower[0]
+                config.y = columns_lower[1]
+
+            config.title = spec.title
+            config.extra_props = {
+                "chartAreaHeight": 350,
+            }
+
         else:
             # Default: assume x/y from columns
             if has_explicit_mappings:
@@ -854,11 +998,21 @@ class ChartPipeline:
                 elif columns_lower:
                     config.x = columns_lower[0]
 
+                # Validate y_column exists in actual SQL output columns
+                y_col_valid = False
                 if spec.y_column:
+                    if isinstance(spec.y_column, str):
+                        y_col_valid = spec.y_column in columns_lower
+                    elif isinstance(spec.y_column, list):
+                        y_col_valid = all(c in columns_lower for c in spec.y_column)
+
+                if spec.y_column and y_col_valid:
                     config.y = spec.y_column
                 elif len(columns_lower) >= 2:
                     y_cols = [c for c in columns_lower if c != config.x]
                     config.y = y_cols[0] if len(y_cols) == 1 else y_cols
+                    if self.config.verbose and spec.y_column:
+                        print(f"[ChartPipeline]   WARNING: spec.y_column '{spec.y_column}' not in SQL columns {columns_lower}, using fallback: {config.y}")
 
                 if spec.series_column and spec.series_column in columns_lower:
                     config.series = spec.series_column

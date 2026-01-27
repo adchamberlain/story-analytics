@@ -1,0 +1,412 @@
+version: '1.0'
+generated_at: '2024-12-19T10:30:00Z'
+source_name: olist_ecommerce
+schema_hash: 86f97d012710
+business_context:
+  description: 'This is an e-commerce marketplace dataset from Olist, a Brazilian
+    e-commerce platform
+
+    that connects small businesses to major marketplaces. The data captures the complete
+
+    customer journey from order placement through delivery and review, including payment
+
+    processing, product catalog, and seller information. This represents a typical
+
+    multi-vendor marketplace with detailed transaction and fulfillment tracking.
+
+    '
+  domain: E-commerce
+  key_metrics:
+  - Gross Merchandise Value (GMV)
+  - Order Conversion Rate
+  - Average Order Value (AOV)
+  - Customer Satisfaction Score
+  - Delivery Performance
+  - Seller Performance
+  key_dimensions:
+  - Order Status
+  - Product Category
+  - Customer Geography (State/City)
+  - Payment Method
+  - Review Score
+  business_glossary:
+    GMV: Gross Merchandise Value - total value of all orders including shipping
+    AOV: Average Order Value - average total value per order
+    Freight: Shipping/delivery cost charged to customer
+    Boleto: Popular Brazilian payment method similar to bank transfer
+    Order_Status: Lifecycle stage of order from creation to delivery
+tables:
+  CUSTOMERS:
+    description: Customer master data with geographic information
+    business_role: Dimensional table for customer analysis and geographic segmentation
+    typical_questions:
+    - Which states/cities have the most customers?
+    - What is the customer distribution across Brazil?
+    - How many unique customers do we have?
+    columns:
+      CUSTOMER_ID:
+        description: Unique identifier for each order (not customer)
+        role: primary_key
+        business_meaning: Links to orders - note this is order-level, not customer-level
+      CUSTOMER_UNIQUE_ID:
+        description: Actual unique customer identifier across all orders
+        role: identifier
+        business_meaning: Use this for customer-level analysis and retention
+      CUSTOMER_ZIP_CODE_PREFIX:
+        description: First 5 digits of customer ZIP code
+        role: dimension
+        business_meaning: Geographic segmentation at postal code level
+      CUSTOMER_CITY:
+        description: Customer city name
+        role: dimension
+        business_meaning: City-level geographic analysis
+      CUSTOMER_STATE:
+        description: Brazilian state abbreviation (SP, RJ, MG, etc.)
+        role: dimension
+        business_meaning: "State-level geographic analysis - SP=S\xE3o Paulo, RJ=Rio\
+          \ de Janeiro"
+  ORDERS:
+    description: Order header information with status and key timestamps
+    business_role: Central fact table for order lifecycle and fulfillment analysis
+    typical_questions:
+    - What is our order conversion funnel?
+    - How long does delivery take on average?
+    - What percentage of orders are delivered on time?
+    columns:
+      ORDER_ID:
+        description: Unique identifier for each order
+        role: primary_key
+      CUSTOMER_ID:
+        description: Links to customer who placed the order
+        role: foreign_key
+        references: CUSTOMERS.CUSTOMER_ID
+      ORDER_STATUS:
+        description: Current status of the order
+        role: dimension
+        business_meaning: delivered=completed successfully, shipped=in transit, canceled=cancelled,
+          processing=being prepared, approved=payment confirmed, invoiced=invoice
+          generated, created=just placed, unavailable=out of stock
+      ORDER_PURCHASE_TIMESTAMP:
+        description: When the order was placed by customer
+        role: date
+        format_hint: timestamp
+      ORDER_APPROVED_AT:
+        description: When payment was approved
+        role: date
+        format_hint: timestamp
+      ORDER_DELIVERED_CARRIER_DATE:
+        description: When order was handed to shipping carrier
+        role: date
+        format_hint: timestamp
+      ORDER_DELIVERED_CUSTOMER_DATE:
+        description: When order was delivered to customer
+        role: date
+        format_hint: timestamp
+      ORDER_ESTIMATED_DELIVERY_DATE:
+        description: Promised delivery date to customer
+        role: date
+        format_hint: date
+  ORDER_ITEMS:
+    description: Individual line items within each order
+    business_role: Fact table for product-level sales analysis and revenue calculation
+    typical_questions:
+    - What is our total revenue and shipping revenue?
+    - Which products sell the most?
+    - What is the average basket size?
+    columns:
+      ORDER_ID:
+        description: Links to the parent order
+        role: foreign_key
+        references: ORDERS.ORDER_ID
+      ORDER_ITEM_ID:
+        description: Sequence number of item within the order
+        role: dimension
+        business_meaning: 1=first item, 2=second item, etc.
+      PRODUCT_ID:
+        description: Links to product catalog
+        role: foreign_key
+        references: PRODUCTS.PRODUCT_ID
+      SELLER_ID:
+        description: Which seller fulfilled this item
+        role: foreign_key
+        references: SELLERS.SELLER_ID
+      SHIPPING_LIMIT_DATE:
+        description: Deadline for seller to ship this item
+        role: date
+        format_hint: timestamp
+      PRICE:
+        description: Product price paid by customer (excluding shipping)
+        role: measure
+        aggregation_hint: SUM
+        format_hint: currency
+      FREIGHT_VALUE:
+        description: Shipping cost for this item
+        role: measure
+        aggregation_hint: SUM
+        format_hint: currency
+  ORDER_PAYMENTS:
+    description: Payment transactions for orders (orders can have multiple payments)
+    business_role: Fact table for payment analysis and financial reconciliation
+    typical_questions:
+    - What are our most popular payment methods?
+    - How many customers use installment payments?
+    - What is the average payment value?
+    columns:
+      ORDER_ID:
+        description: Links to the order being paid for
+        role: foreign_key
+        references: ORDERS.ORDER_ID
+      PAYMENT_SEQUENTIAL:
+        description: Sequence number for multiple payments on same order
+        role: dimension
+        business_meaning: 1=first payment, 2=second payment (for split payments)
+      PAYMENT_TYPE:
+        description: Method of payment used
+        role: dimension
+        business_meaning: credit_card=credit card, boleto=bank slip payment, debit_card=debit
+          card, voucher=gift card/voucher, not_defined=unknown method
+      PAYMENT_INSTALLMENTS:
+        description: Number of installments for this payment
+        role: dimension
+        business_meaning: 1=paid in full, >1=installment plan (common in Brazil)
+      PAYMENT_VALUE:
+        description: Amount paid in this payment transaction
+        role: measure
+        aggregation_hint: SUM
+        format_hint: currency
+  ORDER_REVIEWS:
+    description: Customer reviews and ratings for completed orders
+    business_role: Fact table for customer satisfaction and quality analysis
+    typical_questions:
+    - What is our average customer satisfaction score?
+    - Which products have the best/worst reviews?
+    - How does review score correlate with delivery time?
+    columns:
+      REVIEW_ID:
+        description: Unique identifier for each review
+        role: primary_key
+      ORDER_ID:
+        description: Links to the order being reviewed
+        role: foreign_key
+        references: ORDERS.ORDER_ID
+      REVIEW_SCORE:
+        description: Customer rating from 1-5 stars
+        role: measure
+        aggregation_hint: AVG
+        business_meaning: 1=very dissatisfied, 5=very satisfied
+      REVIEW_COMMENT_TITLE:
+        description: Title/subject of the review
+        role: dimension
+      REVIEW_COMMENT_MESSAGE:
+        description: Full text of customer review
+        role: dimension
+      REVIEW_CREATION_DATE:
+        description: When customer submitted the review
+        role: date
+        format_hint: date
+      REVIEW_ANSWER_TIMESTAMP:
+        description: When seller/platform responded to review
+        role: date
+        format_hint: timestamp
+  PRODUCTS:
+    description: Product catalog with category and physical attributes
+    business_role: Dimensional table for product analysis and catalog management
+    typical_questions:
+    - Which product categories perform best?
+    - How do product attributes affect sales?
+    - What is our product catalog composition?
+    columns:
+      PRODUCT_ID:
+        description: Unique identifier for each product
+        role: primary_key
+      PRODUCT_CATEGORY_NAME:
+        description: Product category in Portuguese
+        role: dimension
+        business_meaning: Use with PRODUCT_CATEGORY_TRANSLATION for English names
+      PRODUCT_NAME_LENGTH:
+        description: Character count of product name
+        role: measure
+        aggregation_hint: AVG
+      PRODUCT_DESCRIPTION_LENGTH:
+        description: Character count of product description
+        role: measure
+        aggregation_hint: AVG
+      PRODUCT_PHOTOS_QTY:
+        description: Number of product photos
+        role: measure
+        aggregation_hint: AVG
+      PRODUCT_WEIGHT_G:
+        description: Product weight in grams
+        role: measure
+        aggregation_hint: AVG
+      PRODUCT_LENGTH_CM:
+        description: Product length in centimeters
+        role: measure
+        aggregation_hint: AVG
+      PRODUCT_HEIGHT_CM:
+        description: Product height in centimeters
+        role: measure
+        aggregation_hint: AVG
+      PRODUCT_WIDTH_CM:
+        description: Product width in centimeters
+        role: measure
+        aggregation_hint: AVG
+  PRODUCT_CATEGORY_TRANSLATION:
+    description: Translation mapping from Portuguese to English category names
+    business_role: Reference table for internationalization of product categories
+    typical_questions:
+    - What are the English names for product categories?
+    columns:
+      PRODUCT_CATEGORY_NAME:
+        description: Portuguese category name
+        role: primary_key
+        references: PRODUCTS.PRODUCT_CATEGORY_NAME
+      PRODUCT_CATEGORY_NAME_ENGLISH:
+        description: English translation of category name
+        role: dimension
+  SELLERS:
+    description: Seller/merchant information with geographic location
+    business_role: Dimensional table for marketplace seller analysis
+    typical_questions:
+    - Which sellers perform best?
+    - What is the geographic distribution of sellers?
+    - How many sellers do we have per state?
+    columns:
+      SELLER_ID:
+        description: Unique identifier for each seller
+        role: primary_key
+      SELLER_ZIP_CODE_PREFIX:
+        description: First 5 digits of seller ZIP code
+        role: dimension
+      SELLER_CITY:
+        description: Seller city name
+        role: dimension
+      SELLER_STATE:
+        description: Brazilian state abbreviation for seller location
+        role: dimension
+relationships:
+- from: ORDERS.CUSTOMER_ID
+  to: CUSTOMERS.CUSTOMER_ID
+  type: many_to_one
+  description: Each order belongs to one customer (order-level relationship)
+- from: ORDER_ITEMS.ORDER_ID
+  to: ORDERS.ORDER_ID
+  type: many_to_one
+  description: Each order can have multiple line items
+- from: ORDER_ITEMS.PRODUCT_ID
+  to: PRODUCTS.PRODUCT_ID
+  type: many_to_one
+  description: Each line item references one product
+- from: ORDER_ITEMS.SELLER_ID
+  to: SELLERS.SELLER_ID
+  type: many_to_one
+  description: Each line item is fulfilled by one seller
+- from: ORDER_PAYMENTS.ORDER_ID
+  to: ORDERS.ORDER_ID
+  type: many_to_one
+  description: Each order can have multiple payment transactions
+- from: ORDER_REVIEWS.ORDER_ID
+  to: ORDERS.ORDER_ID
+  type: one_to_one
+  description: Each order can have one review (not all orders have reviews)
+- from: PRODUCTS.PRODUCT_CATEGORY_NAME
+  to: PRODUCT_CATEGORY_TRANSLATION.PRODUCT_CATEGORY_NAME
+  type: many_to_one
+  description: Product categories can be translated to English
+query_patterns:
+  revenue_analysis:
+    description: Calculate total GMV and revenue metrics
+    use_when:
+    - revenue
+    - sales
+    - GMV
+    - total value
+    pattern: 'Sum PRICE and FREIGHT_VALUE from ORDER_ITEMS, join with ORDERS to filter
+      by
+
+      status and date ranges. Include both product revenue and shipping revenue.
+
+      Filter to ''delivered'' status for actual revenue recognition.
+
+      '
+    example: "SELECT \n  SUM(oi.PRICE + oi.FREIGHT_VALUE) as total_gmv,\n  SUM(oi.PRICE)\
+      \ as product_revenue,\n  SUM(oi.FREIGHT_VALUE) as shipping_revenue\nFROM ORDER_ITEMS\
+      \ oi\nJOIN ORDERS o ON oi.ORDER_ID = o.ORDER_ID\nWHERE o.ORDER_STATUS = 'delivered'\n"
+  delivery_performance:
+    description: Analyze delivery times and on-time performance
+    use_when:
+    - delivery time
+    - shipping performance
+    - on time
+    - late delivery
+    pattern: "Calculate difference between ORDER_DELIVERED_CUSTOMER_DATE and \nORDER_ESTIMATED_DELIVERY_DATE.\
+      \ Negative values indicate early delivery,\npositive values indicate late delivery.\n"
+    example: "SELECT \n  AVG(DATEDIFF(day, ORDER_ESTIMATED_DELIVERY_DATE, ORDER_DELIVERED_CUSTOMER_DATE))\
+      \ as avg_delivery_delay_days,\n  COUNT(CASE WHEN ORDER_DELIVERED_CUSTOMER_DATE\
+      \ <= ORDER_ESTIMATED_DELIVERY_DATE THEN 1 END) / COUNT(*) as on_time_rate\n\
+      FROM ORDERS\nWHERE ORDER_STATUS = 'delivered'\n"
+  customer_segmentation:
+    description: Analyze customer behavior and geographic distribution
+    use_when:
+    - customer analysis
+    - geographic
+    - state analysis
+    - customer lifetime value
+    pattern: 'Use CUSTOMER_UNIQUE_ID for true customer-level analysis. Join CUSTOMERS
+
+      with ORDERS and ORDER_ITEMS for purchase behavior. Group by CUSTOMER_STATE
+
+      for geographic analysis.
+
+      '
+    example: "SELECT \n  c.CUSTOMER_STATE,\n  COUNT(DISTINCT c.CUSTOMER_UNIQUE_ID)\
+      \ as unique_customers,\n  COUNT(DISTINCT o.ORDER_ID) as total_orders,\n  SUM(oi.PRICE\
+      \ + oi.FREIGHT_VALUE) as total_revenue\nFROM CUSTOMERS c\nJOIN ORDERS o ON c.CUSTOMER_ID\
+      \ = o.CUSTOMER_ID\nJOIN ORDER_ITEMS oi ON o.ORDER_ID = oi.ORDER_ID\nGROUP BY\
+      \ c.CUSTOMER_STATE\n"
+  product_performance:
+    description: Analyze product sales and category performance
+    use_when:
+    - product analysis
+    - category performance
+    - best selling
+    - product catalog
+    pattern: 'Join PRODUCTS with ORDER_ITEMS and use PRODUCT_CATEGORY_TRANSLATION
+
+      for English category names. Consider both quantity sold and revenue.
+
+      '
+    example: "SELECT \n  pct.PRODUCT_CATEGORY_NAME_ENGLISH,\n  COUNT(*) as items_sold,\n\
+      \  SUM(oi.PRICE) as category_revenue,\n  AVG(oi.PRICE) as avg_item_price\nFROM\
+      \ ORDER_ITEMS oi\nJOIN PRODUCTS p ON oi.PRODUCT_ID = p.PRODUCT_ID\nJOIN PRODUCT_CATEGORY_TRANSLATION\
+      \ pct ON p.PRODUCT_CATEGORY_NAME = pct.PRODUCT_CATEGORY_NAME\nGROUP BY pct.PRODUCT_CATEGORY_NAME_ENGLISH\n"
+  satisfaction_analysis:
+    description: Analyze customer satisfaction and review patterns
+    use_when:
+    - customer satisfaction
+    - review score
+    - rating
+    - satisfaction
+    pattern: 'Use ORDER_REVIEWS joined with other tables. REVIEW_SCORE ranges 1-5.
+
+      Consider correlation with delivery performance and product categories.
+
+      '
+    example: "SELECT \n  AVG(REVIEW_SCORE) as avg_satisfaction,\n  COUNT(*) as total_reviews,\n\
+      \  COUNT(CASE WHEN REVIEW_SCORE >= 4 THEN 1 END) / COUNT(*) as positive_review_rate\n\
+      FROM ORDER_REVIEWS\n"
+  payment_analysis:
+    description: Analyze payment methods and installment patterns
+    use_when:
+    - payment method
+    - installments
+    - payment analysis
+    - boleto
+    pattern: 'Use ORDER_PAYMENTS to analyze payment behavior. Consider that orders
+
+      can have multiple payments. PAYMENT_INSTALLMENTS > 1 indicates installment plans.
+
+      '
+    example: "SELECT \n  PAYMENT_TYPE,\n  COUNT(*) as payment_count,\n  AVG(PAYMENT_INSTALLMENTS)\
+      \ as avg_installments,\n  SUM(PAYMENT_VALUE) as total_payment_value\nFROM ORDER_PAYMENTS\n\
+      GROUP BY PAYMENT_TYPE"

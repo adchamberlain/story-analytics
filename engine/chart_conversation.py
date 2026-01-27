@@ -105,12 +105,13 @@ class ChartConversationManager:
         self.composer = get_composer()
         self.progress_emitter = progress_emitter
 
-        # Initialize chart pipeline
+        # Initialize chart pipeline with source_name from config
         self._pipeline = ChartPipeline(
             ChartPipelineConfig(
                 provider_name=provider_name,
                 verbose=True,
-            )
+            ),
+            source_name=self.config.source_name,
         )
 
         print(f"[ChartConversation] Using provider: {self.llm.name}")

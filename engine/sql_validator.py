@@ -433,6 +433,17 @@ def validate_query(query: str, query_name: str = "query") -> SQLValidationResult
     return get_validator().validate_query(query, query_name)
 
 
+def clear_validator_cache() -> None:
+    """Clear the cached SQL validator.
+
+    Call this when new data sources are added or data files change.
+    """
+    global _validator
+    if _validator is not None:
+        _validator.close()
+        _validator = None
+
+
 @dataclass
 class QueryExecutionResult:
     """Result of executing a SQL query."""
