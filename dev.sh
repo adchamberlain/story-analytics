@@ -45,9 +45,10 @@ echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━�
 echo -e "${CYAN}  Story Analytics - Development Environment${NC}"
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n"
 
-# Start FastAPI backend
+# Start FastAPI backend - logs go to /tmp/api.log
 echo -e "${GREEN}[1/2] Starting API server on port 8000...${NC}"
-python -m uvicorn api.main:app --reload --port 8000 &
+echo -e "${YELLOW}    API logs: tail -f /tmp/api.log${NC}"
+PYTHONUNBUFFERED=1 python -m uvicorn api.main:app --reload --port 8000 > /tmp/api.log 2>&1 &
 API_PID=$!
 
 # Start React app (primary frontend)
@@ -72,6 +73,8 @@ echo -e "    http://localhost:3001/login     (sign in)"
 echo -e "    http://localhost:3001/chat      (chat with AI)"
 echo -e "    http://localhost:3001/charts    (chart library)"
 echo -e "    http://localhost:3001/dashboards (dashboard list)"
+echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "  ${CYAN}API Logs:${NC} tail -f /tmp/api.log"
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo -e "Press ${RED}Ctrl+C${NC} to stop all services"
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n"

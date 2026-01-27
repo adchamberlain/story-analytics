@@ -168,6 +168,7 @@ def _chart_to_render_spec(chart) -> dict[str, Any]:
             "horizontal": chart.config.horizontal,
             "stacked": chart.config.stacked,
             "sort": chart.config.sort,
+            "legendLabel": chart.config.legend_label,
             # Additional props
             "extraProps": chart.config.extra_props,
         },

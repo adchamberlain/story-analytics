@@ -6,6 +6,7 @@ import ChatPage from './pages/ChatPage'
 import { LoginPage } from './pages/LoginPage'
 import { VerifyPage } from './pages/VerifyPage'
 import { ChartsPage } from './pages/ChartsPage'
+import { ChartEditPage } from './pages/ChartEditPage'
 import { DashboardsPage } from './pages/DashboardsPage'
 import { NewDashboardPage } from './pages/NewDashboardPage'
 import { SettingsPage } from './pages/SettingsPage'
@@ -34,6 +35,7 @@ function App() {
       >
         <Route path="/chat" element={<ChatPage />} />
         <Route path="/charts" element={<ChartsPage />} />
+        <Route path="/chart/:id/edit" element={<ChartEditPage />} />
         <Route path="/charts/new" element={<Navigate to="/chat" replace />} />
         <Route path="/dashboards" element={<DashboardsPage />} />
         <Route path="/dashboards/new" element={<NewDashboardPage />} />

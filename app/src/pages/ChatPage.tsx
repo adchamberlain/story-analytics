@@ -516,104 +516,132 @@ function WelcomeState({ onActionClick }: WelcomeStateProps) {
         fontFamily: 'var(--font-brand)',
       }}
     >
-      <h2
-        style={{
-          fontSize: 'var(--text-xl)',
-          fontWeight: 'var(--font-semibold)' as unknown as number,
-          color: 'var(--color-brand)',
-          marginBottom: 'var(--space-2)',
-          fontFamily: 'var(--font-brand)',
-        }}
-      >
-        Welcome to Story Analytics
-      </h2>
       <p
         style={{
           fontSize: 'var(--text-sm)',
           marginBottom: 'var(--space-8)',
           fontFamily: 'var(--font-brand)',
+          color: 'var(--color-gray-500)',
         }}
       >
-        What would you like to do?
+        What would you like to create?
       </p>
 
       <div
         style={{
           display: 'flex',
           gap: 'var(--space-6)',
-          maxWidth: '600px',
+          maxWidth: '560px',
           width: '100%',
         }}
       >
-        {/* Charts Section */}
-        <div
-          style={{
-            flex: 1,
-            padding: 'var(--space-4)',
-            border: '1px solid var(--color-gray-700)',
-            borderRadius: 'var(--radius-lg)',
-            backgroundColor: 'var(--color-gray-800)',
-          }}
-        >
-          <h3
-            style={{
-              fontSize: 'var(--text-base)',
-              fontWeight: 'var(--font-medium)' as unknown as number,
-              color: 'var(--color-brand)',
-              marginBottom: 'var(--space-3)',
-              fontFamily: 'var(--font-brand)',
-            }}
-          >
-            Charts
-          </h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-            <ActionButtonLarge
-              label="Create New Chart"
-              primary
-              onClick={() => onActionClick('create_chart')}
-            />
-            <ActionButtonLarge
-              label="Find / Edit Chart"
-              onClick={() => onActionClick('find_chart')}
-            />
-          </div>
-        </div>
-
-        {/* Dashboards Section */}
-        <div
-          style={{
-            flex: 1,
-            padding: 'var(--space-4)',
-            border: '1px solid var(--color-gray-700)',
-            borderRadius: 'var(--radius-lg)',
-            backgroundColor: 'var(--color-gray-800)',
-          }}
-        >
-          <h3
-            style={{
-              fontSize: 'var(--text-base)',
-              fontWeight: 'var(--font-medium)' as unknown as number,
-              color: 'var(--color-brand)',
-              marginBottom: 'var(--space-3)',
-              fontFamily: 'var(--font-brand)',
-            }}
-          >
-            Dashboards
-          </h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-            <ActionButtonLarge
-              label="Create New Dashboard"
-              primary
-              onClick={() => onActionClick('create_dashboard')}
-            />
-            <ActionButtonLarge
-              label="Find / Edit Dashboard"
-              onClick={() => onActionClick('find_dashboard')}
-            />
-          </div>
-        </div>
+        <TerminalCard
+          sigil="~"
+          title="New Chart"
+          description="Create a visualization from your data using natural language."
+          command="$ story create --type chart"
+          onClick={() => onActionClick('create_chart')}
+        />
+        <TerminalCard
+          sigil="#"
+          title="New Dashboard"
+          description="Compose multiple charts into an interactive dashboard."
+          command="$ story create --type dashboard"
+          onClick={() => onActionClick('create_dashboard')}
+        />
       </div>
     </div>
+  )
+}
+
+function TerminalCard({
+  sigil,
+  title,
+  description,
+  command,
+  onClick,
+}: {
+  sigil: string
+  title: string
+  description: string
+  command: string
+  onClick: () => void
+}) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        flex: 1,
+        padding: 'var(--space-5)',
+        backgroundColor: 'var(--color-gray-800)',
+        border: '1px solid var(--color-gray-700)',
+        borderRadius: 'var(--radius-lg)',
+        cursor: 'pointer',
+        textAlign: 'left',
+        transition: 'all var(--transition-fast)',
+        fontFamily: 'var(--font-brand)',
+        display: 'flex',
+        flexDirection: 'column' as const,
+        gap: 'var(--space-3)',
+        minHeight: '180px',
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.borderColor = 'var(--color-brand)'
+        e.currentTarget.style.backgroundColor = 'var(--color-gray-750, #1e2433)'
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.borderColor = 'var(--color-gray-700)'
+        e.currentTarget.style.backgroundColor = 'var(--color-gray-800)'
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+        <span
+          style={{
+            color: 'var(--color-amber)',
+            fontSize: 'var(--text-lg)',
+            fontFamily: 'var(--font-brand)',
+            fontWeight: 700,
+          }}
+        >
+          {sigil}
+        </span>
+        <span
+          style={{
+            color: 'var(--color-gray-100)',
+            fontSize: 'var(--text-base)',
+            fontWeight: 600,
+            fontFamily: 'var(--font-brand)',
+          }}
+        >
+          {title}
+        </span>
+      </div>
+      <p
+        style={{
+          color: 'var(--color-gray-400)',
+          fontSize: 'var(--text-sm)',
+          lineHeight: 1.5,
+          margin: 0,
+          fontFamily: 'var(--font-brand)',
+        }}
+      >
+        {description}
+      </p>
+      <div
+        style={{
+          marginTop: 'auto',
+          padding: 'var(--space-2) var(--space-3)',
+          backgroundColor: 'var(--color-gray-900)',
+          borderRadius: 'var(--radius-md)',
+          fontFamily: 'var(--font-brand)',
+          fontSize: 'var(--text-xs)',
+          color: 'var(--color-brand)',
+          letterSpacing: '0.02em',
+        }}
+      >
+        {command}
+      </div>
+    </button>
   )
 }
 

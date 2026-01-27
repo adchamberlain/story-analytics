@@ -125,6 +125,13 @@ export function ConfigFormPanel({ chartType, config, onChange }: ConfigFormPanel
         placeholder="e.g., Revenue, Count"
       />
 
+      <TextInput
+        label="Legend Label"
+        value={config.legendLabel || ''}
+        onChange={(value) => updateField('legendLabel', value || undefined)}
+        placeholder="e.g., Total Revenue"
+      />
+
       {/* ===== COLORS SECTION ===== */}
       {showColorOptions && (
         <>

@@ -150,6 +150,48 @@ class ChartConversationManager:
         self.state.messages.append(Message(role="user", content=user_input))
 
         # Handle based on phase
+        import sys
+        print(f"\n{'='*60}", file=sys.stderr)
+        print(f"[TRACE] process_message called", file=sys.stderr)
+        print(f"  phase: {self.state.phase}", file=sys.stderr)
+        print(f"  current_chart: {self.state.current_chart is not None}", file=sys.stderr)
+        print(f"  current_chart_id: {self.state.current_chart_id}", file=sys.stderr)
+        print(f"  dashboard_slug: {self.state.dashboard_slug}", file=sys.stderr)
+        print(f"  input: {user_input[:50]}...", file=sys.stderr)
+        print(f"{'='*60}\n", file=sys.stderr)
+
+        # Safety check: if we're in VIEWING phase but missing chart data, try to reload
+        if self.state.phase == ChartPhase.VIEWING and self.state.current_chart_id:
+            if not self.state.current_chart or not self.state.dashboard_slug:
+                print(f"[TRACE] VIEWING phase but missing chart data, reloading...", file=sys.stderr)
+                stored_chart = self.chart_storage.get(self.state.current_chart_id)
+                if stored_chart:
+                    from dataclasses import dataclass
+
+                    @dataclass
+                    class MinimalSpec:
+                        chart_type: str
+                        title: str
+                        description: str
+
+                    @dataclass
+                    class MinimalChart:
+                        sql: str
+                        spec: MinimalSpec
+
+                    self.state.current_chart = MinimalChart(
+                        sql=stored_chart.sql,
+                        spec=MinimalSpec(
+                            chart_type=stored_chart.chart_type.value if hasattr(stored_chart.chart_type, 'value') else str(stored_chart.chart_type),
+                            title=stored_chart.title,
+                            description=stored_chart.description or "",
+                        ),
+                    )
+                    self.state.dashboard_slug = self.state.current_chart_id
+                    print(f"[TRACE] Reloaded chart data successfully", file=sys.stderr)
+                else:
+                    print(f"[TRACE] WARNING: Chart not found in storage!", file=sys.stderr)
+
         if self.state.phase == ChartPhase.WAITING:
             # Classify intent before assuming it's a chart request
             intent = self._classify_intent(user_input)
@@ -701,24 +743,252 @@ What would you like to do next?"""
             ],
         )
 
-    def _handle_refinement_request(self, user_input: str) -> ChartConversationResult:
-        """Handle a refinement request for the current chart."""
-        if not self.state.current_chart or not self.state.dashboard_slug:
-            return self._handle_new_chart_request(user_input)
+    def _is_visual_change(self, user_input: str) -> bool:
+        """
+        Use LLM to classify if a refinement request is a visual/styling change (config)
+        vs a data change (SQL).
+        """
+        system_prompt = """You are classifying a chart modification request.
 
+Respond with EXACTLY one word: "visual" or "data"
+
+"visual" - Changes to appearance only (no SQL change needed):
+  Colors, fonts, sizes, titles, labels, legend text, axis titles,
+  show/hide elements, spacing, rotation, stacking, orientation
+
+"data" - Changes to what data is shown (SQL change needed):
+  Filters, date ranges, grouping, metrics, adding/removing columns,
+  changing aggregation, sorting by data, different breakdowns"""
+
+        messages = [Message(role="user", content=user_input)]
+        response = self.llm.generate(
+            messages=messages,
+            system_prompt=system_prompt,
+            temperature=0,
+            max_tokens=10,
+        )
+
+        result = response.content.strip().lower()
+        is_visual = "visual" in result
+        print(f"[ChartConversation] LLM classification for '{user_input[:40]}': {result} → visual={is_visual}")
+        return is_visual
+
+    def _handle_visual_change(self, user_input: str) -> ChartConversationResult:
+        """Handle a visual/config-only change (colors, fonts, etc.)."""
+        import json
+        import sys
+        from dataclasses import asdict
+        from .config_loader import get_config_loader
+
+        print(f"[ChartConversation] Handling visual change: {user_input[:50]}...")
+
+        # Get current chart
+        stored_chart = self.chart_storage.get(self.state.current_chart_id)
+        if not stored_chart:
+            print(f"[ChartConversation] Chart not found in storage!", file=sys.stderr)
+            return ChartConversationResult(
+                response="Chart not found. Please try creating a new chart.",
+                error="Chart not found",
+            )
+
+        print(f"[ChartConversation] Loaded chart: {stored_chart.title}", file=sys.stderr)
+        print(f"[ChartConversation] Config type: {type(stored_chart.config)}", file=sys.stderr)
+
+        chart_type = self.state.current_chart.spec.chart_type
+
+        # Convert ChartConfig dataclass to dict for JSON serialization
+        if stored_chart.config:
+            try:
+                current_config = asdict(stored_chart.config)
+                # Remove None values for cleaner output
+                current_config = {k: v for k, v in current_config.items() if v is not None}
+            except Exception as e:
+                print(f"[ChartConversation] Failed to convert config to dict: {e}", file=sys.stderr)
+                current_config = {}
+        else:
+            current_config = {}
+
+        # Load the config edit prompt
+        loader = get_config_loader()
+        try:
+            prompt_config = loader.get_prompt("config_edit")
+            system_prompt = prompt_config.get("system", "")
+        except Exception:
+            system_prompt = """You are a chart configuration assistant. Given a user request, suggest config changes.
+Output ONLY a raw JSON object: {"suggested_config": {...}, "explanation": "..."}
+
+Available config options:
+- color: hex color for bars/lines (e.g., "#ef4444" for red)
+- title: chart title text
+- xAxisTitle, yAxisTitle: axis label text
+- titleFontSize: title font size in pixels (e.g., 24 for larger, 14 for smaller)
+- axisFontSize: axis labels font size in pixels
+- legendFontSize: legend font size in pixels
+- showLegend: true/false
+- showGrid: true/false
+- horizontal: true/false (for bar charts)
+- stacked: true/false (for bar/area charts)
+- legendLabel: custom text for the legend entry (e.g., "Total Revenue")
+
+Color mappings: blue=#3b82f6, red=#ef4444, green=#22c55e, yellow=#eab308, purple=#a855f7, orange=#f97316"""
+
+        # Build the user message
+        user_message = f"""Chart Type: {chart_type}
+
+Current Config:
+{json.dumps(current_config, indent=2)}
+
+User Request: {user_input}
+
+Suggest the config changes needed."""
+
+        try:
+            llm = get_fast_provider(self._provider_name)
+            llm_response = llm.generate(
+                messages=[Message(role="user", content=user_message)],
+                system_prompt=system_prompt,
+                max_tokens=500,
+                temperature=0.3,
+            )
+
+            # Parse the response
+            content = llm_response.content.strip()
+
+            # Extract JSON from response
+            import re
+            code_block_match = re.search(r'```(?:json)?\s*(\{[\s\S]*?\})\s*```', content)
+            if code_block_match:
+                json_str = code_block_match.group(1)
+            else:
+                # Try to find raw JSON
+                start = content.find('{')
+                if start != -1:
+                    depth = 0
+                    for i, char in enumerate(content[start:], start):
+                        if char == '{':
+                            depth += 1
+                        elif char == '}':
+                            depth -= 1
+                            if depth == 0:
+                                json_str = content[start:i+1]
+                                break
+                    else:
+                        json_str = None
+                else:
+                    json_str = None
+
+            if json_str:
+                result = json.loads(json_str)
+                suggested_config = result.get("suggested_config", {})
+                explanation = result.get("explanation", "Applied your changes.")
+
+                if suggested_config:
+                    # Merge with existing config dict
+                    new_config_dict = {**current_config, **suggested_config}
+
+                    # Update the ChartConfig object with new values
+                    # Map common LLM response keys to ChartConfig field names
+                    key_mapping = {
+                        'color': 'color',
+                        'fillColor': 'color',
+                        'fill_color': 'fill_color',
+                        'backgroundColor': 'background_color',
+                        'background_color': 'background_color',
+                        'title': 'title',
+                        'xAxisTitle': 'x_axis_title',
+                        'x_axis_title': 'x_axis_title',
+                        'yAxisTitle': 'y_axis_title',
+                        'y_axis_title': 'y_axis_title',
+                        'showLegend': 'show_legend',
+                        'show_legend': 'show_legend',
+                        'showGrid': 'show_grid',
+                        'show_grid': 'show_grid',
+                        'horizontal': 'horizontal',
+                        'stacked': 'stacked',
+                        # Font sizes
+                        'titleFontSize': 'title_font_size',
+                        'title_font_size': 'title_font_size',
+                        'legendFontSize': 'legend_font_size',
+                        'legend_font_size': 'legend_font_size',
+                        'axisFontSize': 'axis_font_size',
+                        'axis_font_size': 'axis_font_size',
+                        # Other options
+                        'showValues': 'show_values',
+                        'show_values': 'show_values',
+                        'lineWidth': 'line_width',
+                        'line_width': 'line_width',
+                        'markerSize': 'marker_size',
+                        'marker_size': 'marker_size',
+                        'legendLabel': 'legend_label',
+                        'legend_label': 'legend_label',
+                        'legendText': 'legend_label',
+                        'legendTitle': 'legend_label',
+                    }
+
+                    print(f"[ChartConversation] LLM suggested config: {suggested_config}", file=sys.stderr)
+
+                    # Apply suggested changes to the existing ChartConfig
+                    for key, value in suggested_config.items():
+                        config_key = key_mapping.get(key, key)
+                        if hasattr(stored_chart.config, config_key):
+                            setattr(stored_chart.config, config_key, value)
+
+                    self.chart_storage.save(stored_chart)
+
+                    # Update the dashboard
+                    dashboard = create_chart_dashboard(stored_chart)
+
+                    response = f"Done! {explanation}"
+                    self.state.messages.append(Message(role="assistant", content=response))
+
+                    return ChartConversationResult(
+                        response=response,
+                        chart_url=self.get_chart_embed_url(),
+                        chart_id=stored_chart.id,
+                        dashboard_slug=dashboard.slug,
+                        action_buttons=[
+                            ChartActionButton(id="done", label="Done", style="primary"),
+                            ChartActionButton(id="modify", label="Modify", style="secondary"),
+                            ChartActionButton(id="new_chart", label="Create Another", style="secondary"),
+                        ],
+                    )
+
+            # If we couldn't parse config, fall back to data change handler
+            return self._handle_data_change(user_input)
+
+        except Exception as e:
+            import traceback
+            print(f"[ChartConversation] Visual change failed: {e}")
+            traceback.print_exc()
+            # Don't fall back to data change - it destroys the chart!
+            # Just return an error message
+            response = f"Sorry, I couldn't apply that visual change. Try being more specific (e.g., 'change the bar color to #ef4444')."
+            self.state.messages.append(Message(role="assistant", content=response))
+            return ChartConversationResult(
+                response=response,
+                chart_url=self.get_chart_embed_url(),
+                chart_id=self.state.current_chart_id,
+                action_buttons=[
+                    ChartActionButton(id="done", label="Done", style="primary"),
+                    ChartActionButton(id="modify", label="Try Again", style="secondary"),
+                ],
+            )
+
+    def _handle_data_change(self, user_input: str) -> ChartConversationResult:
+        """Handle a data/SQL change (filters, grouping, etc.)."""
         # Store old chart SQL for comparison
         old_sql = self.state.current_chart.sql if self.state.current_chart else None
 
         # Combine original request with refinement
         combined_request = f"{self.state.original_request}\n\nRefinement: {user_input}"
 
-        print(f"[ChartConversation] Refining chart: {user_input[:50]}...")
+        print(f"[ChartConversation] Handling data change: {user_input[:50]}...")
 
         # Regenerate with the refinement
         result = self._pipeline.run(combined_request)
 
         if not result.success:
-            response = f"I couldn't make that change. Could you try describing it differently?\n\nFor example: \"Change the time range to last 6 months\" or \"Make it a bar chart\""
+            response = f"I couldn't make that change: {result.error}\n\nTry describing it differently."
             self.state.messages.append(Message(role="assistant", content=response))
             return ChartConversationResult(
                 response=response,
@@ -736,15 +1006,7 @@ What would you like to do next?"""
         chart_changed = old_sql != chart.sql
 
         if not chart_changed:
-            response = f"""I wasn't able to apply that change to the chart. The chart remains unchanged.
-
-Try being more specific about what you want to change:
-- "Show data from the last 3 months only"
-- "Change to a bar chart"
-- "Add a trend line"
-- "Group by month instead of day"
-
-What would you like to try?"""
+            response = "The chart wasn't changed. Try being more specific about what you want to modify."
             self.state.messages.append(Message(role="assistant", content=response))
             return ChartConversationResult(
                 response=response,
@@ -766,19 +1028,12 @@ What would you like to try?"""
         # Update the dashboard
         dashboard = create_chart_dashboard(stored_chart)
 
-        chart_url = f"{self.config.frontend_url}/chart/{stored_chart.id}"
-
-        response = f"""Updated: **{chart.spec.title}**
-
-Refresh to see changes: {chart_url}
-
-What else would you like to change?"""
-
+        response = f"Done! Updated the chart."
         self.state.messages.append(Message(role="assistant", content=response))
 
         return ChartConversationResult(
             response=response,
-            chart_url=chart_url,
+            chart_url=self.get_chart_embed_url(),
             chart_id=stored_chart.id,
             dashboard_slug=dashboard.slug,
             action_buttons=[
@@ -787,6 +1042,31 @@ What else would you like to change?"""
                 ChartActionButton(id="new_chart", label="Create Another", style="secondary"),
             ],
         )
+
+    def _handle_refinement_request(self, user_input: str) -> ChartConversationResult:
+        """Handle a refinement request for the current chart."""
+        import sys
+        print(f"\n{'='*60}", file=sys.stderr)
+        print(f"[TRACE] _handle_refinement_request called", file=sys.stderr)
+        print(f"  current_chart is None: {self.state.current_chart is None}", file=sys.stderr)
+        print(f"  current_chart_id: {self.state.current_chart_id}", file=sys.stderr)
+        print(f"  dashboard_slug: {self.state.dashboard_slug}", file=sys.stderr)
+        print(f"{'='*60}\n", file=sys.stderr)
+
+        if not self.state.current_chart or not self.state.dashboard_slug:
+            print(f"[TRACE] FALLING BACK - Missing chart data!", file=sys.stderr)
+            print(f"  current_chart: {self.state.current_chart}", file=sys.stderr)
+            print(f"  dashboard_slug: {self.state.dashboard_slug}", file=sys.stderr)
+            return self._handle_new_chart_request(user_input)
+
+        # Classify the request: visual change (config) vs data change (SQL)
+        is_visual = self._is_visual_change(user_input)
+        print(f"[ChartConversation] Is visual change: {is_visual}")
+
+        if is_visual:
+            return self._handle_visual_change(user_input)
+        else:
+            return self._handle_data_change(user_input)
 
     def get_current_chart(self) -> Chart | None:
         """Get the current chart if one exists."""

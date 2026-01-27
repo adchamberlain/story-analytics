@@ -120,6 +120,7 @@ export interface ChartConfig {
   sort?: boolean | string
   horizontal?: boolean
   stacked?: boolean
+  legendLabel?: string
 
   /** KPI/BigValue options */
   /** Column containing comparison value (e.g., previous period) */

@@ -240,6 +240,7 @@ class ChartConfig:
     sort: bool | str | None = None  # Sort order
     horizontal: bool = False  # For bar charts
     stacked: bool = False  # For bar/area charts
+    legend_label: str | None = None  # Custom legend/trace label
 
     # Additional props
     extra_props: dict[str, Any] = field(default_factory=dict)
@@ -503,6 +504,7 @@ class Chart:
                 "x_fmt": self.config.x_fmt,
                 "y_fmt": self.config.y_fmt,
                 "value_fmt": self.config.value_fmt,
+                "legend_label": self.config.legend_label,
                 "extra_props": self.config.extra_props,
             },
             "filters": [f.to_dict() for f in self.filters],
@@ -561,6 +563,7 @@ class Chart:
             horizontal=config_data.get("horizontal", False),
             stacked=config_data.get("stacked", False),
             sort=config_data.get("sort"),
+            legend_label=config_data.get("legend_label"),
             # Additional props
             extra_props=config_data.get("extra_props", {}),
         )

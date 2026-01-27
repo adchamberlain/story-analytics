@@ -75,7 +75,7 @@ export function BarChart({ data, config }: BarChartProps) {
     for (const yColumn of yColumns) {
       const trace: Data = {
         type: 'bar',
-        name: yColumn,
+        name: (config.legendLabel && yColumns.length === 1) ? config.legendLabel : yColumn,
         orientation: isHorizontal ? 'h' : 'v',
         ...defaultBarStyle,
         hovertemplate: isHorizontal
