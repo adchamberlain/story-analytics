@@ -143,29 +143,42 @@ To customize behavior:
 
 ## Testing Workflow
 
-When doing automated testing of the chart pipeline, **always use the testing log** to pick up where we left off:
+**IMPORTANT:** When running ANY automated tests (chart pipeline, suggested charts, end-to-end tests, etc.), **always update `test_results/TESTING_LOG.md`** with the results.
+
+### Before Testing
 
 1. **Read the log first**: `test_results/TESTING_LOG.md`
-   - Check which providers have been tested
+   - Check which tests have been run recently
    - Review any outstanding issues or next steps
    - Understand what fixes have already been applied
 
-2. **Run tests**: `python tests/comprehensive_chart_tests.py --provider <provider>`
+### Running Tests
+
+2. **Comprehensive chart tests**: `python tests/comprehensive_chart_tests.py --provider <provider>`
    - Use `--smoke` for quick 3-test validation
    - Use `--provider claude|openai|gemini` for specific provider
    - Full suite is 30 tests across all chart types and edge cases
 
-3. **Update the log** after each testing session:
-   - Record initial results (pass rate, failing tests)
+3. **Suggested charts test**: `python test_suggested_charts.py`
+   - Tests all 12 suggested charts from semantic layers (6 per source)
+   - Includes visual QA validation with Playwright screenshots
+   - Generates HTML report at `test_results/SUGGESTED_CHARTS_QA_REPORT.html`
+
+### After Testing (REQUIRED)
+
+4. **Update the log** after EVERY testing session:
+   - Record test suite name, date, and results (pass rate, failing tests)
    - Document issues identified (symptoms, root causes)
    - Record fixes applied (with code snippets)
    - Record re-test results and improvement metrics
+   - Note any test coverage gaps discovered
 
-4. **Test results are stored in**: `test_results/`
+5. **Test results are stored in**: `test_results/`
    - `TESTING_LOG.md` - Consolidated progress log (use this!)
-   - `comprehensive_test_results_<date>.md` - Detailed per-run results
+   - `SUGGESTED_CHARTS_QA_REPORT.html` - Visual QA report with screenshots
+   - `suggested_chart_screenshots/` - Screenshot images
 
-This ensures continuity across sessions and tracks progress toward 100% pass rate on all providers.
+This ensures continuity across sessions and tracks progress. Without updating the log, we lose context on what was tested and what issues were found.
 
 ## Common Issues
 
