@@ -568,13 +568,15 @@ export function Sidebar() {
                     >
                       <span
                         style={{
-                          color: source.connected
-                            ? 'var(--color-success)'
-                            : 'var(--color-gray-600)',
+                          color: isActive
+                            ? 'var(--color-primary)'
+                            : source.connected
+                              ? 'var(--color-success)'
+                              : 'var(--color-gray-600)',
                           fontSize: 'var(--text-xs)',
                         }}
                       >
-                        {source.connected ? '\u25CF' : '\u25CB'}
+                        {isActive ? '\u2713' : source.connected ? '\u25CF' : '\u25CB'}
                       </span>
                       <span
                         style={{
@@ -582,27 +584,18 @@ export function Sidebar() {
                           textOverflow: 'ellipsis',
                           whiteSpace: 'nowrap',
                           fontFamily: 'var(--font-brand)',
+                          flex: 1,
+                          minWidth: 0,
                         }}
                       >
                         {source.name}
                       </span>
-                      {isActive && (
-                        <span
-                          style={{
-                            fontSize: 'var(--text-xs)',
-                            color: 'var(--color-primary)',
-                            opacity: 0.7,
-                          }}
-                        >
-                          (active)
-                        </span>
-                      )}
                       {source.table_count !== null && source.table_count > 0 && (
                         <span
                           style={{
                             fontSize: 'var(--text-xs)',
                             color: 'var(--color-gray-500)',
-                            marginLeft: 'auto',
+                            flexShrink: 0,
                           }}
                         >
                           {source.table_count} tables
