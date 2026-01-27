@@ -10,7 +10,6 @@ import { ChartFactory } from '../components/charts/ChartFactory'
 import { fetchChartRenderData, updateChart, duplicateChart } from '../api/client'
 import type { ChartRenderData, ChartType } from '../types/chart'
 import { createDashboardFromCharts } from '../api/client'
-import { useConversationStore } from '../stores/conversationStore'
 import { CreateDashboardModal } from '../components/modals'
 import { ChartConfigEditor } from '../components/editors'
 import type { ChartLibraryItem } from '../types/conversation'
@@ -261,13 +260,13 @@ function splitByCommaOutsideParens(str: string): string[] {
 
 const CHART_ICONS: Record<string, string> = {
   LineChart: '~',
-  BarChart: '#',
+  BarChart: '~',
   AreaChart: '^',
   BigValue: '*',
   DataTable: '=',
   ScatterPlot: '.',
   DualTrendChart: '~',
-  Histogram: '#',
+  Histogram: '~',
   FunnelChart: 'v',
   Heatmap: '%',
   default: '~',
@@ -319,8 +318,6 @@ export function ChartsPage() {
   // Config editor state
   const [showConfigEditor, setShowConfigEditor] = useState(false)
 
-  // Get conversation store for edit functionality
-  const { setCreationMode } = useConversationStore()
 
   // Get selected chart objects for the modal
   const selectedCharts = charts.filter((c) => selectedChartIds.includes(c.id))
@@ -483,15 +480,12 @@ export function ChartsPage() {
     setRenameTitle('')
   }
 
-  // Handle edit chart (navigate to chat with chart context)
+  // Handle edit chart (navigate to focused edit page)
   const handleEditChart = async () => {
     if (!previewChart) return
 
-    // Navigate to chat page with chart edit mode
-    // The chart conversation should already exist, find it
-    setCreationMode('chart')
     closePreview()
-    navigate(`/chat?editChart=${previewChart.id}`)
+    navigate(`/chart/${previewChart.id}/edit`)
   }
 
   // Handle duplicate chart
@@ -1268,23 +1262,21 @@ export function ChartsPage() {
                 }}
               >
                 <button
-                  onClick={handleStartRename}
-                  disabled={isRenaming}
+                  onClick={handleEditChart}
                   style={{
                     padding: 'var(--space-2) var(--space-3)',
-                    backgroundColor: 'var(--color-gray-700)',
-                    border: '1px solid var(--color-gray-600)',
+                    backgroundColor: 'var(--color-primary)',
+                    border: 'none',
                     borderRadius: 'var(--radius-md)',
-                    color: 'var(--color-gray-200)',
+                    color: 'white',
                     fontSize: 'var(--text-sm)',
-                    cursor: isRenaming ? 'not-allowed' : 'pointer',
-                    opacity: isRenaming ? 0.5 : 1,
+                    cursor: 'pointer',
                   }}
                 >
-                  Rename
+                  Edit with AI
                 </button>
                 <button
-                  onClick={handleEditChart}
+                  onClick={() => setShowConfigEditor(true)}
                   style={{
                     padding: 'var(--space-2) var(--space-3)',
                     backgroundColor: 'var(--color-gray-700)',
@@ -1295,7 +1287,7 @@ export function ChartsPage() {
                     cursor: 'pointer',
                   }}
                 >
-                  Edit
+                  Edit Config
                 </button>
                 <button
                   onClick={handleDuplicateChart}
@@ -1314,18 +1306,20 @@ export function ChartsPage() {
                   {isDuplicating ? 'Duplicating...' : 'Duplicate'}
                 </button>
                 <button
-                  onClick={() => setShowConfigEditor(true)}
+                  onClick={handleStartRename}
+                  disabled={isRenaming}
                   style={{
                     padding: 'var(--space-2) var(--space-3)',
-                    backgroundColor: 'var(--color-primary)',
-                    border: 'none',
+                    backgroundColor: 'var(--color-gray-700)',
+                    border: '1px solid var(--color-gray-600)',
                     borderRadius: 'var(--radius-md)',
-                    color: 'white',
+                    color: 'var(--color-gray-200)',
                     fontSize: 'var(--text-sm)',
-                    cursor: 'pointer',
+                    cursor: isRenaming ? 'not-allowed' : 'pointer',
+                    opacity: isRenaming ? 0.5 : 1,
                   }}
                 >
-                  Edit Config
+                  Rename
                 </button>
               </div>
 

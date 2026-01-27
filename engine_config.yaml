@@ -1,12 +1,10 @@
-llm:
-  provider: claude
-  model: claude-sonnet-4-20250514
-  fast_model: claude-3-5-haiku-20241022  # For structured tasks (faster)
-  api_key_env: ANTHROPIC_API_KEY
-
-snowflake:
-  connection_file: sources/snowflake_saas/connection.yaml
-
 app:
   api_url: http://localhost:8000
   frontend_url: http://localhost:3001
+llm:
+  api_key_env: ANTHROPIC_API_KEY
+  fast_model: claude-3-5-haiku-20241022
+  model: claude-sonnet-4-20250514
+  provider: claude
+snowflake:
+  connection_file: sources/olist_ecommerce/connection.yaml

@@ -4,6 +4,53 @@ This log captures development changes made during each session. Review this at t
 
 ---
 
+## Session: 2026-01-26 (Part 6)
+
+### Focus: Focused Chart Edit Mode + Visual Change Fixes
+
+**Context**: Built a dedicated chart editing page and fixed the visual change pipeline so AI-driven chart modifications (colors, fonts, legend labels) work correctly.
+
+### Features Built
+
+#### 1. Focused Chart Edit Page (`/chart/:id/edit`)
+- New route and page component (`ChartEditPage.tsx`) for immersive chart editing
+- Live chart preview (top) with chat input (bottom) for AI modifications
+- Done/Cancel buttons — Cancel reverts all changes made during the session
+- Edit history sidebar showing user requests and AI responses
+- Added route in `App.tsx`, updated `ChartsPage.tsx` navigation
+
+#### 2. Visual Change Pipeline Fixes
+- **Fixed JSON serialization**: Used `dataclasses.asdict()` for ChartConfig instead of raw `json.dumps()`
+- **Fixed config corruption**: Used `setattr()` on existing ChartConfig object instead of replacing with dict
+- **Removed dangerous fallback**: Visual change errors no longer silently fall back to full data pipeline
+- **LLM-based classification**: Replaced fragile keyword matching in `_is_visual_change()` with LLM call
+- **Key mapping**: Added comprehensive mapping from LLM camelCase keys to Python snake_case fields
+
+#### 3. Legend Label Support
+- Added `legend_label` field to ChartConfig dataclass, `from_dict()`, and `to_dict()`
+- Added to render spec, API config endpoints, BarChart component, and ConfigFormPanel editor
+- Added key aliases (`legendLabel`, `legendText`, `legendTitle`) in visual change handler
+
+#### 4. UI Improvements
+- Fixed chart icons: BarChart and Histogram now use `~` sigil instead of `#`
+- Simplified Chat landing page: removed "Welcome" header and "Find/Edit" buttons
+- Added retro terminal-styled cards for "New Chart" and "New Dashboard" options
+- Force chart re-render after edits using React key prop with version counter
+
+### Files Modified
+- `app/src/pages/ChartEditPage.tsx` (new)
+- `app/src/App.tsx`, `app/src/pages/ChartsPage.tsx`, `app/src/pages/ChatPage.tsx`
+- `app/src/components/charts/BarChart.tsx`, `app/src/components/editors/ConfigFormPanel.tsx`
+- `app/src/components/chat/Message.tsx`, `app/src/types/chart.ts`
+- `engine/chart_conversation.py`, `engine/models/chart.py`
+- `api/routers/chart.py`, `api/routers/render.py`
+- `engine/templates/charts.yaml`, `engine_config.yaml`, `dev.sh`
+
+### Key Bug: `legend_label` not persisted
+The `legend_label` field was added to ChartConfig dataclass and `from_dict()` but missed in `to_dict()`. The value was set correctly in memory via `setattr()` but silently dropped on save.
+
+---
+
 ## Session: 2026-01-26 (Part 5)
 
 ### Focus: End-to-End Testing of Suggested Charts + Bug Fixes

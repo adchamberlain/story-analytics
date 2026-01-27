@@ -197,10 +197,12 @@ export function Message({
                 <DashboardPreview slug={message.dashboard_slug} />
               )}
 
-              {/* View Chart Button - for chart conversations */}
-              {message.dashboard_url && message.dashboard_url.includes('/chart/') && (
-                <ViewChartButton url={message.dashboard_url} />
-              )}
+              {/* View Chart Button - for chart conversations (hide when action buttons present) */}
+              {message.dashboard_url &&
+                message.dashboard_url.includes('/chart/') &&
+                (!message.action_buttons || message.action_buttons.length === 0) && (
+                  <ViewChartButton url={message.dashboard_url} />
+                )}
 
               {/* Clarifying Options */}
               {message.clarifying_options && message.clarifying_options.length > 0 && (

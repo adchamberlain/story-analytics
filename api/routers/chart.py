@@ -83,6 +83,11 @@ def _get_or_create_chart_session(
     db: DBSession, user: User, session_id: int | None
 ) -> tuple[ConversationSession, ChartConversationManager]:
     """Get existing chart session or create a new one."""
+    import sys
+    print(f"\n{'='*60}", file=sys.stderr)
+    print(f"[TRACE] _get_or_create_chart_session called", file=sys.stderr)
+    print(f"  session_id: {session_id}", file=sys.stderr)
+
     if session_id:
         # Get existing session
         session = (
@@ -94,17 +99,28 @@ def _get_or_create_chart_session(
             )
             .first()
         )
+        print(f"  session found: {session is not None}", file=sys.stderr)
         if session:
+            print(f"  session.chart_id: {session.chart_id}", file=sys.stderr)
             # Get or create manager for this session
             if session_id in _chart_managers:
+                print(f"  Manager found in cache", file=sys.stderr)
                 manager = _chart_managers[session_id]
+                # Always restore state if session has a chart - ensures correct phase for editing
+                if session.chart_id:
+                    print(f"  Calling _restore_chart_manager_state", file=sys.stderr)
+                    _restore_chart_manager_state(manager, session)
             else:
+                print(f"  Creating new manager", file=sys.stderr)
                 manager = ChartConversationManager(provider_name=user.preferred_provider)
                 _restore_chart_manager_state(manager, session)
                 _chart_managers[session_id] = manager
+            print(f"{'='*60}\n", file=sys.stderr)
             return session, manager
 
     # Create new session
+    print(f"  Creating new session", file=sys.stderr)
+    print(f"{'='*60}\n", file=sys.stderr)
     session = ConversationSession(
         user_id=user.id,
         messages=[],
@@ -124,6 +140,15 @@ def _restore_chart_manager_state(manager: ChartConversationManager, session: Con
     """Restore chart manager state from database session."""
     from engine.chart_conversation import ChartPhase
     from engine.llm.base import Message
+    from engine.models import get_chart_storage
+    from dataclasses import dataclass
+    import sys
+
+    print(f"\n{'='*60}", file=sys.stderr)
+    print(f"[TRACE] _restore_chart_manager_state called", file=sys.stderr)
+    print(f"  session.id: {session.id}", file=sys.stderr)
+    print(f"  session.chart_id: {session.chart_id}", file=sys.stderr)
+    print(f"  session.phase: {session.phase}", file=sys.stderr)
 
     # Restore messages
     manager.state.messages = [
@@ -138,6 +163,57 @@ def _restore_chart_manager_state(manager: ChartConversationManager, session: Con
 
     # Restore original request
     manager.state.original_request = session.original_request
+
+    # Restore chart data if chart_id exists
+    if session.chart_id:
+        print(f"  Restoring chart data for chart_id: {session.chart_id}", file=sys.stderr)
+
+        # Force phase to VIEWING if we have a chart - this enables refinement
+        manager.state.phase = ChartPhase.VIEWING
+        print(f"  Forced phase to VIEWING", file=sys.stderr)
+        manager.state.current_chart_id = session.chart_id
+
+        # Load the chart from storage
+        storage = get_chart_storage()
+        stored_chart = storage.get(session.chart_id)
+        print(f"  Loaded chart from storage: {stored_chart is not None}", file=sys.stderr)
+
+        if stored_chart:
+            # Get chart_type as string value (it's an enum)
+            chart_type_value = stored_chart.chart_type.value if hasattr(stored_chart.chart_type, 'value') else str(stored_chart.chart_type)
+            print(f"  Chart type: {chart_type_value}, title: {stored_chart.title}", file=sys.stderr)
+
+            # Create a minimal object that has the properties the manager needs
+            # (.sql and .spec.chart_type)
+            @dataclass
+            class MinimalSpec:
+                chart_type: str
+                title: str
+                description: str
+
+            @dataclass
+            class MinimalChart:
+                sql: str
+                spec: MinimalSpec
+
+            manager.state.current_chart = MinimalChart(
+                sql=stored_chart.sql,
+                spec=MinimalSpec(
+                    chart_type=chart_type_value,
+                    title=stored_chart.title,
+                    description=stored_chart.description or "",
+                ),
+            )
+
+            # Set dashboard slug (chart ID is used as slug for single-chart dashboards)
+            manager.state.dashboard_slug = session.chart_id
+            print(f"  State restored: current_chart set, dashboard_slug={manager.state.dashboard_slug}", file=sys.stderr)
+        else:
+            print(f"  WARNING: Chart {session.chart_id} not found in storage!", file=sys.stderr)
+    else:
+        print(f"  No chart_id in session", file=sys.stderr)
+
+    print(f"{'='*60}\n", file=sys.stderr)
 
 
 def _save_chart_manager_state(manager: ChartConversationManager, session: ConversationSession):
@@ -323,6 +399,18 @@ async def send_chart_message_stream(
     - complete: Final response with full message data
     - error: Error occurred during processing
     """
+    import sys
+    # Print to both stdout and stderr to ensure visibility
+    trace_msg = f"""
+{'#'*60}
+### STREAMING MESSAGE ENDPOINT CALLED ###
+  request.session_id: {request.session_id}
+  request.message: {request.message[:50]}...
+{'#'*60}
+"""
+    print(trace_msg)  # stdout
+    print(trace_msg, file=sys.stderr)  # stderr
+
     session, manager = _get_or_create_chart_session(db, current_user, request.session_id)
 
     # Track if this is the first user message (for title generation)
@@ -729,6 +817,8 @@ async def update_chart_config(
         "horizontal": "horizontal",
         "stacked": "stacked",
         "sort": "sort",
+        # Legend
+        "legendLabel": "legend_label",
     }
 
     if chart.config:
@@ -932,6 +1022,8 @@ def _get_allowed_config_fields(chart_type: str) -> set[str]:
         "showLegend", "showGrid", "showValues",
         # Axis options
         "tickAngle", "yAxisMin", "yAxisMax",
+        # Legend
+        "legendLabel",
     }
 
     # Chart-type-specific fields
