@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Suggested Charts QA Report - January 26, 2026</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 40px 20px;
+            background: #f8f9fa;
+            color: #1a1a2e;
+        }
+        h1 { color: #1a1a2e; border-bottom: 3px solid #6366f1; padding-bottom: 20px; }
+        h2 { color: #374151; margin-top: 40px; }
+        .summary {
+            background: #fff;
+            padding: 24px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            margin-bottom: 40px;
+        }
+        .stats {
+            display: flex;
+            gap: 24px;
+            flex-wrap: wrap;
+        }
+        .stat {
+            background: linear-gradient(135deg, #6366f1, #8b5cf6);
+            color: white;
+            padding: 20px 30px;
+            border-radius: 12px;
+            text-align: center;
+            min-width: 150px;
+        }
+        .stat.success { background: linear-gradient(135deg, #22c55e, #16a34a); }
+        .stat.warning { background: linear-gradient(135deg, #f59e0b, #d97706); }
+        .stat .number { font-size: 36px; font-weight: 700; }
+        .stat .label { font-size: 14px; opacity: 0.9; margin-top: 4px; }
+
+        .source-section {
+            background: #fff;
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+        .source-title {
+            font-size: 20px;
+            font-weight: 600;
+            color: #6366f1;
+            margin-bottom: 20px;
+        }
+
+        .chart-card {
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            margin-bottom: 24px;
+            overflow: hidden;
+        }
+        .chart-header {
+            background: #f3f4f6;
+            padding: 16px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .chart-name {
+            font-weight: 600;
+            font-size: 16px;
+        }
+        .chart-status {
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .chart-status.passed {
+            background: #dcfce7;
+            color: #16a34a;
+        }
+        .chart-status.failed {
+            background: #fee2e2;
+            color: #dc2626;
+        }
+        .chart-body {
+            padding: 20px;
+        }
+        .chart-prompt {
+            background: #f9fafb;
+            padding: 12px;
+            border-radius: 6px;
+            font-size: 13px;
+            color: #4b5563;
+            margin-bottom: 16px;
+            border-left: 3px solid #6366f1;
+        }
+        .chart-screenshot {
+            width: 100%;
+            max-width: 800px;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            margin: 16px 0;
+        }
+        .chart-url {
+            font-size: 12px;
+            color: #6b7280;
+            word-break: break-all;
+        }
+        .chart-url a {
+            color: #6366f1;
+            text-decoration: none;
+        }
+        .qa-issues {
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            border-radius: 6px;
+            padding: 12px;
+            margin-top: 12px;
+        }
+        .qa-issues h4 {
+            color: #dc2626;
+            margin: 0 0 8px 0;
+            font-size: 14px;
+        }
+        .qa-issues ul {
+            margin: 0;
+            padding-left: 20px;
+            font-size: 13px;
+            color: #7f1d1d;
+        }
+
+        .footer {
+            margin-top: 40px;
+            text-align: center;
+            color: #6b7280;
+            font-size: 13px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Suggested Charts QA Report</h1>
+    <p style="color: #6b7280;">Generated: January 26, 2026 at 7:38 PM</p>
+
+    <div class="summary">
+        <h2 style="margin-top: 0;">Summary</h2>
+        <div class="stats">
+            <div class="stat">
+                <div class="number">12</div>
+                <div class="label">Total Charts</div>
+            </div>
+            <div class="stat success">
+                <div class="number">12</div>
+                <div class="label">Generated</div>
+            </div>
+            <div class="stat success">
+                <div class="number">11</div>
+                <div class="label">QA Passed</div>
+            </div>
+            <div class="stat warning">
+                <div class="number">1</div>
+                <div class="label">QA Issues</div>
+            </div>
+        </div>
+        <p style="margin-top: 20px; color: #374151;">
+            <strong>Generation Pass Rate:</strong> 100% (12/12)<br>
+            <strong>QA Pass Rate:</strong> 91.7% (11/12)
+        </p>
+    </div>
+
+    <!-- Snowflake SaaS Charts -->
+    <div class="source-section">
+        <div class="source-title">Snowflake SaaS Data Source</div>
+
+        <div class="chart-card">
+            <div class="chart-header">
+                <span class="chart-name">1. MRR Trend</span>
+                <span class="chart-status passed">QA PASSED</span>
+            </div>
+            <div class="chart-body">
+                <div class="chart-prompt">
+                    <strong>Prompt:</strong> Create an area chart showing total MRR by month from the subscriptions table. Only include active subscriptions (where churn_date is null). Show the trend over the full date range.
+                </div>
+                <img src="suggested_chart_screenshots/snowflake_saas_mrr-trend_20260126_193230.png" alt="MRR Trend Chart" class="chart-screenshot">
+                <div class="chart-url">URL: <a href="http://localhost:3001/chart/62004205-c2f9-4e2a-95ec-021eb649dd96" target="_blank">http://localhost:3001/chart/62004205-c2f9-4e2a-95ec-021eb649dd96</a></div>
+            </div>
+        </div>
+
+        <div class="chart-card">
+            <div class="chart-header">
+                <span class="chart-name">2. Customer Growth</span>
+                <span class="chart-status passed">QA PASSED</span>
+            </div>
+            <div class="chart-body">
+                <div class="chart-prompt">
+                    <strong>Prompt:</strong> Create a line chart showing the count of new customer signups by month using the signup_date from the customers table.
+                </div>
+                <img src="suggested_chart_screenshots/snowflake_saas_customer-growth_20260126_193301.png" alt="Customer Growth Chart" class="chart-screenshot">
+                <div class="chart-url">URL: <a href="http://localhost:3001/chart/528bfaa5-4417-412e-8efc-e0e9ebbd35b8" target="_blank">http://localhost:3001/chart/528bfaa5-4417-412e-8efc-e0e9ebbd35b8</a></div>
+            </div>
+        </div>
+
+        <div class="chart-card">
+            <div class="chart-header">
+                <span class="chart-name">3. Revenue by Plan</span>
+                <span class="chart-status passed">QA PASSED</span>
+            </div>
+            <div class="chart-body">
+                <div class="chart-prompt">
+                    <strong>Prompt:</strong> Create a horizontal bar chart showing total MRR by plan tier from active subscriptions. Order from highest to lowest revenue.
+                </div>
+                <img src="suggested_chart_screenshots/snowflake_saas_revenue-by-plan_20260126_193333.png" alt="Revenue by Plan Chart" class="chart-screenshot">
+                <div class="chart-url">URL: <a href="http://localhost:3001/chart/9c94baed-4aaf-4f85-8118-38665fb7faa8" target="_blank">http://localhost:3001/chart/9c94baed-4aaf-4f85-8118-38665fb7faa8</a></div>
+            </div>
+        </div>
+
+        <div class="chart-card">
+            <div class="chart-header">
+                <span class="chart-name">4. Revenue by Industry</span>
+                <span class="chart-status passed">QA PASSED</span>
+            </div>
+            <div class="chart-body">
+                <div class="chart-prompt">
+                    <strong>Prompt:</strong> Create a horizontal bar chart showing total MRR by customer industry. Join subscriptions with customers to get industry. Only include active subscriptions.
+                </div>
+                <img src="suggested_chart_screenshots/snowflake_saas_revenue-by-industry_20260126_193404.png" alt="Revenue by Industry Chart" class="chart-screenshot">
+                <div class="chart-url">URL: <a href="http://localhost:3001/chart/feb78bef-5b68-4ce4-8b5d-b87cae3f4374" target="_blank">http://localhost:3001/chart/feb78bef-5b68-4ce4-8b5d-b87cae3f4374</a></div>
+            </div>
+        </div>
+
+        <div class="chart-card">
+            <div class="chart-header">
+                <span class="chart-name">5. Top Customers</span>
+                <span class="chart-status failed">QA FAILED</span>
+            </div>
+            <div class="chart-body">
+                <div class="chart-prompt">
+                    <strong>Prompt:</strong> Create a horizontal bar chart showing the top 10 customers by MRR. Display the company name and their MRR amount from active subscriptions.
+                </div>
+                <img src="suggested_chart_screenshots/snowflake_saas_top-customers_20260126_193438.png" alt="Top Customers Chart" class="chart-screenshot">
+                <div class="chart-url">URL: <a href="http://localhost:3001/chart/a94d71ef-1a05-4586-951a-5430f414dc26" target="_blank">http://localhost:3001/chart/a94d71ef-1a05-4586-951a-5430f414dc26</a></div>
+                <div class="qa-issues">
+                    <h4>QA Issues Found:</h4>
+                    <ul>
+                        <li>Missing MRR amount values - the chart shows bars but no numerical values are displayed, which was specifically requested in the original ask</li>
+                        <li>No axis labels or scale indicators to show what the MRR amounts actually are</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="chart-card">
+            <div class="chart-header">
+                <span class="chart-name">6. Churn Analysis</span>
+                <span class="chart-status passed">QA PASSED</span>
+            </div>
+            <div class="chart-body">
+                <div class="chart-prompt">
+                    <strong>Prompt:</strong> Create a line chart showing the count of churned customers by month using the churn_date from the subscriptions table.
+                </div>
+                <img src="suggested_chart_screenshots/snowflake_saas_churn-analysis_20260126_193512.png" alt="Churn Analysis Chart" class="chart-screenshot">
+                <div class="chart-url">URL: <a href="http://localhost:3001/chart/4737bd7d-7e4f-47b9-afe0-b3cf2dd26389" target="_blank">http://localhost:3001/chart/4737bd7d-7e4f-47b9-afe0-b3cf2dd26389</a></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Olist E-commerce Charts -->
+    <div class="source-section">
+        <div class="source-title">Olist E-commerce Data Source</div>
+
+        <div class="chart-card">
+            <div class="chart-header">
+                <span class="chart-name">1. GMV Trend</span>
+                <span class="chart-status passed">QA PASSED</span>
+            </div>
+            <div class="chart-body">
+                <div class="chart-prompt">
+                    <strong>Prompt:</strong> Create an area chart showing total GMV (sum of price + freight_value from order_items) by month. Join with orders table and use order_purchase_timestamp for the date. Include all orders.
+                </div>
+                <img src="suggested_chart_screenshots/olist_ecommerce_gmv-trend_20260126_193545.png" alt="GMV Trend Chart" class="chart-screenshot">
+                <div class="chart-url">URL: <a href="http://localhost:3001/chart/05df308a-877b-4c61-9621-7f886bdcafbc" target="_blank">http://localhost:3001/chart/05df308a-877b-4c61-9621-7f886bdcafbc</a></div>
+            </div>
+        </div>
+
+        <div class="chart-card">
+            <div class="chart-header">
+                <span class="chart-name">2. Orders Over Time</span>
+                <span class="chart-status passed">QA PASSED</span>
+            </div>
+            <div class="chart-body">
+                <div class="chart-prompt">
+                    <strong>Prompt:</strong> Create a line chart showing the count of orders by month using order_purchase_timestamp from the orders table.
+                </div>
+                <img src="suggested_chart_screenshots/olist_ecommerce_orders-over-time_20260126_193619.png" alt="Orders Over Time Chart" class="chart-screenshot">
+                <div class="chart-url">URL: <a href="http://localhost:3001/chart/ab4bc090-5be5-41e7-b798-bdf3bedce20a" target="_blank">http://localhost:3001/chart/ab4bc090-5be5-41e7-b798-bdf3bedce20a</a></div>
+            </div>
+        </div>
+
+        <div class="chart-card">
+            <div class="chart-header">
+                <span class="chart-name">3. Orders by State</span>
+                <span class="chart-status passed">QA PASSED</span>
+            </div>
+            <div class="chart-body">
+                <div class="chart-prompt">
+                    <strong>Prompt:</strong> Create a horizontal bar chart showing the count of orders by customer state. Join orders with customers and group by customer_state. Order by count descending.
+                </div>
+                <img src="suggested_chart_screenshots/olist_ecommerce_orders-by-state_20260126_193652.png" alt="Orders by State Chart" class="chart-screenshot">
+                <div class="chart-url">URL: <a href="http://localhost:3001/chart/74013218-e014-40ad-a568-9c80cc2553de" target="_blank">http://localhost:3001/chart/74013218-e014-40ad-a568-9c80cc2553de</a></div>
+            </div>
+        </div>
+
+        <div class="chart-card">
+            <div class="chart-header">
+                <span class="chart-name">4. Category Performance</span>
+                <span class="chart-status passed">QA PASSED</span>
+            </div>
+            <div class="chart-body">
+                <div class="chart-prompt">
+                    <strong>Prompt:</strong> Create a horizontal bar chart showing the top 10 product categories by total revenue (sum of price). Join order_items with products and product_category_translation to get the English category name.
+                </div>
+                <img src="suggested_chart_screenshots/olist_ecommerce_category-performance_20260126_193724.png" alt="Category Performance Chart" class="chart-screenshot">
+                <div class="chart-url">URL: <a href="http://localhost:3001/chart/3de3b8a1-7c58-4a3b-af6b-51638f0c2094" target="_blank">http://localhost:3001/chart/3de3b8a1-7c58-4a3b-af6b-51638f0c2094</a></div>
+            </div>
+        </div>
+
+        <div class="chart-card">
+            <div class="chart-header">
+                <span class="chart-name">5. Payment Methods</span>
+                <span class="chart-status passed">QA PASSED</span>
+            </div>
+            <div class="chart-body">
+                <div class="chart-prompt">
+                    <strong>Prompt:</strong> Create a horizontal bar chart showing total payment value by payment type from the order_payments table. Order by value descending.
+                </div>
+                <img src="suggested_chart_screenshots/olist_ecommerce_payment-methods_20260126_193755.png" alt="Payment Methods Chart" class="chart-screenshot">
+                <div class="chart-url">URL: <a href="http://localhost:3001/chart/3c1de547-3040-4c43-801b-4e041b4ce4ba" target="_blank">http://localhost:3001/chart/3c1de547-3040-4c43-801b-4e041b4ce4ba</a></div>
+            </div>
+        </div>
+
+        <div class="chart-card">
+            <div class="chart-header">
+                <span class="chart-name">6. Satisfaction Score</span>
+                <span class="chart-status passed">QA PASSED</span>
+            </div>
+            <div class="chart-body">
+                <div class="chart-prompt">
+                    <strong>Prompt:</strong> Create a bar chart showing the count of reviews by review score (1-5) from the order_reviews table. Order by score ascending.
+                </div>
+                <img src="suggested_chart_screenshots/olist_ecommerce_satisfaction-score_20260126_193828.png" alt="Satisfaction Score Chart" class="chart-screenshot">
+                <div class="chart-url">URL: <a href="http://localhost:3001/chart/4678df03-3304-4c0c-91da-2ad59df4f5ff" target="_blank">http://localhost:3001/chart/4678df03-3304-4c0c-91da-2ad59df4f5ff</a></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="footer">
+        <p>Report generated by Story Analytics QA System</p>
+    </div>
+</body>
+</html>

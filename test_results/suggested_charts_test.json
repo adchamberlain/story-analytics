@@ -1,0 +1,149 @@
+[
+  {
+    "source": "snowflake_saas",
+    "chart_id": "mrr-trend",
+    "chart_name": "MRR Trend",
+    "prompt": "Create an area chart showing total MRR by month from the subscriptions table. Only include active subscriptions (where churn_date is null). Show the trend over the full date range.",
+    "success": true,
+    "chart_url": "http://localhost:3001/chart/62004205-c2f9-4e2a-95ec-021eb649dd96",
+    "error": null,
+    "qa_passed": true,
+    "qa_issues": [],
+    "screenshot_path": "test_results/suggested_chart_screenshots/snowflake_saas_mrr-trend_20260126_193230.png"
+  },
+  {
+    "source": "snowflake_saas",
+    "chart_id": "customer-growth",
+    "chart_name": "Customer Growth",
+    "prompt": "Create a line chart showing the count of new customer signups by month using the signup_date from the customers table.",
+    "success": true,
+    "chart_url": "http://localhost:3001/chart/528bfaa5-4417-412e-8efc-e0e9ebbd35b8",
+    "error": null,
+    "qa_passed": true,
+    "qa_issues": [],
+    "screenshot_path": "test_results/suggested_chart_screenshots/snowflake_saas_customer-growth_20260126_193301.png"
+  },
+  {
+    "source": "snowflake_saas",
+    "chart_id": "revenue-by-plan",
+    "chart_name": "Revenue by Plan",
+    "prompt": "Create a horizontal bar chart showing total MRR by plan tier from active subscriptions. Order from highest to lowest revenue.",
+    "success": true,
+    "chart_url": "http://localhost:3001/chart/9c94baed-4aaf-4f85-8118-38665fb7faa8",
+    "error": null,
+    "qa_passed": true,
+    "qa_issues": [],
+    "screenshot_path": "test_results/suggested_chart_screenshots/snowflake_saas_revenue-by-plan_20260126_193333.png"
+  },
+  {
+    "source": "snowflake_saas",
+    "chart_id": "revenue-by-industry",
+    "chart_name": "Revenue by Industry",
+    "prompt": "Create a horizontal bar chart showing total MRR by customer industry. Join subscriptions with customers to get industry. Only include active subscriptions.",
+    "success": true,
+    "chart_url": "http://localhost:3001/chart/feb78bef-5b68-4ce4-8b5d-b87cae3f4374",
+    "error": null,
+    "qa_passed": true,
+    "qa_issues": [],
+    "screenshot_path": "test_results/suggested_chart_screenshots/snowflake_saas_revenue-by-industry_20260126_193404.png"
+  },
+  {
+    "source": "snowflake_saas",
+    "chart_id": "top-customers",
+    "chart_name": "Top Customers",
+    "prompt": "Create a horizontal bar chart showing the top 10 customers by MRR. Display the company name and their MRR amount from active subscriptions.",
+    "success": true,
+    "chart_url": "http://localhost:3001/chart/a94d71ef-1a05-4586-951a-5430f414dc26",
+    "error": null,
+    "qa_passed": false,
+    "qa_issues": [
+      "Missing MRR amount values - the chart shows bars but no numerical values are displayed, which was specifically requested in the original ask",
+      "No axis labels or scale indicators to show what the MRR amounts actually are"
+    ],
+    "screenshot_path": "test_results/suggested_chart_screenshots/snowflake_saas_top-customers_20260126_193438.png"
+  },
+  {
+    "source": "snowflake_saas",
+    "chart_id": "churn-analysis",
+    "chart_name": "Churn Analysis",
+    "prompt": "Create a line chart showing the count of churned customers by month using the churn_date from the subscriptions table.",
+    "success": true,
+    "chart_url": "http://localhost:3001/chart/4737bd7d-7e4f-47b9-afe0-b3cf2dd26389",
+    "error": null,
+    "qa_passed": true,
+    "qa_issues": [],
+    "screenshot_path": "test_results/suggested_chart_screenshots/snowflake_saas_churn-analysis_20260126_193512.png"
+  },
+  {
+    "source": "olist_ecommerce",
+    "chart_id": "gmv-trend",
+    "chart_name": "GMV Trend",
+    "prompt": "Create an area chart showing total GMV (sum of price + freight_value from order_items) by month. Join with orders table and use order_purchase_timestamp for the date. Include all orders.",
+    "success": true,
+    "chart_url": "http://localhost:3001/chart/05df308a-877b-4c61-9621-7f886bdcafbc",
+    "error": null,
+    "qa_passed": true,
+    "qa_issues": [],
+    "screenshot_path": "test_results/suggested_chart_screenshots/olist_ecommerce_gmv-trend_20260126_193545.png"
+  },
+  {
+    "source": "olist_ecommerce",
+    "chart_id": "orders-over-time",
+    "chart_name": "Orders Over Time",
+    "prompt": "Create a line chart showing the count of orders by month using order_purchase_timestamp from the orders table.",
+    "success": true,
+    "chart_url": "http://localhost:3001/chart/ab4bc090-5be5-41e7-b798-bdf3bedce20a",
+    "error": null,
+    "qa_passed": true,
+    "qa_issues": [],
+    "screenshot_path": "test_results/suggested_chart_screenshots/olist_ecommerce_orders-over-time_20260126_193619.png"
+  },
+  {
+    "source": "olist_ecommerce",
+    "chart_id": "orders-by-state",
+    "chart_name": "Orders by State",
+    "prompt": "Create a horizontal bar chart showing the count of orders by customer state. Join orders with customers and group by customer_state. Order by count descending.",
+    "success": true,
+    "chart_url": "http://localhost:3001/chart/74013218-e014-40ad-a568-9c80cc2553de",
+    "error": null,
+    "qa_passed": true,
+    "qa_issues": [],
+    "screenshot_path": "test_results/suggested_chart_screenshots/olist_ecommerce_orders-by-state_20260126_193652.png"
+  },
+  {
+    "source": "olist_ecommerce",
+    "chart_id": "category-performance",
+    "chart_name": "Category Performance",
+    "prompt": "Create a horizontal bar chart showing the top 10 product categories by total revenue (sum of price). Join order_items with products and product_category_translation to get the English category name.",
+    "success": true,
+    "chart_url": "http://localhost:3001/chart/3de3b8a1-7c58-4a3b-af6b-51638f0c2094",
+    "error": null,
+    "qa_passed": true,
+    "qa_issues": [],
+    "screenshot_path": "test_results/suggested_chart_screenshots/olist_ecommerce_category-performance_20260126_193724.png"
+  },
+  {
+    "source": "olist_ecommerce",
+    "chart_id": "payment-methods",
+    "chart_name": "Payment Methods",
+    "prompt": "Create a horizontal bar chart showing total payment value by payment type from the order_payments table. Order by value descending.",
+    "success": true,
+    "chart_url": "http://localhost:3001/chart/3c1de547-3040-4c43-801b-4e041b4ce4ba",
+    "error": null,
+    "qa_passed": true,
+    "qa_issues": [],
+    "screenshot_path": "test_results/suggested_chart_screenshots/olist_ecommerce_payment-methods_20260126_193755.png"
+  },
+  {
+    "source": "olist_ecommerce",
+    "chart_id": "satisfaction-score",
+    "chart_name": "Satisfaction Score",
+    "prompt": "Create a bar chart showing the count of reviews by review score (1-5) from the order_reviews table. Order by score ascending.",
+    "success": true,
+    "chart_url": "http://localhost:3001/chart/4678df03-3304-4c0c-91da-2ad59df4f5ff",
+    "error": null,
+    "qa_passed": true,
+    "qa_issues": [],
+    "screenshot_path": "test_results/suggested_chart_screenshots/olist_ecommerce_satisfaction-score_20260126_193828.png"
+  }
+]

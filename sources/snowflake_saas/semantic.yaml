@@ -337,3 +337,34 @@ query_patterns:
       \ JOIN EVENTS e ON u.USER_ID = e.USER_ID AND e.EVENT_TIMESTAMP >= CURRENT_DATE\
       \ - 30\nWHERE s.CHURN_DATE IS NULL\nGROUP BY c.CUSTOMER_ID, c.COMPANY_NAME,\
       \ s.MRR"
+suggested_charts:
+  - id: mrr-trend
+    name: MRR Trend
+    icon: "\U0001F4B0"
+    description: Track monthly recurring revenue over time
+    prompt: Create an area chart showing total MRR by month from the subscriptions table. Only include active subscriptions (where churn_date is null). Show the trend over the full date range.
+  - id: customer-growth
+    name: Customer Growth
+    icon: "\U0001F4C8"
+    description: New customer signups over time
+    prompt: Create a line chart showing the count of new customer signups by month using the signup_date from the customers table.
+  - id: revenue-by-plan
+    name: Revenue by Plan
+    icon: "\U0001F3AF"
+    description: MRR breakdown by subscription tier
+    prompt: Create a horizontal bar chart showing total MRR by plan tier from active subscriptions. Order from highest to lowest revenue.
+  - id: revenue-by-industry
+    name: Revenue by Industry
+    icon: "\U0001F3ED"
+    description: MRR breakdown by customer industry
+    prompt: Create a horizontal bar chart showing total MRR by customer industry. Join subscriptions with customers to get industry. Only include active subscriptions.
+  - id: top-customers
+    name: Top Customers
+    icon: "\U0001F3C6"
+    description: Highest value customers by MRR
+    prompt: Create a horizontal bar chart showing the top 10 customers by MRR. Display the company name and their MRR amount from active subscriptions.
+  - id: churn-analysis
+    name: Churn Analysis
+    icon: "\U0001F4C9"
+    description: Customer churn patterns over time
+    prompt: Create a line chart showing the count of churned customers by month using the churn_date from the subscriptions table.

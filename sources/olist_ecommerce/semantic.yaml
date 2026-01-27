@@ -4,16 +4,16 @@ source_name: olist_ecommerce
 schema_hash: 86f97d012710
 business_context:
   description: 'This is an e-commerce marketplace dataset from Olist, a Brazilian
-    e-commerce platform
+    e-commerce platform that connects small businesses to major marketplaces. The data
+    captures the complete customer journey from order placement through delivery and
+    review, including payment processing, product catalog, and seller information.
+    This represents a typical multi-vendor marketplace with detailed transaction and
+    fulfillment tracking.
 
-    that connects small businesses to major marketplaces. The data captures the complete
-
-    customer journey from order placement through delivery and review, including payment
-
-    processing, product catalog, and seller information. This represents a typical
-
-    multi-vendor marketplace with detailed transaction and fulfillment tracking.
-
+    IMPORTANT: This is a HISTORICAL dataset covering September 2016 to October 2018.
+    DO NOT use relative date filters like "CURRENT_DATE - INTERVAL" as they will return
+    no data. Instead, use the full date range or explicit dates like 2017-01-01 to 2018-10-31.
+    For "over time" or "trend" queries, include ALL available data without date restrictions.
     '
   domain: E-commerce
   key_metrics:
@@ -410,3 +410,34 @@ query_patterns:
     example: "SELECT \n  PAYMENT_TYPE,\n  COUNT(*) as payment_count,\n  AVG(PAYMENT_INSTALLMENTS)\
       \ as avg_installments,\n  SUM(PAYMENT_VALUE) as total_payment_value\nFROM ORDER_PAYMENTS\n\
       GROUP BY PAYMENT_TYPE"
+suggested_charts:
+  - id: gmv-trend
+    name: GMV Trend
+    icon: "\U0001F4B0"
+    description: Track gross merchandise value over time
+    prompt: Create an area chart showing total GMV (sum of price + freight_value from order_items) by month. Join with orders table and use order_purchase_timestamp for the date. Include all orders.
+  - id: orders-over-time
+    name: Orders Over Time
+    icon: "\U0001F4E6"
+    description: Order volume trends by month
+    prompt: Create a line chart showing the count of orders by month using order_purchase_timestamp from the orders table.
+  - id: orders-by-state
+    name: Orders by State
+    icon: "\U0001F4CD"
+    description: Geographic distribution of orders
+    prompt: Create a horizontal bar chart showing the count of orders by customer state. Join orders with customers and group by customer_state. Order by count descending.
+  - id: category-performance
+    name: Category Performance
+    icon: "\U0001F3F7\uFE0F"
+    description: Top product categories by revenue
+    prompt: Create a horizontal bar chart showing the top 10 product categories by total revenue (sum of price). Join order_items with products and product_category_translation to get the English category name.
+  - id: payment-methods
+    name: Payment Methods
+    icon: "\U0001F4B3"
+    description: Revenue breakdown by payment type
+    prompt: Create a horizontal bar chart showing total payment value by payment type from the order_payments table. Order by value descending.
+  - id: satisfaction-score
+    name: Satisfaction Score
+    icon: "\u2B50"
+    description: Distribution of customer review scores
+    prompt: Create a bar chart showing the count of reviews by review score (1-5) from the order_reviews table. Order by score ascending.

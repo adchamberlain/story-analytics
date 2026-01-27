@@ -5,6 +5,7 @@ Templates router for dashboard templates and suggestions.
 import sys
 from pathlib import Path
 
+import yaml
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
 
@@ -14,6 +15,7 @@ from ..models.user import User
 # Add engine to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 from engine.config_loader import get_config_loader
+from engine.semantic import SemanticLayer
 
 router = APIRouter(prefix="/templates", tags=["templates"])
 
@@ -36,12 +38,12 @@ class ChartTemplateResponse(BaseModel):
     id: str
     name: str
     icon: str
-    chart_type: str
+    chart_type: str = "suggested"  # Default for semantic layer charts
     description: str
     prompt: str
-    business_types: list[str]
-    category_id: str
-    category_name: str
+    business_types: list[str] = []  # Optional, kept for backwards compatibility
+    category_id: str = "suggested"
+    category_name: str = "Suggested Charts"
 
 
 class TemplatesListResponse(BaseModel):
@@ -154,14 +156,43 @@ async def list_chart_templates(
     current_user: User = Depends(get_current_user),
 ):
     """
-    List chart templates for the user's business type.
+    List chart templates for the user's selected data source.
 
-    Returns 6 chart templates relevant to the user's business type setting,
-    organized by funnel stage (top/middle/bottom of funnel).
+    Returns 6 suggested charts tailored to the user's preferred data source.
+    Falls back to static business_type templates if no semantic layer charts exist.
     """
-    config = get_config_loader()
+    source_name = current_user.preferred_source
 
-    # Get templates filtered by user's business type
+    # Try to load from semantic layer first
+    semantic_path = Path("sources") / source_name / "semantic.yaml"
+    if semantic_path.exists():
+        try:
+            semantic = SemanticLayer.load(str(semantic_path))
+            if semantic.suggested_charts:
+                templates = [
+                    ChartTemplateResponse(
+                        id=chart.id,
+                        name=chart.name,
+                        icon=chart.icon,
+                        chart_type="suggested",
+                        description=chart.description,
+                        prompt=chart.prompt,
+                        business_types=[],
+                        category_id="suggested",
+                        category_name="Suggested Charts",
+                    )
+                    for chart in semantic.suggested_charts
+                ]
+                return ChartTemplatesListResponse(
+                    templates=templates,
+                    total=len(templates),
+                )
+        except Exception:
+            # If loading fails, fall back to static templates
+            pass
+
+    # Fallback to static templates (for backwards compatibility)
+    config = get_config_loader()
     templates = config.get_chart_templates_by_business_type(current_user.business_type)
 
     return ChartTemplatesListResponse(

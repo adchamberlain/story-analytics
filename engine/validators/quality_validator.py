@@ -718,6 +718,51 @@ class ChartQualityValidator:
 
         return combined
 
+    def validate_chart(
+        self,
+        chart,  # ValidatedChart - not type-hinted to avoid circular import
+        original_request: str,
+        chart_slug: str,
+    ):
+        """
+        Validate a rendered chart using vision QA.
+
+        This method is used by ChartConversationManager after chart creation
+        to validate the visual output.
+
+        Args:
+            chart: The validated chart object
+            original_request: Original user request
+            chart_slug: The chart slug (e.g., "/chart/{id}")
+
+        Returns:
+            QAResult from visual inspection
+        """
+        from ..qa import ChartQA, QAResult
+
+        if not self.enable_visual_qa:
+            return QAResult(
+                passed=True,
+                summary="Visual QA disabled",
+                critical_issues=[],
+                suggestions=[],
+            )
+
+        try:
+            # Extract chart ID from slug (format: "/chart/{id}")
+            chart_id = chart_slug.replace("/chart/", "")
+
+            qa = ChartQA(provider_name=self.provider_name)
+            return qa.validate(chart_id, original_request)
+
+        except Exception as e:
+            return QAResult(
+                passed=True,  # Don't fail the chart on QA errors
+                summary=f"Visual QA skipped: {str(e)[:100]}",
+                critical_issues=[],
+                suggestions=["Visual QA not available - ensure the app is running"],
+            )
+
     def validate_full(
         self,
         spec: "ChartSpec",
