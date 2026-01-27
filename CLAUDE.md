@@ -180,6 +180,61 @@ To customize behavior:
 
 This ensures continuity across sessions and tracks progress. Without updating the log, we lose context on what was tested and what issues were found.
 
+## Exception Handling: NEVER Use These Patterns
+
+We discovered bugs that were hidden for weeks because of overly broad exception handling. **NEVER use these dangerous patterns:**
+
+### Pattern 1: Catching Exception and passing silently
+```python
+# BAD - hides ALL errors including programming bugs
+try:
+    result = some_method()
+except Exception:
+    pass  # Silent failure - bugs hide here forever
+```
+
+### Pattern 2: Catching Exception and returning success
+```python
+# BAD - makes bugs look like success
+try:
+    return validate_something()
+except Exception as e:
+    return ValidationResult(passed=True)  # BUG: AttributeError becomes "passed"!
+```
+
+### Pattern 3: Catching Exception with only print
+```python
+# BAD - logs error but continues as if nothing happened
+try:
+    qa_result = validator.validate_chart(...)  # Method didn't exist!
+except Exception as e:
+    print(f"Validation failed: {e}")  # AttributeError was silently swallowed
+    # Code continues, bug stays hidden
+```
+
+### INSTEAD: Catch specific exceptions
+
+```python
+# GOOD - Distinguish expected vs unexpected errors
+try:
+    result = external_service.call()
+except (ConnectionError, TimeoutError) as e:
+    # Expected: service unavailable - OK to handle gracefully
+    return fallback_result()
+except (AttributeError, TypeError) as e:
+    # Unexpected: programming bug - fail loudly!
+    traceback.print_exc()
+    raise  # Or return failure result
+except Exception as e:
+    # Unknown: log full traceback, don't hide it
+    traceback.print_exc()
+    return error_result(passed=False)  # NOT passed=True!
+```
+
+### Why This Matters
+
+A missing `validate_chart()` method was hidden for weeks because the code caught `Exception` and printed a message. The `AttributeError` looked like "QA service unavailable" instead of "you have a bug". Always ask: "If this method doesn't exist, will I find out?"
+
 ## Common Issues
 
 - **SQL errors**: Check `sources/{source}/dialect.yaml` for allowed/forbidden functions
