@@ -114,8 +114,6 @@ class ChartConversationManager:
             source_name=self.config.source_name,
         )
 
-        print(f"[ChartConversation] Using provider: {self.llm.name}")
-
     def _emit_progress(
         self,
         step: str,
@@ -150,20 +148,9 @@ class ChartConversationManager:
         self.state.messages.append(Message(role="user", content=user_input))
 
         # Handle based on phase
-        import sys
-        print(f"\n{'='*60}", file=sys.stderr)
-        print(f"[TRACE] process_message called", file=sys.stderr)
-        print(f"  phase: {self.state.phase}", file=sys.stderr)
-        print(f"  current_chart: {self.state.current_chart is not None}", file=sys.stderr)
-        print(f"  current_chart_id: {self.state.current_chart_id}", file=sys.stderr)
-        print(f"  dashboard_slug: {self.state.dashboard_slug}", file=sys.stderr)
-        print(f"  input: {user_input[:50]}...", file=sys.stderr)
-        print(f"{'='*60}\n", file=sys.stderr)
-
         # Safety check: if we're in VIEWING phase but missing chart data, try to reload
         if self.state.phase == ChartPhase.VIEWING and self.state.current_chart_id:
             if not self.state.current_chart or not self.state.dashboard_slug:
-                print(f"[TRACE] VIEWING phase but missing chart data, reloading...", file=sys.stderr)
                 stored_chart = self.chart_storage.get(self.state.current_chart_id)
                 if stored_chart:
                     from dataclasses import dataclass
@@ -188,9 +175,6 @@ class ChartConversationManager:
                         ),
                     )
                     self.state.dashboard_slug = self.state.current_chart_id
-                    print(f"[TRACE] Reloaded chart data successfully", file=sys.stderr)
-                else:
-                    print(f"[TRACE] WARNING: Chart not found in storage!", file=sys.stderr)
 
         if self.state.phase == ChartPhase.WAITING:
             # Classify intent before assuming it's a chart request
@@ -334,7 +318,6 @@ Respond with EXACTLY one word: chart_request, data_question, or unclear"""
 
         intent = response.content.strip().lower().replace('"', '').replace("'", "")
 
-        print(f"[ChartConversation] Intent classification for '{user_input[:30]}...': {intent}")
 
         # Use exact matching for the expected values
         if intent == "chart_request":
@@ -393,7 +376,6 @@ Keep your response brief and friendly."""
         """Handle a request for a new chart - creates a PROPOSAL first."""
         self.state.original_request = user_input
 
-        print(f"[ChartConversation] Creating proposal for: {user_input[:50]}...")
 
         # Stage 1: Extract requirements
         self._emit_progress("requirements", ProgressStatus.IN_PROGRESS, "Analyzing request...")
@@ -405,7 +387,6 @@ Keep your response brief and friendly."""
             spec = ChartSpecValidator.validate_spec(spec)
             self._emit_progress("requirements", ProgressStatus.COMPLETED, "Request analyzed")
         except Exception as e:
-            print(f"[ChartConversation] Requirements extraction failed: {e}")
             self._emit_progress("requirements", ProgressStatus.FAILED, f"Failed: {e}")
             self.state.phase = ChartPhase.WAITING
             return ChartConversationResult(
@@ -425,7 +406,6 @@ Keep your response brief and friendly."""
                 raise Exception(error)
             self._emit_progress("sql", ProgressStatus.COMPLETED, "SQL generated")
         except Exception as e:
-            print(f"[ChartConversation] SQL generation failed: {e}")
             self._emit_progress("sql", ProgressStatus.FAILED, f"SQL failed: {e}")
             self.state.phase = ChartPhase.WAITING
             return ChartConversationResult(
@@ -443,23 +423,18 @@ Keep your response brief and friendly."""
         row_count = 0
         try:
             from .sql_validator import execute_query
-            print(f"[ChartConversation] Executing preview query: {sql[:100]}...")
             result = execute_query(sql, query_name, limit=100)
             if result.error:
-                print(f"[ChartConversation] Data preview query error: {result.error}")
                 self._emit_progress("validation", ProgressStatus.COMPLETED, "Query validated (no preview)")
             elif result.data:
                 row_count = result.row_count
                 # Get first 5 rows for preview
                 data_preview = result.data[:5]
-                print(f"[ChartConversation] Got {row_count} rows, preview has {len(data_preview)} rows")
                 self._emit_progress("validation", ProgressStatus.COMPLETED, f"Found {row_count} rows")
             else:
-                print(f"[ChartConversation] Query returned no data")
                 self._emit_progress("validation", ProgressStatus.COMPLETED, "Query returned no data")
         except Exception as e:
             import traceback
-            print(f"[ChartConversation] Data preview failed: {e}")
             traceback.print_exc()
             self._emit_progress("validation", ProgressStatus.COMPLETED, "Query validated (no preview)")
             # Continue without preview - not a blocking error
@@ -641,7 +616,6 @@ Keep your response brief and friendly."""
                 error="No proposal in state",
             )
 
-        print(f"[ChartConversation] Generating chart from proposal...")
         self.state.phase = ChartPhase.GENERATING
         self._emit_progress("layout", ProgressStatus.IN_PROGRESS, "Building chart configuration...")
 
@@ -700,12 +674,10 @@ Keep your response brief and friendly."""
                     self._emit_progress("qa", ProgressStatus.COMPLETED, f"Quality check found {issues} issues")
             except (RuntimeError, ConnectionError, TimeoutError) as e:
                 # Expected errors: QA service unavailable, network issues, timeouts
-                print(f"[ChartConversation] QA validation skipped (service unavailable): {e}")
                 self._emit_progress("qa", ProgressStatus.COMPLETED, "Quality check skipped")
             except Exception as e:
                 # Unexpected errors: log full traceback so bugs don't hide
                 import traceback
-                print(f"[ChartConversation] QA validation error (unexpected): {e}")
                 traceback.print_exc()
                 self._emit_progress("qa", ProgressStatus.FAILED, f"Quality check error: {type(e).__name__}")
 
@@ -770,29 +742,23 @@ Respond with EXACTLY one word: "visual" or "data"
 
         result = response.content.strip().lower()
         is_visual = "visual" in result
-        print(f"[ChartConversation] LLM classification for '{user_input[:40]}': {result} → visual={is_visual}")
         return is_visual
 
     def _handle_visual_change(self, user_input: str) -> ChartConversationResult:
         """Handle a visual/config-only change (colors, fonts, etc.)."""
         import json
-        import sys
         from dataclasses import asdict
         from .config_loader import get_config_loader
 
-        print(f"[ChartConversation] Handling visual change: {user_input[:50]}...")
 
         # Get current chart
         stored_chart = self.chart_storage.get(self.state.current_chart_id)
         if not stored_chart:
-            print(f"[ChartConversation] Chart not found in storage!", file=sys.stderr)
             return ChartConversationResult(
                 response="Chart not found. Please try creating a new chart.",
                 error="Chart not found",
             )
 
-        print(f"[ChartConversation] Loaded chart: {stored_chart.title}", file=sys.stderr)
-        print(f"[ChartConversation] Config type: {type(stored_chart.config)}", file=sys.stderr)
 
         chart_type = self.state.current_chart.spec.chart_type
 
@@ -803,7 +769,6 @@ Respond with EXACTLY one word: "visual" or "data"
                 # Remove None values for cleaner output
                 current_config = {k: v for k, v in current_config.items() if v is not None}
             except Exception as e:
-                print(f"[ChartConversation] Failed to convert config to dict: {e}", file=sys.stderr)
                 current_config = {}
         else:
             current_config = {}
@@ -925,7 +890,6 @@ Suggest the config changes needed."""
                         'legendTitle': 'legend_label',
                     }
 
-                    print(f"[ChartConversation] LLM suggested config: {suggested_config}", file=sys.stderr)
 
                     # Apply suggested changes to the existing ChartConfig
                     for key, value in suggested_config.items():
@@ -958,7 +922,6 @@ Suggest the config changes needed."""
 
         except Exception as e:
             import traceback
-            print(f"[ChartConversation] Visual change failed: {e}")
             traceback.print_exc()
             # Don't fall back to data change - it destroys the chart!
             # Just return an error message
@@ -982,7 +945,6 @@ Suggest the config changes needed."""
         # Combine original request with refinement
         combined_request = f"{self.state.original_request}\n\nRefinement: {user_input}"
 
-        print(f"[ChartConversation] Handling data change: {user_input[:50]}...")
 
         # Regenerate with the refinement
         result = self._pipeline.run(combined_request)
@@ -1045,23 +1007,11 @@ Suggest the config changes needed."""
 
     def _handle_refinement_request(self, user_input: str) -> ChartConversationResult:
         """Handle a refinement request for the current chart."""
-        import sys
-        print(f"\n{'='*60}", file=sys.stderr)
-        print(f"[TRACE] _handle_refinement_request called", file=sys.stderr)
-        print(f"  current_chart is None: {self.state.current_chart is None}", file=sys.stderr)
-        print(f"  current_chart_id: {self.state.current_chart_id}", file=sys.stderr)
-        print(f"  dashboard_slug: {self.state.dashboard_slug}", file=sys.stderr)
-        print(f"{'='*60}\n", file=sys.stderr)
-
         if not self.state.current_chart or not self.state.dashboard_slug:
-            print(f"[TRACE] FALLING BACK - Missing chart data!", file=sys.stderr)
-            print(f"  current_chart: {self.state.current_chart}", file=sys.stderr)
-            print(f"  dashboard_slug: {self.state.dashboard_slug}", file=sys.stderr)
             return self._handle_new_chart_request(user_input)
 
         # Classify the request: visual change (config) vs data change (SQL)
         is_visual = self._is_visual_change(user_input)
-        print(f"[ChartConversation] Is visual change: {is_visual}")
 
         if is_visual:
             return self._handle_visual_change(user_input)

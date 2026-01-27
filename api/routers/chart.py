@@ -83,11 +83,6 @@ def _get_or_create_chart_session(
     db: DBSession, user: User, session_id: int | None
 ) -> tuple[ConversationSession, ChartConversationManager]:
     """Get existing chart session or create a new one."""
-    import sys
-    print(f"\n{'='*60}", file=sys.stderr)
-    print(f"[TRACE] _get_or_create_chart_session called", file=sys.stderr)
-    print(f"  session_id: {session_id}", file=sys.stderr)
-
     if session_id:
         # Get existing session
         session = (
@@ -142,14 +137,6 @@ def _restore_chart_manager_state(manager: ChartConversationManager, session: Con
     from engine.llm.base import Message
     from engine.models import get_chart_storage
     from dataclasses import dataclass
-    import sys
-
-    print(f"\n{'='*60}", file=sys.stderr)
-    print(f"[TRACE] _restore_chart_manager_state called", file=sys.stderr)
-    print(f"  session.id: {session.id}", file=sys.stderr)
-    print(f"  session.chart_id: {session.chart_id}", file=sys.stderr)
-    print(f"  session.phase: {session.phase}", file=sys.stderr)
-
     # Restore messages
     manager.state.messages = [
         Message(role=m["role"], content=m["content"]) for m in (session.messages or [])
