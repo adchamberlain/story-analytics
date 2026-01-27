@@ -132,9 +132,11 @@ class DataShapeValidator:
             try:
                 count_result = conn.execute(count_sql).fetchone()
                 result.row_count = count_result[0] if count_result else 0
-            except Exception:
-                # If count fails, try running limited query
-                result.row_count = -1  # Unknown
+            except duckdb.Error as e:
+                # SQL/database errors when counting (e.g., complex queries that fail to wrap)
+                # Fall back to counting from limited query results
+                print(f"[QualityValidator] Row count query failed (will count from sample): {e}")
+                result.row_count = -1  # Will be updated from sample query
 
             # Get sample data
             sample_sql = f"SELECT * FROM ({test_sql}) AS subq LIMIT 100"
@@ -755,12 +757,37 @@ class ChartQualityValidator:
             qa = ChartQA(provider_name=self.provider_name)
             return qa.validate(chart_id, original_request)
 
-        except Exception as e:
+        except (RuntimeError, ConnectionError, TimeoutError) as e:
+            # Expected errors: screenshot service unavailable, network issues
+            # These are OK to skip - the chart might still be valid
             return QAResult(
-                passed=True,  # Don't fail the chart on QA errors
-                summary=f"Visual QA skipped: {str(e)[:100]}",
+                passed=True,  # Skip QA when service unavailable
+                summary=f"Visual QA skipped (service unavailable): {str(e)[:100]}",
                 critical_issues=[],
-                suggestions=["Visual QA not available - ensure the app is running"],
+                suggestions=["Visual QA not available - ensure the React app is running on port 3001"],
+            )
+        except (AttributeError, TypeError, ValueError) as e:
+            # Programming errors: missing methods, wrong types, bad values
+            # These indicate bugs that should NOT be silently hidden
+            import traceback
+            print(f"[ChartQualityValidator] BUG DETECTED in validate_chart: {e}")
+            traceback.print_exc()
+            return QAResult(
+                passed=False,  # Fail validation - there's a bug
+                summary=f"Visual QA failed due to internal error: {type(e).__name__}",
+                critical_issues=[f"Internal error: {str(e)[:200]}"],
+                suggestions=["This appears to be a bug in the QA validation code"],
+            )
+        except Exception as e:
+            # Other unexpected errors - log but don't crash
+            import traceback
+            print(f"[ChartQualityValidator] Unexpected error in validate_chart: {e}")
+            traceback.print_exc()
+            return QAResult(
+                passed=False,  # Fail on unexpected errors
+                summary=f"Visual QA encountered unexpected error: {type(e).__name__}",
+                critical_issues=[f"Unexpected error: {str(e)[:200]}"],
+                suggestions=["Check logs for full traceback"],
             )
 
     def validate_full(
