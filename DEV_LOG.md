@@ -78,7 +78,7 @@ The system had hardcoded `snowflake_saas` as the source name in multiple places,
 | `engine/chart_pipeline.py` | Auto-detect source_name from config |
 | `engine/chart_conversation.py` | Pass source_name to ChartPipeline |
 | `engine/sql_validator.py` | Added `clear_validator_cache()` |
-| `engine_config.yaml` | Point to olist_ecommerce source |
+| `.gitignore` | Added `sources/olist_ecommerce/connection.yaml` to protect credentials |
 
 ### Verification
 
@@ -89,6 +89,23 @@ Successfully tested chart creation with new source:
 ```
 
 SQL now correctly uses `olist_ecommerce.tablename` instead of `snowflake_saas.tablename`.
+
+### Commit
+
+Pushed to main: `f3e2081` - "Add multi-source support and Olist E-commerce dataset"
+
+**Note**: Default `engine_config.yaml` still points to `snowflake_saas` to avoid breaking other developers. To use Olist, change the connection_file path locally.
+
+### Client Onboarding Flow - Validated ✓
+
+The complete end-to-end flow for new Snowflake data sources works:
+1. Load data into Snowflake → ✓
+2. Create source configuration (connection.yaml, dialect.yaml) → ✓
+3. Generate semantic layer with AI → ✓ (auto-documents tables, columns, relationships)
+4. Export data for local validation → ✓
+5. Create charts with natural language → ✓
+
+Time to value: ~10 minutes from raw data to asking natural language questions.
 
 ### Next Steps
 
