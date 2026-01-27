@@ -87,6 +87,40 @@ def validate_chart(
 - [ ] Add test specifically for `validate_chart` method
 - [ ] Consider making QA failures more visible (warnings vs silent skip)
 
+### Codebase Audit: Other Potential Silent Failures
+
+After finding the `validate_chart` bug, performed a full codebase search for similar patterns that could hide errors.
+
+#### HIGH RISK - Same Pattern as validate_chart Bug
+
+| File | Line | Pattern | Risk |
+|------|------|---------|------|
+| `engine/chart_conversation.py` | 659-660 | `except Exception as e: print(...)` | **THE BUG** - Caught AttributeError silently |
+| `engine/validators/quality_validator.py` | 758-759 | `except Exception: return QAResult(passed=True...)` | Returns "passing" on any error! |
+| `engine/validators/quality_validator.py` | 135-137 | `except Exception: pass` in row count | Could hide missing methods |
+
+#### MEDIUM RISK - Silent Fallbacks (Functional but Hide Issues)
+
+| File | Line | Pattern | Impact |
+|------|------|---------|--------|
+| `api/routers/templates.py` | 190-192 | `except Exception: pass` | Falls back to static templates silently |
+| `api/routers/chart.py` | 1213-1214 | `except Exception: pass` | Skips business context silently |
+| `engine/qa.py` | 410-411 | `except Exception: pass` | Auto-fix proceeds without schema |
+| `engine/chart_pipeline.py` | 468-470 | `except Exception as e:` (only warns if verbose) | Silent in production |
+
+#### Patterns to Watch
+
+1. **`except Exception` catching AttributeError** - This hides missing methods/typos
+2. **`pass` after except** - Complete silence, no indication anything failed
+3. **`return default_value` after except** - Makes it look like success
+4. **Logging to console only** - Easy to miss in production logs
+
+#### Recommendations
+
+1. Change `chart_conversation.py:659` to catch only expected exceptions (e.g., `RuntimeError` for service unavailable), not all exceptions
+2. Consider adding warnings/metrics for silent fallbacks
+3. Review `quality_validator.py:758` - returning `passed=True` on exception is dangerous
+
 ### Files Modified
 
 | File | Change |
