@@ -431,3 +431,137 @@ Generated markdown:
     title="Monthly Invoice Payment Status"
 />
 ```
+
+---
+
+## Session: 2026-01-26 (Suggested Charts End-to-End Test)
+
+### Test Suite: Auto-Generated Suggested Charts
+
+This session tested all 12 suggested charts from both data sources (6 per source) end-to-end with Claude, including visual QA validation via Playwright screenshots.
+
+**Test Script:** `test_suggested_charts.py`
+**QA Report:** `test_results/SUGGESTED_CHARTS_QA_REPORT.html`
+
+---
+
+### Results Summary
+
+| Metric | Result |
+|--------|--------|
+| Total Charts | 12 |
+| Generated Successfully | 12 (100%) |
+| QA Passed | 11 (91.7%) |
+| QA Failed | 1 |
+
+---
+
+### Charts Tested
+
+#### Snowflake SaaS (6 charts)
+
+| Chart | Type | QA Result | Notes |
+|-------|------|-----------|-------|
+| MRR Trend | Area | ✅ PASS | Monthly recurring revenue over time |
+| Customer Growth | Line | ✅ PASS | New signups by month |
+| Revenue by Plan | Horizontal Bar | ✅ PASS | MRR by subscription tier |
+| Revenue by Industry | Horizontal Bar | ✅ PASS | MRR by customer industry |
+| Top Customers | Horizontal Bar | ❌ FAIL | Missing value labels on bars |
+| Churn Analysis | Line | ✅ PASS | Churned customers by month |
+
+#### Olist E-commerce (6 charts)
+
+| Chart | Type | QA Result | Notes |
+|-------|------|-----------|-------|
+| GMV Trend | Area | ✅ PASS | Gross merchandise value over time |
+| Orders Over Time | Line | ✅ PASS | Order volume by month |
+| Orders by State | Horizontal Bar | ✅ PASS | Geographic distribution |
+| Category Performance | Horizontal Bar | ✅ PASS | Top 10 categories by revenue |
+| Payment Methods | Horizontal Bar | ✅ PASS | Revenue by payment type |
+| Satisfaction Score | Bar | ✅ PASS | Review score distribution (1-5) |
+
+---
+
+### QA Failure Details
+
+**Chart:** Top Customers (snowflake_saas)
+
+**Issues Identified:**
+1. Missing MRR amount values - bars displayed but no numerical labels
+2. No axis labels or scale indicators showing actual MRR amounts
+
+**Prompt Used:**
+> "Create a horizontal bar chart showing the top 10 customers by MRR. Display the company name and their MRR amount from active subscriptions."
+
+**Root Cause:** The prompt requested "display... their MRR amount" but the chart didn't include value labels on bars. This is a chart configuration issue - bar charts don't automatically add data labels.
+
+**Recommendation:** Update the prompt to be more explicit: "Show value labels on each bar" or add data label support to horizontal bar charts by default.
+
+---
+
+### Bugs Fixed During Testing
+
+#### 1. Blank Screenshot Capture
+
+**Problem:** Playwright screenshots were blank/white.
+
+**Root Cause:** `_wait_for_dashboard_ready()` in `engine/qa.py` didn't wait for Plotly elements to render.
+
+**Fix:** Added explicit waits for `.js-plotly-plot` (Plotly container) before capturing:
+```python
+plotly_chart = page.locator(".js-plotly-plot")
+await plotly_chart.wait_for(state="visible", timeout=10000)
+```
+
+#### 2. Missing validate_chart Method
+
+**Problem:** Every chart's built-in QA step silently failed with:
+```
+'ChartQualityValidator' object has no attribute 'validate_chart'
+```
+
+**Root Cause:** `ChartConversationManager` called `validate_chart()` but the method didn't exist on `ChartQualityValidator`.
+
+**Fix:** Added the missing method to `engine/validators/quality_validator.py`:
+```python
+def validate_chart(self, chart, original_request: str, chart_slug: str):
+    """Validate a rendered chart using vision QA."""
+    from ..qa import ChartQA, QAResult
+    chart_id = chart_slug.replace("/chart/", "")
+    qa = ChartQA(provider_name=self.provider_name)
+    return qa.validate(chart_id, original_request)
+```
+
+---
+
+### Test Coverage Gap Identified
+
+**How did the broken QA method evade unit tests?**
+
+1. **Method never existed** - Unit tests tested `validate_spec()` and `validate_query()`, but never `validate_chart()` because it didn't exist
+2. **Visual QA disabled by default** - Tests run with `enable_visual_qa=False`, so the broken path was never exercised
+3. **No integration test** - No test verified the full flow from `ChartConversationManager` through QA validation
+4. **Silent error handling** - The try/except caught the AttributeError and logged it, allowing charts to generate while QA silently skipped
+
+**Action Items:**
+- [ ] Add integration test for full chart creation with visual QA enabled
+- [ ] Add specific test for `validate_chart` method
+- [ ] Consider making QA failures more visible (warning vs silent skip)
+
+---
+
+### Files Modified
+
+| File | Change |
+|------|--------|
+| `engine/qa.py` | Fixed Playwright wait for Plotly elements |
+| `engine/validators/quality_validator.py` | Added missing `validate_chart` method |
+| `test_suggested_charts.py` | Created test script for suggested charts |
+
+---
+
+### Screenshots
+
+All 12 chart screenshots saved to: `test_results/suggested_chart_screenshots/`
+
+Visual QA report with embedded screenshots: `test_results/SUGGESTED_CHARTS_QA_REPORT.html`
