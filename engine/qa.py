@@ -159,19 +159,40 @@ class DashboardScreenshot:
     async def _wait_for_dashboard_ready(self, page, timeout: int):
         """Wait for the dashboard to finish loading data and rendering."""
         # Wait for any loading indicators to disappear
-        # Evidence uses various loading states we need to wait out
+        # For React + Plotly apps, we need to wait for the chart to actually render
 
-        # First, wait a moment for initial render
+        # First, wait for initial page load
         await asyncio.sleep(1)
 
-        # Wait for no more "Loading..." text or error states to appear
-        # Check that charts/tables have rendered (have content)
         try:
-            # Wait for the main content area to be stable
+            # Wait for network to be idle (API calls complete)
             await page.wait_for_load_state("networkidle", timeout=timeout)
 
-            # Give charts a moment to render after data loads
-            await asyncio.sleep(2)
+            # Wait for loading spinner to disappear
+            loading_spinner = page.locator(".loading-spinner")
+            try:
+                await loading_spinner.wait_for(state="detached", timeout=5000)
+            except PlaywrightTimeout:
+                pass  # Spinner may not exist or already gone
+
+            # Wait for Plotly chart to render
+            # Plotly creates a .js-plotly-plot element when rendering
+            plotly_chart = page.locator(".js-plotly-plot")
+            try:
+                await plotly_chart.wait_for(state="visible", timeout=10000)
+                # Give Plotly a moment to finish animations
+                await asyncio.sleep(1)
+            except PlaywrightTimeout:
+                # Try alternate selector - the Plot component wraps in fade-in div
+                fade_in = page.locator(".fade-in")
+                try:
+                    await fade_in.wait_for(state="visible", timeout=5000)
+                    await asyncio.sleep(2)
+                except PlaywrightTimeout:
+                    pass  # Proceed anyway
+
+            # Extra wait for animations to complete
+            await asyncio.sleep(1)
 
         except PlaywrightTimeout:
             # If we timeout, proceed anyway - we'll capture whatever state it's in

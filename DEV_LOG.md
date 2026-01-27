@@ -4,6 +4,271 @@ This log captures development changes made during each session. Review this at t
 
 ---
 
+## Session: 2026-01-26 (Part 5)
+
+### Focus: End-to-End Testing of Suggested Charts + Bug Fixes
+
+**Context**: Tested all 12 suggested charts (6 per data source) end-to-end with Claude and visual QA validation. Discovered and fixed multiple bugs in the screenshot capture and QA validation systems.
+
+### Test Results
+
+**Summary:**
+- 12/12 charts generated successfully (100% generation rate)
+- 11/12 passed QA validation (91.7% QA pass rate)
+- 1 chart failed QA: "Top Customers" - missing value labels on bars
+
+**Full Report:** See `test_results/SUGGESTED_CHARTS_QA_REPORT.html` for all screenshots and details.
+
+### Bugs Found and Fixed
+
+#### 1. Blank Screenshot Capture (engine/qa.py)
+
+**Problem:** Playwright screenshots were blank/white because the wait logic didn't properly wait for Plotly charts to render.
+
+**Root Cause:** The `_wait_for_dashboard_ready` method only waited for `networkidle` and added sleep delays, but didn't wait for actual Plotly elements to appear in the DOM.
+
+**Fix:** Updated to wait for `.js-plotly-plot` (Plotly's container class) and `.fade-in` (our React wrapper) before capturing:
+
+```python
+# Wait for Plotly chart to render
+plotly_chart = page.locator(".js-plotly-plot")
+try:
+    await plotly_chart.wait_for(state="visible", timeout=10000)
+    await asyncio.sleep(1)  # Let animations complete
+except PlaywrightTimeout:
+    # Fallback to fade-in wrapper
+    fade_in = page.locator(".fade-in")
+    await fade_in.wait_for(state="visible", timeout=5000)
+```
+
+#### 2. Missing validate_chart Method (engine/validators/quality_validator.py)
+
+**Problem:** `ChartConversationManager` was calling `self._pipeline.quality_validator.validate_chart()` but this method didn't exist, causing every chart's built-in QA step to silently fail with:
+```
+[ChartConversation] QA validation failed: 'ChartQualityValidator' object has no attribute 'validate_chart'
+```
+
+**Root Cause:** The `ChartQualityValidator` class had methods for `validate_spec`, `validate_query`, and `validate_visual`, but no `validate_chart` method that `chart_conversation.py` was expecting. The error was silently caught in a try/except block.
+
+**Fix:** Added the missing `validate_chart` method that wraps `ChartQA.validate()`:
+
+```python
+def validate_chart(
+    self,
+    chart,  # ValidatedChart
+    original_request: str,
+    chart_slug: str,
+):
+    """Validate a rendered chart using vision QA."""
+    from ..qa import ChartQA, QAResult
+
+    if not self.enable_visual_qa:
+        return QAResult(passed=True, summary="Visual QA disabled", ...)
+
+    chart_id = chart_slug.replace("/chart/", "")
+    qa = ChartQA(provider_name=self.provider_name)
+    return qa.validate(chart_id, original_request)
+```
+
+### Lessons Learned: Test Coverage Gap
+
+**How did the broken QA evade unit tests?**
+
+1. **Method never existed, never tested** - Unit tests in `tests/test_quality_validators.py` tested `validate_spec()`, `validate_query()`, and initialization, but never tested `validate_chart()` because it didn't exist.
+
+2. **Visual QA disabled by default** - Tests always ran with `enable_visual_qa=False`, so the broken code path was never exercised.
+
+3. **No integration test for full flow** - Unit tests tested individual methods in isolation, but no test verified that `ChartConversationManager` called the correct validator method with the correct signature.
+
+4. **Silent error swallowing** - The try/except in `chart_conversation.py` caught the `AttributeError` and just logged it, so charts generated successfully while QA silently failed.
+
+**Action Items:**
+- [ ] Add integration test that exercises full chart creation with visual QA enabled
+- [ ] Add test specifically for `validate_chart` method
+- [ ] Consider making QA failures more visible (warnings vs silent skip)
+
+### Files Modified
+
+| File | Change |
+|------|--------|
+| `engine/qa.py` | Fixed `_wait_for_dashboard_ready` to wait for Plotly elements |
+| `engine/validators/quality_validator.py` | Added missing `validate_chart` method |
+| `test_suggested_charts.py` | Fixed to use `ChartQA` instead of `DashboardQA` |
+
+### Files Created
+
+| File | Description |
+|------|-------------|
+| `test_results/SUGGESTED_CHARTS_QA_REPORT.html` | HTML report with all 12 chart screenshots and QA results |
+| `test_results/suggested_charts_test.json` | JSON data for test results |
+| `test_results/suggested_chart_screenshots/*.png` | Screenshot images for each chart |
+
+---
+
+## Session: 2026-01-26 (Part 4)
+
+### Focus: Auto-Generated Suggested Charts Feature
+
+**Context**: Implemented the auto-generated suggested charts feature to replace static business-type templates with source-specific charts that are stored in each source's semantic.yaml.
+
+### Problem Solved
+
+The previous system had several issues:
+- Templates were generic, not tailored to actual data
+- Cart abandonment template failed on Olist (no clickstream data)
+- User had to manually set business_type
+- Templates often referenced tables/columns that didn't exist
+
+### Solution: Source-Specific Suggested Charts
+
+Instead of filtering generic templates by business_type, charts are now auto-generated and stored in each source's semantic.yaml, ensuring they work with the actual data.
+
+**New Architecture:**
+```
+User selects data source → GET /templates/charts
+    → Load sources/{source}/semantic.yaml
+    → Return 6 charts from suggested_charts section
+```
+
+### Implementation
+
+1. **Added SuggestedChart dataclass** (`engine/semantic.py`)
+   - Fields: id, name, icon, description, prompt
+   - Added to SemanticLayer with to_dict/from_dict support
+
+2. **Added 6 suggested charts to snowflake_saas semantic.yaml:**
+   - MRR Trend (area chart of monthly recurring revenue)
+   - Customer Growth (new signups over time)
+   - Revenue by Plan (MRR by subscription tier)
+   - Revenue by Industry (MRR by customer industry)
+   - Top Customers (highest value by MRR)
+   - Churn Analysis (churn patterns over time)
+
+3. **Added 6 suggested charts to olist_ecommerce semantic.yaml:**
+   - GMV Trend (gross merchandise value by month)
+   - Orders Over Time (order volume trends)
+   - Orders by State (geographic distribution)
+   - Category Performance (top categories by revenue)
+   - Payment Methods (revenue by payment type)
+   - Satisfaction Score (review score distribution)
+
+4. **Updated templates API** (`api/routers/templates.py`)
+   - Now loads from semantic layer first
+   - Falls back to static templates if no semantic layer charts
+   - Uses preferred_source instead of business_type
+
+5. **Removed Business Type from Settings** (`app/src/pages/SettingsPage.tsx`)
+   - Removed BUSINESS_TYPES constant
+   - Removed handleBusinessTypeChange function
+   - Removed Business Type section from UI
+   - Data source selection now determines chart templates
+
+### Files Modified
+
+| File | Change |
+|------|--------|
+| `engine/semantic.py` | Added SuggestedChart dataclass, updated SemanticLayer |
+| `sources/snowflake_saas/semantic.yaml` | Added 6 suggested charts |
+| `sources/olist_ecommerce/semantic.yaml` | Added 6 suggested charts |
+| `api/routers/templates.py` | Load charts from semantic layer by source |
+| `app/src/pages/SettingsPage.tsx` | Removed Business Type section |
+
+### Verification
+
+```bash
+# Both sources load 6 charts successfully
+python -c "from engine.semantic import SemanticLayer; \
+  sl = SemanticLayer.load('sources/snowflake_saas/semantic.yaml'); \
+  print([c.name for c in sl.suggested_charts])"
+# ['MRR Trend', 'Customer Growth', 'Revenue by Plan', 'Revenue by Industry', 'Top Customers', 'Churn Analysis']
+```
+
+### Next Steps
+
+- [ ] Test all 12 suggested charts end-to-end to verify they render correctly
+- [ ] Update semantic generation prompt to auto-generate suggested_charts for new sources
+- [ ] Consider removing updateBusinessType from API client (now unused)
+- [ ] Optionally remove business_type from UserPreferences model validation
+
+---
+
+## Session: 2026-01-26 (Part 3)
+
+### Focus: E-Commerce Template Fixes & Test Suite Validation
+
+**Context**: Ran the autonomous chart test suite with the Olist E-commerce dataset. Discovered that several suggested chart templates don't work with the actual e-commerce data, creating a poor user experience where charts render with no data.
+
+### Test Results
+
+Ran 30 prompts across all 3 LLMs with Olist e-commerce data:
+
+| Provider | Passed | Failed | Pass Rate |
+|----------|--------|--------|-----------|
+| Claude   | 29     | 1      | 96.7%     |
+| OpenAI   | 27     | 3      | 90.0%     |
+| Gemini   | 25     | 5      | 83.3%     |
+
+**Systematic Failure**: Prompt 27 ("Revenue by month with a filter for year") failed on all providers due to SQL filter syntax issues.
+
+### Problems Identified
+
+1. **Historical Data Issue**: LLM generated SQL with `CURRENT_DATE - INTERVAL '12 months'` but Olist data is from 2016-2018, returning 0 rows.
+   - **Fix**: Updated `sources/olist_ecommerce/semantic.yaml` with note about historical data timeframe
+
+2. **E-commerce Templates Don't Match Data**: Several suggested templates reference data that Olist doesn't have:
+   - Cart abandonment funnel (requires clickstream data - Olist only has orders)
+   - Visitor trends (requires web analytics - Olist only has transactions)
+   - Product-level performance (Olist doesn't have product views/engagement)
+   - Customer LTV (Olist has no subscription/recurring revenue)
+
+### Solution: Updated E-Commerce Templates
+
+Modified `engine/templates/charts.yaml` to replace templates with ones that work with typical order-based e-commerce data:
+
+| Old Template | New Template | Reason |
+|--------------|--------------|--------|
+| `visitors-trend` | `orders-trend` | No visitor data in transactional datasets |
+| `traffic-sources` | `orders-by-state` | No traffic/UTM data; use geographic analysis |
+| `cart-abandonment` | `order-fulfillment-funnel` | No cart events; use order status progression |
+| `product-performance` | `category-performance` | Aggregate by category, not individual products |
+| `sales-trend` | `gmv-trend` | Renamed to standard e-commerce metric (GMV) |
+| `customer-ltv` | `payment-methods` | No LTV data; analyze payment preferences |
+
+Also split `metric-health-check` into business-type specific versions:
+- `metric-health-check` (SaaS) - uses subscriptions table
+- `metric-health-check-orders` (E-commerce) - uses orders table
+- `metric-health-check-general` (General) - generic key metrics
+
+### Files Modified
+
+| File | Change |
+|------|--------|
+| `engine/templates/charts.yaml` | Updated all e-commerce templates to match actual data availability |
+| `sources/olist_ecommerce/semantic.yaml` | Added historical data timeframe note |
+| `tests/chart_prompts.yaml` | Adapted 30 test prompts for e-commerce (earlier in session) |
+| `tests/test_chart_prompts.py` | Added cache clearing for fresh data loading |
+
+### Feature Enhancement Idea (Future)
+
+**Auto-generate suggested charts during semantic layer creation**:
+
+When a new data source is onboarded and the semantic layer is auto-generated via LLM, also auto-generate 6 suggested chart prompts specific to that data source. Benefits:
+- Charts guaranteed to work with the actual data
+- Customized to the real schema, not generic business type assumptions
+- Better UX - users see charts that actually work
+- LLM already has full schema context at that point
+
+This would toggle on when that data source is selected, replacing the generic business-type templates.
+
+### Next Steps
+
+- [ ] Implement auto-generated suggested charts during onboarding
+- [ ] Re-run test suite to verify template fixes work
+- [ ] Investigate systematic failure on Prompt 27 (year filter)
+- [ ] Consider adding data availability checks before suggesting templates
+
+---
+
 ## Session: 2026-01-26 (Part 2)
 
 ### Focus: Multi-Source Support & Olist E-Commerce Dataset

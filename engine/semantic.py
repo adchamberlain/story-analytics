@@ -151,6 +151,36 @@ class QueryPattern:
 
 
 @dataclass
+class SuggestedChart:
+    """A suggested chart template for a data source."""
+
+    id: str  # kebab-case identifier
+    name: str  # User-friendly display name
+    icon: str  # Single emoji
+    description: str  # One-line explanation
+    prompt: str  # Natural language prompt to generate the chart
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "name": self.name,
+            "icon": self.icon,
+            "description": self.description,
+            "prompt": self.prompt,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "SuggestedChart":
+        return cls(
+            id=data.get("id", ""),
+            name=data.get("name", ""),
+            icon=data.get("icon", "📊"),
+            description=data.get("description", ""),
+            prompt=data.get("prompt", ""),
+        )
+
+
+@dataclass
 class BusinessContext:
     """High-level business context for the data source."""
 
@@ -199,9 +229,10 @@ class SemanticLayer:
     tables: dict[str, TableSemantic] = field(default_factory=dict)
     relationships: list[Relationship] = field(default_factory=list)
     query_patterns: dict[str, QueryPattern] = field(default_factory=dict)
+    suggested_charts: list[SuggestedChart] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        result = {
             "version": self.version,
             "generated_at": self.generated_at,
             "source_name": self.source_name,
@@ -213,6 +244,11 @@ class SemanticLayer:
                 name: pattern.to_dict() for name, pattern in self.query_patterns.items()
             },
         }
+        if self.suggested_charts:
+            result["suggested_charts"] = [
+                chart.to_dict() for chart in self.suggested_charts
+            ]
+        return result
 
     def to_yaml(self) -> str:
         """Serialize to YAML string."""
@@ -244,6 +280,12 @@ class SemanticLayer:
         for pattern_name, pattern_data in data.get("query_patterns", {}).items():
             query_patterns[pattern_name] = QueryPattern.from_dict(pattern_data)
 
+        # Parse suggested charts
+        suggested_charts = [
+            SuggestedChart.from_dict(chart)
+            for chart in data.get("suggested_charts", [])
+        ]
+
         return cls(
             version=data.get("version", "1.0"),
             generated_at=data.get("generated_at", datetime.now().isoformat()),
@@ -253,6 +295,7 @@ class SemanticLayer:
             tables=tables,
             relationships=relationships,
             query_patterns=query_patterns,
+            suggested_charts=suggested_charts,
         )
 
     @classmethod

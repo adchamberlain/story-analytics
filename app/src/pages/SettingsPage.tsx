@@ -1,6 +1,6 @@
 /**
  * Settings page.
- * User account info, provider selection, business type, and data source.
+ * User account info, provider selection, and data source.
  */
 
 import { useEffect, useState } from 'react'
@@ -9,16 +9,9 @@ import {
   getProviders,
   getSources,
   updateProvider,
-  updateBusinessType,
   updateSource,
 } from '../api/client'
-import type { Provider, SourceInfo, BusinessType } from '../types/conversation'
-
-const BUSINESS_TYPES: { value: BusinessType; label: string; description: string }[] = [
-  { value: 'saas', label: 'SaaS', description: 'Subscription-based software business' },
-  { value: 'ecommerce', label: 'E-commerce', description: 'Online retail and sales' },
-  { value: 'general', label: 'General', description: 'Other business types' },
-]
+import type { Provider, SourceInfo } from '../types/conversation'
 
 export function SettingsPage() {
   const { user, loadUser } = useConversationStore()
@@ -50,18 +43,6 @@ export function SettingsPage() {
       await loadUser()
     } catch (error) {
       console.error('Failed to update provider:', error)
-    } finally {
-      setSaving(null)
-    }
-  }
-
-  const handleBusinessTypeChange = async (businessType: string) => {
-    setSaving('businessType')
-    try {
-      await updateBusinessType(businessType)
-      await loadUser()
-    } catch (error) {
-      console.error('Failed to update business type:', error)
     } finally {
       setSaving(null)
     }
@@ -194,78 +175,6 @@ export function SettingsPage() {
               </label>
             ))}
             {saving === 'provider' && (
-              <span style={{ color: 'var(--color-gray-400)', fontSize: 'var(--text-xs)' }}>
-                Saving...
-              </span>
-            )}
-          </div>
-        </section>
-
-        {/* Business Type */}
-        <section
-          style={{
-            padding: 'var(--space-4)',
-            backgroundColor: 'var(--color-gray-800)',
-            border: '1px solid var(--color-gray-700)',
-            borderRadius: 'var(--radius-md)',
-          }}
-        >
-          <h2
-            style={{
-              margin: '0 0 var(--space-2) 0',
-              fontSize: 'var(--text-base)',
-              fontWeight: 700,
-              color: 'var(--color-warning)',
-            }}
-          >
-            Business Type
-          </h2>
-          <p
-            style={{
-              margin: '0 0 var(--space-4) 0',
-              color: 'var(--color-gray-400)',
-              fontSize: 'var(--text-sm)',
-            }}
-          >
-            Choose your business type to see relevant dashboard templates
-          </p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-            {BUSINESS_TYPES.map((type) => (
-              <label
-                key={type.value}
-                style={{
-                  display: 'flex',
-                  alignItems: 'flex-start',
-                  gap: 'var(--space-2)',
-                  cursor: 'pointer',
-                }}
-              >
-                <input
-                  type="radio"
-                  name="businessType"
-                  value={type.value}
-                  checked={user?.business_type === type.value}
-                  onChange={() => handleBusinessTypeChange(type.value)}
-                  disabled={saving === 'businessType'}
-                  style={{ cursor: 'pointer', marginTop: '2px' }}
-                />
-                <div>
-                  <span style={{ color: 'var(--color-gray-200)', fontSize: 'var(--text-sm)' }}>
-                    {type.label}
-                  </span>
-                  <p
-                    style={{
-                      margin: 0,
-                      color: 'var(--color-gray-500)',
-                      fontSize: 'var(--text-xs)',
-                    }}
-                  >
-                    {type.description}
-                  </p>
-                </div>
-              </label>
-            ))}
-            {saving === 'businessType' && (
               <span style={{ color: 'var(--color-gray-400)', fontSize: 'var(--text-xs)' }}>
                 Saving...
               </span>
