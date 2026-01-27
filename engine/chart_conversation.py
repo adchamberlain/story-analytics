@@ -656,9 +656,16 @@ Keep your response brief and friendly."""
                 else:
                     issues = len(qa_result.critical_issues) if qa_result.critical_issues else 0
                     self._emit_progress("qa", ProgressStatus.COMPLETED, f"Quality check found {issues} issues")
-            except Exception as e:
-                print(f"[ChartConversation] QA validation failed: {e}")
+            except (RuntimeError, ConnectionError, TimeoutError) as e:
+                # Expected errors: QA service unavailable, network issues, timeouts
+                print(f"[ChartConversation] QA validation skipped (service unavailable): {e}")
                 self._emit_progress("qa", ProgressStatus.COMPLETED, "Quality check skipped")
+            except Exception as e:
+                # Unexpected errors: log full traceback so bugs don't hide
+                import traceback
+                print(f"[ChartConversation] QA validation error (unexpected): {e}")
+                traceback.print_exc()
+                self._emit_progress("qa", ProgressStatus.FAILED, f"Quality check error: {type(e).__name__}")
 
         # Build response - use /chart/{id} route for React app
         chart_url = f"{self.config.frontend_url}/chart/{stored_chart.id}"
