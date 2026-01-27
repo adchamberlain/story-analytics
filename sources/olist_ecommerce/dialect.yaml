@@ -1,0 +1,133 @@
+# SQL dialect rules for Olist E-Commerce data (Snowflake via DuckDB)
+# These rules help the LLM generate valid SQL for this data source
+#
+# IMPORTANT: Although data comes from Snowflake, Evidence executes queries
+# locally using DuckDB. You MUST use DuckDB-compatible SQL syntax.
+
+dialect: duckdb  # Evidence uses DuckDB locally, NOT Snowflake SQL
+source_name: olist_ecommerce
+
+# How to reference tables in queries
+table_reference:
+  format: "{source_name}.{table_name}"
+  example: "olist_ecommerce.orders"
+  note: "ALWAYS prefix table names with the source name"
+
+# Date/time function rules
+date_functions:
+  # Functions that work
+  allowed:
+    - name: DATE_TRUNC
+      syntax: "DATE_TRUNC('month', date_column)"
+      description: "Truncate date to specified precision"
+      example: "DATE_TRUNC('month', order_purchase_timestamp) as month"
+
+    - name: YEAR
+      syntax: "YEAR(date_column)"
+      description: "Extract year from date"
+      example: "WHERE YEAR(order_purchase_timestamp) = 2017"
+
+    - name: MONTH
+      syntax: "MONTH(date_column)"
+      description: "Extract month from date"
+
+    - name: EXTRACT
+      syntax: "EXTRACT(part FROM date_column)"
+      description: "Extract date part"
+      example: "EXTRACT(year FROM order_purchase_timestamp)"
+
+    - name: "Date comparisons"
+      syntax: "date_column >= '2017-01-01'"
+      description: "Simple date comparisons with string literals"
+
+    - name: STRFTIME
+      syntax: "STRFTIME(date_column, '%Y-%m')"
+      description: "Format date as string (DuckDB equivalent of TO_CHAR)"
+      example: "STRFTIME(order_purchase_timestamp, '%Y-%m') as month_str"
+
+    - name: DATE_DIFF
+      syntax: "DATE_DIFF('day', date1, date2)"
+      description: "Calculate difference between dates"
+      example: "DATE_DIFF('day', order_purchase_timestamp, order_delivered_customer_date) as delivery_days"
+
+    - name: CURRENT_DATE
+      syntax: "CURRENT_DATE"
+      description: "Current date"
+
+    - name: "Date arithmetic"
+      syntax: "date_column + INTERVAL '1 month'"
+      description: "Add/subtract intervals from dates"
+      example: "WHERE order_purchase_timestamp >= CURRENT_DATE - INTERVAL '30 days'"
+
+  # Functions to NEVER use (cause errors in Evidence/DuckDB)
+  # CRITICAL: These Snowflake functions do NOT work in DuckDB
+  forbidden:
+    - name: TO_CHAR
+      reason: "Snowflake function - does NOT exist in DuckDB"
+      alternative: "Use STRFTIME(date_column, '%Y-%m') or CAST(column AS VARCHAR)"
+
+    - name: TO_VARCHAR
+      reason: "Snowflake function - does NOT exist in DuckDB"
+      alternative: "Use CAST(column AS VARCHAR)"
+
+    - name: TO_DATE
+      reason: "Snowflake function - does NOT exist in DuckDB"
+      alternative: "Use CAST(column AS DATE) or date_column::DATE"
+
+    - name: TO_TIMESTAMP
+      reason: "Snowflake function - does NOT exist in DuckDB"
+      alternative: "Use CAST(column AS TIMESTAMP)"
+
+    - name: DATEADD
+      reason: "Snowflake function - does NOT exist in DuckDB"
+      alternative: "Use date_column + INTERVAL '1 month' or simple date comparisons"
+
+    - name: DATEDIFF
+      reason: "Snowflake syntax differs from DuckDB"
+      alternative: "Use DATE_DIFF('day', date1, date2) or (date2 - date1)"
+
+    - name: DATE_SUB
+      reason: "Not supported in DuckDB"
+      alternative: "Use date_column - INTERVAL '1 day'"
+
+    - name: NVL
+      reason: "Snowflake function - does NOT exist in DuckDB"
+      alternative: "Use COALESCE(column, default_value)"
+
+    - name: IFF
+      reason: "Snowflake function - does NOT exist in DuckDB"
+      alternative: "Use CASE WHEN condition THEN x ELSE y END"
+
+    - name: ZEROIFNULL
+      reason: "Snowflake function - does NOT exist in DuckDB"
+      alternative: "Use COALESCE(column, 0)"
+
+# Aggregation functions
+aggregation:
+  allowed:
+    - COUNT(*)
+    - SUM(column)
+    - AVG(column)
+    - MIN(column)
+    - MAX(column)
+    - COUNT(DISTINCT column)
+
+# String functions
+string_functions:
+  allowed:
+    - UPPER(column)
+    - LOWER(column)
+    - CONCAT(col1, col2)
+    - TRIM(column)
+
+# General SQL rules
+general_rules:
+  - "CRITICAL: Use DuckDB SQL syntax, NOT Snowflake syntax"
+  - "NEVER use Snowflake-specific functions (TO_CHAR, TO_VARCHAR, NVL, IFF, etc.)"
+  - "Always use explicit column aliases with AS keyword"
+  - "Use single quotes for string literals"
+  - "Column names are case-insensitive but preserve case in output"
+  - "Use GROUP BY with all non-aggregated columns"
+  - "For date formatting, use STRFTIME() not TO_CHAR()"
+  - "For null handling, use COALESCE() not NVL()"
+  - "For conditionals, use CASE WHEN not IFF()"

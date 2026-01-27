@@ -96,9 +96,13 @@ def _execute_sql(sql: str, filters: dict[str, Any] | None = None) -> tuple[list[
                 # Handle numeric vs string values
                 try:
                     float(str_value)
+                    # Replace both ${inputs.name} and ${inputs.name.value} syntaxes
                     processed_sql = processed_sql.replace(f"${{inputs.{name}}}", str_value)
+                    processed_sql = processed_sql.replace(f"${{inputs.{name}.value}}", str_value)
                 except ValueError:
+                    # Replace both ${inputs.name} and ${inputs.name.value} syntaxes
                     processed_sql = processed_sql.replace(f"${{inputs.{name}}}", f"'{str_value}'")
+                    processed_sql = processed_sql.replace(f"${{inputs.{name}.value}}", f"'{str_value}'")
 
     # Get DuckDB connection from SQLValidator
     validator = SQLValidator()
@@ -183,6 +187,48 @@ def _chart_to_render_spec(chart) -> dict[str, Any]:
     }
 
 
+def _extract_default_filters(chart) -> dict[str, Any]:
+    """
+    Extract default filter values from chart's filter definitions.
+
+    This ensures charts with filters render properly on initial load
+    by substituting default values into the SQL.
+    """
+    defaults = {}
+    if chart.filters:
+        validator = SQLValidator()
+        conn = validator._get_connection()
+
+        for f in chart.filters:
+            if f.default_value is not None:
+                defaults[f.name] = f.default_value
+            elif f.default_start and f.default_end:
+                # DateRange with start/end defaults
+                defaults[f.name] = {
+                    "start": f.default_start,
+                    "end": f.default_end,
+                }
+            elif f.options_column and f.options_table:
+                # No default set for dropdown - query for the first available option
+                try:
+                    # Handle common cases where the column might be a derived value
+                    col = f.options_column
+                    if col.lower() == "year" and f.options_table.lower() == "invoices":
+                        # Year is typically extracted from invoice_date
+                        col = "EXTRACT(YEAR FROM invoice_date)::INTEGER"
+                    elif col.lower() == "month" and f.options_table.lower() == "invoices":
+                        col = "EXTRACT(MONTH FROM invoice_date)::INTEGER"
+
+                    query = f"SELECT DISTINCT {col} as val FROM snowflake_saas.{f.options_table} ORDER BY val DESC LIMIT 1"
+                    result = conn.execute(query).fetchone()
+                    if result:
+                        defaults[f.name] = str(result[0])
+                except Exception:
+                    # If query fails, skip this filter - it will fail on render
+                    pass
+    return defaults
+
+
 @router.get("/chart/{chart_id}", response_model=ChartRenderData)
 async def get_chart_render_data(
     chart_id: str,
@@ -200,9 +246,12 @@ async def get_chart_render_data(
     if not chart:
         raise HTTPException(status_code=404, detail="Chart not found")
 
-    # Execute the query
+    # Extract default filter values for initial render
+    default_filters = _extract_default_filters(chart)
+
+    # Execute the query with default filter values
     try:
-        data, columns = _execute_sql(chart.sql)
+        data, columns = _execute_sql(chart.sql, default_filters)
     except HTTPException:
         raise
     except Exception as e:
@@ -270,7 +319,9 @@ async def get_dashboard_render_data(
             continue
 
         try:
-            data, columns = _execute_sql(chart.sql)
+            # Extract default filter values for initial render
+            default_filters = _extract_default_filters(chart)
+            data, columns = _execute_sql(chart.sql, default_filters)
             spec = _chart_to_render_spec(chart)
 
             charts_data.append(ChartRenderData(
@@ -331,8 +382,11 @@ async def get_chart_render_data_by_slug(
     if not chart:
         raise HTTPException(status_code=404, detail="Chart not found")
 
+    # Extract default filter values for initial render
+    default_filters = _extract_default_filters(chart)
+
     try:
-        data, columns = _execute_sql(chart.sql)
+        data, columns = _execute_sql(chart.sql, default_filters)
     except HTTPException:
         raise
     except Exception as e:

@@ -4,6 +4,205 @@ This log captures development changes made during each session. Review this at t
 
 ---
 
+## Session: 2026-01-26 (Part 2)
+
+### Focus: Multi-Source Support & Olist E-Commerce Dataset
+
+**Context**: User wanted to test the client onboarding flow with a new e-commerce dataset. We set up the Olist Brazilian E-Commerce dataset and fixed the source caching issues to support multiple data sources.
+
+### Problem Identified
+
+The system had hardcoded `snowflake_saas` as the source name in multiple places, preventing proper multi-source support:
+- `engine/schema.py` - Hardcoded in `to_prompt_context()`
+- `engine/chart_pipeline.py` - Default parameter was `snowflake_saas`
+- Various prompt templates referenced `snowflake_saas.tablename`
+
+### Solution Implemented
+
+1. **Added `source_name` property to Config** (`engine/config.py`)
+   - Reads source name from the `name` field in connection.yaml
+   - Provides proper default when not specified
+
+2. **Made `Schema.to_prompt_context()` dynamic** (`engine/schema.py`)
+   - Accepts `source_name` parameter
+   - Falls back to semantic layer's source_name if available
+   - Uses config default otherwise
+
+3. **Updated ChartPipeline to auto-detect source** (`engine/chart_pipeline.py`)
+   - Gets source_name from config when not explicitly provided
+   - Passes source_name to schema context
+
+4. **Added cache clearing functions**
+   - `clear_config_cache()` in `engine/config.py`
+   - `clear_schema_cache()` in `engine/schema.py`
+   - `clear_validator_cache()` in `engine/sql_validator.py`
+
+### Olist E-Commerce Dataset Setup
+
+1. **Downloaded dataset** from Kaggle (Brazilian E-Commerce Public Dataset by Olist)
+   - 8 tables, ~550k total rows
+   - Covers orders, customers, products, payments, reviews, sellers
+
+2. **Loaded into Snowflake** (`data/olist/load_to_snowflake.py`)
+   - Created `ANALYTICS_POC.OLIST_ECOMMERCE` schema
+   - Loaded all 8 CSV files
+
+3. **Created source configuration** (`sources/olist_ecommerce/`)
+   - `connection.yaml` - Snowflake connection with schema reference
+   - `dialect.yaml` - DuckDB-compatible SQL rules
+   - `semantic.yaml` - AI-generated semantic layer (E-commerce domain)
+
+4. **Exported data for local validation** (`data/olist_ecommerce/`)
+   - Created parquet files for each table
+   - Enables DuckDB validation without Snowflake connection
+
+5. **Updated engine_config.yaml** to use new source
+
+### Files Created
+
+| File | Purpose |
+|------|---------|
+| `sources/olist_ecommerce/connection.yaml` | Snowflake connection config |
+| `sources/olist_ecommerce/dialect.yaml` | DuckDB-compatible SQL rules |
+| `sources/olist_ecommerce/semantic.yaml` | AI-generated semantic layer |
+| `data/olist/load_to_snowflake.py` | Script to load CSV data to Snowflake |
+| `data/olist_ecommerce/export_to_parquet.py` | Export Snowflake to parquet |
+| `data/olist_ecommerce/{table}/*.parquet` | Local parquet files for validation |
+
+### Files Modified
+
+| File | Change |
+|------|--------|
+| `engine/config.py` | Added `source_name` property, `clear_config_cache()` |
+| `engine/schema.py` | Made `to_prompt_context()` accept dynamic source_name, added `clear_schema_cache()` |
+| `engine/chart_pipeline.py` | Auto-detect source_name from config |
+| `engine/chart_conversation.py` | Pass source_name to ChartPipeline |
+| `engine/sql_validator.py` | Added `clear_validator_cache()` |
+| `engine_config.yaml` | Point to olist_ecommerce source |
+
+### Verification
+
+Successfully tested chart creation with new source:
+```
+[ChartPipeline] Loaded semantic layer: E-commerce
+[ChartConversation] Executing preview query: SELECT op.PAYMENT_TYPE as payment_type, SUM(op.PAYMENT_VALUE) as revenue FROM olist_ecommerce.order_payments...
+```
+
+SQL now correctly uses `olist_ecommerce.tablename` instead of `snowflake_saas.tablename`.
+
+### Next Steps
+
+- [ ] Test full autonomous chart testing suite with new source
+- [ ] Add UI for switching between data sources
+- [ ] Consider adding source selection to chart creation flow
+
+---
+
+## Session: 2026-01-26 (Part 1)
+
+### Focus: Autonomous Chart Testing System
+
+**Context**: Implemented a repeatable, autonomous testing system for chart generation that:
+1. Tests 30 realistic PM/data scientist prompts across all 3 LLMs (Claude, OpenAI, Gemini)
+2. Runs all 3 LLMs in parallel using ProcessPoolExecutor
+3. Logs results separately per LLM (parallel-safe JSON files)
+4. Generates combined markdown analysis report
+5. Identifies systematically failing patterns
+
+### Files Created
+
+| File | Purpose |
+|------|---------|
+| `tests/chart_prompts.yaml` | 30 prompt definitions with validation criteria |
+| `tests/test_chart_prompts.py` | Parallel test runner for all providers |
+
+### Implementation Details
+
+#### 1. Prompt Definitions (`tests/chart_prompts.yaml`)
+
+30 prompts organized into 3 categories:
+- **Template Tests (10)**: Explicitly test all chart templates (mrr-trend, signups-trend, churn-rate, top-customers, feature-adoption, active-users, revenue-trend, engagement-rate, activation-rate, metric-health-check)
+- **Chart Type Tests (10)**: Test all chart types (bar, line, area, bigvalue, histogram, heatmap, scatter, funnel, table, dual-trend)
+- **Natural Language Variations (10)**: Realistic PM/DS requests including vague questions, casual language, typos, verbose requests, and business questions
+
+Each prompt includes:
+- `expected_chart_type`: The chart type expected
+- `expected_template`: Template if applicable
+- `validation_criteria`: List of criteria for QA validation
+
+#### 2. Parallel Test Runner (`tests/test_chart_prompts.py`)
+
+Key features:
+- **Parallel Execution**: Uses `ProcessPoolExecutor` to run all 3 providers simultaneously
+- **Parallel-Safe Output**: Each provider writes to its own JSON file (`prompts_{provider}_{timestamp}.json`)
+- **Incremental Saves**: Results saved after each test to prevent data loss
+- **QA Validation**: Uses Claude for consistent visual validation across all providers
+- **Analysis Report**: Generates combined markdown report with:
+  - Pass rates by provider
+  - Results by category and chart type
+  - Failing prompts with error details
+  - Systematic failures (same test failing on all LLMs)
+  - Provider-specific failures
+
+CLI Interface:
+```bash
+# Run all providers in parallel (default)
+python tests/test_chart_prompts.py
+
+# Run single provider
+python tests/test_chart_prompts.py --provider claude
+
+# Run specific prompts only
+python tests/test_chart_prompts.py --prompts 01,05,10
+
+# Skip QA for faster testing
+python tests/test_chart_prompts.py --no-qa
+
+# Verbose output
+python tests/test_chart_prompts.py --verbose
+```
+
+#### 3. Output Structure
+
+```
+test_results/
+├── prompts_claude_TIMESTAMP.json    # Claude results
+├── prompts_openai_TIMESTAMP.json    # OpenAI results
+├── prompts_gemini_TIMESTAMP.json    # Gemini results
+├── prompts_analysis_TIMESTAMP.md    # Combined analysis report
+└── prompt_screenshots/
+    ├── 01_claude_TIMESTAMP.png
+    ├── 01_openai_TIMESTAMP.png
+    └── ...
+```
+
+### Architecture
+
+```
+test_chart_prompts.py
+       │
+       ├── Spawns 3 parallel processes (ProcessPoolExecutor)
+       │   ├── Claude subprocess → prompts_claude_TIMESTAMP.json
+       │   ├── OpenAI subprocess → prompts_openai_TIMESTAMP.json
+       │   └── Gemini subprocess → prompts_gemini_TIMESTAMP.json
+       │
+       ├── Each subprocess:
+       │   ├── Uses ChartConversationManager
+       │   ├── Takes screenshots via Playwright
+       │   └── Validates via QA system (always Claude for consistency)
+       │
+       └── Main process generates combined analysis report
+```
+
+### Next Steps
+
+- [ ] Run initial test suite: `python tests/test_chart_prompts.py`
+- [ ] Identify systematic failures
+- [ ] Fix failing templates/pipeline issues
+- [ ] Iterate until 100% pass rate
+
+---
+
 ## Session: 2026-01-25 (Part 13)
 
 ### Focus: Complete Data Source Onboarding Flow

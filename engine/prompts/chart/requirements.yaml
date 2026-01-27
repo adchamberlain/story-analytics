@@ -40,19 +40,36 @@ instructions: |
      - If not specified, may be a single BigValue metric
 
   5. CHART TYPE: What visualization best represents this data?
-     - LineChart: Trends over time (continuous x-axis)
+     - LineChart: Trends over time (continuous x-axis) for counts, rates, percentages
      - BarChart: Comparisons across categories (discrete x-axis)
        - If user says "horizontal bar" → set horizontal: true
-     - AreaChart: Trends with volume emphasis
-     - DataTable: Detailed data exploration
-     - BigValue: Single key metric/KPI
-     - ScatterPlot: Correlation between two metrics
-     - Histogram: Distribution of values
+     - AreaChart: ALWAYS use for financial/volume metrics over time:
+       - Revenue, MRR, ARR, sales, income (monetary values over time)
+       - When user says "MRR trend", "revenue trend", "sales trend" → AreaChart
+       - When user says "area chart" explicitly → AreaChart
+       - The filled area emphasizes cumulative magnitude
+     - DataTable: Detailed data exploration, lists of records
+     - BigValue: Single key metric/KPI (one number)
+     - ScatterPlot: Correlation between two metrics (X vs Y relationship)
+     - Histogram: Distribution of values (frequency buckets)
+     - Heatmap: Two-dimensional comparison with color intensity
+       - Use when: "heatmap", "by X and Y", "matrix", "day of week and hour"
+       - Requires THREE columns: x dimension, y dimension, and value for color intensity
+       - Example: "invoice counts by month and segment" → Heatmap with x=month, y=segment, value=count
+     - FunnelChart: Conversion flow visualization
+       - Use when: "funnel", "conversion", "pipeline", "stages", "drop-off"
+       - Shows narrowing progression from one stage to the next
+       - Example: "signup funnel", "conversion funnel", "sales pipeline"
      - DualTrendChart: Amazon-style health check with TWO side-by-side panels
        - Left panel: Last 6 weeks vs same weeks last year
        - Right panel: Last 12 months vs same months last year
        - Use when user says: "health check", "WBR", "vs last year", "year-over-year comparison", "monitoring trends"
        - IMPORTANT: DualTrendChart is a SPECIAL chart type that only needs a metric and date column
+
+     IMPORTANT - Distinguishing comparison types:
+     - "new vs cancelled subscriptions" → LineChart with series_column (category comparison)
+     - "this year vs last year" → DualTrendChart (time period comparison)
+     - "compare X vs Y over time" where X and Y are categories → LineChart with series_column
 
   5b. HORIZONTAL BAR CHARTS:
      CRITICAL: If the user mentions ANY of these phrases, you MUST set horizontal: true:
@@ -83,6 +100,14 @@ instructions: |
      - y_column: The column(s) that will be plotted on the Y-axis (metrics/values)
        Can be a single column name OR a list of column names for multi-metric charts.
        Examples: "revenue", "count", ["revenue", "customer_count"]
+
+       SPECIAL CASE FOR HEATMAP:
+       For Heatmap charts, y_column should be the ROW DIMENSION (category), NOT the metric!
+       Example: For "invoice counts by month and segment"
+         - x_column: "month" (column dimension)
+         - y_column: "segment" (row dimension - the category for rows!)
+         - The metric (count) is inferred as the third column
+       This creates a matrix where rows=segments, columns=months, colors=count values.
 
      - series_column: The column used to create multiple lines/bars (grouping/coloring)
        Only specify this for multi-line/grouped charts where you want to split by a category.
@@ -121,9 +146,11 @@ instructions: |
          - "last 12 months" or "past year" → default_value: "Last 12 Months"
          - "last 30 days" → default_value: "Last 30 Days"
          - If no time period mentioned → default_value: "Last 12 Months"
-       - For Dropdown: DO NOT set default_value. Leave it null/omit it.
-         The dropdown will automatically select the first option from the data.
-         Never use placeholder values like "Current Year" or "All" - these won't match actual data.
+       - For Dropdown: Set a sensible default_value when the filter affects the query:
+         - For year filters: Use the current year as a string (e.g., "2024" or "2025")
+         - For category filters: Use a common/expected value that exists in the data
+         - IMPORTANT: The SQL will fail if ${inputs.filter_name.value} has no default!
+         - Never use placeholder values like "Current Year" or "All" - use actual data values.
 
 output_format: |
   Respond with a JSON object in exactly this format:
@@ -253,14 +280,21 @@ output_format: |
   - Set horizontal: true ONLY when user explicitly requests "horizontal bar chart"
   - Default is false (vertical bars)
 
-  Chart type mapping:
-  - Time series, trends → "LineChart"
+  Chart type mapping (FOLLOW STRICTLY):
+  - Revenue, MRR, ARR, sales over time → "AreaChart" (financial volume metrics)
+  - User counts, rates, percentages over time → "LineChart" (non-financial trends)
   - Category comparisons → "BarChart"
   - Single metric/KPI → "BigValue"
-  - Data exploration → "DataTable"
-  - Volume over time → "AreaChart"
-  - Correlations → "ScatterPlot"
-  - Year-over-year trends, health check, WBR, "vs last year" → "DualTrendChart"
+  - Data exploration, lists → "DataTable"
+  - Correlations (X vs Y) → "ScatterPlot"
+  - Value distributions → "Histogram"
+  - Two-dimensional comparison with color → "Heatmap"
+  - Conversion flow, funnel, stages → "FunnelChart"
+  - Year-over-year trends, health check, WBR → "DualTrendChart"
+
+  Category comparison examples (use series_column with LineChart):
+  - "new vs cancelled subscriptions" → LineChart with series_column="status"
+  - "revenue by product over time" → LineChart with series_column="product"
 
   IMPORTANT:
   - Output ONLY the JSON, no other text
