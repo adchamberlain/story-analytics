@@ -545,59 +545,73 @@ export function Sidebar() {
                 marginLeft: 'var(--space-4)',
               }}
             >
-              {sources.map((source) => (
-                <li key={source.name}>
-                  <button
-                    onClick={() => openSchemaBrowser(source.name)}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 'var(--space-2)',
-                      width: '100%',
-                      textAlign: 'left',
-                      fontSize: 'var(--text-sm)',
-                      color: 'var(--color-gray-400)',
-                      padding: 'var(--space-1) 0',
-                      background: 'none',
-                      border: 'none',
-                      cursor: 'pointer',
-                    }}
-                    title={`${source.name} - Click to browse schema`}
-                  >
-                    <span
+              {sources.map((source) => {
+                const isActive = user?.preferred_source === source.name
+                return (
+                  <li key={source.name}>
+                    <button
+                      onClick={() => openSchemaBrowser(source.name)}
                       style={{
-                        color: source.connected
-                          ? 'var(--color-success)'
-                          : 'var(--color-gray-600)',
-                        fontSize: 'var(--text-xs)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 'var(--space-2)',
+                        width: '100%',
+                        textAlign: 'left',
+                        fontSize: 'var(--text-sm)',
+                        color: isActive ? 'var(--color-primary)' : 'var(--color-gray-400)',
+                        padding: 'var(--space-1) 0',
+                        background: 'none',
+                        border: 'none',
+                        cursor: 'pointer',
                       }}
+                      title={`${source.name}${isActive ? ' (active)' : ''} - Click to browse schema`}
                     >
-                      {source.connected ? '\u25CF' : '\u25CB'}
-                    </span>
-                    <span
-                      style={{
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
-                        fontFamily: 'var(--font-brand)',
-                      }}
-                    >
-                      {source.name}
-                    </span>
-                    {source.table_count !== null && source.table_count > 0 && (
                       <span
                         style={{
+                          color: source.connected
+                            ? 'var(--color-success)'
+                            : 'var(--color-gray-600)',
                           fontSize: 'var(--text-xs)',
-                          color: 'var(--color-gray-500)',
-                          marginLeft: 'auto',
                         }}
                       >
-                        {source.table_count} tables
+                        {source.connected ? '\u25CF' : '\u25CB'}
                       </span>
-                    )}
-                  </button>
-                </li>
-              ))}
+                      <span
+                        style={{
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                          fontFamily: 'var(--font-brand)',
+                        }}
+                      >
+                        {source.name}
+                      </span>
+                      {isActive && (
+                        <span
+                          style={{
+                            fontSize: 'var(--text-xs)',
+                            color: 'var(--color-primary)',
+                            opacity: 0.7,
+                          }}
+                        >
+                          (active)
+                        </span>
+                      )}
+                      {source.table_count !== null && source.table_count > 0 && (
+                        <span
+                          style={{
+                            fontSize: 'var(--text-xs)',
+                            color: 'var(--color-gray-500)',
+                            marginLeft: 'auto',
+                          }}
+                        >
+                          {source.table_count} tables
+                        </span>
+                      )}
+                    </button>
+                  </li>
+                )
+              })}
               {/* Add Data Source button */}
               <li style={{ marginTop: 'var(--space-2)' }}>
                 <button
