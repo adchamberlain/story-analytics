@@ -1,0 +1,944 @@
+=== SYSTEM ===
+You are an expert dbt analytics engineer who builds production-quality semantic layers using the dbt MetricFlow framework. You analyze database schemas and data profiles to generate comprehensive semantic_models, metrics, and saved_queries in valid dbt YAML format.
+
+Your output must be EXACTLY valid dbt MetricFlow YAML that could be dropped into a real dbt project. Follow the format specification precisely.
+
+Key principles:
+1. Every measure name must be globally unique across all semantic models
+2. Classify columns correctly: entities (join keys), dimensions (group by), measures (aggregate)
+3. Define derived metrics for ratios, rates, and per-unit calculations
+4. Include cumulative metrics for running totals and period-to-date
+5. Use descriptive labels and descriptions that explain business meaning
+6. Define saved_queries for the most common analytical questions
+7. Infer business context from column names, data patterns, and relationships
+8. Use the actual data distributions to write accurate descriptions (e.g., "97% of orders are delivered")
+
+IMPORTANT: Output THREE separate YAML documents, clearly labeled:
+1. `_semantic_models.yml` — all semantic model definitions
+2. `_metrics.yml` — all metric definitions
+3. `_saved_queries.yml` — common query patterns
+
+Each YAML document must start with `version: 2` and the appropriate top-level key.
+Separate each document with a line of `---` and a comment indicating the filename.
+
+=== USER ===
+# Database Profile
+
+## Table: customers (99,441 rows)
+
+| Column | Type | Nullable | Distinct | Nulls | Key Stats |
+|--------|------|----------|----------|-------|-----------|
+| customer_id | VARCHAR | Yes | 99,441 | 0.0% | Samples: 89ed25d65f84b1f97909a80ac1676090, f84d0d7ea2cf322d3255ed470e443de5, 574784507f8c418dc386a0961453a3c0, 05c21a5b935941bf33883571a74defa9, e2742ef931c3e60509e74345605c5370 |
+| customer_unique_id | VARCHAR | Yes | 96,096 | 0.0% | Samples: f7c9766df2ab3e4ea4eb3e85a92cad95, 5c4532e92c92ee3c58cd84d7eb15e0be, b759758aaabd73a68af56b03927618e5, 85bbce1d5467842800f2d80b78a54bb6, b8d5a24b75c1001495f32b01bb45fb54 |
+| customer_zip_code_prefix | VARCHAR | Yes | 14,994 | 0.0% | Samples: 43825, 86010, 79041, 89010, 63430 |
+| customer_city | VARCHAR | Yes | 4,119 | 0.0% | Samples: sao paulo, rio de janeiro, faxinal dos guedes, sao bento, curitiba |
+| customer_state | VARCHAR | Yes | 27 | 0.0% | Values: SP (41,746), RJ (12,852), MG (11,635), ... (27 total values) |
+
+## Table: order_items (112,650 rows)
+
+| Column | Type | Nullable | Distinct | Nulls | Key Stats |
+|--------|------|----------|----------|-------|-----------|
+| order_id | VARCHAR | Yes | 98,666 | 0.0% | Samples: 421bc5d68665463cbb939db50847894d, 21dfb91aa3e9fa351ae6f12da1c53fb9, 36b513ae01c274c623245660d7069dfa, 50703a5cdfb2b550cebacccaef68c958, 5c821b37fad60b510aec78ab1883a584 |
+| order_item_id | BIGINT | Yes | 21 | 0.0% | Values: 1 (98,666), 2 (9,803), 3 (2,287), ... (21 total values); Range: 1.00 to 21.00, Avg: 1.20, Median: 1.00 |
+| product_id | VARCHAR | Yes | 32,951 | 0.0% | Samples: 83bfae859f4a37b048a3abcecb17c506, d392a00a8d96150a649853d20d63e8ba, dc3ecc737589882b0318d38cf8b3efaf, 2d110366dd24a714cb50dddc30b4101c, ec2d43cc59763ec91694573b31f1c29a |
+| seller_id | VARCHAR | Yes | 3,095 | 0.0% | Samples: 86ccac0b835037332a596a33b6949ee1, 1f50f920176fa81dab994f9023523100, 1835b56ce799e6a4dc4eddc053f04066, d650b663c3b5f6fb392b6326366efa9a, 33cbbec1e7e1044aaf11d152172c776f |
+| shipping_limit_date | TIMESTAMP_NS | Yes | 93,318 | 0.0% | Range: 2016-09-19 00:15:34 to 2020-04-09 22:35:08; Samples: 2018-02-27 06:55:33, 2018-01-25 08:58:16, 2017-10-03 18:55:14, 2017-06-08 02:25:25, 2017-10-18 12:56:09 |
+| price | DECIMAL(6,2) | Yes | 5,968 | 0.0% | Range: 0.85 to 6,735.00, Avg: 120.65, Median: 74.99; Samples: 44.90, 100.00, 49.90, 189.90, 209.90 |
+| freight_value | DECIMAL(5,2) | Yes | 6,999 | 0.0% | Range: 0.00 to 409.68, Avg: 19.99, Median: 16.26; Samples: 13.77, 17.74, 15.10, 22.35, 17.42 |
+
+## Table: order_payments (103,886 rows)
+
+| Column | Type | Nullable | Distinct | Nulls | Key Stats |
+|--------|------|----------|----------|-------|-----------|
+| order_id | VARCHAR | Yes | 99,440 | 0.0% | Samples: ff4118746eaaed0d632211903070df50, fd7f1e5cb7d88c786df9b8026d733572, 3d4f72b7f014eaf7b6d68f504feef55c, 1f1f6cb06f69d4d020c56d12c8943240, 0787c233e9c027ebb134e0339cdc1ef2 |
+| payment_sequential | BIGINT | Yes | 29 | 0.0% | Values: 1 (99,360), 2 (3,039), 3 (581), ... (29 total values); Range: 1.00 to 29.00, Avg: 1.09, Median: 1.00 |
+| payment_type | VARCHAR | Yes | 5 | 0.0% | Values: credit_card (76,795), boleto (19,784), voucher (5,775), ... (5 total values) |
+| payment_installments | BIGINT | Yes | 24 | 0.0% | Values: 1 (52,546), 2 (12,413), 3 (10,461), ... (24 total values); Range: 0.00 to 24.00, Avg: 2.85, Median: 1.00 |
+| payment_value | DECIMAL(7,2) | Yes | 29,077 | 0.0% | Range: 0.00 to 13,664.08, Avg: 154.10, Median: 100.00; Samples: 148.97, 79.95, 100.33, 13.83, 198.88 |
+
+## Table: order_reviews (99,224 rows)
+
+| Column | Type | Nullable | Distinct | Nulls | Key Stats |
+|--------|------|----------|----------|-------|-----------|
+| review_id | VARCHAR | Yes | 98,410 | 0.0% | Samples: 6d8868466aa0cd7c45b60080cd4bfca9, c702e1dd1ee8c5e58f57be91f46c2a4b, 8beb1f690f41ee648f720f8e880696b0, a1a3fe7451fb15edf8a98d1e0d65ae06, 531cbddd6c3c7bcff22d9c98603d0d25 |
+| order_id | VARCHAR | Yes | 98,673 | 0.0% | Samples: e9385a6ce895738e4ea275adb91aa955, 6021e72cbaae84fabb1a8d6908d2e407, 9bdcb4559b75d21a22fcd868d9e5dfec, 0f13cc32312efa26fb2a0f9176f070d2, 0e947809a364825d9cd3af9fe3197074 |
+| review_score | BIGINT | Yes | 5 | 0.0% | Values: 5 (57,328), 4 (19,142), 1 (11,424), ... (5 total values); Range: 1.00 to 5.00, Avg: 4.09, Median: 5.00 |
+| review_comment_title | VARCHAR | Yes | 4,527 | 88.3% | Samples: Super recomendo |
+| review_comment_message | VARCHAR | Yes | 36,159 | 58.7% | Samples: Adorei, Recebi antes do prazo! , Fiz um pedido e recebi outro totalmente diferente. O pior é que não consigo contato com as lannister o telefone não funciona. Profundamente indignada, nunca tive problemas mas também não compro mais., Produto ótimo. .. chegou antes do esperado., Infelizmente não tenho como avaliar pois não sei se o atraso na entrega foi culpa do vendedor ou dos correios, acho que as lojas tem que procurar outra alternativa além dos correios. |
+| review_creation_date | TIMESTAMP_NS | Yes | 636 | 0.0% | Range: 2016-10-02 00:00:00 to 2018-08-31 00:00:00; Samples: 2017-12-31 00:00:00, 2017-12-03 00:00:00, 2018-07-28 00:00:00, 2017-04-20 00:00:00, 2018-04-13 00:00:00 |
+| review_answer_timestamp | TIMESTAMP_NS | Yes | 98,248 | 0.0% | Range: 2016-10-07 18:32:28 to 2018-10-29 12:27:35; Samples: 2017-12-02 17:08:20, 2017-12-17 02:55:50, 2018-03-25 11:09:37, 2018-07-29 06:56:07, 2018-03-28 12:35:55 |
+
+## Table: orders (99,441 rows)
+
+| Column | Type | Nullable | Distinct | Nulls | Key Stats |
+|--------|------|----------|----------|-------|-----------|
+| order_id | VARCHAR | Yes | 99,441 | 0.0% | Samples: f24bbebc2c8ba687b65f1be751dd8982, 440e9f47085a2b746335a1dc25b8bba8, f811bab9c2621b4c181ebc2cb4605614, c012d344cb9c8788cdbf60b4e4d1fc43, 1946c4925cef4f63c6d90302b3d8caf4 |
+| customer_id | VARCHAR | Yes | 99,441 | 0.0% | Samples: 9aa6c220e3046bb40fb8b625fa1237c5, 194022ce695cffb81d8a6aea3c050fbf, bfcaf458a9fbd5fdae2eb2babf3e2f23, 4450c6a83f4bcae20ad2c76ee33e8f6e, 5f9d4ba1b2825bd9d4c3af5722c8f790 |
+| order_status | VARCHAR | Yes | 8 | 0.0% | Values: delivered (96,478), shipped (1,107), canceled (625), ... (8 total values) |
+| order_purchase_timestamp | TIMESTAMP_NS | Yes | 98,875 | 0.0% | Range: 2016-09-04 21:15:19 to 2018-10-17 17:30:18; Samples: 2018-01-29 21:34:59, 2017-09-01 16:11:40, 2018-04-15 16:20:40, 2017-10-17 11:54:07, 2017-02-21 10:54:37 |
+| order_approved_at | TIMESTAMP_NS | Yes | 90,733 | 0.2% | Range: 2016-09-15 12:16:38 to 2018-09-03 17:40:06; Samples: 2017-02-07 12:30:36, 2017-10-21 21:14:50, 2018-05-03 09:55:21, 2017-11-07 18:55:33, 2018-05-02 09:33:14 |
+| order_delivered_carrier_date | TIMESTAMP_NS | Yes | 81,018 | 1.8% | Range: 2016-10-08 10:34:01 to 2018-09-11 19:48:28; Samples: 2018-04-10 17:11:23, 2017-10-27 18:08:01, 2017-11-27 13:39:35, 2018-04-17 17:33:00, 2018-04-30 16:36:00 |
+| order_delivered_customer_date | TIMESTAMP_NS | Yes | 95,664 | 3.0% | Range: 2016-10-11 13:46:32 to 2018-10-17 13:22:46; Samples: 2017-05-03 16:03:07, 2018-04-12 21:10:36, 2018-05-19 14:18:39, 2018-02-26 21:34:23, 2018-05-23 18:45:28 |
+| order_estimated_delivery_date | TIMESTAMP_NS | Yes | 459 | 0.0% | Range: 2016-09-30 00:00:00 to 2018-11-12 00:00:00; Samples: 2018-07-26 00:00:00, 2018-02-06 00:00:00, 2017-08-07 00:00:00, 2018-07-24 00:00:00, 2017-10-02 00:00:00 |
+
+## Table: product_category_translation (73 rows)
+
+| Column | Type | Nullable | Distinct | Nulls | Key Stats |
+|--------|------|----------|----------|-------|-----------|
+| product_category_name | VARCHAR | Yes | 73 | 0.0% | Samples: moveis_escritorio, fashion_roupa_feminina, fashion_esporte, moveis_decoracao, musica |
+| product_category_name_english | VARCHAR | Yes | 73 | 0.0% | Samples: cds_dvds_musicals, pc_gamer, construction_tools_safety, party_supplies, bed_bath_table |
+
+## Table: products (32,951 rows)
+
+| Column | Type | Nullable | Distinct | Nulls | Key Stats |
+|--------|------|----------|----------|-------|-----------|
+| product_id | VARCHAR | Yes | 32,951 | 0.0% | Samples: 788446dae9ad0409017f7f0b40105057, a13374144d7adf59d766eee43e93b849, 058b372f969b59e8c4a27e224243909c, 9a7c0784b8058269d176b3089c946ed0, c8fe6d20891a028383071e2e0902bd05 |
+| product_category_name | VARCHAR | Yes | 73 | 1.9% | Samples: cama_mesa_banho, utilidades_domesticas, casa_construcao, moveis_decoracao, beleza_saude |
+| product_name_length | DOUBLE | Yes | 66 | 1.9% | Range: 5.00 to 76.00, Avg: 48.48, Median: 51.00; Samples: 41.0, 45.0, 52.0, 60.0, 50.0 |
+| product_description_length | DOUBLE | Yes | 2,960 | 1.9% | Range: 4.00 to 3,992.00, Avg: 771.50, Median: 595.00; Samples: 769.0, 1257.0, 678.0, 297.0, 1451.0 |
+| product_photos_qty | DOUBLE | Yes | 19 | 1.9% | Values: 1.0 (16,489), 2.0 (6,263), 3.0 (3,860), ... (19 total values); Range: 1.00 to 20.00, Avg: 2.19, Median: 1.00 |
+| product_weight_g | DOUBLE | Yes | 2,204 | 0.0% | Range: 0.00 to 40,425.00, Avg: 2,276.47, Median: 700.00; Samples: 100.0, 175.0, 200.0, 3900.0, 450.0 |
+| product_length_cm | DOUBLE | Yes | 99 | 0.0% | Range: 7.00 to 105.00, Avg: 30.82, Median: 25.00; Samples: 47.0, 86.0, 16.0, 30.0, 25.0 |
+| product_height_cm | DOUBLE | Yes | 102 | 0.0% | Range: 2.00 to 105.00, Avg: 16.94, Median: 13.00; Samples: 2.0, 31.0, 10.0, 38.0, 72.0 |
+| product_width_cm | DOUBLE | Yes | 95 | 0.0% | Range: 6.00 to 118.00, Avg: 23.20, Median: 20.00; Samples: 16.0, 30.0, 26.0, 35.0, 23.0 |
+
+## Table: sellers (3,095 rows)
+
+| Column | Type | Nullable | Distinct | Nulls | Key Stats |
+|--------|------|----------|----------|-------|-----------|
+| seller_id | VARCHAR | Yes | 3,095 | 0.0% | Samples: 751bdc4d83a466c7206cd42e8f426b03, 4992e76a42cb3aad7a7047e0d3d7e729, d2f3e277560ed4c6361284429b00f037, 3a1a1fec38dd360f15fc912e821e169d, 9535a841eecebed61a9fb1ac1cbb5597 |
+| seller_zip_code_prefix | VARCHAR | Yes | 2,246 | 0.0% | Samples: 3471, 13481, 13322, 8290, 7411 |
+| seller_city | VARCHAR | Yes | 611 | 0.0% | Samples: mamanguape, sao bernardo do campo, rio de janeiro, jaci, sao paulo |
+| seller_state | VARCHAR | Yes | 23 | 0.0% | Values: SP (1,849), PR (349), MG (244), ... (23 total values) |
+
+## Inferred Foreign Key Relationships
+
+- orders.customer_id → customers.customer_id (100% match rate)
+- order_items.order_id → orders.order_id (100% match rate)
+- order_payments.order_id → orders.order_id (100% match rate)
+- order_reviews.order_id → orders.order_id (100% match rate)
+- order_items.product_id → products.product_id (100% match rate)
+- order_items.seller_id → sellers.seller_id (100% match rate)
+- products.product_category_name → product_category_translation.product_category_name (100% match rate)
+
+# Sample Rows
+
+## customers
+Row 1: {"customer_id": "c9215c202f283f26558cc8e3b469ade1", "customer_unique_id": "9e066311b498f2311b3e21a6577fe238", "customer_zip_code_prefix": "6717", "customer_city": "cotia", "customer_state": "SP"}
+Row 2: {"customer_id": "5d981b7a328ccdfc41d79164694a6b51", "customer_unique_id": "a8333c0243253bb6d89193af79807384", "customer_zip_code_prefix": "38402", "customer_city": "uberlandia", "customer_state": "MG"}
+Row 3: {"customer_id": "1106c98e3e238c15a37f86586c61effa", "customer_unique_id": "5dc7a67e8f67e4a66f8e3ef6a0568997", "customer_zip_code_prefix": "24451", "customer_city": "sao goncalo", "customer_state": "RJ"}
+
+## order_items
+Row 1: {"order_id": "02fafd9313d5274736b9740f23006a8d", "order_item_id": "1", "product_id": "50063fba038aabf31446889396187973", "seller_id": "f5a590cf36251cf1162ea35bef76fe84", "shipping_limit_date": "2017-11-24 02:30:37", "price": "301.00", "freight_value": "17.87"}
+Row 2: {"order_id": "1728325be5eb1de748928d1e52fbdc29", "order_item_id": "1", "product_id": "5baf51b71ace9afbb38f0b161f0c098b", "seller_id": "b17b679f4f5ce2e03ce6968c62648246", "shipping_limit_date": "2018-03-12 12:16:01", "price": "39.97", "freight_value": "19.32"}
+Row 3: {"order_id": "1b46c5cd349b4c1e7bda383bb8d64731", "order_item_id": "1", "product_id": "8abbebcdff5d78ce6bcafa077e5347ed", "seller_id": "784ba75dd9d20200c4caed3d7a77141a", "shipping_limit_date": "2017-07-25 21:55:10", "price": "1199.99", "freight_value": "53.87"}
+
+## order_payments
+Row 1: {"order_id": "25f3c1b1bb343d4a5d3f63f418f02cda", "payment_sequential": "1", "payment_type": "credit_card", "payment_installments": "3", "payment_value": "79.00"}
+Row 2: {"order_id": "5dfbd16c2935172c2f8eed9135087454", "payment_sequential": "1", "payment_type": "credit_card", "payment_installments": "1", "payment_value": "87.64"}
+Row 3: {"order_id": "79600d8903faf815002622ab515263c4", "payment_sequential": "1", "payment_type": "credit_card", "payment_installments": "2", "payment_value": "26.24"}
+
+## order_reviews
+Row 1: {"review_id": "487891d45486c84f3f7b73e9f80ab3b2", "order_id": "60cea07de0865aeead1984c1c97dee57", "review_score": "5", "review_comment_title": "None", "review_comment_message": "Eu compro de tudo pelo stark, nunca precisei trocar nada, sempre chega antes e certinho, amo comprar no stark e nas lojas que entregam por eles tbm...", "review_creation_date": "2017-06-06 00:00:00", "review_answer_timestamp": "2017-06-07 12:06:26"}
+Row 2: {"review_id": "f95ecf718eba22f1add47a34980a191e", "order_id": "af3327b567206d03f49d5cc63c712a22", "review_score": "1", "review_comment_title": "None", "review_comment_message": "Ainda n\u00e3o chegou o meu jogo,estou esperando", "review_creation_date": "2017-12-06 00:00:00", "review_answer_timestamp": "2017-12-06 19:52:18"}
+Row 3: {"review_id": "eb3445b9157edef536a9228a0f17c8ec", "order_id": "2a301a7ce18d62a743d2cdf9555c15c9", "review_score": "4", "review_comment_title": "None", "review_comment_message": "None", "review_creation_date": "2018-01-23 00:00:00", "review_answer_timestamp": "2018-01-24 19:18:13"}
+
+## orders
+Row 1: {"order_id": "d47e5fbb24cade152dd968c93b0f0c66", "customer_id": "e55ce7b0d217face26f0b2126413a84d", "order_status": "delivered", "order_purchase_timestamp": "2018-05-14 19:23:56", "order_approved_at": "2018-05-14 19:35:19", "order_delivered_carrier_date": "2018-05-15 14:45:00", "order_delivered_customer_date": "2018-05-17 01:40:47", "order_estimated_delivery_date": "2018-05-22 00:00:00"}
+Row 2: {"order_id": "aadd7193594d4613a0aa92401c30234b", "customer_id": "b9ef1929c0f7c27c2610fdbc2f2b5c40", "order_status": "delivered", "order_purchase_timestamp": "2018-06-02 11:33:43", "order_approved_at": "2018-06-02 11:50:35", "order_delivered_carrier_date": "2018-06-04 14:47:00", "order_delivered_customer_date": "2018-06-07 18:02:23", "order_estimated_delivery_date": "2018-07-13 00:00:00"}
+Row 3: {"order_id": "03708181cb41c558287d1feff6df5cb6", "customer_id": "7a2a4f108f5de77e0e1ed87dc208a267", "order_status": "delivered", "order_purchase_timestamp": "2017-12-12 19:01:39", "order_approved_at": "2017-12-12 19:29:53", "order_delivered_carrier_date": "2017-12-15 17:12:55", "order_delivered_customer_date": "2018-01-03 18:24:47", "order_estimated_delivery_date": "2018-01-12 00:00:00"}
+
+## product_category_translation
+Row 1: {"product_category_name": "utilidades_domesticas", "product_category_name_english": "housewares"}
+Row 2: {"product_category_name": "fashion_roupa_masculina", "product_category_name_english": "fashion_male_clothing"}
+Row 3: {"product_category_name": "eletrodomesticos", "product_category_name_english": "home_appliances"}
+
+## products
+Row 1: {"product_id": "a694f2632fae82ef419fd71587103dc9", "product_category_name": "esporte_lazer", "product_name_length": "44.0", "product_description_length": "461.0", "product_photos_qty": "1.0", "product_weight_g": "5100.0", "product_length_cm": "60.0", "product_height_cm": "30.0", "product_width_cm": "30.0"}
+Row 2: {"product_id": "94938d42be4ea1064db3325c385ee6d6", "product_category_name": "esporte_lazer", "product_name_length": "45.0", "product_description_length": "374.0", "product_photos_qty": "2.0", "product_weight_g": "827.0", "product_length_cm": "52.0", "product_height_cm": "19.0", "product_width_cm": "21.0"}
+Row 3: {"product_id": "3fa16862566852fd5dcdb4c0e24c9db6", "product_category_name": "moveis_decoracao", "product_name_length": "61.0", "product_description_length": "694.0", "product_photos_qty": "1.0", "product_weight_g": "5300.0", "product_length_cm": "30.0", "product_height_cm": "35.0", "product_width_cm": "30.0"}
+
+## sellers
+Row 1: {"seller_id": "3d2400ac620cffa23ac81bd192f7f555", "seller_zip_code_prefix": "9810", "seller_city": "sao bernardo do campo", "seller_state": "SP"}
+Row 2: {"seller_id": "9b522ba7eae9e1d04082f267144583cc", "seller_zip_code_prefix": "4843", "seller_city": "sao paulo", "seller_state": "SP"}
+Row 3: {"seller_id": "165fc07beebdcb6190fba8a06db2a449", "seller_zip_code_prefix": "87015", "seller_city": "maringa", "seller_state": "PR"}
+
+
+## dbt MetricFlow YAML Format Reference
+
+### semantic_models
+
+```yaml
+semantic_models:
+  - name: <unique_name>
+    description: |
+      Multi-line description of what this model represents.
+    model: ref('<dbt_model_name>')
+    defaults:
+      agg_time_dimension: <time_dimension_name>
+
+    entities:
+      - name: <entity_name>
+        type: primary | unique | foreign | natural
+        expr: <column_or_sql_expression>  # defaults to name if omitted
+
+    dimensions:
+      - name: <dimension_name>
+        type: categorical | time
+        description: <description>
+        label: <display_name>
+        expr: <column_or_sql_expression>  # defaults to name if omitted
+        type_params:  # required for type: time
+          time_granularity: day | week | month | quarter | year
+
+    measures:
+      - name: <measure_name>  # MUST be unique across ALL semantic models
+        agg: sum | count | count_distinct | average | min | max | median
+        expr: <column_or_sql_expression>
+        description: <description>
+        label: <display_name>
+```
+
+### metrics
+
+**Simple** — wraps a single measure:
+```yaml
+metrics:
+  - name: revenue
+    label: Revenue
+    description: Total revenue from delivered orders.
+    type: simple
+    type_params:
+      measure: <measure_name>
+    filter: |  # optional
+      {{ Dimension('entity__dimension_name') }} = 'value'
+```
+
+**Derived** — expression combining other metrics:
+```yaml
+  - name: average_order_value
+    label: Average Order Value
+    type: derived
+    type_params:
+      expr: revenue / nullif(order_count, 0)
+      metrics:
+        - name: revenue
+        - name: order_count
+          alias: order_count  # optional alias for use in expr
+          offset_window: 1 month  # optional time offset
+```
+
+**Cumulative** — running totals:
+```yaml
+  - name: cumulative_revenue
+    type: cumulative
+    type_params:
+      measure: revenue
+      window: 30 days  # optional; omit for all-time
+      grain_to_date: month  # optional; for MTD/YTD
+```
+
+**Ratio** — numerator / denominator:
+```yaml
+  - name: conversion_rate
+    type: ratio
+    type_params:
+      numerator: converted_users
+      denominator: total_users
+```
+
+### saved_queries
+
+```yaml
+saved_queries:
+  - name: monthly_overview
+    label: Monthly Overview
+    description: Key metrics by month.
+    query_params:
+      metrics:
+        - revenue
+        - order_count
+      group_by:
+        - TimeDimension('metric_time', 'month')
+        - Dimension('entity__dimension_name')
+      where:  # optional filters
+        - "{{ Dimension('entity__dim') }} = 'value'"
+```
+
+# Business Logic Extracted from Existing SQL Queries
+
+The following business rules, metric definitions, and naming conventions were extracted from SQL queries that analysts actually run against this data. Use these as the authoritative source for:
+- How metrics should be named and calculated
+- What filters should be applied by default
+- Which join patterns are standard
+- What naming conventions to follow
+
+
+business_domain:
+  description: "Brazilian e-commerce marketplace (Olist) connecting sellers with customers across Brazil. Platform facilitates order fulfillment, payment processing, and logistics coordination. Data represents actual transactions, customer reviews, and operational metrics from a multi-seller marketplace model similar to Amazon or eBay."
+  currency: "BRL (Brazilian Real, R$)"
+  date_range: "September 2016 - September 2018 (~2 years)"
+  scale: "~100,000 orders, ~96,000 unique customers, ~3,095 sellers"
+
+metric_definitions:
+  total_revenue:
+    description: "Total payment value from completed orders"
+    calculation: "SUM(order_payments.payment_value)"
+    standard_filters: "order_status <> 'canceled' OR order_status = 'delivered'"
+    notes: "Expected value ~R$15.4-15.9 million for full dataset. Always exclude canceled orders."
+    
+  gmv:
+    description: "Gross Merchandise Value - total value of goods sold"
+    calculation: "SUM(order_items.price + order_items.freight_value) OR SUM(order_items.price)"
+    standard_filters: "order_status = 'delivered'"
+    notes: "Two definitions exist: (1) price only, (2) price + freight. Context determines which to use."
+    
+  aov:
+    description: "Average Order Value"
+    calculation: "AVG(order_payments.payment_value) OR AVG(order_items.price)"
+    standard_filters: "order_status = 'delivered'"
+    notes: "Credit card AOV ~R$162.70, Voucher AOV ~R$62.33"
+    
+  on_time_delivery_rate:
+    description: "Percentage of orders delivered by estimated date"
+    calculation: "SUM(CASE WHEN order_delivered_customer_date <= order_estimated_delivery_date THEN 1 ELSE 0 END) * 100.0 / COUNT(*)"
+    standard_filters: "order_status = 'delivered' AND order_delivered_customer_date IS NOT NULL"
+    notes: "Benchmark: ~63% on-time delivery rate. Critical operational KPI."
+    
+  delivery_time_days:
+    description: "Days from purchase to customer delivery"
+    calculation: "order_delivered_customer_date - order_purchase_timestamp (in days)"
+    standard_filters: "order_status = 'delivered' AND order_delivered_customer_date IS NOT NULL"
+    notes: "Use EXTRACT(EPOCH FROM ...)/86400 for PostgreSQL, DATEDIFF for SQL Server"
+    
+  repeat_purchase_rate:
+    description: "Percentage of customers who make more than one order"
+    calculation: "COUNT(customers with order_count > 1) * 100.0 / COUNT(DISTINCT customer_unique_id)"
+    standard_filters: "order_status <> 'canceled'"
+    notes: "Benchmark: ~3% repeat rate (97% one-time buyers). Critical retention metric."
+    
+  freight_to_price_ratio:
+    description: "Shipping cost as percentage of product price"
+    calculation: "SUM(order_items.freight_value) / NULLIF(SUM(order_items.price), 0)"
+    standard_filters: "order_status = 'delivered'"
+    notes: "Varies by distance and product category. Used for logistics optimization."
+    
+  avg_review_score:
+    description: "Average customer satisfaction rating"
+    calculation: "AVG(reviews.review_score)"
+    standard_filters: "None typically, but join to delivered orders for operational analysis"
+    notes: "Scale 1-5. Benchmark: 4.09/5.0 overall, 56.55% give 5 stars. Strongly correlated with delivery performance."
+    
+  monthly_revenue:
+    description: "Revenue aggregated by calendar month"
+    calculation: "SUM(order_payments.payment_value) grouped by DATE_TRUNC('month', order_purchase_timestamp)"
+    standard_filters: "order_status <> 'canceled'"
+    notes: "Q2 2018 had highest revenue, Q3 2016 had lowest. Used for trend analysis."
+    
+  customer_lifetime_value:
+    description: "Total spending per customer in defined time window"
+    calculation: "SUM(order_payments.payment_value) per customer_unique_id within time window"
+    standard_filters: "order_status <> 'canceled', typically first 6 months (182.5 days)"
+    notes: "Track from first_order_date + INTERVAL '182.5 day'"
+
+standard_filters:
+  - name: "exclude_canceled_orders"
+    sql: "WHERE order_status <> 'canceled'"
+    when_applied: "All revenue, GMV, and financial calculations. Canceled orders should never count toward business metrics."
+    
+  - name: "delivered_orders_only"
+    sql: "WHERE order_status = 'delivered'"
+    when_applied: "Product performance, seller performance, review analysis, delivery metrics. Most restrictive filter."
+    
+  - name: "valid_delivery_dates"
+    sql: "WHERE order_delivered_customer_date IS NOT NULL"
+    when_applied: "Any delivery time or on-time performance calculation. Prevents NULL date arithmetic."
+    
+  - name: "minimum_review_threshold"
+    sql: "HAVING COUNT(review_id) >= 100"
+    when_applied: "Category or seller review analysis to ensure statistical significance."
+    
+  - name: "minimum_order_threshold"
+    sql: "HAVING COUNT(DISTINCT order_id) >= 10"
+    when_applied: "Seller performance analysis to filter out low-volume sellers."
+
+join_patterns:
+  - tables: ["orders", "order_payments"]
+    join_key: "order_id"
+    join_type: "INNER"
+    notes: "Standard join for all revenue calculations. Always use INNER JOIN."
+    
+  - tables: ["orders", "order_items"]
+    join_key: "order_id"
+    join_type: "INNER"
+    notes: "For product-level analysis, seller analysis, freight calculations."
+    
+  - tables: ["orders", "customers"]
+    join_key: "customer_id"
+    join_type: "INNER"
+    notes: "For geographic analysis, customer segmentation. Note: customer_id is NOT unique per customer."
+    
+  - tables: ["customers", "orders"]
+    join_key: "customer_id"
+    join_type: "INNER"
+    notes: "Always aggregate by customer_unique_id, not customer_id, for accurate customer counts."
+    
+  - tables: ["order_items", "products"]
+    join_key: "product_id"
+    join_type: "INNER"
+    notes: "For category analysis, product dimensions, weight-based freight analysis."
+    
+  - tables: ["products", "product_category_name_translation"]
+    join_key: "product_category_name"
+    join_type: "LEFT"
+    notes: "Always LEFT JOIN to get English category names. Some categories may not have translations."
+    
+  - tables: ["order_items", "sellers"]
+    join_key: "seller_id"
+    join_type: "INNER"
+    notes: "For seller performance, geographic distribution of sellers, multi-seller order analysis."
+    
+  - tables: ["orders", "reviews"]
+    join_key: "order_id"
+    join_type: "INNER"
+    notes: "For satisfaction analysis. Reviews exist for most but not all orders."
+    
+  - tables: ["customers", "geolocation"]
+    join_key: "customer_zip_code = geolocation_zip_code_prefix"
+    join_type: "INNER"
+    notes: "For distance calculations, logistics optimization. Use Haversine formula for distance."
+    
+  - tables: ["sellers", "geolocation"]
+    join_key: "seller_zip_code_prefix = geolocation_zip_code_prefix"
+    join_type: "INNER"
+    notes: "For seller-to-customer distance calculations affecting freight and delivery time."
+
+naming_conventions:
+  - concept: "Gross transaction value"
+    preferred_name: "GMV"
+    alternatives: ["revenue", "total_revenue", "category_revenue"]
+    notes: "GMV and revenue used somewhat interchangeably, but GMV typically includes freight"
+    
+  - concept: "Customer identifier"
+    preferred_name: "customer_unique_id"
+    alternatives: ["customer_id"]
+    notes: "CRITICAL: Always use customer_unique_id for counting customers. customer_id can repeat."
+    
+  - concept: "Product price"
+    preferred_name: "price"
+    alternatives: ["item_price", "product_revenue"]
+    notes: "From order_items.price, excludes freight"
+    
+  - concept: "Shipping cost"
+    preferred_name: "freight_value"
+    alternatives: ["shipping_cost", "freight", "freight_cost"]
+    notes: "Always from order_items.freight_value"
+    
+  - concept: "Order completion"
+    preferred_name: "delivered"
+    alternatives: ["completed", "fulfilled"]
+    notes: "order_status = 'delivered' is the canonical completed state"
+    
+  - concept: "Customer satisfaction"
+    preferred_name: "review_score"
+    alternatives: ["rating", "satisfaction_score"]
+    notes: "Scale 1-5 from reviews.review_score"
+    
+  - concept: "Geographic region"
+    preferred_name: "state"
+    alternatives: ["customer_state", "seller_state", "region"]
+    notes: "Use 2-letter state codes (SP, RJ, MG). State preferred over city for aggregation."
+    
+  - concept: "Time period grouping"
+    preferred_name: "month" or "cohort_month"
+    alternatives: ["period", "date", "order_month"]
+    notes: "Use DATE_TRUNC('month', ...) for monthly aggregations"
+    
+  - concept: "First purchase date"
+    preferred_name: "first_order_date"
+    alternatives: ["cohort_date", "acquisition_date"]
+    notes: "MIN(order_purchase_timestamp) per customer_unique_id"
+
+key_dimensions:
+  - dimension: "DATE_TRUNC('month', order_purchase_timestamp)"
+    used_for: "Monthly trend analysis, time series, MoM growth, cohort definition"
+    
+  - dimension: "customer_state"
+    used_for: "Geographic performance, regional revenue, delivery performance by region"
+    notes: "SP (São Paulo) dominates at ~46% of customers"
+    
+  - dimension: "product_category_name_english"
+    used_for: "Category performance, product mix analysis, AOV by category"
+    notes: "Top category: bed_bath_table (~R$1.69M revenue)"
+    
+  - dimension: "payment_type"
+    used_for: "Payment method analysis, installment behavior, financial strategy"
+    notes: "credit_card ~76%, boleto ~18%, voucher ~4%, debit_card ~2%"
+    
+  - dimension: "seller_id / seller_state"
+    used_for: "Seller performance ranking, marketplace coverage, seller quality"
+    
+  - dimension: "review_score"
+    used_for: "Satisfaction distribution, quality analysis, correlation with delivery"
+    
+  - dimension: "order_status"
+    used_for: "Order lifecycle analysis, cancellation rates, operational health"
+    notes: "Statuses: delivered, shipped, canceled, processing, unavailable, etc."
+    
+  - dimension: "EXTRACT(DOW FROM order_purchase_timestamp)"
+    used_for: "Day of week patterns, weekly seasonality, staffing planning"
+    
+  - dimension: "cohort_month"
+    used_for: "Cohort retention analysis, customer lifetime value tracking"
+    notes: "Defined as DATE_TRUNC('month', MIN(order_purchase_timestamp))"
+
+business_rules:
+  - rule: "On-time delivery definition"
+    sql_pattern: "CASE WHEN order_delivered_customer_date <= order_estimated_delivery_date THEN 'On Time' ELSE 'Late' END"
+    notes: "Critical for logistics KPIs. Late delivery strongly correlates with poor reviews."
+    
+  - rule: "Repeat customer identification"
+    sql_pattern: "CASE WHEN order_count > 1 THEN 1 ELSE 0 END"
+    notes: "Only ~3% of customers are repeat buyers. Major retention opportunity."
+    
+  - rule: "Freight cost bucketing"
+    sql_pattern: "CASE WHEN freight_value < 10 THEN '< R$10' WHEN freight_value < 20 THEN 'R$10-20' WHEN freight_value < 30 THEN 'R$20-30' ELSE 'R$30+' END"
+    notes: "Used for logistics cost analysis and delivery time correlation."
+    
+  - rule: "Product weight categories"
+    sql_pattern: "CASE WHEN product_weight_g < 500 THEN 'Light' WHEN product_weight_g < 2000 THEN 'Medium' WHEN product_weight_g < 5000 THEN 'Heavy' ELSE 'Very Heavy' END"
+    notes: "Weight drives freight costs. Used for logistics pricing analysis."
+    
+  - rule: "Distance bucketing for logistics"
+    sql_pattern: "CASE WHEN distance_km < 100 THEN '< 100km' WHEN distance_km < 500 THEN '100-500km' WHEN distance_km < 1000 THEN '500-1000km' ELSE '1000km+' END"
+    notes: "Distance calculated using Haversine formula. Drives shipping cost and delivery time."
+    
+  - rule: "Positive review definition"
+    sql_pattern: "CASE WHEN review_score >= 4 THEN 1 ELSE 0 END"
+    notes: "4-5 stars considered positive. Used for seller quality metrics."
+    
+  - rule: "Multi-seller order complexity"
+    sql_pattern: "COUNT(DISTINCT seller_id) per order_id"
+    notes: "Orders with multiple sellers require coordination. Affects fulfillment complexity."
+    
+  - rule: "Order timeline validation"
+    sql_pattern: "WHERE order_approved_at >= order_purchase_timestamp AND order_delivered_carrier_date >= order_approved_at AND order_delivered_customer_date >= order_delivered_carrier_date"
+    notes: "Data quality check. Dates must be in logical sequence."
+    
+  - rule: "Payment reconciliation"
+    sql_pattern: "ABS(SUM(order_items.price + order_items.freight_value) - SUM(order_payments.payment_value)) < 0.01"
+    notes: "Financial reconciliation. Payment total should match order items total within rounding."
+    
+  - rule: "Customer lifetime value window"
+    sql_pattern: "WHERE order_purchase_timestamp < first_order_date + INTERVAL '182.5 day'"
+    notes: "Standard 6-month window for CLV analysis. 182.5 days = ~6 months."
+
+analytical_patterns:
+  - pattern: "Monthly time series"
+    description: "Aggregate metrics by calendar month for trend analysis"
+    key_tables: ["orders", "order_payments"]
+    sql_structure: "DATE_TRUNC('month', order_purchase_timestamp) GROUP BY month ORDER BY month"
+    notes: "Used for revenue trends, order volume, MoM growth calculations"
+    
+  - pattern: "Cohort retention analysis"
+    description: "Track customer activity over time from first purchase date"
+    key_tables: ["customers", "orders"]
+    sql_structure: "CTE for first_purchase (cohort_month), CTE for monthly_activity, join and calculate months_since_cohort"
+    notes: "Critical for understanding retention. Only ~3% repeat rate indicates retention problem."
+    
+  - pattern: "Geographic performance"
+    description: "Aggregate metrics by customer_state or customer_city"
+    key_tables: ["customers", "orders", "order_payments"]
+    sql_structure: "GROUP BY customer_state ORDER BY revenue/customers DESC"
+    notes: "SP dominates at 46%. Top 10 states = 90%+ of business."
+    
+  - pattern: "Category performance ranking"
+    description: "Rank product categories by revenue, orders, AOV"
+    key_tables: ["order_items", "products", "product_category_name_translation"]
+    sql_structure: "LEFT JOIN for translation, GROUP BY category, ORDER BY revenue DESC LIMIT 20"
+    notes: "bed_bath_table is top category. Always use English translation."
+    
+  - pattern: "Delivery performance analysis"
+    description: "Calculate on-time rate, delivery time, late orders"
+    key_tables: ["orders"]
+    sql_structure: "CASE for on-time logic, date arithmetic for delivery_days, filter for delivered + NOT NULL dates"
+    notes: "~63% on-time benchmark. Late delivery = poor reviews."
+    
+  - pattern: "Seller performance ranking"
+    description: "Rank sellers by revenue, orders, review scores"
+    key_tables: ["sellers", "order_items", "orders", "reviews"]
+    sql_structure: "GROUP BY seller_id, HAVING minimum order threshold, ORDER BY revenue DESC"
+    notes: "Filter for sellers with >= 10 orders for statistical significance."
+    
+  - pattern: "Payment method analysis"
+    description: "Distribution of payment types, installment behavior"
+    key_tables: ["order_payments", "orders"]
+    sql_structure: "GROUP BY payment_type, calculate percentages, AVG(payment_installments)"
+    notes: "Credit card 76%, most use 1 installment. Credit card AOV highest."
+    
+  - pattern: "Review correlation analysis"
+    description: "Correlate review scores with delivery performance, category, seller"
+    key_tables: ["reviews", "orders", "order_items", "products"]
+    sql_structure: "JOIN reviews to orders, CASE for delivery_status, GROUP BY and AVG(review_score)"
+    notes: "Late delivery strongly predicts poor reviews. Avg 4.09/5.0 overall."
+    
+  - pattern: "RFM segmentation"
+    description: "Recency, Frequency, Monetary analysis for customer segmentation"
+    key_tables: ["customers", "orders", "order_payments"]
+    sql_structure: "GROUP BY customer_unique_id, calculate days since last order, COUNT orders, SUM payment_value"
+    notes: "Used for marketing segmentation. Most customers are one-time buyers."
+    
+  - pattern: "Freight cost optimization"
+    description: "Analyze freight costs by distance, weight, category"
+    key_tables: ["order_items", "products", "geolocation", "customers", "sellers"]
+    sql_structure: "Haversine distance calculation, GROUP BY distance/weight buckets, AVG(freight_value)"
+    notes: "Distance and weight drive freight. Formula: 111 * SQRT(POW(lat_diff, 2) + POW(lng_diff * COS(lat), 2))"
+    
+  - pattern: "Month-over-month growth"
+    description: "Calculate period-over-period growth rates"
+    key_tables: ["orders", "order_payments"]
+    sql_structure: "CTE for monthly_stats, LAG() window function for previous period, calculate growth %"
+    notes: "Used for executive reporting. Shows business momentum."
+    
+  - pattern: "Multi-seller order complexity"
+    description: "Analyze orders with multiple sellers"
+    key_tables: ["orders", "order_items"]
+    sql_structure: "Subquery: COUNT(DISTINCT seller_id) per order_id, outer query: GROUP BY seller_count"
+    notes: "Multi-seller orders require coordination. Affects fulfillment complexity."
+    
+  - pattern: "Data quality validation"
+    description: "Check for duplicates, NULL values, logical inconsistencies"
+    key_tables: ["all tables"]
+    sql_structure: "COUNT(*) vs COUNT(DISTINCT), date sequence validation, reconciliation queries"
+    notes: "Always validate: order_id uniqueness, date sequences, payment reconciliation, geolocation matches"
+
+key_business_insights:
+  - insight: "Low repeat purchase rate"
+    value: "~3% of customers make repeat purchases"
+    implication: "Major retention opportunity. Focus on customer lifecycle marketing."
+    
+  - insight: "Geographic concentration"
+    value: "São Paulo (SP) = 46% of customers, SP + RJ > 50%"
+    implication: "Business highly concentrated in Southeast Brazil. Expansion opportunity in other regions."
+    
+  - insight: "Delivery performance gap"
+    value: "Only 63% on-time delivery rate"
+    implication: "Logistics improvement needed. Late delivery = poor reviews."
+    
+  - insight: "Payment preference"
+    value: "Credit card 76%, boleto 18%"
+    implication: "Credit card dominant. Most pay in 1 installment despite installment option."
+    
+  - insight: "Category concentration"
+    value: "bed_bath_table is top category by revenue"
+    implication: "Home goods drive business. Low AOV but high volume."
+    
+  - insight: "Review-delivery correlation"
+    value: "Late delivery strongly predicts poor reviews"
+    implication: "Delivery performance is primary driver of satisfaction, not just product quality."
+    
+  - insight: "One-time buyer dominance"
+    value: "97% of customers make only one purchase"
+    implication: "Acquisition-focused business model. Need retention strategy."
+
+data_quality_considerations:
+  - consideration: "Customer ID vs Unique ID"
+    issue: "customer_id can repeat per customer"
+    solution: "Always use customer_unique_id for customer counts"
+    
+  - consideration: "Payment reconciliation"
+    issue: "order_items total may not match order_payments total"
+    solution: "Check ABS(difference) < 0.01 for rounding. Investigate larger discrepancies."
+    
+  - consideration: "Geolocation matching"
+    issue: "customer_city may not match geolocation_city for same zip"
+    solution: "Use geolocation table as source of truth for coordinates"
+    
+  - consideration: "Date sequence validation"
+    issue: "Order dates may be out of logical sequence"
+    solution: "Validate: purchase < approved < carrier < delivered"
+    
+  - consideration: "NULL delivery dates"
+    issue: "Some delivered orders have NULL delivery dates"
+    solution: "Always filter: order_delivered_customer_date IS NOT NULL for time calculations"
+
+# Business Documentation
+
+# Olist Business Context & Analytics Documentation
+
+## Business Overview
+
+Olist is Brazil's largest department store marketplace, connecting small and medium businesses (SMBs) to major Brazilian e-commerce channels (Mercado Livre, B2W, Via Varejo, etc.) through a single logistics and storefront platform. Sellers list products on Olist's unified catalog, and when a customer purchases on any partner marketplace, Olist handles the order orchestration while the seller handles fulfillment and shipping directly to the customer.
+
+**Revenue model**: Olist earns a commission on each transaction (Gross Merchandise Value). The key business levers are:
+1. **Seller acquisition** — more sellers = broader catalog = more GMV
+2. **Order volume** — driven by marketplace traffic and conversion
+3. **Average Order Value (AOV)** — higher-value products drive more revenue per transaction
+4. **Repeat purchases** — currently very low (~3% repeat rate), a major growth opportunity
+5. **Delivery experience** — on-time delivery directly impacts review scores and repeat rates
+
+**Scale (Sep 2016 – Oct 2018)**:
+- ~99,441 orders from ~96,096 unique customers
+- ~3,095 active sellers across 23 of 27 Brazilian states
+- ~32,951 products across 73 categories
+- All transactions in Brazilian Real (BRL)
+
+## Data Dictionary
+
+### orders
+The central fact table — one row per order. Contains the full order lifecycle timestamps.
+
+| Column | Business Description |
+|--------|---------------------|
+| order_id | Unique order identifier (UUID) |
+| customer_id | Per-order customer ID — NOT the unique customer identifier. Each order generates a new customer_id even for repeat buyers |
+| order_status | Order lifecycle stage: created → approved → invoiced → shipped → delivered (or canceled/unavailable). **97% reach delivered.** |
+| order_purchase_timestamp | When the customer placed the order — this is the primary time dimension for all order-level analysis |
+| order_approved_at | When payment was approved. Null for some orders that were canceled before approval |
+| order_delivered_carrier_date | When the seller handed the package to the carrier. Used to calculate shipping time |
+| order_delivered_customer_date | When the customer received the package. Used to calculate total delivery time |
+| order_estimated_delivery_date | Estimated delivery date shown to customer at purchase. Used to calculate on-time delivery rate |
+
+### order_items
+Line items within orders. One row per item. Most orders (87.6%) have a single item; max is 21.
+
+| Column | Business Description |
+|--------|---------------------|
+| order_id | Foreign key to orders |
+| order_item_id | Sequential item number within order (1-indexed) |
+| product_id | Foreign key to products catalog |
+| seller_id | Foreign key to sellers — identifies which seller fulfills this item |
+| shipping_limit_date | Deadline for the seller to ship. Seller SLA compliance is tracked against this |
+| price | Item selling price in BRL. Range: R$0.85 to R$6,735. Median: R$74.99. Mean: R$120.65. This is the core GMV component |
+| freight_value | Shipping cost charged to customer in BRL. Range: R$0 to R$409.68. Median: R$16.26. When an order has multiple items from the same seller, freight is split across items |
+
+### order_payments
+Payment details — one row per payment method used. Orders can have multiple payments (e.g., credit card + voucher).
+
+| Column | Business Description |
+|--------|---------------------|
+| order_id | Foreign key to orders |
+| payment_sequential | Sequential payment number (1-indexed). Most orders have 1 payment |
+| payment_type | Payment method: credit_card (73.9%), boleto (19%), voucher (5.5%), debit_card (1.5%), not_defined (<0.1%). Boleto is a Brazilian bank slip payment method — unique to Brazil |
+| payment_installments | Number of installments for credit card payments (1-24). 50.6% pay in 1 installment. Installment culture is very common in Brazil |
+| payment_value | Amount paid in BRL via this payment method |
+
+### order_reviews
+Customer reviews — one row per review. Bimodal distribution (mostly 5-star or 1-star).
+
+| Column | Business Description |
+|--------|---------------------|
+| review_id | Unique review identifier |
+| order_id | Foreign key to orders |
+| review_score | Customer satisfaction rating (1-5). Mean: 4.09. Distribution: 5★=57.8%, 4★=19.3%, 3★=8.2%, 2★=3.2%, 1★=11.5% |
+| review_comment_title | Optional review title in Portuguese. 88.3% null |
+| review_comment_message | Optional review body in Portuguese. 58.7% null — most customers just leave a star rating |
+| review_creation_date | When the review was submitted |
+| review_answer_timestamp | When the review was processed/answered |
+
+### customers
+Customer dimension table. **Critical deduplication note below.**
+
+| Column | Business Description |
+|--------|---------------------|
+| customer_id | Per-order customer identifier — a new ID is generated for each order. 99,441 values (= order count). Use this to join to orders |
+| customer_unique_id | True unique customer identifier across all orders. 96,096 values. **Always use this for customer count and repeat purchase analysis** |
+| customer_zip_code_prefix | 5-digit ZIP code prefix |
+| customer_city | Customer city. Top: São Paulo, Rio de Janeiro, Belo Horizonte |
+| customer_state | Two-letter Brazilian state code. Top: SP (42%), RJ (12.9%), MG (11.7%) |
+
+### products
+Product catalog — 32,951 products across 73 categories (in Portuguese).
+
+| Column | Business Description |
+|--------|---------------------|
+| product_id | Unique product identifier |
+| product_category_name | Category in Portuguese (join to translation table for English). 1.9% null |
+| product_name_length | Character length of product name |
+| product_description_length | Character length of description |
+| product_photos_qty | Number of product photos (1-20). 51% have only 1 photo |
+| product_weight_g | Product weight in grams — affects shipping cost |
+| product_length_cm, product_height_cm, product_width_cm | Physical dimensions — affect shipping cost calculation |
+
+### product_category_translation
+Lookup table: 73 Portuguese category names → English equivalents.
+
+### sellers
+Seller dimension — 3,095 sellers across 23 of 27 Brazilian states.
+
+| Column | Business Description |
+|--------|---------------------|
+| seller_id | Unique seller identifier |
+| seller_zip_code_prefix | 5-digit ZIP code prefix |
+| seller_city | Seller city. Top: São Paulo (22.4%) |
+| seller_state | Two-letter Brazilian state code. Top: SP (59.7%), PR (11.3%), MG (7.9%). Seller concentration in SP is much higher than customer concentration (59.7% vs 42%) |
+
+## Key Performance Indicators
+
+These are the metrics the business actually tracks, with preferred names and definitions:
+
+### Revenue KPIs
+- **GMV (Gross Merchandise Value)** — `SUM(price)` from order_items. Excludes freight. The primary top-line revenue metric. Total dataset GMV: ~R$13.6M
+- **Realized GMV** — GMV filtered to delivered orders only. Represents actual completed revenue
+- **Total Revenue** — `SUM(price + freight_value)` from order_items. Includes shipping charges
+- **Freight Revenue** — `SUM(freight_value)`. Tracks shipping revenue separately
+- **AOV (Average Order Value)** — `GMV / COUNT(DISTINCT order_id)`. Dataset average: ~R$137. The business prefers "AOV" as the abbreviation
+- **Revenue per Customer** — `GMV / COUNT(DISTINCT customer_unique_id)`. Measures monetization efficiency
+
+### Volume KPIs
+- **Orders** — `COUNT(DISTINCT order_id)` from orders table. Total: ~99,441
+- **Delivered Orders** — Orders with status = 'delivered'. ~97% of total
+- **Canceled Orders** — Orders with status = 'canceled'. ~0.6% of total
+- **Items Sold** — `COUNT(*)` from order_items. Total: ~112,650
+- **Items per Order** — `Items Sold / Orders`. Average: ~1.13
+- **Active Sellers** — `COUNT(DISTINCT seller_id)` from order_items in the period
+- **Active Products** — `COUNT(DISTINCT product_id)` sold in the period
+
+### Customer KPIs
+- **Unique Customers** — `COUNT(DISTINCT customer_unique_id)`. Always use customer_unique_id, not customer_id
+- **Active Customers** — Unique customers with purchases in the period
+- **Orders per Customer** — `Orders / Unique Customers`. Very low (~1.03) indicating minimal repeat purchases
+- **Repeat Purchase Rate** — Percentage of customers with >1 order. Only ~3% — a key area for business improvement
+
+### Delivery KPIs
+- **Avg Delivery Days** — Average calendar days from order purchase to customer delivery
+- **Avg Shipping Days** — Average calendar days from carrier handoff to customer delivery
+- **On-Time Delivery Rate** — Percentage of delivered orders arriving on or before estimated delivery date. Dataset: ~63% on-time. **This is the most critical operational KPI**
+- **Late Deliveries** — Count of orders arriving after estimated delivery date
+
+### Customer Satisfaction KPIs
+- **Avg Review Score** — Mean of review_score (1-5 scale). Dataset: 4.09
+- **Review Count** — Total reviews submitted
+- **5-Star Rate** — Percentage of reviews that are 5 stars. Dataset: 57.8%
+- **1-Star Rate** — Percentage of 1-star reviews. Dataset: 11.5%
+- **Positive Review Rate** — Reviews with score 4 or 5
+- **Negative Review Rate** — Reviews with score 1 or 2
+
+### Payment KPIs
+- **Total Payment Value** — `SUM(payment_value)` across all payment methods
+- **Credit Card Share** — Percentage of payment value from credit cards. ~74%
+- **Avg Installments** — Average installment count for credit card payments
+- **Boleto Revenue** — Payment value from boleto (bank slips), Brazil's alternative to credit cards
+
+### Marketplace Health KPIs
+- **GMV per Seller** — `GMV / Active Sellers`. Measures seller productivity
+- **Items per Seller** — Measures seller activity level
+
+## Business Rules
+
+### Order Lifecycle
+1. Orders progress through statuses: created → approved → invoiced → shipped → delivered
+2. **Exclude canceled orders** from revenue and delivery metrics unless specifically analyzing cancellations
+3. Use `order_purchase_timestamp` as the primary time dimension for all order analysis
+4. Delivery time = `order_delivered_customer_date - order_purchase_timestamp` (total time from customer perspective)
+5. Shipping time = `order_delivered_customer_date - order_delivered_carrier_date` (carrier transit time)
+6. On-time = `order_delivered_customer_date <= order_estimated_delivery_date`
+
+### Revenue Recognition
+- GMV is recognized at order placement (order_purchase_timestamp), not at delivery
+- Realized GMV filters to delivered orders only
+- Price and freight are separate line-item level fields — always clarify whether "revenue" includes freight
+- When reporting total order value, use `SUM(price + freight_value)` from order_items, not payment_value (which may differ due to vouchers/discounts)
+
+### Customer Deduplication
+- **customer_id is NOT unique across orders** — it is a per-order identifier (99,441 values = same as order count)
+- **customer_unique_id IS the true unique identifier** (96,096 values)
+- Always use customer_unique_id when counting unique customers or calculating repeat rates
+- About 3,345 customers placed more than one order during the dataset period
+
+### Freight Splitting
+- When a single order contains multiple items from the same seller, the freight charge is split across items
+- This means `freight_value` at the item level is a proportional allocation, not the full shipping cost
+- For total freight per order, sum freight_value across all items: `SUM(freight_value) GROUP BY order_id`
+
+### Payment Method Logic
+- One order can have multiple payments (e.g., partial credit card + partial voucher)
+- `payment_sequential` tracks the payment order within a single order
+- Credit card payments can have installments (1-24); boleto/voucher/debit are always single payment
+- Installment analysis should filter to `payment_type = 'credit_card'`
+
+## Geographic & Market Context
+
+### Currency
+All monetary values are in **Brazilian Real (BRL, R$)**. No currency conversion is needed within the dataset.
+
+### State Codes
+Brazil uses two-letter state codes (similar to US). Key states in this dataset:
+- **SP (São Paulo)** — 42% of customers, 59.7% of sellers. The economic center of Brazil
+- **RJ (Rio de Janeiro)** — 12.9% of customers
+- **MG (Minas Gerais)** — 11.7% of customers
+- All 27 Brazilian states are represented in customer data, but only 23 have sellers
+
+### Market Characteristics
+- Brazil has a strong **installment culture** — buying on credit cards with 2-12 monthly installments is very common (not a sign of financial distress)
+- **Boleto bancário** is a Brazilian bank slip payment method with no US equivalent — it's a common alternative for customers without credit cards
+- Delivery distances can be very large (continental-size country) which affects shipping times and costs
+- São Paulo dominance in both buying and selling reflects Brazil's economic concentration
+
+## Metric Naming Conventions
+
+The business team uses these preferred names:
+
+| Concept | Preferred Name | Avoid |
+|---------|---------------|-------|
+| Total product value | **GMV** or **Gross Merchandise Value** | "sales", "total sales" |
+| Revenue per order | **AOV** or **Average Order Value** | "avg order size", "basket size" |
+| Completed revenue | **Realized GMV** | "net revenue", "confirmed revenue" |
+| Product + freight | **Total Revenue** | "gross revenue" |
+| Customer count | **Unique Customers** (using customer_unique_id) | "customers" (ambiguous — could be customer_id count) |
+| Order count | **Orders** | "transactions" |
+| Shipping charges | **Freight Revenue** | "shipping revenue" |
+| Bank slip payments | **Boleto** | "bank transfer", "wire" |
+| Review satisfaction | **Avg Review Score** | "NPS", "CSAT" (these are different metrics) |
+| Delivery performance | **On-Time Delivery Rate** | "SLA compliance" |
+| Seller output | **GMV per Seller** | "seller revenue" (Olist, not the seller, earns the commission) |
+
+## Known Data Quality Issues
+
+1. **customer_id vs customer_unique_id** — The most common analytical mistake. customer_id is per-order (99,441 values) and should NOT be used for unique customer counts. Always use customer_unique_id (96,096 values).
+
+2. **Missing review comments** — 58.7% of reviews have no comment text, and 88.3% have no title. Review score is the only universally available satisfaction signal.
+
+3. **Null product categories** — 1.9% of products have null `product_category_name`. Either exclude these from category analysis or label them "uncategorized."
+
+4. **Freight splitting** — Freight values at the item level are allocated proportionally when multiple items ship from the same seller. Don't interpret item-level freight as the "shipping cost for that item."
+
+5. **Duplicate review risk** — Some orders may have multiple reviews (the review_id is the primary key, not order_id). Use `review_id` for counting reviews or deduplicate by order_id if you want one review per order.
+
+6. **Order status edge cases** — While 97% of orders are "delivered," about 0.6% are "canceled" and 2.4% are in other statuses (shipped, invoiced, processing, etc.). Always clarify whether your metric includes or excludes non-delivered orders.
+
+7. **Date range gaps** — The data starts in September 2016 but early months have very few orders. October 2016 has only ~400 orders. Analysis periods should ideally start from January 2017 for meaningful trends.
+
+8. **No product names** — The dataset includes product dimensions and category but no actual product names (anonymized). Product-level analysis is limited to category and physical attributes.
+
+9. **Payment value vs item price discrepancy** — `SUM(payment_value)` may not exactly equal `SUM(price + freight_value)` for an order due to vouchers, discounts, or rounding. Use order_items for GMV/revenue calculations, order_payments for payment method analysis.
+
+
+# Your Task
+
+Generate a complete dbt MetricFlow semantic layer for this data. Based on the
+schema, data profiling, and relationships above:
+
+1. **Semantic Models**: Create one semantic model per major table (or per logical
+   fact/dimension). Each needs entities, dimensions, and measures. Every semantic
+   model MUST have a time dimension set as the agg_time_dimension. If a table lacks
+   a timestamp, you may need to create a denormalized fact table model that joins
+   in the timestamp from a related table. Use `model: ref('model_name')` references.
+
+2. **Metrics** (~30-50 metrics): Create metrics in these categories:
+   - Revenue/value metrics (totals, averages, per-unit)
+   - Volume metrics (counts, rates)
+   - Growth metrics (month-over-month using offset_window)
+   - Cumulative metrics (running totals, MTD)
+   - Rate/ratio metrics (conversion rates, satisfaction rates)
+   - Performance metrics specific to this business domain
+
+3. **Saved Queries** (~8-12): Common analytical views that a business analyst
+   would regularly need.
+
+If business logic was provided above, use those metric names and definitions as the
+canonical source. Prefer the naming conventions and calculation methods from the
+business logic over your own inferences.
+
+Output exactly three YAML documents separated by `---` lines.
+Use the data distributions and value counts to write accurate, specific descriptions.

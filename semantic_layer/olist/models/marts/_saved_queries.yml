@@ -1,0 +1,210 @@
+version: 2
+
+saved_queries:
+
+  # ---------------------------------------------------------------------------
+  # EXECUTIVE OVERVIEW
+  # ---------------------------------------------------------------------------
+  - name: monthly_revenue_overview
+    label: Monthly Revenue Overview
+    description: >
+      Monthly breakdown of key revenue metrics with order counts and
+      average order value. Primary report for executive-level trend analysis.
+    query_params:
+      metrics:
+        - gmv
+        - total_revenue
+        - freight_revenue
+        - order_count_from_items
+        - average_order_value
+        - active_customers
+      group_by:
+        - TimeDimension('metric_time', 'month')
+
+  - name: monthly_revenue_delivered_only
+    label: Monthly Revenue (Delivered Only)
+    description: >
+      Same as monthly revenue overview but filtered to delivered orders only.
+      Use this for realized revenue reporting.
+    query_params:
+      metrics:
+        - realized_gmv
+        - order_count_from_items
+        - average_order_value
+        - active_customers
+      group_by:
+        - TimeDimension('metric_time', 'month')
+
+
+  # ---------------------------------------------------------------------------
+  # GROWTH TRACKING
+  # ---------------------------------------------------------------------------
+  - name: growth_dashboard
+    label: Growth Dashboard
+    description: >
+      Month-over-month growth rates for key business metrics. Shows both
+      absolute values and percentage change for GMV and orders.
+    query_params:
+      metrics:
+        - gmv
+        - gmv_growth_mom
+        - orders
+        - order_growth_mom
+        - active_customers
+      group_by:
+        - TimeDimension('metric_time', 'month')
+
+
+  # ---------------------------------------------------------------------------
+  # PRODUCT & CATEGORY PERFORMANCE
+  # ---------------------------------------------------------------------------
+  - name: category_performance
+    label: Product Category Performance
+    description: >
+      Revenue, volume, and pricing metrics broken down by product category.
+      Identifies top-performing and underperforming categories.
+    query_params:
+      metrics:
+        - gmv
+        - items_sold
+        - order_count_from_items
+        - avg_item_price
+        - median_item_price
+      group_by:
+        - Dimension('order_item__product_category')
+
+  - name: category_performance_monthly
+    label: Monthly Category Performance
+    description: >
+      Category performance over time. Use to identify seasonal trends
+      and category growth patterns.
+    query_params:
+      metrics:
+        - gmv
+        - items_sold
+      group_by:
+        - TimeDimension('metric_time', 'month')
+        - Dimension('order_item__product_category')
+
+
+  # ---------------------------------------------------------------------------
+  # GEOGRAPHIC ANALYSIS
+  # ---------------------------------------------------------------------------
+  - name: customer_state_performance
+    label: Customer State Performance
+    description: >
+      Revenue and customer metrics by Brazilian state. São Paulo dominates
+      at 42% of customers but worth tracking relative performance.
+    query_params:
+      metrics:
+        - gmv
+        - order_count_from_items
+        - active_customers
+        - average_order_value
+      group_by:
+        - Dimension('order_item__customer_state')
+
+  - name: seller_state_performance
+    label: Seller State Performance
+    description: >
+      Seller activity and revenue by state. São Paulo sellers account for
+      ~60% of the marketplace.
+    query_params:
+      metrics:
+        - gmv
+        - active_sellers
+        - gmv_per_seller
+        - items_sold
+      group_by:
+        - Dimension('order_item__seller_state')
+
+
+  # ---------------------------------------------------------------------------
+  # DELIVERY PERFORMANCE
+  # ---------------------------------------------------------------------------
+  - name: delivery_performance_monthly
+    label: Monthly Delivery Performance
+    description: >
+      Monthly tracking of delivery speed and on-time rates. Key operational
+      metric for marketplace health.
+    query_params:
+      metrics:
+        - delivered_orders
+        - avg_delivery_days
+        - on_time_delivery_rate
+        - late_deliveries
+      group_by:
+        - TimeDimension('metric_time', 'month')
+
+  - name: delivery_by_state
+    label: Delivery Performance by State
+    description: >
+      Delivery metrics by customer state. Useful for identifying
+      geographic logistics challenges.
+    query_params:
+      metrics:
+        - delivered_orders
+        - avg_delivery_days
+        - on_time_delivery_rate
+      group_by:
+        - Dimension('order_id__customer_state')
+
+
+  # ---------------------------------------------------------------------------
+  # CUSTOMER SATISFACTION
+  # ---------------------------------------------------------------------------
+  - name: satisfaction_monthly
+    label: Monthly Customer Satisfaction
+    description: >
+      Monthly review scores and sentiment breakdown. Track whether
+      customer experience is improving or declining over time.
+    query_params:
+      metrics:
+        - avg_review_score
+        - review_count
+        - five_star_rate
+        - negative_review_rate
+      group_by:
+        - TimeDimension('metric_time', 'month')
+
+  - name: satisfaction_by_score
+    label: Review Score Distribution
+    description: >
+      Breakdown of review counts by score. Reveals the bimodal nature
+      of the dataset (heavy 5-star and 1-star concentration).
+    query_params:
+      metrics:
+        - review_count
+      group_by:
+        - Dimension('review__review_score')
+        - TimeDimension('metric_time', 'month')
+
+
+  # ---------------------------------------------------------------------------
+  # PAYMENT ANALYSIS
+  # ---------------------------------------------------------------------------
+  - name: payment_method_analysis
+    label: Payment Method Analysis
+    description: >
+      Revenue breakdown by payment method. Credit cards dominate at ~74%
+      with boleto at ~19%. Tracks payment mix over time.
+    query_params:
+      metrics:
+        - total_payment_value
+        - payment_count
+        - avg_payment_value
+      group_by:
+        - Dimension('order_payment__payment_type')
+        - TimeDimension('metric_time', 'month')
+
+  - name: installment_analysis
+    label: Installment Analysis
+    description: >
+      Credit card installment patterns. Shows how customers spread
+      payments over time, useful for cash flow analysis.
+    query_params:
+      metrics:
+        - total_payment_value
+        - payment_count
+      group_by:
+        - Dimension('order_payment__payment_installments')

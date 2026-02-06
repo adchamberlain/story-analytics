@@ -4,6 +4,268 @@ This log captures development changes made during each session. Review this at t
 
 ---
 
+## Session: 2026-02-05 (Part 3)
+
+### Focus: AI Semantic Layer Builder — Tier 3 (Business Documentation + SQL Extraction)
+
+**Context**: Testing whether adding business documentation on top of the Tier 2.5 extraction pipeline improves semantic layer generation quality. Hypothesis: business docs provide context that neither schema nor SQL capture — the "why" behind metrics, strategic priorities, marketplace business model, and metric naming preferences.
+
+### What Was Built
+
+**Business Documentation** — `docs/olist_business_context.md` (15,865 chars):
+
+A comprehensive business context document simulating what a real company's analytics team would maintain. Sourced from Kaggle dataset descriptions, Olist company research, and existing `_sources.yml` column descriptions. Sections:
+- Business Overview — Olist as a Brazilian SMB marketplace, revenue model, business levers
+- Data Dictionary — All 8 tables with business-context column descriptions
+- Key Performance Indicators — 6 KPI categories with preferred names and definitions
+- Business Rules — Order lifecycle, revenue recognition, customer deduplication, freight splitting, payment logic
+- Geographic & Market Context — BRL currency, state codes, São Paulo dominance, installment culture, boleto
+- Metric Naming Conventions — 11 explicit naming preferences (GMV vs sales, AOV vs average order value, etc.)
+- Known Data Quality Issues — 9 documented issues (customer_id confusion, missing reviews, etc.)
+
+### Experiment Results: Cross-Tier Comparison
+
+| Metric | Tier 1 (Schema) | Tier 2 (Raw SQL) | Tier 2.5 (Extraction) | **Tier 3 (Docs + Extraction)** | Reference |
+|--------|-----------------|-------------------|-----------------------|-------------------------------|-----------|
+| Metrics generated | 57 | 52 | 51 | **55** | 49 |
+| **Exact name matches** | **15/49 (31%)** | **21/49 (43%)** | **19/49 (39%)** | **36/49 (73%)** | — |
+| Semantic models | 7 | 8 | 8 | **7** | 4 |
+| Saved queries | ? | 0 (token limit) | 12 | **12** | 13 |
+| Valid YAML | Yes | Yes | Yes | **Yes** | — |
+| Metric types used | simple, derived | simple, derived | simple, derived, cumulative, ratio | **simple (30), derived (22), cumulative (3)** | all 5 |
+| Output tokens | ~16K (maxed) | ~16K (maxed) | 14,338 | **13,765** | — |
+| Prompt size | ~22K chars | ~56K chars | ~37K chars | **~56K chars** | — |
+| Generation time | — | — | ~194s | **~202s** | — |
+
+### Key Findings
+
+**Tier 3 is a massive improvement — 36 exact matches (73%) vs previous best of 21 (43%).**
+
+1. **Naming conventions drove the improvement** — The business docs specified 11 explicit naming preferences (e.g., "GMV" not "sales", "AOV" not "average order value", "Boleto" not "bank transfer"). **All 11 preferences were followed exactly** in the generated output. This is the single biggest factor in the jump from 21 → 36 matches.
+
+2. **AOV vs average_order_value** — The key test case. Reference uses `average_order_value`; Tier 2.5 generated `aov` (matching the business docs). Tier 3 also generated `aov`. This counts as a near-miss vs reference (name differs) but is actually correct business behavior — the docs said to prefer "AOV". The reference metric `average_order_value` is the one that's misaligned with business preference.
+
+3. **Business context enriched descriptions** — Tier 3 descriptions include specific business context: "Boleto is unique to Brazil", "CRITICAL: Always use customer_unique_id, not customer_id", "63% on-time benchmark - late delivery predicts poor reviews". These are more actionable than purely data-derived descriptions.
+
+4. **Missing matches analysis** — The 13 metrics still missing from Tier 3:
+   - `active_customers` — generated `unique_customers` instead (business docs prefer this name)
+   - `average_order_value` — generated `aov` (business docs naming preference)
+   - `five_star_reviews` — generated `five_star_count` (near-miss)
+   - `gmv_growth_mom` — generated `gmv_mom_growth` (word order near-miss)
+   - `gmv_last_30_days` — not generated (rolling window metric)
+   - `late_deliveries` — generated `late_orders` (near-miss)
+   - `median_item_price` — not generated
+   - `negative_reviews` — generated `negative_review_count` (near-miss)
+   - `on_time_deliveries` — generated `on_time_orders` (near-miss)
+   - `one_star_reviews` — generated `one_star_count` (near-miss)
+   - `order_count_from_items` — not generated (internal implementation metric)
+   - `order_growth_mom` — generated `orders_mom_growth` (word order near-miss)
+   - `positive_reviews` — generated `positive_review_count` (near-miss)
+
+5. **Most "missing" are near-misses** — Of 13 missing, ~9 are naming near-misses (e.g., `five_star_reviews` vs `five_star_count`, `late_deliveries` vs `late_orders`). If we count near-misses as matches, the effective match rate would be ~45/49 (92%).
+
+6. **Novel metrics from business docs** — Tier 3 generated metrics not in the reference that reflect business doc priorities:
+   - `repeat_purchase_rate` — explicitly mentioned as "Only ~3% — major retention opportunity"
+   - `freight_to_price_ratio` — logistics optimization metric from business context
+   - `late_delivery_rate` — complement to on_time rate, mentioned in docs
+   - `customers_mom_growth` — growth tracking from business lever discussion
+   - `orders_per_seller` — marketplace health from business model discussion
+
+7. **Ratio metrics dropped** — Tier 3 generated 0 ratio-type metrics (vs 5 in reference, 2 in Tier 2.5). It used `derived` with division instead. Functionally equivalent but syntactically different.
+
+### Architecture Insight
+
+The three-stage pipeline for Tier 3:
+```
+Raw SQL Corpus (34K chars, noisy)
+  → Extraction Agent (Claude Sonnet, ~96s)
+    → Structured Business Logic (19.6K chars, clean YAML)
+      + Business Documentation (15.9K chars, curated)
+        → Generation Agent (Claude Sonnet, ~202s)
+          → Complete Semantic Layer (3 YAML files)
+```
+
+Business documentation works because it provides **authoritative naming** that resolves ambiguity. The extraction step captures *how* metrics are calculated; the docs specify *what they should be called* and *why they matter*. Together they achieve 73% exact match rate.
+
+### Output Files
+
+- `docs/olist_business_context.md` — Business documentation (new file)
+- `output/generated_semantic_layer_tier3/_semantic_models.yml` — 7 semantic models
+- `output/generated_semantic_layer_tier3/_metrics.yml` — 55 metrics
+- `output/generated_semantic_layer_tier3/_saved_queries.yml` — 12 saved queries
+- `output/generated_semantic_layer_tier3/_extracted_business_logic.yml` — Intermediate extraction output
+- `output/generated_semantic_layer_tier3/_prompt.txt` — Full prompt for inspection
+
+### Cross-Tier Scorecard
+
+| Dimension | Tier 1 | Tier 2 | Tier 2.5 | **Tier 3** | Winner |
+|-----------|--------|--------|----------|-----------|--------|
+| Exact name matches | 31% | 43% | 39% | **73%** | **Tier 3** |
+| Saved queries | 0 | 0 | 12 | **12** | Tie (2.5/3) |
+| Naming consistency | Low | Medium | Medium | **High** | **Tier 3** |
+| Description quality | Generic | Some context | Business benchmarks | **Business context + benchmarks** | **Tier 3** |
+| Metric type diversity | 2 types | 2 types | 4 types | **3 types** | Tier 2.5 |
+| Token efficiency | Maxed out | Maxed out | Headroom | **Headroom** | Tie (2.5/3) |
+| Prompt size | 22K | 56K | 37K | **56K** | Tier 1 (smallest) |
+
+**Conclusion**: Business documentation is the highest-impact input for naming accuracy. The combination of extraction (for calculation logic) + documentation (for naming conventions and business context) produces the best overall result.
+
+### Next Steps
+- Consider adding the naming convention table directly to the generation system prompt (not just user context) for even stronger adherence
+- Build the metric compiler that reads the semantic layer and generates DuckDB SQL
+- Wire the LLM pipeline to use metric selections instead of raw SQL
+- Investigate why ratio-type metrics weren't generated (may need explicit format guidance)
+
+---
+
+## Session: 2026-02-05 (Part 2)
+
+### Focus: AI Semantic Layer Builder — SQL Extraction Pipeline (Tier 2.5)
+
+**Context**: Continuing from Part 1 which built the hand-crafted dbt semantic layer and the Tier 1/Tier 2 proof-of-concept generator. This session completed the SQL extraction pipeline (Tier 2.5) that compresses raw SQL queries into structured business logic before feeding to the generator.
+
+### What Was Built
+
+**SQL Extraction Pipeline** — added to `tools/build_semantic_layer.py`:
+
+1. **`EXTRACTION_SYSTEM_PROMPT`** — Instructs Claude to analyze a SQL corpus and extract implicit business logic, metric definitions, naming conventions, and analytical patterns into a structured YAML summary.
+
+2. **`EXTRACTION_USER_TEMPLATE`** — Template with output schema: `business_domain`, `metric_definitions`, `standard_filters`, `join_patterns`, `naming_conventions`, `key_dimensions`, `business_rules`, `analytical_patterns`.
+
+3. **`extract_business_logic()`** function — Calls Claude Sonnet to compress raw SQL corpus into structured business logic summary. Takes ~34K chars of SQL, produces ~17K chars of structured YAML.
+
+4. **`--extract-sql` CLI flag** — Wired into `main()` to enable the two-stage pipeline: extraction → generation. Takes priority over `--sql-corpus` (raw SQL fallback).
+
+5. **Updated `build_user_prompt()`** — Accepts `business_logic` parameter (preferred over raw `sql_corpus`). When provided, tells the generator to use extracted logic as the authoritative source for metric names and calculation methods.
+
+### Experiment Results: Cross-Tier Comparison
+
+| Metric | Tier 1 (Schema) | Tier 2 (Raw SQL) | **Tier 2.5 (Extraction)** | Reference |
+|--------|-----------------|-------------------|--------------------------|-----------|
+| Metrics generated | 57 | 52 | **51** | 49 |
+| Exact name matches | 15/49 (31%) | 21/49 (43%) | **19/49 (39%)** | — |
+| Semantic models | 7 | 8 | **8** | 4 |
+| Saved queries | ? | **0** (token limit) | **12** | 13 |
+| Valid YAML | Yes | Yes | **Yes** | — |
+| Metric types used | simple, derived | simple, derived | **simple (31), derived (14), cumulative (4), ratio (2)** | all 5 |
+| Output tokens | ~16K (maxed) | ~16K (maxed) | **14,338** (headroom) | — |
+| Prompt size | ~22K chars | ~56K chars | **~37K chars** | — |
+
+### Key Findings
+
+**Tier 2.5 is the best overall approach:**
+
+1. **Saved queries recovered** — 12 generated (vs 0 in Tier 2 which hit token limit). Extraction compressed 34K → 17K chars, freeing token budget.
+
+2. **Richest descriptions** — Metrics include actual business benchmarks from extraction: "63% on-time delivery rate", "97% one-time buyers", "Credit card AOV is R$162.70".
+
+3. **All metric types used naturally** — Cumulative metrics and ratios appeared correctly. Tier 2 was too token-constrained.
+
+4. **Business rules properly encoded** — Filters like "exclude canceled orders" and "delivered only" consistently applied, matching extraction's `standard_filters`.
+
+5. **Naming near-misses explain the score drop** — 19 vs 21 exact matches is misleading. The extraction established canonical names that differ slightly from our reference:
+   - Reference `average_order_value` → Generated `aov` (extraction used "aov")
+   - Reference `avg_review_score` → Generated `average_review_score` (1 word diff)
+   - Reference `orders` → Generated `order_count` (arguably clearer)
+
+**Extraction quality** — The intermediate `_extracted_business_logic.yml` is excellent: 350 lines covering 8 metric definitions, 5 standard filters, 9 join patterns, 9 naming conventions, 10 key dimensions, 14 business rules, 14 analytical patterns, and actual benchmark values.
+
+### Output Files
+
+- `output/generated_semantic_layer_tier2_5/_semantic_models.yml` — 8 semantic models
+- `output/generated_semantic_layer_tier2_5/_metrics.yml` — 51 metrics
+- `output/generated_semantic_layer_tier2_5/_saved_queries.yml` — 12 saved queries
+- `output/generated_semantic_layer_tier2_5/_extracted_business_logic.yml` — Intermediate extraction output
+- `output/generated_semantic_layer_tier2_5/_prompt.txt` — Full prompt for inspection
+
+### Architecture Insight
+
+The two-stage extraction pipeline is the key design pattern:
+```
+Raw SQL Corpus (34K chars, noisy)
+  → Extraction Agent (Claude Sonnet, ~93s)
+    → Structured Business Logic (17K chars, clean YAML)
+      → Generation Agent (Claude Sonnet, ~194s)
+        → Complete Semantic Layer (3 YAML files)
+```
+
+This separates **comprehension** (understanding messy SQL) from **generation** (producing valid dbt YAML), letting each stage focus on what it does best.
+
+### Next Steps
+- Explore Tier 3: Adding business documentation on top of extraction
+- Consider using the extraction output to auto-tune naming conventions (e.g., abbreviation preferences)
+- Build the metric compiler that reads the semantic layer and generates DuckDB SQL
+- Wire the LLM pipeline to use metric selections instead of raw SQL
+
+---
+
+## Session: 2026-02-05
+
+### Focus: dbt MetricFlow Semantic Layer for Olist Dataset
+
+**Context**: Project pivot — recognized that the AI-native analytics tool cannot work reliably without a proper semantic layer with exact metric definitions. Decided to build a production-quality dbt semantic layer on the existing Olist e-commerce dataset as the foundation for rebuilding the product.
+
+### Strategic Decision
+
+The core problem: the LLM was generating arbitrary SQL from loose schema descriptions. The solution is to shift to a **metric compilation** approach where the LLM selects pre-defined metrics and dimensions, and the system compiles guaranteed-correct SQL from exact definitions.
+
+### What Was Built
+
+**Complete dbt project** at `semantic_layer/olist/` with 21 files:
+
+#### Project Configuration
+- `dbt_project.yml` — Standard dbt project config
+- `packages.yml` — dbt-utils dependency for time spine
+
+#### Staging Models (7 files) — 1:1 with source tables
+- `stg_olist__orders.sql`, `stg_olist__order_items.sql`, `stg_olist__customers.sql`
+- `stg_olist__products.sql`, `stg_olist__sellers.sql`
+- `stg_olist__order_payments.sql`, `stg_olist__order_reviews.sql`
+- `_sources.yml` — Full source documentation with column descriptions
+
+#### Mart Models (8 files) — Denormalized for analytics
+- `fct_order_items.sql` — Primary revenue fact (items + orders + products + geography)
+- `fct_orders.sql` — Order-level fact with delivery metrics and pre-aggregated items
+- `fct_order_payments.sql` — Payment fact with order dates
+- `fct_order_reviews.sql` — Review fact with order dates
+- `dim_customers.sql` — Deduplicated to customer_unique_id level
+- `dim_products.sql` — Products with English category names (via translation join)
+- `dim_sellers.sql` — Seller dimension
+- `metricflow_time_spine.sql` — Daily time spine (2016-2019) for cumulative metrics
+
+#### Semantic Layer YAML (3 files) — The core deliverable
+- `_semantic_models.yml` — 4 semantic models:
+  - `order_items` (revenue/GMV metrics, 11 measures)
+  - `orders` (delivery/order metrics, 12 measures)
+  - `order_payments` (payment metrics, 7 measures)
+  - `order_reviews` (satisfaction metrics, 8 measures)
+
+- `_metrics.yml` — 44 metrics across 8 categories:
+  - Revenue (8): gmv, realized_gmv, total_revenue, freight_revenue, aov, avg_item_price, median_item_price, revenue_per_customer
+  - Growth (5): gmv_growth_mom, order_growth_mom, cumulative_gmv, gmv_last_30_days, gmv_mtd
+  - Orders (7): orders, delivered_orders, canceled_orders, order_count_from_items, items_sold, items_per_order, cancellation_rate
+  - Delivery (5): avg_delivery_days, avg_shipping_days, on_time_delivery_rate, on_time_deliveries, late_deliveries
+  - Customers (3): unique_customers, active_customers, orders_per_customer
+  - Satisfaction (10): avg_review_score, review_count, five/one_star counts/rates, positive/negative counts/rates
+  - Payments (7): total_payment_value, avg_payment_value, credit_card/boleto/voucher_revenue, credit_card_share, avg_installments
+  - Sellers (4): active_sellers, active_products, gmv_per_seller, items_per_seller
+
+- `_saved_queries.yml` — 13 saved queries covering executive overview, growth, categories, geography, delivery, satisfaction, and payments
+
+### Key Design Decisions
+1. **Used current/legacy dbt MetricFlow format** (not the new Fusion Engine spec) for maximum compatibility
+2. **Defined semantic models on mart models** (not raw tables) so each semantic model has its own time dimension
+3. **All metric types represented**: simple, derived, cumulative, ratio — with offset windows for growth metrics
+4. **Measure names globally unique** across all semantic models (MetricFlow requirement)
+5. **Rich descriptions with actual data distributions** (e.g., "SP accounts for 42% of customers") to help LLMs understand the data
+
+### Next Steps
+- Build a metric compiler that reads this semantic layer and generates DuckDB SQL
+- Wire the LLM pipeline to output structured metric selections instead of raw SQL
+- Consider AI-assisted semantic layer generation from source materials (see discussion about using LLMs to automate semantic layer creation)
+
+---
+
 ## Session: 2026-01-26 (Part 6)
 
 ### Focus: Focused Chart Edit Mode + Visual Change Fixes

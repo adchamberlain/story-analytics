@@ -1,0 +1,473 @@
+version: 2
+
+metrics:
+  # Revenue & GMV Metrics
+  - name: total_revenue
+    label: Total Revenue
+    description: Total revenue from item sales (excluding freight)
+    type: simple
+    type_params:
+      measure: total_item_revenue
+  
+  - name: total_freight_revenue
+    label: Total Freight Revenue
+    description: Total shipping/freight revenue collected
+    type: simple
+    type_params:
+      measure: total_freight_revenue
+  
+  - name: total_gmv
+    label: Total GMV
+    description: Total Gross Merchandise Value including items and freight
+    type: simple
+    type_params:
+      measure: total_gmv
+  
+  - name: average_order_value
+    label: Average Order Value
+    description: Average GMV per order (items + freight)
+    type: derived
+    type_params:
+      expr: total_gmv / nullif(order_count, 0)
+      metrics:
+        - name: total_gmv
+        - name: order_count
+  
+  - name: average_item_price
+    label: Average Item Price
+    description: Average price per item sold ($120.65)
+    type: simple
+    type_params:
+      measure: avg_item_price
+  
+  - name: average_freight_per_order
+    label: Average Freight per Order
+    description: Average shipping cost per order
+    type: derived
+    type_params:
+      expr: total_freight_revenue / nullif(order_count, 0)
+      metrics:
+        - name: total_freight_revenue
+        - name: order_count
+  
+  - name: freight_as_percent_of_gmv
+    label: Freight % of GMV
+    description: Freight revenue as percentage of total GMV
+    type: derived
+    type_params:
+      expr: (total_freight_revenue / nullif(total_gmv, 0)) * 100
+      metrics:
+        - name: total_freight_revenue
+        - name: total_gmv
+
+  # Volume Metrics
+  - name: order_count
+    label: Order Count
+    description: Total number of orders placed
+    type: simple
+    type_params:
+      measure: order_count
+  
+  - name: delivered_orders
+    label: Delivered Orders
+    description: Number of successfully delivered orders (97% of total)
+    type: simple
+    type_params:
+      measure: delivered_order_count
+  
+  - name: canceled_orders
+    label: Canceled Orders
+    description: Number of canceled orders (0.6% of total)
+    type: simple
+    type_params:
+      measure: canceled_order_count
+  
+  - name: order_items
+    label: Order Items
+    description: Total number of line items across all orders
+    type: simple
+    type_params:
+      measure: order_item_count
+  
+  - name: items_per_order
+    label: Items per Order
+    description: Average number of items per order (1.2 items)
+    type: derived
+    type_params:
+      expr: order_items / nullif(order_count, 0)
+      metrics:
+        - name: order_items
+        - name: order_count
+  
+  - name: unique_products_sold
+    label: Unique Products Sold
+    description: Number of distinct products with sales
+    type: simple
+    type_params:
+      measure: distinct_products_sold
+  
+  - name: active_sellers
+    label: Active Sellers
+    description: Number of sellers with sales activity
+    type: simple
+    type_params:
+      measure: distinct_sellers
+  
+  - name: unique_customers
+    label: Unique Customers
+    description: Number of unique customers (96,096)
+    type: simple
+    type_params:
+      measure: unique_customer_count
+
+  # Conversion & Rate Metrics
+  - name: delivery_rate
+    label: Delivery Rate
+    description: Percentage of orders successfully delivered (97%)
+    type: ratio
+    type_params:
+      numerator: delivered_orders
+      denominator: order_count
+  
+  - name: cancellation_rate
+    label: Cancellation Rate
+    description: Percentage of orders canceled (0.6%)
+    type: ratio
+    type_params:
+      numerator: canceled_orders
+      denominator: order_count
+  
+  - name: on_time_delivery_rate
+    label: On-Time Delivery Rate
+    description: Percentage of orders delivered on or before estimated date
+    type: derived
+    type_params:
+      expr: on_time_deliveries / nullif(delivered_orders, 0)
+      metrics:
+        - name: on_time_deliveries
+        - name: delivered_orders
+  
+  - name: on_time_deliveries
+    label: On-Time Deliveries
+    description: Count of orders delivered by estimated date
+    type: simple
+    type_params:
+      measure: on_time_delivery_count
+  
+  - name: repeat_customer_rate
+    label: Repeat Customer Rate
+    description: Percentage of customers who made multiple purchases (3.4%)
+    type: derived
+    type_params:
+      expr: ((customer_count - unique_customers) / nullif(unique_customers, 0)) * 100
+      metrics:
+        - name: customer_count
+        - name: unique_customers
+  
+  - name: customer_count
+    label: Customer Count
+    description: Total customer records (includes repeats)
+    type: simple
+    type_params:
+      measure: customer_count
+
+  # Customer Satisfaction Metrics
+  - name: review_count
+    label: Review Count
+    description: Total number of customer reviews
+    type: simple
+    type_params:
+      measure: review_count
+  
+  - name: average_review_score
+    label: Average Review Score
+    description: Average customer review rating (4.09 out of 5)
+    type: simple
+    type_params:
+      measure: avg_review_score
+  
+  - name: five_star_reviews
+    label: 5-Star Reviews
+    description: Count of 5-star reviews (58% of total)
+    type: simple
+    type_params:
+      measure: five_star_review_count
+  
+  - name: positive_reviews
+    label: Positive Reviews
+    description: Count of 4-5 star reviews (77% of total)
+    type: simple
+    type_params:
+      measure: positive_review_count
+  
+  - name: negative_reviews
+    label: Negative Reviews
+    description: Count of 1-2 star reviews (15% of total)
+    type: simple
+    type_params:
+      measure: negative_review_count
+  
+  - name: customer_satisfaction_rate
+    label: Customer Satisfaction Rate
+    description: Percentage of reviews that are positive (4-5 stars)
+    type: ratio
+    type_params:
+      numerator: positive_reviews
+      denominator: review_count
+  
+  - name: review_response_rate
+    label: Review Response Rate
+    description: Percentage of reviews that received a response
+    type: derived
+    type_params:
+      expr: (reviews_with_response / nullif(review_count, 0)) * 100
+      metrics:
+        - name: reviews_with_response
+        - name: review_count
+  
+  - name: reviews_with_response
+    label: Reviews with Response
+    description: Count of reviews that were answered
+    type: simple
+    type_params:
+      measure: review_count
+    filter: |
+      {{ Dimension('order_reviews__review_answer_date') }} is not null
+
+  # Operational Performance Metrics
+  - name: avg_days_to_delivery
+    label: Avg Days to Delivery
+    description: Average days from order purchase to customer delivery
+    type: simple
+    type_params:
+      measure: days_to_delivery
+  
+  - name: avg_days_to_approval
+    label: Avg Days to Approval
+    description: Average days from purchase to order approval
+    type: simple
+    type_params:
+      measure: days_to_approval
+  
+  - name: avg_days_to_carrier
+    label: Avg Days to Carrier
+    description: Average days from approval to carrier pickup
+    type: simple
+    type_params:
+      measure: days_to_carrier
+  
+  - name: avg_delivery_vs_estimate
+    label: Avg Days vs Estimate
+    description: Average days early (positive) or late (negative) compared to estimate
+    type: simple
+    type_params:
+      measure: delivery_vs_estimate_days
+  
+  - name: avg_review_response_time
+    label: Avg Review Response Time
+    description: Average days to respond to customer reviews
+    type: simple
+    type_params:
+      measure: days_to_review_response
+
+  # Payment Metrics
+  - name: total_payment_value
+    label: Total Payment Value
+    description: Total value of all payments received
+    type: simple
+    type_params:
+      measure: total_payment_value
+  
+  - name: payment_count
+    label: Payment Count
+    description: Total number of payment transactions
+    type: simple
+    type_params:
+      measure: payment_count
+  
+  - name: average_payment_value
+    label: Average Payment Value
+    description: Average payment amount ($154.10)
+    type: simple
+    type_params:
+      measure: avg_payment_value
+  
+  - name: average_installments
+    label: Average Installments
+    description: Average number of payment installments (2.85)
+    type: simple
+    type_params:
+      measure: avg_installments
+  
+  - name: credit_card_payment_rate
+    label: Credit Card Payment Rate
+    description: Percentage of payments made by credit card (74%)
+    type: derived
+    type_params:
+      expr: (credit_card_payments / nullif(payment_count, 0)) * 100
+      metrics:
+        - name: credit_card_payments
+        - name: payment_count
+  
+  - name: credit_card_payments
+    label: Credit Card Payments
+    description: Count of credit card payment transactions
+    type: simple
+    type_params:
+      measure: credit_card_payment_count
+  
+  - name: installment_payment_rate
+    label: Installment Payment Rate
+    description: Percentage of payments using installments
+    type: derived
+    type_params:
+      expr: (installment_payments / nullif(payment_count, 0)) * 100
+      metrics:
+        - name: installment_payments
+        - name: payment_count
+  
+  - name: installment_payments
+    label: Installment Payments
+    description: Count of payments with installment plans
+    type: simple
+    type_params:
+      measure: installment_payment_count
+
+  # Cumulative Metrics
+  - name: cumulative_revenue
+    label: Cumulative Revenue
+    description: Running total of revenue over time
+    type: cumulative
+    type_params:
+      measure: total_item_revenue
+  
+  - name: cumulative_orders
+    label: Cumulative Orders
+    description: Running total of orders over time
+    type: cumulative
+    type_params:
+      measure: order_count
+  
+  - name: revenue_mtd
+    label: Revenue MTD
+    description: Month-to-date revenue
+    type: cumulative
+    type_params:
+      measure: total_item_revenue
+      grain_to_date: month
+  
+  - name: orders_mtd
+    label: Orders MTD
+    description: Month-to-date order count
+    type: cumulative
+    type_params:
+      measure: order_count
+      grain_to_date: month
+  
+  - name: revenue_ytd
+    label: Revenue YTD
+    description: Year-to-date revenue
+    type: cumulative
+    type_params:
+      measure: total_item_revenue
+      grain_to_date: year
+
+  # Growth Metrics (MoM)
+  - name: revenue_mom_growth
+    label: Revenue MoM Growth
+    description: Month-over-month revenue growth percentage
+    type: derived
+    type_params:
+      expr: ((total_revenue - total_revenue_prior_month) / nullif(total_revenue_prior_month, 0)) * 100
+      metrics:
+        - name: total_revenue
+        - name: total_revenue
+          alias: total_revenue_prior_month
+          offset_window: 1 month
+  
+  - name: orders_mom_growth
+    label: Orders MoM Growth
+    description: Month-over-month order count growth percentage
+    type: derived
+    type_params:
+      expr: ((order_count - order_count_prior_month) / nullif(order_count_prior_month, 0)) * 100
+      metrics:
+        - name: order_count
+        - name: order_count
+          alias: order_count_prior_month
+          offset_window: 1 month
+  
+  - name: aov_mom_change
+    label: AOV MoM Change
+    description: Month-over-month change in average order value
+    type: derived
+    type_params:
+      expr: average_order_value - average_order_value_prior_month
+      metrics:
+        - name: average_order_value
+        - name: average_order_value
+          alias: average_order_value_prior_month
+          offset_window: 1 month
+
+  # Product Metrics
+  - name: product_catalog_size
+    label: Product Catalog Size
+    description: Total number of products in catalog
+    type: simple
+    type_params:
+      measure: product_count
+  
+  - name: avg_product_weight
+    label: Avg Product Weight
+    description: Average product weight in grams (2,276g)
+    type: simple
+    type_params:
+      measure: avg_product_weight_g
+  
+  - name: catalog_coverage_rate
+    label: Catalog Coverage Rate
+    description: Percentage of catalog products that have been sold
+    type: derived
+    type_params:
+      expr: (unique_products_sold / nullif(product_catalog_size, 0)) * 100
+      metrics:
+        - name: unique_products_sold
+        - name: product_catalog_size
+
+  # Seller Metrics
+  - name: total_sellers
+    label: Total Sellers
+    description: Total number of sellers in marketplace
+    type: simple
+    type_params:
+      measure: seller_count
+  
+  - name: seller_activation_rate
+    label: Seller Activation Rate
+    description: Percentage of sellers with active sales
+    type: derived
+    type_params:
+      expr: (active_sellers / nullif(total_sellers, 0)) * 100
+      metrics:
+        - name: active_sellers
+        - name: total_sellers
+  
+  - name: revenue_per_active_seller
+    label: Revenue per Active Seller
+    description: Average revenue generated per active seller
+    type: derived
+    type_params:
+      expr: total_revenue / nullif(active_sellers, 0)
+      metrics:
+        - name: total_revenue
+        - name: active_sellers
+  
+  - name: orders_per_active_seller
+    label: Orders per Active Seller
+    description: Average number of orders per active seller
+    type: derived
+    type_params:
+      expr: order_count / nullif(active_sellers, 0)
+      metrics:
+        - name: order_count
+        - name: active_sellers

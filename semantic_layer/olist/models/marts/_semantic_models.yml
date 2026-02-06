@@ -1,0 +1,460 @@
+version: 2
+
+semantic_models:
+
+  # ---------------------------------------------------------------------------
+  # ORDER ITEMS — Primary revenue fact table (line-item grain)
+  # ---------------------------------------------------------------------------
+  - name: order_items
+    description: |
+      Line-item level fact table for the Olist marketplace. Each row represents
+      one product purchased within an order, denormalized with order dates,
+      product categories, and geographic dimensions. This is the primary source
+      for revenue, GMV, and product performance metrics.
+    model: ref('fct_order_items')
+    defaults:
+      agg_time_dimension: order_date
+
+    entities:
+      - name: order_item
+        type: primary
+        expr: order_id || '-' || cast(order_item_id as varchar)
+      - name: order_id
+        type: foreign
+      - name: product
+        type: foreign
+        expr: product_id
+      - name: seller
+        type: foreign
+        expr: seller_id
+      - name: customer
+        type: foreign
+        expr: customer_id
+
+    dimensions:
+      - name: order_date
+        type: time
+        type_params:
+          time_granularity: day
+        description: Date the order was placed by the customer.
+
+      - name: order_status
+        type: categorical
+        description: >
+          Order lifecycle status. Values: delivered (97%), shipped (1.1%),
+          canceled (0.6%), unavailable (0.6%), invoiced, processing,
+          created, approved.
+
+      - name: product_category
+        type: categorical
+        description: >
+          English name of the product category (73 categories). Top:
+          bed_bath_table, sports_leisure, furniture_decor, health_beauty,
+          housewares, auto, computers_accessories, toys.
+
+      - name: customer_state
+        type: categorical
+        description: >
+          Two-letter Brazilian state code of the customer. All 27 states
+          represented. Top: SP (42%), RJ (12.9%), MG (11.7%).
+
+      - name: customer_city
+        type: categorical
+        description: >
+          Customer city name. Top: sao paulo (15.6%), rio de janeiro (6.9%),
+          belo horizonte (2.8%).
+
+      - name: seller_state
+        type: categorical
+        description: >
+          Two-letter Brazilian state code of the seller. Only 23 of 27 states.
+          Top: SP (59.7%), PR (11.3%), MG (7.9%).
+
+      - name: seller_city
+        type: categorical
+        description: >
+          Seller city name. Top: sao paulo (22.4%), curitiba (4.1%).
+
+    measures:
+      - name: gmv
+        agg: sum
+        expr: price
+        description: >
+          Gross Merchandise Value — sum of product prices excluding freight.
+          Filter to delivered orders for realized GMV.
+        label: GMV
+
+      - name: freight_revenue
+        agg: sum
+        expr: freight_value
+        description: Total freight/shipping charges collected from customers.
+        label: Freight Revenue
+
+      - name: total_revenue
+        agg: sum
+        expr: total_item_value
+        description: Sum of product price plus freight for all line items.
+        label: Total Revenue
+
+      - name: item_count
+        agg: count
+        expr: order_item_id
+        description: Total number of line items sold.
+        label: Items Sold
+
+      - name: order_count_from_items
+        agg: count_distinct
+        expr: order_id
+        description: Distinct count of orders (derived from line items table).
+        label: Orders (from Items)
+
+      - name: avg_item_price
+        agg: average
+        expr: price
+        description: Average selling price per item.
+        label: Avg Item Price
+
+      - name: median_item_price
+        agg: median
+        expr: price
+        description: >
+          Median item price. More representative than average due to
+          right-skewed distribution (median R$74.99 vs mean R$120.65).
+        label: Median Item Price
+
+      - name: avg_freight_per_item
+        agg: average
+        expr: freight_value
+        description: Average freight/shipping cost per item.
+        label: Avg Freight per Item
+
+      - name: active_sellers
+        agg: count_distinct
+        expr: seller_id
+        description: Count of distinct sellers who fulfilled orders in the period.
+        label: Active Sellers
+
+      - name: active_products
+        agg: count_distinct
+        expr: product_id
+        description: Count of distinct products sold in the period.
+        label: Active Products
+
+      - name: active_customers
+        agg: count_distinct
+        expr: customer_unique_id
+        description: >
+          Count of distinct unique customers (deduplicated via
+          customer_unique_id, not the per-order customer_id).
+        label: Active Customers
+
+
+  # ---------------------------------------------------------------------------
+  # ORDERS — Order-level fact table for delivery and order metrics
+  # ---------------------------------------------------------------------------
+  - name: orders
+    description: |
+      Order-level fact table. Each row represents one customer order on the
+      Olist marketplace, enriched with pre-aggregated item counts/values and
+      computed delivery metrics. Contains the full order lifecycle timestamps.
+      Date range: September 2016 to October 2018.
+    model: ref('fct_orders')
+    defaults:
+      agg_time_dimension: order_date
+
+    entities:
+      - name: order_id
+        type: primary
+      - name: customer
+        type: foreign
+        expr: customer_id
+
+    dimensions:
+      - name: order_date
+        type: time
+        type_params:
+          time_granularity: day
+        description: Date the order was placed by the customer.
+
+      - name: order_status
+        type: categorical
+        description: >
+          Order lifecycle status. Values: delivered (97%), shipped (1.1%),
+          canceled (0.6%), unavailable (0.6%), invoiced, processing,
+          created, approved.
+
+      - name: is_on_time
+        type: categorical
+        description: >
+          Whether the order was delivered on or before the estimated delivery
+          date. True = on time, False = late, Null = not yet delivered.
+
+      - name: customer_state
+        type: categorical
+        description: Two-letter Brazilian state code of the customer.
+
+      - name: customer_city
+        type: categorical
+        description: Customer city name.
+
+    measures:
+      - name: orders
+        agg: count
+        expr: order_id
+        description: Total number of orders placed.
+        label: Orders
+
+      - name: delivered_orders
+        agg: sum
+        expr: "case when order_status = 'delivered' then 1 else 0 end"
+        description: Count of orders successfully delivered to customers.
+        label: Delivered Orders
+
+      - name: canceled_orders
+        agg: sum
+        expr: "case when order_status = 'canceled' then 1 else 0 end"
+        description: Count of orders that were canceled.
+        label: Canceled Orders
+
+      - name: avg_delivery_days
+        agg: average
+        expr: delivery_days
+        description: >
+          Average calendar days from order placement to customer delivery.
+          Undelivered orders (null delivery_days) are excluded.
+        label: Avg Delivery Days
+
+      - name: avg_shipping_days
+        agg: average
+        expr: shipping_days
+        description: >
+          Average calendar days from carrier handoff to customer delivery.
+        label: Avg Shipping Days
+
+      - name: on_time_delivery_count
+        agg: sum
+        expr: "case when is_on_time = true then 1 else 0 end"
+        description: Count of orders delivered on or before estimated date.
+        label: On-Time Deliveries
+
+      - name: late_delivery_count
+        agg: sum
+        expr: "case when is_on_time = false then 1 else 0 end"
+        description: Count of orders delivered after the estimated date.
+        label: Late Deliveries
+
+      - name: order_revenue
+        agg: sum
+        expr: order_revenue
+        description: Sum of item prices per order (excludes freight).
+        label: Order Revenue
+
+      - name: order_total_value
+        agg: sum
+        expr: order_total_value
+        description: Sum of items + freight per order.
+        label: Order Total Value
+
+      - name: avg_items_per_order
+        agg: average
+        expr: item_count
+        description: >
+          Average number of line items per order. Most orders have 1 item
+          (87.6%); maximum is 21.
+        label: Avg Items per Order
+
+      - name: unique_customers
+        agg: count_distinct
+        expr: customer_unique_id
+        description: >
+          Distinct count of unique customers (deduplicated across orders
+          via customer_unique_id).
+        label: Unique Customers
+
+
+  # ---------------------------------------------------------------------------
+  # ORDER PAYMENTS — Payment method and installment analysis
+  # ---------------------------------------------------------------------------
+  - name: order_payments
+    description: |
+      Payment-level fact table. Each row represents one payment toward an
+      order. Orders may have multiple payments (e.g., credit card + voucher).
+      73.9% of payments are credit card, 19% boleto (Brazilian bank slip).
+      Installments range from 0-24 months.
+    model: ref('fct_order_payments')
+    defaults:
+      agg_time_dimension: order_date
+
+    entities:
+      - name: order_payment
+        type: primary
+        expr: order_id || '-' || cast(payment_sequential as varchar)
+      - name: order_id
+        type: foreign
+
+    dimensions:
+      - name: order_date
+        type: time
+        type_params:
+          time_granularity: day
+        description: Date the associated order was placed.
+
+      - name: payment_type
+        type: categorical
+        description: >
+          Payment method. Values: credit_card (73.9%), boleto (19%),
+          voucher (5.6%), debit_card (1.5%), not_defined (<0.01%).
+
+      - name: payment_installments
+        type: categorical
+        description: >
+          Number of installments chosen by the customer (0-24). 50.6% of
+          payments are single-installment. 10 installments is notably
+          popular (5.1%).
+
+      - name: order_status
+        type: categorical
+        description: Order lifecycle status from the associated order.
+
+    measures:
+      - name: payment_total
+        agg: sum
+        expr: payment_value
+        description: Total payment value across all payment records.
+        label: Total Payments
+
+      - name: payment_count
+        agg: count
+        expr: payment_sequential
+        description: Total number of payment transactions.
+        label: Payment Count
+
+      - name: avg_payment_value
+        agg: average
+        expr: payment_value
+        description: Average value per payment transaction.
+        label: Avg Payment Value
+
+      - name: credit_card_payments
+        agg: sum
+        expr: "case when payment_type = 'credit_card' then payment_value else 0 end"
+        description: Total value of credit card payments.
+        label: Credit Card Revenue
+
+      - name: boleto_payments
+        agg: sum
+        expr: "case when payment_type = 'boleto' then payment_value else 0 end"
+        description: Total value of boleto (bank slip) payments.
+        label: Boleto Revenue
+
+      - name: voucher_payments
+        agg: sum
+        expr: "case when payment_type = 'voucher' then payment_value else 0 end"
+        description: Total value of voucher payments.
+        label: Voucher Revenue
+
+      - name: avg_installments
+        agg: average
+        expr: "case when payment_type = 'credit_card' and payment_installments > 0 then payment_installments end"
+        description: >
+          Average number of installments for credit card payments.
+          Excludes non-credit-card payments and zero-installment records.
+        label: Avg Installments
+
+
+  # ---------------------------------------------------------------------------
+  # ORDER REVIEWS — Customer satisfaction analysis
+  # ---------------------------------------------------------------------------
+  - name: order_reviews
+    description: |
+      Review-level fact table. Each row is a customer review for an order.
+      Scores are 1-5 with a bimodal distribution: 57.8% are 5-star, 11.5%
+      are 1-star. Overall average is 4.09. Review text (when present) is
+      in Portuguese.
+    model: ref('fct_order_reviews')
+    defaults:
+      agg_time_dimension: order_date
+
+    entities:
+      - name: review
+        type: primary
+        expr: review_id
+      - name: order_id
+        type: foreign
+
+    dimensions:
+      - name: order_date
+        type: time
+        type_params:
+          time_granularity: day
+        description: Date the associated order was placed.
+
+      - name: review_date
+        type: time
+        type_params:
+          time_granularity: day
+        description: Date the review was submitted by the customer.
+
+      - name: review_score
+        type: categorical
+        description: >
+          Customer satisfaction score (1-5). Distribution: 5 stars (57.8%),
+          4 stars (19.3%), 1 star (11.5%), 3 stars (8.2%), 2 stars (3.2%).
+
+      - name: has_review_comment
+        type: categorical
+        expr: "case when review_comment_message is not null then 'Yes' else 'No' end"
+        description: Whether the customer left a text comment with their review.
+
+      - name: order_status
+        type: categorical
+        description: Order lifecycle status from the associated order.
+
+    measures:
+      - name: review_count
+        agg: count
+        expr: review_id
+        description: Total number of reviews submitted.
+        label: Reviews
+
+      - name: avg_review_score
+        agg: average
+        expr: review_score
+        description: Average customer review score (1-5). Dataset average is 4.09.
+        label: Avg Review Score
+
+      - name: five_star_reviews
+        agg: sum
+        expr: "case when review_score = 5 then 1 else 0 end"
+        description: Count of 5-star reviews.
+        label: 5-Star Reviews
+
+      - name: four_star_reviews
+        agg: sum
+        expr: "case when review_score = 4 then 1 else 0 end"
+        description: Count of 4-star reviews.
+        label: 4-Star Reviews
+
+      - name: one_star_reviews
+        agg: sum
+        expr: "case when review_score = 1 then 1 else 0 end"
+        description: Count of 1-star reviews.
+        label: 1-Star Reviews
+
+      - name: positive_reviews
+        agg: sum
+        expr: "case when review_score >= 4 then 1 else 0 end"
+        description: Count of reviews rated 4 or 5 (positive sentiment).
+        label: Positive Reviews
+
+      - name: negative_reviews
+        agg: sum
+        expr: "case when review_score <= 2 then 1 else 0 end"
+        description: Count of reviews rated 1 or 2 (negative sentiment).
+        label: Negative Reviews
+
+      - name: reviews_with_comments
+        agg: sum
+        expr: "case when review_comment_message is not null then 1 else 0 end"
+        description: Count of reviews that include a text comment.
+        label: Reviews with Comments

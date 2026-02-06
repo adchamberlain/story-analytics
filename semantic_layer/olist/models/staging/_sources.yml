@@ -1,0 +1,167 @@
+version: 2
+
+sources:
+  - name: olist
+    description: >
+      Brazilian e-commerce public dataset from Olist, a marketplace platform
+      connecting small businesses to major Brazilian marketplaces. Contains
+      ~100K orders placed between September 2016 and October 2018.
+      Originally published on Kaggle by Olist.
+    tables:
+      - name: orders
+        description: >
+          One row per order. Contains the full order lifecycle timestamps:
+          purchase, approval, carrier handoff, customer delivery, and
+          estimated delivery date. 97% of orders reach delivered status.
+        columns:
+          - name: order_id
+            description: Unique order identifier (UUID).
+          - name: customer_id
+            description: >
+              Foreign key to customers table. Note: this is a per-order
+              customer ID, not a unique customer identifier.
+          - name: order_status
+            description: >
+              Order lifecycle status. Values: delivered, shipped, canceled,
+              unavailable, invoiced, processing, created, approved.
+          - name: order_purchase_timestamp
+            description: Timestamp when the order was placed by the customer.
+          - name: order_approved_at
+            description: Timestamp when the payment was approved.
+          - name: order_delivered_carrier_date
+            description: Timestamp when the order was handed to the carrier.
+          - name: order_delivered_customer_date
+            description: Timestamp when the order was delivered to the customer.
+          - name: order_estimated_delivery_date
+            description: Estimated delivery date shown to the customer at purchase time.
+
+      - name: order_items
+        description: >
+          One row per item within an order. Contains price and freight for
+          each product purchased. Most orders (87.6%) have a single item.
+          Maximum is 21 items per order.
+        columns:
+          - name: order_id
+            description: Foreign key to orders table.
+          - name: order_item_id
+            description: Sequential item number within the order (1-indexed).
+          - name: product_id
+            description: Foreign key to products table.
+          - name: seller_id
+            description: Foreign key to sellers table.
+          - name: shipping_limit_date
+            description: Deadline for the seller to ship the item.
+          - name: price
+            description: Item price in BRL. Range 0.85 to 6,735.00, median 74.99.
+          - name: freight_value
+            description: Freight/shipping cost in BRL. Range 0.00 to 409.68, median 16.26.
+
+      - name: order_payments
+        description: >
+          One row per payment toward an order. Orders may have multiple
+          payments (e.g., credit card + voucher). 73.9% of payments are
+          by credit card, 19% by boleto (Brazilian bank slip).
+        columns:
+          - name: order_id
+            description: Foreign key to orders table.
+          - name: payment_sequential
+            description: Sequential payment number within the order (1-indexed).
+          - name: payment_type
+            description: >
+              Payment method. Values: credit_card, boleto, voucher,
+              debit_card, not_defined.
+          - name: payment_installments
+            description: Number of installments chosen (0-24). 50.6% pay in 1 installment.
+          - name: payment_value
+            description: Payment amount in BRL.
+
+      - name: order_reviews
+        description: >
+          One row per customer review. Scores are 1-5 with a bimodal
+          distribution (57.8% are 5-star, 11.5% are 1-star). Review
+          text is in Portuguese. 58.7% of reviews have no comment.
+        columns:
+          - name: review_id
+            description: Unique review identifier.
+          - name: order_id
+            description: Foreign key to orders table.
+          - name: review_score
+            description: Customer satisfaction score (1-5).
+          - name: review_comment_title
+            description: Optional review title in Portuguese. 88.3% null.
+          - name: review_comment_message
+            description: Optional review body in Portuguese. 58.7% null.
+          - name: review_creation_date
+            description: Date the review was submitted.
+          - name: review_answer_timestamp
+            description: Timestamp when the review was answered/processed.
+
+      - name: customers
+        description: >
+          Customer dimension table. IMPORTANT: customer_id is per-order
+          (99,441 values = same as order count). Use customer_unique_id
+          (96,096 values) for true customer deduplication. About 3,345
+          customers placed multiple orders.
+        columns:
+          - name: customer_id
+            description: Per-order customer identifier. Foreign key used by orders table.
+          - name: customer_unique_id
+            description: True unique customer identifier across all orders.
+          - name: customer_zip_code_prefix
+            description: 5-digit ZIP code prefix for the customer.
+          - name: customer_city
+            description: Customer city name. Top cities are sao paulo, rio de janeiro.
+          - name: customer_state
+            description: >
+              Two-letter Brazilian state code. All 27 states represented.
+              Top: SP (42%), RJ (12.9%), MG (11.7%).
+
+      - name: products
+        description: >
+          Product catalog. 32,951 products across 73 categories (in Portuguese).
+          610 products (1.9%) have null category. Includes physical dimensions.
+        columns:
+          - name: product_id
+            description: Unique product identifier.
+          - name: product_category_name
+            description: Product category in Portuguese. Null for 1.9% of products.
+          - name: product_name_length
+            description: Character length of the product name.
+          - name: product_description_length
+            description: Character length of the product description.
+          - name: product_photos_qty
+            description: Number of product photos (1-20). 51% have 1 photo.
+          - name: product_weight_g
+            description: Product weight in grams.
+          - name: product_length_cm
+            description: Product length in centimeters.
+          - name: product_height_cm
+            description: Product height in centimeters.
+          - name: product_width_cm
+            description: Product width in centimeters.
+
+      - name: product_category_translation
+        description: >
+          Lookup table mapping 73 Portuguese product category names to
+          English equivalents. One-to-one mapping.
+        columns:
+          - name: product_category_name
+            description: Category name in Portuguese (matches products table).
+          - name: product_category_name_english
+            description: Category name in English.
+
+      - name: sellers
+        description: >
+          Seller dimension table. 3,095 sellers across 23 of 27 Brazilian
+          states. Heavily concentrated in São Paulo (59.7%).
+        columns:
+          - name: seller_id
+            description: Unique seller identifier.
+          - name: seller_zip_code_prefix
+            description: 5-digit ZIP code prefix for the seller.
+          - name: seller_city
+            description: Seller city name. Top city is sao paulo (22.4%).
+          - name: seller_state
+            description: >
+              Two-letter Brazilian state code. Top: SP (59.7%), PR (11.3%),
+              MG (7.9%). Only 23 of 27 states have sellers.
