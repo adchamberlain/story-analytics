@@ -1,0 +1,578 @@
+version: 2
+
+metrics:
+  # ============================================================================
+  # REVENUE & VALUE METRICS
+  # ============================================================================
+  
+  - name: total_revenue
+    label: Total Revenue
+    description: |
+      Total payment value from all non-canceled orders. This is the canonical revenue
+      metric for the business. Excludes canceled orders. Expected total: ~R$16M.
+    type: simple
+    type_params:
+      measure: payments_value_sum
+    filter: |
+      {{ Dimension('order__order_status') }} != 'canceled'
+  
+  - name: gmv
+    label: Gross Merchandise Value (GMV)
+    description: |
+      Total value of goods sold (product price only, excluding freight) from delivered
+      orders. Represents the core product revenue. Expected total: ~R$13.6M.
+    type: simple
+    type_params:
+      measure: order_items_price_sum
+    filter: |
+      {{ Dimension('order__order_status') }} = 'delivered'
+  
+  - name: gmv_with_freight
+    label: GMV Including Freight
+    description: |
+      Total value of goods sold including freight charges from delivered orders.
+      Combined product and shipping revenue. Expected total: ~R$15.9M.
+    type: simple
+    type_params:
+      measure: order_items_total_value_sum
+    filter: |
+      {{ Dimension('order__order_status') }} = 'delivered'
+  
+  - name: freight_revenue
+    label: Total Freight Revenue
+    description: |
+      Total shipping charges collected from delivered orders. Average freight per
+      item is R$19.99. Expected total: ~R$2.25M.
+    type: simple
+    type_params:
+      measure: order_items_freight_sum
+    filter: |
+      {{ Dimension('order__order_status') }} = 'delivered'
+  
+  - name: aov
+    label: Average Order Value (AOV)
+    description: |
+      Average payment value per order. Overall AOV is ~R$154. Credit card AOV is
+      R$162.70, voucher AOV is R$62.33. Key metric for pricing strategy.
+    type: derived
+    type_params:
+      expr: total_revenue / NULLIF(order_count, 0)
+      metrics:
+        - name: total_revenue
+        - name: order_count
+  
+  - name: average_item_price
+    label: Average Item Price
+    description: |
+      Average product price per line item, excluding freight. Overall average is
+      R$120.65. Used for product pricing analysis.
+    type: simple
+    type_params:
+      measure: order_items_price_avg
+    filter: |
+      {{ Dimension('order__order_status') }} = 'delivered'
+  
+  - name: average_freight_per_item
+    label: Average Freight per Item
+    description: |
+      Average shipping cost per line item. Overall average is R$19.99. Varies by
+      distance, weight, and product category.
+    type: simple
+    type_params:
+      measure: order_items_freight_avg
+    filter: |
+      {{ Dimension('order__order_status') }} = 'delivered'
+  
+  - name: freight_to_price_ratio
+    label: Freight to Price Ratio
+    description: |
+      Shipping cost as a percentage of product price. Used for logistics optimization
+      and identifying high-freight categories. Lower ratio indicates better economics.
+    type: derived
+    type_params:
+      expr: freight_revenue / NULLIF(gmv, 0)
+      metrics:
+        - name: freight_revenue
+        - name: gmv
+  
+  # ============================================================================
+  # VOLUME & COUNT METRICS
+  # ============================================================================
+  
+  - name: order_count
+    label: Total Orders
+    description: |
+      Total count of non-canceled orders. Used as denominator for rate calculations.
+      Expected total: ~98,816 orders (excluding 625 canceled).
+    type: simple
+    type_params:
+      measure: orders_total_count
+    filter: |
+      {{ Dimension('order__order_status') }} != 'canceled'
+  
+  - name: delivered_order_count
+    label: Delivered Orders
+    description: |
+      Count of successfully delivered orders. 97% of all orders are delivered.
+      Expected total: ~96,478 orders.
+    type: simple
+    type_params:
+      measure: orders_delivered_count
+  
+  - name: canceled_order_count
+    label: Canceled Orders
+    description: |
+      Count of canceled orders. Represents 0.6% of all orders. Expected total: ~625 orders.
+    type: simple
+    type_params:
+      measure: orders_canceled_count
+  
+  - name: items_sold
+    label: Total Items Sold
+    description: |
+      Total number of line items sold across all delivered orders. Average 1.2 items
+      per order. Expected total: ~112,650 items.
+    type: simple
+    type_params:
+      measure: order_items_count
+    filter: |
+      {{ Dimension('order__order_status') }} = 'delivered'
+  
+  - name: unique_customers
+    label: Unique Customers
+    description: |
+      Distinct count of unique individuals who placed orders. CRITICAL: Use
+      customer_unique_id, not customer_id. Expected total: ~96,096 unique customers.
+    type: simple
+    type_params:
+      measure: customers_unique_count
+  
+  - name: active_sellers
+    label: Active Sellers
+    description: |
+      Count of unique sellers with sales in the period. Expected total: ~3,095 sellers.
+    type: simple
+    type_params:
+      measure: order_items_distinct_sellers
+    filter: |
+      {{ Dimension('order__order_status') }} = 'delivered'
+  
+  - name: products_sold
+    label: Distinct Products Sold
+    description: |
+      Count of unique products sold in the period. Expected total: ~32,951 products.
+    type: simple
+    type_params:
+      measure: order_items_distinct_products
+    filter: |
+      {{ Dimension('order__order_status') }} = 'delivered'
+  
+  - name: items_per_order
+    label: Average Items per Order
+    description: |
+      Average number of line items per order. Overall average is 1.2 items per order.
+      Most orders (98,666 of 99,441) contain a single item.
+    type: derived
+    type_params:
+      expr: items_sold / NULLIF(delivered_order_count, 0)
+      metrics:
+        - name: items_sold
+        - name: delivered_order_count
+  
+  # ============================================================================
+  # PAYMENT METHOD METRICS
+  # ============================================================================
+  
+  - name: credit_card_orders
+    label: Credit Card Orders
+    description: |
+      Count of orders paid by credit card. Credit cards account for 76% of all orders
+      and 75% of revenue. Expected: ~76,795 orders.
+    type: simple
+    type_params:
+      measure: payments_credit_card_count
+    filter: |
+      {{ Dimension('order__order_status') }} != 'canceled'
+  
+  - name: credit_card_revenue
+    label: Credit Card Revenue
+    description: |
+      Total revenue from credit card payments. Represents 75% of total revenue.
+      Credit card AOV is R$162.70.
+    type: simple
+    type_params:
+      measure: payments_value_sum
+    filter: |
+      {{ Dimension('order__order_status') }} != 'canceled' AND
+      {{ Dimension('payment__payment_type') }} = 'credit_card'
+  
+  - name: boleto_orders
+    label: Boleto Orders
+    description: |
+      Count of orders paid by boleto (bank slip). Boleto accounts for 18% of orders.
+      Expected: ~19,784 orders.
+    type: simple
+    type_params:
+      measure: payments_boleto_count
+    filter: |
+      {{ Dimension('order__order_status') }} != 'canceled'
+  
+  - name: voucher_orders
+    label: Voucher Orders
+    description: |
+      Count of orders paid by voucher/gift card. Vouchers account for 5.5% of orders
+      with lower AOV of R$62.33. Expected: ~5,775 orders.
+    type: simple
+    type_params:
+      measure: payments_voucher_count
+    filter: |
+      {{ Dimension('order__order_status') }} != 'canceled'
+  
+  - name: credit_card_share
+    label: Credit Card Order Share
+    description: |
+      Percentage of orders paid by credit card. Benchmark: 76% of all orders.
+      Key metric for payment mix analysis.
+    type: derived
+    type_params:
+      expr: credit_card_orders / NULLIF(order_count, 0) * 100
+      metrics:
+        - name: credit_card_orders
+        - name: order_count
+  
+  - name: average_installments
+    label: Average Payment Installments
+    description: |
+      Average number of installments for credit card payments. Overall average is
+      2.85 installments, with most payments using 1 installment.
+    type: simple
+    type_params:
+      measure: payments_installments_avg
+    filter: |
+      {{ Dimension('payment__payment_type') }} = 'credit_card'
+  
+  # ============================================================================
+  # DELIVERY PERFORMANCE METRICS
+  # ============================================================================
+  
+  - name: on_time_deliveries
+    label: On-Time Deliveries
+    description: |
+      Count of orders delivered by or before the estimated delivery date. Benchmark:
+      63% on-time delivery rate. Critical operational KPI.
+    type: simple
+    type_params:
+      measure: orders_on_time_count
+  
+  - name: late_deliveries
+    label: Late Deliveries
+    description: |
+      Count of orders delivered after the estimated delivery date. Represents 37%
+      of deliveries. Late delivery strongly correlates with poor reviews.
+    type: simple
+    type_params:
+      measure: orders_late_count
+  
+  - name: on_time_delivery_rate
+    label: On-Time Delivery Rate
+    description: |
+      Percentage of orders delivered by estimated date. Benchmark: 63% on-time rate.
+      Critical for customer satisfaction and review scores.
+    type: derived
+    type_params:
+      expr: on_time_deliveries / NULLIF(delivered_order_count, 0) * 100
+      metrics:
+        - name: on_time_deliveries
+        - name: delivered_order_count
+  
+  - name: average_delivery_days
+    label: Average Delivery Time (Days)
+    description: |
+      Average days from purchase to customer delivery. Used for logistics performance
+      tracking and customer expectation management.
+    type: derived
+    type_params:
+      expr: total_delivery_days / NULLIF(delivered_order_count, 0)
+      metrics:
+        - name: total_delivery_days
+        - name: delivered_order_count
+  
+  - name: total_delivery_days
+    label: Total Delivery Days
+    description: |
+      Sum of delivery days across all delivered orders. Used for calculating average
+      delivery time. Internal metric for aggregation.
+    type: simple
+    type_params:
+      measure: orders_delivery_days_sum
+  
+  - name: average_approval_hours
+    label: Average Approval Time (Hours)
+    description: |
+      Average hours from order purchase to payment approval. Measures payment
+      processing efficiency.
+    type: derived
+    type_params:
+      expr: total_approval_hours / NULLIF(order_count, 0)
+      metrics:
+        - name: total_approval_hours
+        - name: order_count
+  
+  - name: total_approval_hours
+    label: Total Approval Hours
+    description: |
+      Sum of approval delay hours across all orders. Used for calculating average
+      approval time. Internal metric for aggregation.
+    type: simple
+    type_params:
+      measure: orders_approval_hours_sum
+  
+  # ============================================================================
+  # CUSTOMER SATISFACTION METRICS
+  # ============================================================================
+  
+  - name: total_reviews
+    label: Total Reviews
+    description: |
+      Total number of customer reviews submitted. Expected: ~99,224 reviews covering
+      99.5% of delivered orders.
+    type: simple
+    type_params:
+      measure: reviews_count
+  
+  - name: average_review_score
+    label: Average Review Score
+    description: |
+      Mean customer satisfaction rating on 1-5 scale. Benchmark: 4.09/5.0.
+      Distribution heavily skewed positive with 56.55% five-star reviews.
+    type: simple
+    type_params:
+      measure: reviews_score_avg
+  
+  - name: five_star_reviews
+    label: Five Star Reviews
+    description: |
+      Count of perfect 5-star reviews. Represents 56.55% of all reviews (57,328 reviews).
+      Key indicator of customer delight.
+    type: simple
+    type_params:
+      measure: reviews_five_star_count
+  
+  - name: positive_reviews
+    label: Positive Reviews (4-5 Stars)
+    description: |
+      Count of reviews with 4 or 5 stars. Represents 75.55% of all reviews.
+      Standard definition of positive customer feedback.
+    type: simple
+    type_params:
+      measure: reviews_positive_count
+  
+  - name: negative_reviews
+    label: Negative Reviews (1-2 Stars)
+    description: |
+      Count of reviews with 1 or 2 stars. Represents detractors and dissatisfied
+      customers. Used for service recovery prioritization.
+    type: simple
+    type_params:
+      measure: reviews_negative_count
+  
+  - name: positive_review_rate
+    label: Positive Review Rate
+    description: |
+      Percentage of reviews with 4-5 stars. Benchmark: 75.55% positive rate.
+      Key customer satisfaction KPI.
+    type: derived
+    type_params:
+      expr: positive_reviews / NULLIF(total_reviews, 0) * 100
+      metrics:
+        - name: positive_reviews
+        - name: total_reviews
+  
+  - name: five_star_rate
+    label: Five Star Rate
+    description: |
+      Percentage of reviews with perfect 5-star rating. Benchmark: 56.55%.
+      Measures exceptional customer experiences.
+    type: derived
+    type_params:
+      expr: five_star_reviews / NULLIF(total_reviews, 0) * 100
+      metrics:
+        - name: five_star_reviews
+        - name: total_reviews
+  
+  - name: reviews_with_comments
+    label: Reviews with Written Comments
+    description: |
+      Count of reviews containing written feedback. 41.3% of reviews include comments.
+      Valuable for qualitative analysis.
+    type: simple
+    type_params:
+      measure: reviews_with_comments_count
+  
+  - name: comment_rate
+    label: Review Comment Rate
+    description: |
+      Percentage of reviews with written comments. Benchmark: 41.3%. Higher rates
+      indicate stronger customer engagement (positive or negative).
+    type: derived
+    type_params:
+      expr: reviews_with_comments / NULLIF(total_reviews, 0) * 100
+      metrics:
+        - name: reviews_with_comments
+        - name: total_reviews
+  
+  # ============================================================================
+  # CUSTOMER BEHAVIOR METRICS
+  # ============================================================================
+  
+  - name: repeat_customers
+    label: Repeat Customers
+    description: |
+      Count of customers who made more than one purchase. Only ~3% of customers are
+      repeat buyers. Major retention opportunity.
+    type: simple
+    type_params:
+      measure: customers_unique_count
+    filter: |
+      {{ Dimension('customer__order_count') }} > 1
+  
+  - name: repeat_purchase_rate
+    label: Repeat Purchase Rate
+    description: |
+      Percentage of customers who make more than one purchase. Benchmark: ~3% repeat
+      rate (97% one-time buyers). Critical retention metric.
+    type: derived
+    type_params:
+      expr: repeat_customers / NULLIF(unique_customers, 0) * 100
+      metrics:
+        - name: repeat_customers
+        - name: unique_customers
+  
+  - name: orders_per_customer
+    label: Average Orders per Customer
+    description: |
+      Average number of orders per unique customer. Given 3% repeat rate, overall
+      average is ~1.03 orders per customer.
+    type: derived
+    type_params:
+      expr: order_count / NULLIF(unique_customers, 0)
+      metrics:
+        - name: order_count
+        - name: unique_customers
+  
+  # ============================================================================
+  # GROWTH & TREND METRICS
+  # ============================================================================
+  
+  - name: revenue_previous_month
+    label: Revenue (Previous Month)
+    description: |
+      Total revenue from the previous month. Used for month-over-month growth
+      calculations and trend analysis.
+    type: simple
+    type_params:
+      measure: payments_value_sum
+      offset_window: 1 month
+    filter: |
+      {{ Dimension('order__order_status') }} != 'canceled'
+  
+  - name: revenue_mom_growth
+    label: Revenue Month-over-Month Growth
+    description: |
+      Percentage change in revenue compared to previous month. Key metric for
+      tracking business momentum and seasonality.
+    type: derived
+    type_params:
+      expr: (total_revenue - revenue_previous_month) / NULLIF(revenue_previous_month, 0) * 100
+      metrics:
+        - name: total_revenue
+        - name: revenue_previous_month
+  
+  - name: orders_previous_month
+    label: Orders (Previous Month)
+    description: |
+      Total orders from the previous month. Used for month-over-month growth
+      calculations.
+    type: simple
+    type_params:
+      measure: orders_total_count
+      offset_window: 1 month
+    filter: |
+      {{ Dimension('order__order_status') }} != 'canceled'
+  
+  - name: orders_mom_growth
+    label: Orders Month-over-Month Growth
+    description: |
+      Percentage change in order count compared to previous month. Tracks volume
+      trends independent of pricing changes.
+    type: derived
+    type_params:
+      expr: (order_count - orders_previous_month) / NULLIF(orders_previous_month, 0) * 100
+      metrics:
+        - name: order_count
+        - name: orders_previous_month
+  
+  # ============================================================================
+  # CUMULATIVE METRICS
+  # ============================================================================
+  
+  - name: cumulative_revenue
+    label: Cumulative Revenue (All-Time)
+    description: |
+      Running total of revenue from the beginning of time. Used for lifetime value
+      tracking and cumulative performance dashboards.
+    type: cumulative
+    type_params:
+      measure: payments_value_sum
+  
+  - name: cumulative_revenue_mtd
+    label: Cumulative Revenue (Month-to-Date)
+    description: |
+      Running total of revenue within the current month. Resets at month boundaries.
+      Used for monthly target tracking.
+    type: cumulative
+    type_params:
+      measure: payments_value_sum
+      grain_to_date: month
+  
+  - name: cumulative_orders
+    label: Cumulative Orders (All-Time)
+    description: |
+      Running total of orders from the beginning of time. Used for milestone tracking
+      and growth visualization.
+    type: cumulative
+    type_params:
+      measure: orders_total_count
+  
+  - name: cumulative_customers
+    label: Cumulative Unique Customers
+    description: |
+      Running total of unique customers acquired over time. Tracks customer base
+      growth and acquisition trends.
+    type: cumulative
+    type_params:
+      measure: customers_unique_count
+  
+  # ============================================================================
+  # RATIO METRICS
+  # ============================================================================
+  
+  - name: cancellation_rate
+    label: Order Cancellation Rate
+    description: |
+      Percentage of orders that are canceled. Benchmark: 0.6% cancellation rate
+      (625 of 99,441 orders). Low rate indicates healthy operations.
+    type: ratio
+    type_params:
+      numerator: canceled_order_count
+      denominator: order_count
+  
+  - name: review_coverage_rate
+    label: Review Coverage Rate
+    description: |
+      Percentage of delivered orders that received customer reviews. Benchmark:
+      99.5% coverage. High rate indicates strong customer engagement.
+    type: ratio
+    type_params:
+      numerator: total_reviews
+      denominator: delivered_order_count

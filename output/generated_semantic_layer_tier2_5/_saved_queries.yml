@@ -1,0 +1,230 @@
+version: 2
+
+saved_queries:
+  - name: monthly_revenue_overview
+    label: Monthly Revenue Overview
+    description: |
+      Key revenue and volume metrics by month with month-over-month growth rates.
+      Shows total revenue, GMV, order count, AOV, and growth trends. Used for
+      executive dashboards and monthly business reviews.
+    query_params:
+      metrics:
+        - total_revenue
+        - gmv
+        - order_count
+        - aov
+        - revenue_mom_growth
+        - orders_mom_growth
+      group_by:
+        - "TimeDimension('metric_time', 'month')"
+      order_by:
+        - "TimeDimension('metric_time', 'month')"
+  
+  - name: revenue_by_state
+    label: Revenue by Customer State
+    description: |
+      Geographic revenue analysis showing total revenue, orders, and AOV by customer
+      state. São Paulo dominates at 42% of customers. Used for regional performance
+      tracking and market expansion planning.
+    query_params:
+      metrics:
+        - total_revenue
+        - order_count
+        - unique_customers
+        - aov
+      group_by:
+        - "Dimension('customer__customer_state')"
+      order_by:
+        - total_revenue desc
+  
+  - name: product_category_performance
+    label: Product Category Performance
+    description: |
+      Product category analysis showing revenue, items sold, average price, and
+      review scores. Top category is bed_bath_table at ~R$1.69M. Used for inventory
+      planning and category management.
+    query_params:
+      metrics:
+        - gmv
+        - items_sold
+        - average_item_price
+        - average_review_score
+        - positive_review_rate
+      group_by:
+        - "Dimension('product__product_category_name_english')"
+      order_by:
+        - gmv desc
+      where:
+        - "{{ Dimension('product__product_category_name_english') }} IS NOT NULL"
+  
+  - name: delivery_performance_dashboard
+    label: Delivery Performance Dashboard
+    description: |
+      Logistics KPI dashboard showing on-time delivery rate, average delivery days,
+      and correlation with review scores. Benchmark: 63% on-time rate. Used for
+      operations monitoring and service level tracking.
+    query_params:
+      metrics:
+        - delivered_order_count
+        - on_time_deliveries
+        - late_deliveries
+        - on_time_delivery_rate
+        - average_delivery_days
+        - average_review_score
+      group_by:
+        - "TimeDimension('metric_time', 'month')"
+      order_by:
+        - "TimeDimension('metric_time', 'month')"
+  
+  - name: payment_method_analysis
+    label: Payment Method Analysis
+    description: |
+      Payment mix and performance by payment type. Credit cards dominate at 76% of
+      orders with R$162.70 AOV. Used for payment strategy and partnership decisions.
+    query_params:
+      metrics:
+        - order_count
+        - total_revenue
+        - aov
+        - average_installments
+      group_by:
+        - "Dimension('payment__payment_type')"
+      order_by:
+        - order_count desc
+  
+  - name: seller_performance_ranking
+    label: Top Seller Performance
+    description: |
+      Seller leaderboard showing revenue, orders, items sold, and average review
+      scores. Minimum 10 orders for statistical significance. Used for seller
+      relationship management and marketplace health monitoring.
+    query_params:
+      metrics:
+        - gmv
+        - order_count
+        - items_sold
+        - average_review_score
+      group_by:
+        - "Dimension('seller__seller_id')"
+        - "Dimension('seller__seller_state')"
+      order_by:
+        - gmv desc
+      where:
+        - "{{ Metric('order_count') }} >= 10"
+      limit: 100
+  
+  - name: customer_satisfaction_trends
+    label: Customer Satisfaction Trends
+    description: |
+      Monthly customer satisfaction metrics including average review score, positive
+      review rate, and five-star rate. Benchmark: 4.09/5.0 average, 75.55% positive.
+      Used for customer experience monitoring.
+    query_params:
+      metrics:
+        - total_reviews
+        - average_review_score
+        - positive_review_rate
+        - five_star_rate
+        - comment_rate
+      group_by:
+        - "TimeDimension('metric_time', 'month')"
+      order_by:
+        - "TimeDimension('metric_time', 'month')"
+  
+  - name: freight_cost_analysis
+    label: Freight Cost Analysis
+    description: |
+      Shipping cost analysis showing freight revenue, freight-to-price ratio, and
+      average freight by product weight category. Used for logistics optimization
+      and pricing strategy.
+    query_params:
+      metrics:
+        - freight_revenue
+        - gmv
+        - freight_to_price_ratio
+        - average_freight_per_item
+        - items_sold
+      group_by:
+        - "Dimension('product__weight_category')"
+      order_by:
+        - items_sold desc
+  
+  - name: customer_cohort_retention
+    label: Customer Cohort Retention
+    description: |
+      Cohort analysis showing customer acquisition and repeat purchase behavior by
+      cohort month. Benchmark: 3% repeat rate. Used for retention strategy and
+      lifecycle marketing.
+    query_params:
+      metrics:
+        - unique_customers
+        - order_count
+        - repeat_customers
+        - repeat_purchase_rate
+        - orders_per_customer
+      group_by:
+        - "TimeDimension('customer__first_order_date', 'month')"
+      order_by:
+        - "TimeDimension('customer__first_order_date', 'month')"
+  
+  - name: weekly_operations_snapshot
+    label: Weekly Operations Snapshot
+    description: |
+      Weekly operational metrics including orders, revenue, delivery performance,
+      and customer satisfaction. Used for weekly business reviews and operational
+      planning.
+    query_params:
+      metrics:
+        - order_count
+        - total_revenue
+        - aov
+        - on_time_delivery_rate
+        - average_delivery_days
+        - average_review_score
+        - active_sellers
+      group_by:
+        - "TimeDimension('metric_time', 'week')"
+      order_by:
+        - "TimeDimension('metric_time', 'week')"
+  
+  - name: marketplace_health_scorecard
+    label: Marketplace Health Scorecard
+    description: |
+      Comprehensive marketplace health metrics including revenue, volume, customer
+      satisfaction, delivery performance, and seller activity. Used for executive
+      reporting and strategic planning.
+    query_params:
+      metrics:
+        - total_revenue
+        - order_count
+        - unique_customers
+        - aov
+        - on_time_delivery_rate
+        - average_review_score
+        - positive_review_rate
+        - active_sellers
+        - products_sold
+        - repeat_purchase_rate
+      group_by:
+        - "TimeDimension('metric_time', 'month')"
+      order_by:
+        - "TimeDimension('metric_time', 'month')"
+  
+  - name: state_delivery_performance
+    label: Delivery Performance by State
+    description: |
+      Geographic delivery performance showing on-time rates and average delivery
+      days by customer state. Used for logistics network optimization and regional
+      service level management.
+    query_params:
+      metrics:
+        - delivered_order_count
+        - on_time_delivery_rate
+        - average_delivery_days
+        - average_review_score
+      group_by:
+        - "Dimension('customer__customer_state')"
+      order_by:
+        - delivered_order_count desc
+      where:
+        - "{{ Metric('delivered_order_count') }} >= 100"

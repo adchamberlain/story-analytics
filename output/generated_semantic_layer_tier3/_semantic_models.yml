@@ -1,0 +1,650 @@
+version: 2
+
+semantic_models:
+  - name: orders
+    description: |
+      Core order fact table representing the complete order lifecycle from purchase through delivery.
+      Each row is one order. 97% of orders reach delivered status. This is the primary fact table
+      for order-level analysis, revenue trends, and delivery performance metrics.
+    model: ref('orders')
+    defaults:
+      agg_time_dimension: order_purchase_date
+    
+    entities:
+      - name: order
+        type: primary
+        expr: order_id
+      - name: customer
+        type: foreign
+        expr: customer_id
+    
+    dimensions:
+      - name: order_purchase_date
+        type: time
+        label: Order Purchase Date
+        description: When the customer placed the order - primary time dimension for all order analysis
+        expr: order_purchase_timestamp
+        type_params:
+          time_granularity: day
+      
+      - name: order_approved_date
+        type: time
+        label: Order Approved Date
+        description: When payment was approved (0.2% null for canceled orders)
+        expr: order_approved_at
+        type_params:
+          time_granularity: day
+      
+      - name: order_delivered_carrier_date
+        type: time
+        label: Delivered to Carrier Date
+        description: When seller handed package to carrier (1.8% null)
+        expr: order_delivered_carrier_date
+        type_params:
+          time_granularity: day
+      
+      - name: order_delivered_customer_date
+        type: time
+        label: Delivered to Customer Date
+        description: When customer received the package (3.0% null)
+        expr: order_delivered_customer_date
+        type_params:
+          time_granularity: day
+      
+      - name: order_estimated_delivery_date
+        type: time
+        label: Estimated Delivery Date
+        description: Estimated delivery date shown to customer at purchase
+        expr: order_estimated_delivery_date
+        type_params:
+          time_granularity: day
+      
+      - name: order_status
+        type: categorical
+        label: Order Status
+        description: Order lifecycle stage - delivered (97%), shipped (1.1%), canceled (0.6%), processing, unavailable, etc.
+      
+      - name: is_delivered
+        type: categorical
+        label: Is Delivered
+        description: Whether order reached delivered status
+        expr: "CASE WHEN order_status = 'delivered' THEN TRUE ELSE FALSE END"
+      
+      - name: is_canceled
+        type: categorical
+        label: Is Canceled
+        description: Whether order was canceled
+        expr: "CASE WHEN order_status = 'canceled' THEN TRUE ELSE FALSE END"
+      
+      - name: is_on_time
+        type: categorical
+        label: Is On Time
+        description: Whether order was delivered on or before estimated date (63% on-time rate)
+        expr: "CASE WHEN order_delivered_customer_date <= order_estimated_delivery_date THEN TRUE ELSE FALSE END"
+    
+    measures:
+      - name: orders_total_count
+        agg: count
+        label: Total Orders
+        description: Total count of all orders including canceled (99,441 orders)
+      
+      - name: orders_delivered_count
+        agg: count
+        label: Delivered Orders
+        description: Count of orders that reached delivered status (97% of total)
+        expr: "CASE WHEN order_status = 'delivered' THEN order_id END"
+      
+      - name: orders_canceled_count
+        agg: count
+        label: Canceled Orders
+        description: Count of canceled orders (0.6% of total)
+        expr: "CASE WHEN order_status = 'canceled' THEN order_id END"
+      
+      - name: orders_on_time_count
+        agg: count
+        label: On-Time Orders
+        description: Count of orders delivered on or before estimated date
+        expr: "CASE WHEN order_delivered_customer_date <= order_estimated_delivery_date THEN order_id END"
+      
+      - name: orders_late_count
+        agg: count
+        label: Late Orders
+        description: Count of orders delivered after estimated date
+        expr: "CASE WHEN order_delivered_customer_date > order_estimated_delivery_date THEN order_id END"
+      
+      - name: delivery_days_total
+        agg: sum
+        label: Total Delivery Days
+        description: Sum of days from purchase to customer delivery
+        expr: "EXTRACT(EPOCH FROM (order_delivered_customer_date - order_purchase_timestamp)) / 86400"
+      
+      - name: shipping_days_total
+        agg: sum
+        label: Total Shipping Days
+        description: Sum of days from carrier handoff to customer delivery
+        expr: "EXTRACT(EPOCH FROM (order_delivered_customer_date - order_delivered_carrier_date)) / 86400"
+
+  - name: order_items
+    description: |
+      Line items within orders - one row per product per order. Most orders (87.6%) have a single item,
+      max is 21 items. This is the primary fact table for GMV, revenue, freight analysis, and
+      product/seller performance. Total 112,650 items across 99,441 orders.
+    model: ref('order_items')
+    defaults:
+      agg_time_dimension: order_purchase_date
+    
+    entities:
+      - name: order_item
+        type: primary
+        expr: "order_id || '-' || order_item_id"
+      - name: order
+        type: foreign
+        expr: order_id
+      - name: product
+        type: foreign
+        expr: product_id
+      - name: seller
+        type: foreign
+        expr: seller_id
+    
+    dimensions:
+      - name: order_purchase_date
+        type: time
+        label: Order Purchase Date
+        description: When the order was placed (joined from orders table)
+        expr: order_purchase_timestamp
+        type_params:
+          time_granularity: day
+      
+      - name: shipping_limit_date
+        type: time
+        label: Shipping Limit Date
+        description: Deadline for seller to ship - used for seller SLA compliance tracking
+        expr: shipping_limit_date
+        type_params:
+          time_granularity: day
+      
+      - name: order_item_sequence
+        type: categorical
+        label: Order Item Sequence
+        description: Sequential item number within order (1-21)
+        expr: order_item_id
+      
+      - name: price_bucket
+        type: categorical
+        label: Price Bucket
+        description: Item price range - median R$74.99, mean R$120.65
+        expr: |
+          CASE 
+            WHEN price < 50 THEN '< R$50'
+            WHEN price < 100 THEN 'R$50-100'
+            WHEN price < 200 THEN 'R$100-200'
+            WHEN price < 500 THEN 'R$200-500'
+            ELSE 'R$500+'
+          END
+      
+      - name: freight_bucket
+        type: categorical
+        label: Freight Bucket
+        description: Shipping cost range - median R$16.26, used for logistics analysis
+        expr: |
+          CASE 
+            WHEN freight_value < 10 THEN '< R$10'
+            WHEN freight_value < 20 THEN 'R$10-20'
+            WHEN freight_value < 30 THEN 'R$20-30'
+            ELSE 'R$30+'
+          END
+    
+    measures:
+      - name: order_items_count
+        agg: count
+        label: Items Sold
+        description: Total count of items sold (112,650 items)
+      
+      - name: gmv_total
+        agg: sum
+        label: GMV (Gross Merchandise Value)
+        description: Total product value excluding freight - primary revenue metric (R$13.6M total)
+        expr: price
+      
+      - name: freight_revenue_total
+        agg: sum
+        label: Freight Revenue
+        description: Total shipping charges collected from customers
+        expr: freight_value
+      
+      - name: total_revenue
+        agg: sum
+        label: Total Revenue
+        description: Total revenue including product price and freight charges
+        expr: price + freight_value
+      
+      - name: avg_item_price
+        agg: average
+        label: Average Item Price
+        description: Mean item price (R$120.65 average)
+        expr: price
+      
+      - name: avg_freight_value
+        agg: average
+        label: Average Freight Value
+        description: Mean shipping cost per item (R$19.99 average)
+        expr: freight_value
+      
+      - name: max_item_price
+        agg: max
+        label: Maximum Item Price
+        description: Highest item price in the period
+        expr: price
+      
+      - name: min_item_price
+        agg: min
+        label: Minimum Item Price
+        description: Lowest item price in the period
+        expr: price
+
+  - name: order_payments
+    description: |
+      Payment details for orders - one row per payment method used. Most orders (95.7%) have a single
+      payment, but orders can split payment across multiple methods (e.g., credit card + voucher).
+      Credit cards dominate at 73.9%, followed by boleto (19%) and voucher (5.5%).
+    model: ref('order_payments')
+    defaults:
+      agg_time_dimension: order_purchase_date
+    
+    entities:
+      - name: order_payment
+        type: primary
+        expr: "order_id || '-' || payment_sequential"
+      - name: order
+        type: foreign
+        expr: order_id
+    
+    dimensions:
+      - name: order_purchase_date
+        type: time
+        label: Order Purchase Date
+        description: When the order was placed (joined from orders table)
+        expr: order_purchase_timestamp
+        type_params:
+          time_granularity: day
+      
+      - name: payment_type
+        type: categorical
+        label: Payment Type
+        description: Payment method - credit_card (73.9%), boleto (19%), voucher (5.5%), debit_card (1.5%)
+      
+      - name: payment_sequential
+        type: categorical
+        label: Payment Sequential
+        description: Sequential payment number within order (95.7% have only 1 payment)
+      
+      - name: installment_bucket
+        type: categorical
+        label: Installment Bucket
+        description: Number of installments for credit card payments (50.6% pay in 1 installment)
+        expr: |
+          CASE 
+            WHEN payment_installments = 1 THEN '1 installment'
+            WHEN payment_installments BETWEEN 2 AND 3 THEN '2-3 installments'
+            WHEN payment_installments BETWEEN 4 AND 6 THEN '4-6 installments'
+            WHEN payment_installments BETWEEN 7 AND 12 THEN '7-12 installments'
+            ELSE '13+ installments'
+          END
+    
+    measures:
+      - name: payment_count
+        agg: count
+        label: Payment Count
+        description: Total count of payment transactions (103,886 payments)
+      
+      - name: payment_value_total
+        agg: sum
+        label: Total Payment Value
+        description: Total payment value across all payment methods
+        expr: payment_value
+      
+      - name: avg_payment_value
+        agg: average
+        label: Average Payment Value
+        description: Mean payment value per transaction (R$154.10 average)
+        expr: payment_value
+      
+      - name: avg_installments
+        agg: average
+        label: Average Installments
+        description: Mean number of installments for credit card payments (2.85 average)
+        expr: payment_installments
+      
+      - name: credit_card_payment_value
+        agg: sum
+        label: Credit Card Payment Value
+        description: Total payment value from credit cards (73.9% of total)
+        expr: "CASE WHEN payment_type = 'credit_card' THEN payment_value END"
+      
+      - name: boleto_payment_value
+        agg: sum
+        label: Boleto Payment Value
+        description: Total payment value from boleto bank slips (19% of total)
+        expr: "CASE WHEN payment_type = 'boleto' THEN payment_value END"
+      
+      - name: voucher_payment_value
+        agg: sum
+        label: Voucher Payment Value
+        description: Total payment value from vouchers (5.5% of total)
+        expr: "CASE WHEN payment_type = 'voucher' THEN payment_value END"
+
+  - name: order_reviews
+    description: |
+      Customer reviews - one row per review. Bimodal distribution with 57.8% giving 5 stars and
+      11.5% giving 1 star. Mean score 4.09/5.0. Most reviews (58.7%) have no comment text.
+      Late delivery strongly predicts poor reviews - critical for satisfaction analysis.
+    model: ref('order_reviews')
+    defaults:
+      agg_time_dimension: review_creation_date
+    
+    entities:
+      - name: review
+        type: primary
+        expr: review_id
+      - name: order
+        type: foreign
+        expr: order_id
+    
+    dimensions:
+      - name: review_creation_date
+        type: time
+        label: Review Creation Date
+        description: When the review was submitted by the customer
+        expr: review_creation_date
+        type_params:
+          time_granularity: day
+      
+      - name: review_answer_date
+        type: time
+        label: Review Answer Date
+        description: When the review was processed/answered
+        expr: review_answer_timestamp
+        type_params:
+          time_granularity: day
+      
+      - name: review_score
+        type: categorical
+        label: Review Score
+        description: Customer satisfaction rating 1-5 (mean 4.09, 57.8% give 5 stars)
+      
+      - name: is_positive_review
+        type: categorical
+        label: Is Positive Review
+        description: Whether review score is 4 or 5 stars (77.1% positive)
+        expr: "CASE WHEN review_score >= 4 THEN TRUE ELSE FALSE END"
+      
+      - name: is_negative_review
+        type: categorical
+        label: Is Negative Review
+        description: Whether review score is 1 or 2 stars (14.7% negative)
+        expr: "CASE WHEN review_score <= 2 THEN TRUE ELSE FALSE END"
+      
+      - name: is_five_star
+        type: categorical
+        label: Is Five Star
+        description: Whether review is 5 stars (57.8% of reviews)
+        expr: "CASE WHEN review_score = 5 THEN TRUE ELSE FALSE END"
+      
+      - name: has_comment
+        type: categorical
+        label: Has Comment
+        description: Whether review includes comment text (41.3% have comments)
+        expr: "CASE WHEN review_comment_message IS NOT NULL THEN TRUE ELSE FALSE END"
+    
+    measures:
+      - name: review_count
+        agg: count
+        label: Review Count
+        description: Total count of reviews submitted (99,224 reviews)
+      
+      - name: avg_review_score
+        agg: average
+        label: Average Review Score
+        description: Mean customer satisfaction rating (4.09/5.0 overall)
+        expr: review_score
+      
+      - name: five_star_count
+        agg: count
+        label: Five Star Count
+        description: Count of 5-star reviews (57.8% of total)
+        expr: "CASE WHEN review_score = 5 THEN review_id END"
+      
+      - name: one_star_count
+        agg: count
+        label: One Star Count
+        description: Count of 1-star reviews (11.5% of total)
+        expr: "CASE WHEN review_score = 1 THEN review_id END"
+      
+      - name: positive_review_count
+        agg: count
+        label: Positive Review Count
+        description: Count of 4-5 star reviews (77.1% of total)
+        expr: "CASE WHEN review_score >= 4 THEN review_id END"
+      
+      - name: negative_review_count
+        agg: count
+        label: Negative Review Count
+        description: Count of 1-2 star reviews (14.7% of total)
+        expr: "CASE WHEN review_score <= 2 THEN review_id END"
+      
+      - name: review_score_sum
+        agg: sum
+        label: Review Score Sum
+        description: Sum of all review scores for weighted calculations
+        expr: review_score
+
+  - name: customers
+    description: |
+      Customer dimension table. CRITICAL: customer_id is per-order (99,441 values), customer_unique_id
+      is the true unique identifier (96,096 values). Always use customer_unique_id for customer counts.
+      Geographic concentration: São Paulo (SP) 42%, Rio de Janeiro (RJ) 12.9%, Minas Gerais (MG) 11.7%.
+    model: ref('customers')
+    defaults:
+      agg_time_dimension: first_order_date
+    
+    entities:
+      - name: customer
+        type: primary
+        expr: customer_id
+      - name: customer_unique
+        type: natural
+        expr: customer_unique_id
+    
+    dimensions:
+      - name: first_order_date
+        type: time
+        label: First Order Date
+        description: Date of customer's first order (joined from orders table for time dimension)
+        expr: first_order_date
+        type_params:
+          time_granularity: day
+      
+      - name: customer_state
+        type: categorical
+        label: Customer State
+        description: Two-letter Brazilian state code - SP (42%), RJ (12.9%), MG (11.7%)
+      
+      - name: customer_city
+        type: categorical
+        label: Customer City
+        description: Customer city - top cities are São Paulo, Rio de Janeiro, Belo Horizonte
+      
+      - name: customer_zip_code_prefix
+        type: categorical
+        label: Customer ZIP Code Prefix
+        description: 5-digit ZIP code prefix (14,994 unique values)
+      
+      - name: is_sao_paulo
+        type: categorical
+        label: Is São Paulo
+        description: Whether customer is in São Paulo state (42% of customers)
+        expr: "CASE WHEN customer_state = 'SP' THEN TRUE ELSE FALSE END"
+      
+      - name: is_top_3_states
+        type: categorical
+        label: Is Top 3 States
+        description: Whether customer is in SP, RJ, or MG (66.6% of customers)
+        expr: "CASE WHEN customer_state IN ('SP', 'RJ', 'MG') THEN TRUE ELSE FALSE END"
+    
+    measures:
+      - name: customer_count
+        agg: count_distinct
+        label: Unique Customers
+        description: Count of unique customers using customer_unique_id (96,096 unique customers)
+        expr: customer_unique_id
+      
+      - name: customer_order_count
+        agg: count
+        label: Customer Order Count
+        description: Count of customer_id records (equals order count, 99,441)
+
+  - name: products
+    description: |
+      Product catalog - 32,951 products across 73 categories. Physical dimensions (weight, length,
+      height, width) affect shipping costs. 1.9% have null category. Top category by revenue is
+      bed_bath_table. 51% of products have only 1 photo.
+    model: ref('products')
+    defaults:
+      agg_time_dimension: first_sold_date
+    
+    entities:
+      - name: product
+        type: primary
+        expr: product_id
+    
+    dimensions:
+      - name: first_sold_date
+        type: time
+        label: First Sold Date
+        description: Date product was first sold (joined from order_items for time dimension)
+        expr: first_sold_date
+        type_params:
+          time_granularity: day
+      
+      - name: product_category_name
+        type: categorical
+        label: Product Category (Portuguese)
+        description: Category in Portuguese - 73 categories, 1.9% null
+      
+      - name: product_category_name_english
+        type: categorical
+        label: Product Category (English)
+        description: Category in English - join from translation table
+      
+      - name: product_weight_bucket
+        type: categorical
+        label: Product Weight Bucket
+        description: Weight category affecting shipping cost - median 700g, mean 2,276g
+        expr: |
+          CASE 
+            WHEN product_weight_g < 500 THEN 'Light (< 500g)'
+            WHEN product_weight_g < 2000 THEN 'Medium (500-2000g)'
+            WHEN product_weight_g < 5000 THEN 'Heavy (2-5kg)'
+            ELSE 'Very Heavy (5kg+)'
+          END
+      
+      - name: product_photo_count_bucket
+        type: categorical
+        label: Product Photo Count Bucket
+        description: Number of product photos - 51% have only 1 photo
+        expr: |
+          CASE 
+            WHEN product_photos_qty = 1 THEN '1 photo'
+            WHEN product_photos_qty BETWEEN 2 AND 3 THEN '2-3 photos'
+            WHEN product_photos_qty BETWEEN 4 AND 6 THEN '4-6 photos'
+            ELSE '7+ photos'
+          END
+    
+    measures:
+      - name: product_count
+        agg: count_distinct
+        label: Product Count
+        description: Count of unique products (32,951 products)
+        expr: product_id
+      
+      - name: avg_product_weight
+        agg: average
+        label: Average Product Weight
+        description: Mean product weight in grams (2,276g average)
+        expr: product_weight_g
+      
+      - name: avg_product_length
+        agg: average
+        label: Average Product Length
+        description: Mean product length in cm (30.82cm average)
+        expr: product_length_cm
+      
+      - name: avg_product_height
+        agg: average
+        label: Average Product Height
+        description: Mean product height in cm (16.94cm average)
+        expr: product_height_cm
+      
+      - name: avg_product_width
+        agg: average
+        label: Average Product Width
+        description: Mean product width in cm (23.20cm average)
+        expr: product_width_cm
+      
+      - name: avg_photos_per_product
+        agg: average
+        label: Average Photos per Product
+        description: Mean number of product photos (2.19 average)
+        expr: product_photos_qty
+
+  - name: sellers
+    description: |
+      Seller dimension - 3,095 sellers across 23 of 27 Brazilian states. Seller concentration
+      in São Paulo (59.7%) is much higher than customer concentration (42%). Top states:
+      SP (59.7%), PR (11.3%), MG (7.9%).
+    model: ref('sellers')
+    defaults:
+      agg_time_dimension: first_sale_date
+    
+    entities:
+      - name: seller
+        type: primary
+        expr: seller_id
+    
+    dimensions:
+      - name: first_sale_date
+        type: time
+        label: First Sale Date
+        description: Date of seller's first sale (joined from order_items for time dimension)
+        expr: first_sale_date
+        type_params:
+          time_granularity: day
+      
+      - name: seller_state
+        type: categorical
+        label: Seller State
+        description: Two-letter Brazilian state code - SP (59.7%), PR (11.3%), MG (7.9%)
+      
+      - name: seller_city
+        type: categorical
+        label: Seller City
+        description: Seller city - São Paulo dominates at 22.4%
+      
+      - name: seller_zip_code_prefix
+        type: categorical
+        label: Seller ZIP Code Prefix
+        description: 5-digit ZIP code prefix (2,246 unique values)
+      
+      - name: is_sao_paulo_seller
+        type: categorical
+        label: Is São Paulo Seller
+        description: Whether seller is in São Paulo state (59.7% of sellers)
+        expr: "CASE WHEN seller_state = 'SP' THEN TRUE ELSE FALSE END"
+    
+    measures:
+      - name: seller_count
+        agg: count_distinct
+        label: Seller Count
+        description: Count of unique sellers (3,095 sellers)
+        expr: seller_id
