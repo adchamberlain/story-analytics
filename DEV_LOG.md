@@ -4,6 +4,92 @@ This log captures development changes made during each session. Review this at t
 
 ---
 
+## Session: 2026-02-07
+
+### Focus: Metric Compiler — Compiles Semantic Layer YAML to DuckDB SQL
+
+**Context**: The semantic layer (Tier 3) achieved 73% exact metric name match rate. The next step from the DEV_LOG was to "build the metric compiler that reads the semantic layer and generates DuckDB SQL." This session delivered a fully working compiler.
+
+### What Was Built
+
+**`engine/metric_compiler.py`** — Complete metric compilation module (~500 lines):
+
+1. **ModelRegistry** — Loads and indexes the semantic layer YAML files:
+   - Parses `_semantic_models.yml` (entities, dimensions, measures)
+   - Parses `_metrics.yml` (49 metric definitions across 4 types)
+   - Parses `_saved_queries.yml` (13 saved query definitions)
+   - Builds measure → model index for fast lookups
+   - Configurable table mapping (`ref('fct_order_items')` → actual DuckDB table name)
+
+2. **MetricCompiler** — Compiles metric definitions into executable DuckDB SQL:
+   - **Simple metrics**: Direct measure aggregation (e.g., `SUM(price) AS gmv`)
+   - **Derived metrics**: Expression over sub-metrics with inline optimization when all sub-metrics share a model
+   - **Ratio metrics**: `CAST(numerator AS DOUBLE) / NULLIF(denominator, 0)` with same-model inlining
+   - **Cumulative metrics**: Window functions with `ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW`
+   - **Offset window metrics**: LAG-based MoM growth using a two-level CTE pattern to avoid self-referencing aliases
+   - **Multi-metric queries**: Automatically groups simple metrics from the same model, uses CTEs for cross-model joins
+
+3. **Dimension Resolution**:
+   - `TimeDimension('metric_time', 'month')` → `DATE_TRUNC('month', order_date)`
+   - `Dimension('order_item__product_category')` → `product_category`
+   - Filter resolution: `{{ Dimension('order_item__order_status') }} = 'delivered'` → `order_status = 'delivered'`
+
+4. **Saved Query Compiler**: Compiles a full saved query (multiple metrics + group_by) into a single SQL statement.
+
+**`tests/test_metric_compiler.py`** — 50 tests, all passing:
+- Creates synthetic Olist fact tables in DuckDB (no external data dependency)
+- Validates correct SQL generation AND correct query results
+- Tests every metric type, dimension resolution, filters, edge cases
+- Bulk tests: all simple metrics compile, all ratio metrics compile
+
+### Key Design Decisions
+
+1. **Inline vs CTE strategy**: When all metrics in a query come from the same model, they're computed in a single `SELECT` (no CTEs). When they span models, each gets its own CTE and they're joined on the group_by dimension. This produces efficient SQL.
+
+2. **Offset window two-level CTE**: MoM growth metrics use `LAG()`, but SQL doesn't let you reference a window function alias in the same SELECT. Fixed by materializing LAG results in a `lagged` CTE before applying the expression.
+
+3. **Table map abstraction**: The compiler doesn't hardcode table names. `ref('fct_order_items')` is resolved through a configurable mapping, so the same semantic layer works against different DuckDB schemas (test vs production).
+
+4. **Python 3.11 compatibility**: Backslashes aren't allowed in f-string expressions in Python 3.11. Used module-level constants (`_SEL_JOIN`, `_CTE_JOIN`, `_NL`) as separators.
+
+### Semantic Layer Gap Found
+
+The saved query `payment_method_analysis` references `payment_count` which exists as a measure but not as a metric in `_metrics.yml`. The compiler correctly raises a `ValueError`. This should be added to the metrics file in a future session.
+
+### Test Results
+
+```
+50 passed in 0.78s
+```
+
+Coverage by metric type:
+- Simple: 13 tests (GMV, orders, reviews, payments, filters, dimensions)
+- Derived: 6 tests (AOV, items/order, cancellation rate, delivery rate, GMV/seller)
+- Ratio: 5 tests (5-star rate, 1-star rate, positive/negative review rate, credit card share)
+- Cumulative: 4 tests (all-time, monotonic, MTD, rolling 30-day)
+- Offset: 2 tests (GMV MoM growth, order MoM growth)
+- Multi-metric: 2 tests (same model, mixed types)
+- Saved queries: 5 tests
+- Edge cases: 6 tests (error handling, bulk compilation)
+
+### Data Availability Note
+
+The Olist semantic layer references fact tables (`fct_order_items`, etc.) that don't exist as parquet files yet. The test creates synthetic data in DuckDB to validate the compiler. When real Olist data becomes available (from Kaggle or Snowflake), the compiler will work against it by setting the table map to point to the actual DuckDB schema.
+
+### Files Created/Modified
+
+- `engine/metric_compiler.py` — New: metric compiler module
+- `tests/test_metric_compiler.py` — New: 50 tests for the compiler
+
+### Next Steps
+
+- Wire the metric compiler into the chart generation pipeline (LLM references metric names → compiler produces SQL → DuckDB executes)
+- Add the missing `payment_count` metric to `_metrics.yml`
+- Download Olist data from Kaggle and create parquet files for integration testing
+- Build a CLI tool for ad-hoc metric compilation (useful for debugging)
+
+---
+
 ## Session: 2026-02-05 (Part 3)
 
 ### Focus: AI Semantic Layer Builder — Tier 3 (Business Documentation + SQL Extraction)
