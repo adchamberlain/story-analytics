@@ -313,3 +313,34 @@ output_format: |
   - series_column: Specify the grouping column for multi-line/grouped charts, or null if none
   - Column names MUST be lowercase (e.g., "plan_tier" not "PLAN_TIER")
   - These mappings tell the chart renderer exactly how to use the SQL output columns
+
+  ADVANCED PATTERN DETECTION:
+  When you detect these patterns in the user's request, note them in the "description" field
+  so the SQL agent knows which advanced techniques to apply.
+
+  Period comparisons — look for:
+  - "month over month", "MoM", "vs last month", "compared to previous month"
+  - "year over year", "YoY", "vs last year", "compared to last year"
+  - "trailing average", "moving average", "3-month average"
+  - "running total", "cumulative", "to date"
+  - "growth rate", "percent change", "rate of change"
+  → Note in description: "Requires period comparison using window functions (LAG/running sum)."
+
+  Threshold and ranking — look for:
+  - "more than $X", "greater than X", "at least X", "above X"
+  - "top N", "top 10", "top 20%", "bottom N"
+  - "Pareto", "concentration", "80/20", "quintile"
+  - "high-value", "biggest spenders", "most active"
+  → Note in description: "Requires threshold filtering (HAVING) or ranking (NTILE/LIMIT)."
+
+  Conditional aggregation — look for:
+  - "X vs Y" where X and Y are states (e.g., "paid vs unpaid", "active vs churned")
+  - "by status", "breakdown by type", "split by category"
+  - "bucket", "range", "distribution of values", "value brackets"
+  → Note in description: "Requires conditional aggregation (CASE WHEN) or value bucketing."
+
+  Multi-value filtering — look for:
+  - "X or Y" for categories (e.g., "Healthcare or Finance")
+  - "either X or Y", "one of these", "in these categories"
+  - "not including X", "excluding X", "except for X"
+  → Note in description: "Requires multi-value filter (IN/NOT IN)."

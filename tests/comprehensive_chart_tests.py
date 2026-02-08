@@ -29,7 +29,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from test_runner import check_server, ensure_server_running, wait_for_server, check_api_keys
 
 from engine.chart_conversation import ChartConversationManager
-from engine.qa import DashboardScreenshot, DashboardQA, QAResult
+from engine.qa import DashboardScreenshot, ChartQA, QAResult
 
 
 # =============================================================================
@@ -596,7 +596,13 @@ def run_single_attempt(
         # Create fresh conversation manager for each attempt
         manager = ChartConversationManager(provider_name=provider)
 
-        # Process the test request
+        # Disable the pipeline's internal visual QA to avoid redundant
+        # Playwright screenshots + Claude vision calls. The test harness
+        # runs its own QA validation below.
+        if manager._pipeline.quality_validator:
+            manager._pipeline.quality_validator.enable_visual_qa = False
+
+        # Process the test request (returns a PROPOSAL, not the final chart)
         response = manager.process_message(test_case["request"])
 
         if response.error:
@@ -604,6 +610,21 @@ def run_single_attempt(
             result.error_type = "pipeline"
             print(f"    Pipeline error: {response.error[:100]}...")
             return result
+
+        # The conversation manager has a two-phase flow:
+        # 1. First call creates a PROPOSAL (shows SQL preview)
+        # 2. User must click "generate" action to create the actual chart
+        # We need to send the generate action to complete chart creation
+        from engine.chart_conversation import ChartPhase
+        if manager.state.phase == ChartPhase.PROPOSING:
+            print(f"    Proposal received, sending generate action...")
+            response = manager.process_message("__action:generate")
+
+            if response.error:
+                result.error = response.error
+                result.error_type = "pipeline"
+                print(f"    Generation error: {response.error[:100]}...")
+                return result
 
         if not response.chart_url:
             result.error = "No chart URL returned"
@@ -619,16 +640,18 @@ def run_single_attempt(
             result.sql_valid = bool(result.sql and len(result.sql) > 20)
 
         # Take screenshot with retry for transient errors
-        dashboard_slug = manager.state.dashboard_slug
-        if dashboard_slug:
+        # Use chart UUID (current_chart_id), not the slug (dashboard_slug)
+        # React serves charts at /chart/{uuid}, not /chart/{slug}
+        chart_id = manager.state.current_chart_id
+        if chart_id:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             screenshot_path = screenshots_dir / f"{test_id}_{provider}_{attempt + 1}_{timestamp}.png"
 
             # Retry screenshot up to 2 times for connection issues
             for screenshot_attempt in range(2):
-                screenshotter = DashboardScreenshot()
+                screenshotter = DashboardScreenshot(mode="chart")
                 screenshot_result = screenshotter.capture(
-                    dashboard_slug,
+                    f"chart/{chart_id}",
                     save_path=screenshot_path,
                     timeout=45000,
                 )
@@ -655,7 +678,7 @@ def run_single_attempt(
 
             if result.screenshot_path:
                 # Run QA validation (always use Claude for consistent validation)
-                qa = DashboardQA(provider_name="claude")
+                qa = ChartQA(provider_name="claude")
 
                 # Build validation prompt with test-specific criteria
                 validation_context = f"""
@@ -667,7 +690,7 @@ Validation Criteria:
 {chr(10).join('- ' + c for c in test_case['validation_criteria'])}
 """
                 result.qa_result = qa.validate(
-                    dashboard_slug,
+                    chart_id,
                     validation_context,
                 )
 

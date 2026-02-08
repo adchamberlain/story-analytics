@@ -112,6 +112,61 @@ aggregation:
     - MAX(column)
     - COUNT(DISTINCT column)
 
+# Window functions (all supported in DuckDB)
+window_functions:
+  allowed:
+    - name: LAG
+      syntax: "LAG(column) OVER (ORDER BY date_col)"
+      description: "Access previous row value for period-over-period comparisons"
+      example: "LAG(revenue) OVER (ORDER BY month) AS prev_month_revenue"
+
+    - name: LEAD
+      syntax: "LEAD(column) OVER (ORDER BY date_col)"
+      description: "Access next row value"
+
+    - name: ROW_NUMBER
+      syntax: "ROW_NUMBER() OVER (ORDER BY column DESC)"
+      description: "Sequential row numbering for ranking"
+
+    - name: RANK
+      syntax: "RANK() OVER (ORDER BY column DESC)"
+      description: "Rank with gaps for ties"
+
+    - name: NTILE
+      syntax: "NTILE(n) OVER (ORDER BY column DESC)"
+      description: "Divide rows into n equal buckets for percentile/Pareto analysis"
+      example: "NTILE(5) OVER (ORDER BY total_spent DESC) AS quintile"
+
+    - name: "Running SUM"
+      syntax: "SUM(col) OVER (ORDER BY date_col ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW)"
+      description: "Cumulative/running total"
+
+    - name: "Moving AVG"
+      syntax: "AVG(col) OVER (ORDER BY date_col ROWS BETWEEN 2 PRECEDING AND CURRENT ROW)"
+      description: "Trailing/moving average"
+
+# Conditional functions (all supported in DuckDB)
+conditional_functions:
+  allowed:
+    - name: "CASE WHEN"
+      syntax: "CASE WHEN condition THEN value ELSE default END"
+      description: "Conditional logic for aggregation splits and value bucketing"
+      example: "COUNT(CASE WHEN status = 'paid' THEN 1 END) AS paid_count"
+
+    - name: HAVING
+      syntax: "GROUP BY col HAVING aggregate_function(col) > threshold"
+      description: "Filter on aggregated values (post-GROUP BY)"
+      example: "HAVING SUM(amount) > 5000"
+
+    - name: IN
+      syntax: "WHERE column IN ('value1', 'value2')"
+      description: "Multi-value filter"
+
+    - name: NULLIF
+      syntax: "NULLIF(column, 0)"
+      description: "Return NULL if value equals second arg - use for safe division"
+      example: "revenue / NULLIF(prev_revenue, 0)"
+
 # String functions
 string_functions:
   allowed:
