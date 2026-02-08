@@ -119,6 +119,188 @@ instructions: |
   - Active subscriber counts over time
   - Any "how many were active at this point" metric
 
+  CONDITIONAL AGGREGATION (paid vs unpaid, active vs inactive, value buckets):
+  Use CASE WHEN inside aggregate functions to count or sum by condition.
+
+  Pattern 1 - Conditional counts/sums (e.g., "paid vs unpaid invoices"):
+  ```sql
+  SELECT
+    DATE_TRUNC('month', invoice_date) AS month,
+    COUNT(CASE WHEN status = 'paid' THEN 1 END) AS paid_count,
+    COUNT(CASE WHEN status = 'unpaid' THEN 1 END) AS unpaid_count
+  FROM invoices
+  GROUP BY 1
+  ORDER BY 1
+  ```
+
+  Pattern 2 - Value bucketing (e.g., "distribution of order values"):
+  ```sql
+  SELECT
+    CASE
+      WHEN amount < 50 THEN '$0-50'
+      WHEN amount < 200 THEN '$50-200'
+      WHEN amount < 500 THEN '$200-500'
+      ELSE '$500+'
+    END AS value_bucket,
+    COUNT(*) AS order_count
+  FROM invoices
+  GROUP BY 1
+  ORDER BY MIN(amount)
+  ```
+  TIP: ORDER BY MIN(amount) ensures buckets appear in numeric order, not alphabetical.
+
+  Pattern 3 - Series column approach (alternative to conditional aggregation):
+  When the user wants to compare categories as separate lines/bars, use series_column:
+  ```sql
+  SELECT DATE_TRUNC('month', date) AS month, status, COUNT(*) AS count
+  FROM subscriptions
+  GROUP BY 1, 2
+  ORDER BY 1
+  ```
+  The chart renderer splits this into one line per status value.
+
+  Use conditional aggregation when:
+  - User asks "X vs Y" where X and Y are states of the same column
+  - User asks for "breakdown by status", "paid vs unpaid", "active vs inactive"
+  - User asks for "distribution" or "buckets" of a numeric value
+
+  THRESHOLD & MULTI-VALUE FILTERING (HAVING, IN, compound WHERE):
+  Use these patterns when the user wants to filter by aggregated values or multiple categories.
+
+  Pattern 1 - HAVING for post-aggregation thresholds (e.g., "customers who spent more than $5000"):
+  ```sql
+  SELECT customer_id, SUM(amount) AS total_spent
+  FROM invoices
+  GROUP BY customer_id
+  HAVING SUM(amount) > 5000
+  ORDER BY total_spent DESC
+  ```
+  IMPORTANT: HAVING filters AFTER aggregation. WHERE filters BEFORE aggregation.
+
+  Pattern 2 - IN for multi-value filters (e.g., "Healthcare or Finance industries"):
+  ```sql
+  SELECT industry, COUNT(*) AS customer_count
+  FROM customers
+  WHERE industry IN ('Healthcare', 'Finance')
+  GROUP BY industry
+  ```
+
+  Pattern 3 - Compound conditions (e.g., "enterprise customers in Healthcare or Finance"):
+  ```sql
+  SELECT segment, industry, COUNT(*) AS count
+  FROM customers
+  WHERE segment = 'Enterprise'
+    AND industry IN ('Healthcare', 'Finance')
+  GROUP BY 1, 2
+  ```
+
+  Use these patterns when:
+  - User mentions "more than $X", "at least N", "top spenders" → HAVING
+  - User mentions "X or Y", "either X or Y", "these categories" → IN
+  - User mentions "not including X" → NOT IN or != in WHERE
+  - User combines category filters with thresholds → WHERE + HAVING
+
+  WINDOW FUNCTIONS (period comparisons, running totals, rankings):
+  Use window functions for calculations that need access to other rows.
+
+  Pattern 1 - Month-over-month growth rate (LAG):
+  ```sql
+  WITH monthly AS (
+    SELECT DATE_TRUNC('month', invoice_date) AS month,
+           SUM(amount) AS revenue
+    FROM invoices
+    GROUP BY 1
+  )
+  SELECT month,
+         revenue,
+         LAG(revenue) OVER (ORDER BY month) AS prev_month_revenue,
+         ROUND(100.0 * (revenue - LAG(revenue) OVER (ORDER BY month))
+               / NULLIF(LAG(revenue) OVER (ORDER BY month), 0), 1) AS mom_growth_pct
+  FROM monthly
+  ORDER BY month
+  ```
+  IMPORTANT: Use NULLIF(denominator, 0) to avoid division-by-zero errors.
+
+  Pattern 2 - Year-over-year comparison (date extraction + filter):
+  ```sql
+  SELECT EXTRACT(MONTH FROM invoice_date) AS month_num,
+         STRFTIME(DATE_TRUNC('month', invoice_date), '%b') AS month_name,
+         YEAR(invoice_date) AS year,
+         SUM(amount) AS revenue
+  FROM invoices
+  WHERE YEAR(invoice_date) IN (2024, 2025)
+  GROUP BY 1, 2, 3
+  ORDER BY 1, 3
+  ```
+  Use series_column = "year" so the chart shows one line per year.
+
+  Pattern 3 - Quarter-over-quarter or specific period comparison:
+  ```sql
+  SELECT EXTRACT(QUARTER FROM date) AS quarter,
+         YEAR(date) AS year,
+         SUM(amount) AS revenue
+  FROM invoices
+  WHERE EXTRACT(QUARTER FROM date) = 4
+    AND YEAR(date) IN (2023, 2024)
+  GROUP BY 1, 2
+  ```
+
+  Pattern 4 - Running total / cumulative sum:
+  ```sql
+  WITH monthly AS (
+    SELECT DATE_TRUNC('month', invoice_date) AS month,
+           SUM(amount) AS revenue
+    FROM invoices
+    GROUP BY 1
+  )
+  SELECT month, revenue,
+         SUM(revenue) OVER (ORDER BY month ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS cumulative_revenue
+  FROM monthly
+  ORDER BY month
+  ```
+
+  Pattern 5 - Moving/trailing average:
+  ```sql
+  WITH monthly AS (
+    SELECT DATE_TRUNC('month', invoice_date) AS month,
+           SUM(amount) AS revenue
+    FROM invoices
+    GROUP BY 1
+  )
+  SELECT month, revenue,
+         AVG(revenue) OVER (ORDER BY month ROWS BETWEEN 2 PRECEDING AND CURRENT ROW) AS trailing_3mo_avg
+  FROM monthly
+  ORDER BY month
+  ```
+
+  Pattern 6 - Percentile ranking / Pareto analysis (NTILE):
+  ```sql
+  WITH customer_totals AS (
+    SELECT customer_id, SUM(amount) AS total_spent
+    FROM invoices
+    GROUP BY customer_id
+  ),
+  ranked AS (
+    SELECT *, NTILE(5) OVER (ORDER BY total_spent DESC) AS quintile
+    FROM customer_totals
+  )
+  SELECT quintile,
+         COUNT(*) AS customer_count,
+         SUM(total_spent) AS group_revenue,
+         ROUND(100.0 * SUM(total_spent) / (SELECT SUM(total_spent) FROM customer_totals), 1) AS pct_of_total
+  FROM ranked
+  GROUP BY quintile
+  ORDER BY quintile
+  ```
+
+  Trigger phrases for window functions:
+  - "MoM", "month over month", "vs last month" → LAG pattern
+  - "YoY", "year over year", "vs last year" → Year extraction or DualTrendChart
+  - "running total", "cumulative" → Running sum pattern
+  - "trailing average", "moving average" → Moving average pattern
+  - "top 20%", "Pareto", "concentration", "quintile" → NTILE pattern
+  - "growth rate", "percent change" → LAG with percentage calculation
+
   Query structure for different chart types:
 
   LineChart (time series):

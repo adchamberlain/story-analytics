@@ -4,6 +4,58 @@ This log captures development changes made during each session. Review this at t
 
 ---
 
+## Session: 2026-02-07 (Part 2 & 3)
+
+### Focus: Advanced SQL Patterns + Fix Test Screenshot Infrastructure
+
+**Context**: The advanced chart test suite (30 tests) showed ~40% failure rate. Systemic failures were in period-over-period comparisons (MoM/YoY), conditional aggregation (CASE WHEN), threshold filtering (HAVING), and multi-value filters (IN/OR). These are SQL patterns the LLM knows but wasn't guided to use because the prompts didn't document them.
+
+### Part 2: Advanced SQL Patterns (YAML-only changes)
+
+**`engine/prompts/chart/sql.yaml`** — Added three new SQL pattern sections (~140 lines) after the existing POINT-IN-TIME METRICS section:
+
+1. **CONDITIONAL AGGREGATION**: CASE WHEN inside COUNT/SUM for paid-vs-unpaid splits, value bucketing with ordered labels, series_column alternative approach.
+
+2. **THRESHOLD & MULTI-VALUE FILTERING**: HAVING clause for post-aggregation thresholds, IN operator for multi-value category filters, compound WHERE + IN patterns.
+
+3. **WINDOW FUNCTIONS**: LAG() for MoM growth rate with NULLIF safety, year-over-year via date extraction, running total/cumulative sum, moving/trailing average, NTILE for Pareto/concentration analysis. Includes trigger phrase mapping.
+
+**`engine/prompts/chart/requirements.yaml`** — Added ADVANCED PATTERN DETECTION section at the end of `instructions:` so the requirements agent flags advanced patterns in the description field.
+
+**`sources/snowflake_saas/dialect.yaml`** and **`sources/olist_ecommerce/dialect.yaml`** — Added `window_functions` and `conditional_functions` sections.
+
+### Part 3: Fix Test Screenshot Infrastructure
+
+Found and fixed **three bugs** causing all test screenshots to be blank (5,288 bytes):
+
+1. **URL path mismatch** (root cause): Tests navigated to `localhost:3001/{slug}` but React route is `/chart/{uuid}`. Fixed by using `manager.state.current_chart_id` (UUID) instead of `manager.state.dashboard_slug` (human-readable slug), and prepending `chart/` to the path.
+
+2. **Wrong QA class**: Tests used `DashboardQA` (designed for dashboard pages) instead of `ChartQA` (which correctly constructs chart URLs). Switched to `ChartQA`.
+
+3. **Double QA overhead**: Each test ran Playwright + Claude vision **twice** — once in the pipeline's internal QA, once in the test harness. Disabled the pipeline's `enable_visual_qa` during testing. This roughly halves test execution time.
+
+### Additional Bugs Fixed (from Part 2)
+
+4. **Test harness missing two-phase flow** (`advanced_chart_tests.py`, `comprehensive_chart_tests.py`): Tests called `process_message()` once but pipeline requires a second `__action:generate` step. Fixed by adding `ChartPhase.PROPOSING` check.
+5. **Wrong port in test_runner.py**: Legacy `localhost:3000` reference changed to `localhost:3001`.
+
+### Test Results (Partial — Smoke Test)
+
+After fixing screenshots, smoke test (3 tests) with Claude: **2/3 passed (67%)**
+- Test 31 (Cumulative Running Total): PASSED — line chart with correct running sum
+- Test 33 (Average vs Median): PASSED — dual-line chart showing both metrics
+- Test 38 (Last 6 Months): FAILED — data limitation (Olist dataset only has ~3 months)
+
+Full test run (30 tests) reached test 48 before API connection hung. Partial results through test 48 show real chart screenshots (16-98KB) confirming the fix works.
+
+### Next Steps
+
+- [ ] Run full 30-test suite to completion (process hung at test 48 last time)
+- [ ] Investigate tests that fail due to Olist dataset limitations (small date range)
+- [ ] Consider adding test timeout/retry logic for hung API connections
+
+---
+
 ## Session: 2026-02-07
 
 ### Focus: Metric Compiler — Compiles Semantic Layer YAML to DuckDB SQL

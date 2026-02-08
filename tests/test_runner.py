@@ -19,14 +19,14 @@ import requests
 
 @dataclass
 class ServerStatus:
-    """Status of the Evidence dev server."""
+    """Status of the dev server."""
     running: bool
-    url: str = "http://localhost:3000"
+    url: str = "http://localhost:3001"
     error: str | None = None
 
 
-def check_server(url: str = "http://localhost:3000", timeout: float = 5.0) -> ServerStatus:
-    """Check if the Evidence server is running and responding."""
+def check_server(url: str = "http://localhost:3001", timeout: float = 5.0) -> ServerStatus:
+    """Check if the dev server is running and responding."""
     try:
         response = requests.get(url, timeout=timeout)
         if response.status_code == 200:
@@ -45,7 +45,7 @@ def check_server(url: str = "http://localhost:3000", timeout: float = 5.0) -> Se
 
 
 def wait_for_server(
-    url: str = "http://localhost:3000",
+    url: str = "http://localhost:3001",
     max_wait: float = 60.0,
     check_interval: float = 2.0,
 ) -> ServerStatus:
@@ -102,7 +102,7 @@ def start_server_background() -> subprocess.Popen | None:
 
 def ensure_server_running(
     auto_start: bool = False,
-    url: str = "http://localhost:3000",
+    url: str = "http://localhost:3001",
 ) -> tuple[bool, subprocess.Popen | None]:
     """
     Ensure the Evidence server is running.
