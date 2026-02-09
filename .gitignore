@@ -14,3 +14,5 @@ data/*
 !data/snowflake_saas
 qa_screenshots/
 app/dist/
+.story-analytics/
+.claude/
