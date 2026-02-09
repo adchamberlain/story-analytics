@@ -670,10 +670,17 @@ Keep your response brief and friendly."""
                 if qa_result.passed:
                     self._emit_progress("qa", ProgressStatus.COMPLETED, "Quality check passed")
                 else:
-                    issues = len(qa_result.critical_issues) if qa_result.critical_issues else 0
-                    self._emit_progress("qa", ProgressStatus.COMPLETED, f"Quality check found {issues} issues")
+                    issues = qa_result.critical_issues or []
+                    import logging
+                    logger = logging.getLogger(__name__)
+                    logger.warning(f"Visual QA failed with {len(issues)} issue(s):")
+                    for issue in issues:
+                        logger.warning(f"  - {issue}")
+                    self._emit_progress("qa", ProgressStatus.COMPLETED, f"Quality check found {len(issues)} issues")
             except (RuntimeError, ConnectionError, TimeoutError) as e:
                 # Expected errors: QA service unavailable, network issues, timeouts
+                import logging
+                logging.getLogger(__name__).warning(f"Visual QA skipped (service unavailable): {e}")
                 self._emit_progress("qa", ProgressStatus.COMPLETED, "Quality check skipped")
             except Exception as e:
                 # Unexpected errors: log full traceback so bugs don't hide

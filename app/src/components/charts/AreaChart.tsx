@@ -62,7 +62,7 @@ export function AreaChart({ data, config }: AreaChartProps) {
         if (config.showValues) {
           trace.text = yValues as string[]
           trace.textposition = 'top center'
-          trace.mode = 'lines+text'
+          trace.mode = 'text+lines'
         }
 
         traces.push(trace)
@@ -91,7 +91,7 @@ export function AreaChart({ data, config }: AreaChartProps) {
       if (config.showValues) {
         trace.text = yValues as string[]
         trace.textposition = 'top center'
-        trace.mode = 'lines+text'
+        trace.mode = 'text+lines'
       }
 
       traces.push(trace)

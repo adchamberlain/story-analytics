@@ -1,0 +1,321 @@
+# Chart Prompt Test Suite
+# 30 prompts covering all templates, chart types, and natural language variations
+#
+# Adapted for E-commerce (Olist Brazilian Marketplace Dataset)
+# Tables: orders, order_items, order_payments, order_reviews, customers, products, sellers
+#
+# Categories:
+# - template_test: Explicitly tests chart templates from engine/templates/charts.yaml
+# - chart_type_test: Tests all supported chart types
+# - natural_language: Tests realistic PM/DS request variations
+
+prompts:
+  # ===========================================================================
+  # TEMPLATE TESTS (10) - Explicitly test chart templates
+  # ===========================================================================
+  - id: "01"
+    prompt: "Create a GMV trend chart showing total order value over time"
+    category: template_test
+    expected_chart_type: area
+    expected_template: revenue-trend
+    validation_criteria:
+      - "Area chart displayed"
+      - "Shows revenue/GMV over time"
+      - "Monthly granularity on x-axis"
+      - "Title indicates GMV or revenue"
+
+  - id: "02"
+    prompt: "Show me new orders over time"
+    category: template_test
+    expected_chart_type: line
+    expected_template: signups-trend
+    validation_criteria:
+      - "Line chart displayed"
+      - "Shows order counts over time"
+      - "Time-based x-axis"
+      - "Order metrics visible"
+
+  - id: "03"
+    prompt: "Show me the order cancellation rate over time"
+    category: template_test
+    expected_chart_type: line
+    expected_template: churn-rate
+    validation_criteria:
+      - "Line chart displayed"
+      - "Shows cancellation rate or percentage"
+      - "Time-based x-axis"
+      - "Values appear to be rates (0-1 or 0-100%)"
+
+  - id: "04"
+    prompt: "Create a chart showing our top 10 customers by total spend"
+    category: template_test
+    expected_chart_type: bar
+    expected_template: top-customers
+    validation_criteria:
+      - "Bar chart displayed"
+      - "Shows approximately 10 customers"
+      - "Customer identifiers visible"
+      - "Revenue/spend values shown"
+
+  - id: "05"
+    prompt: "Show sales by product category"
+    category: template_test
+    expected_chart_type: bar
+    expected_template: feature-adoption
+    validation_criteria:
+      - "Bar chart displayed"
+      - "Shows product categories"
+      - "Values indicate sales amounts or counts"
+
+  - id: "06"
+    prompt: "Create an orders per day trend"
+    category: template_test
+    expected_chart_type: line
+    expected_template: active-users
+    validation_criteria:
+      - "Line chart displayed"
+      - "Shows order counts over time"
+      - "Time-based x-axis"
+      - "Daily or aggregated metrics visible"
+
+  - id: "07"
+    prompt: "Show me revenue trend over time"
+    category: template_test
+    expected_chart_type: area
+    expected_template: revenue-trend
+    validation_criteria:
+      - "Area or line chart displayed"
+      - "Shows revenue over time"
+      - "Time-based x-axis"
+      - "Revenue values visible"
+
+  - id: "08"
+    prompt: "Create a customer review score trend"
+    category: template_test
+    expected_chart_type: line
+    expected_template: engagement-rate
+    validation_criteria:
+      - "Line chart displayed"
+      - "Shows review scores over time"
+      - "Values appear to be ratings (1-5 scale)"
+
+  - id: "09"
+    prompt: "Show order delivery rate over time"
+    category: template_test
+    expected_chart_type: line
+    expected_template: activation-rate
+    validation_criteria:
+      - "Line chart displayed"
+      - "Shows delivery completion metrics"
+      - "Time-based x-axis"
+      - "Values are percentages or ratios"
+
+  - id: "10"
+    prompt: "Create a metric health check for orders"
+    category: template_test
+    expected_chart_type: dual-trend
+    expected_template: metric-health-check
+    validation_criteria:
+      - "Dual trend or multi-panel chart displayed"
+      - "Shows year-over-year or period comparison"
+      - "Order-related metrics present"
+
+  # ===========================================================================
+  # CHART TYPE TESTS (10) - Test all chart types
+  # ===========================================================================
+  - id: "11"
+    prompt: "Show me total revenue by product category as a bar chart"
+    category: chart_type_test
+    expected_chart_type: bar
+    validation_criteria:
+      - "Bar chart displayed"
+      - "Shows revenue by category"
+      - "Category names on axis"
+      - "Revenue values visible"
+
+  - id: "12"
+    prompt: "Create a line chart of orders over time"
+    category: chart_type_test
+    expected_chart_type: line
+    validation_criteria:
+      - "Line chart displayed"
+      - "Shows order data over time"
+      - "Time-based x-axis"
+      - "Multiple data points connected"
+
+  - id: "13"
+    prompt: "Show revenue as an area chart by month"
+    category: chart_type_test
+    expected_chart_type: area
+    validation_criteria:
+      - "Area chart displayed (filled under line)"
+      - "Shows revenue values"
+      - "Monthly granularity"
+      - "Filled area visible"
+
+  - id: "14"
+    prompt: "What's our total order count? Show as a big number"
+    category: chart_type_test
+    expected_chart_type: bigvalue
+    validation_criteria:
+      - "Large number displayed prominently"
+      - "Shows order count"
+      - "Clear label or title"
+      - "Single metric focus"
+
+  - id: "15"
+    prompt: "Distribution of order values as a histogram"
+    category: chart_type_test
+    expected_chart_type: histogram
+    validation_criteria:
+      - "Histogram displayed"
+      - "Shows distribution of values"
+      - "Bins/buckets visible"
+      - "Order value related"
+
+  - id: "16"
+    prompt: "Show a heatmap of order counts by month and customer state"
+    category: chart_type_test
+    expected_chart_type: heatmap
+    validation_criteria:
+      - "Heatmap displayed"
+      - "Two dimensions visible (rows and columns)"
+      - "Color intensity indicates values"
+      - "Month and state dimensions"
+
+  - id: "17"
+    prompt: "Create a scatter plot of order count vs total revenue by seller"
+    category: chart_type_test
+    expected_chart_type: scatter
+    validation_criteria:
+      - "Scatter plot displayed"
+      - "Points distributed across the chart"
+      - "Two metrics compared (count vs revenue)"
+      - "Seller data points"
+
+  - id: "18"
+    prompt: "Show the order status funnel from placed to delivered"
+    category: chart_type_test
+    expected_chart_type: funnel
+    validation_criteria:
+      - "Funnel chart displayed"
+      - "Shows order status stages"
+      - "Narrowing visualization from top to bottom"
+      - "Stage labels visible"
+
+  - id: "19"
+    prompt: "List our top 20 sellers with their details in a table"
+    category: chart_type_test
+    expected_chart_type: table
+    validation_criteria:
+      - "Table displayed"
+      - "Multiple columns visible"
+      - "Seller IDs or names present"
+      - "Additional details shown"
+
+  - id: "20"
+    prompt: "Create a dual trend chart comparing orders this year vs last year"
+    category: chart_type_test
+    expected_chart_type: dual-trend
+    validation_criteria:
+      - "Dual trend or comparison chart displayed"
+      - "Two time periods compared"
+      - "Order data shown"
+      - "Year-over-year comparison visible"
+
+  # ===========================================================================
+  # NATURAL LANGUAGE VARIATIONS (10) - Realistic PM/DS requests
+  # ===========================================================================
+  - id: "21"
+    prompt: "What's our total revenue?"
+    category: natural_language
+    expected_chart_type: any
+    validation_criteria:
+      - "Visualization displayed (chart or big number)"
+      - "Shows revenue or GMV data"
+      - "Clear value visible"
+
+  - id: "22"
+    prompt: "how are we doing with orders"
+    category: natural_language
+    expected_chart_type: any
+    validation_criteria:
+      - "Some visualization displayed"
+      - "Shows order-related data"
+      - "Reasonable interpretation of request"
+
+  - id: "23"
+    prompt: "gimme a quick breakdown of revenue by payment type"
+    category: natural_language
+    expected_chart_type: bar
+    validation_criteria:
+      - "Chart displayed"
+      - "Shows breakdown by payment type"
+      - "Revenue values visible"
+
+  - id: "24"
+    prompt: "Show me revnue by custmer state"
+    category: natural_language
+    expected_chart_type: bar
+    validation_criteria:
+      - "Chart displayed despite typos"
+      - "Shows revenue data"
+      - "Shows customer states"
+
+  - id: "25"
+    prompt: "I need to see a visualization of our order numbers trending over the past several months, preferably as a line graph with dates on the bottom"
+    category: natural_language
+    expected_chart_type: line
+    validation_criteria:
+      - "Line chart displayed"
+      - "Shows order data"
+      - "Time-based x-axis"
+      - "Multiple months of data"
+
+  - id: "26"
+    prompt: "Which product categories are driving our sales?"
+    category: natural_language
+    expected_chart_type: bar
+    validation_criteria:
+      - "Chart displayed"
+      - "Shows revenue or sales by category"
+      - "Categories clearly labeled"
+
+  - id: "27"
+    prompt: "Revenue by month with a filter for year"
+    category: natural_language
+    expected_chart_type: bar
+    validation_criteria:
+      - "Chart displayed"
+      - "Shows monthly revenue"
+      - "Filter control present or year-based grouping"
+
+  - id: "28"
+    prompt: "Compare delivered orders vs cancelled orders over time"
+    category: natural_language
+    expected_chart_type: line
+    validation_criteria:
+      - "Chart with two lines or series"
+      - "Shows both delivered and cancelled"
+      - "Time-based comparison"
+      - "Legend distinguishing the two"
+
+  - id: "29"
+    prompt: "Average order value by month"
+    category: natural_language
+    expected_chart_type: line
+    validation_criteria:
+      - "Chart displayed"
+      - "Shows average (not total) amounts"
+      - "Monthly granularity"
+      - "Order value metric"
+
+  - id: "30"
+    prompt: "Top sellers by order count, show as horizontal bars"
+    category: natural_language
+    expected_chart_type: bar
+    validation_criteria:
+      - "Bar chart displayed"
+      - "Shows top sellers"
+      - "Order count metric"
+      - "Horizontal orientation (or clear ranking)"

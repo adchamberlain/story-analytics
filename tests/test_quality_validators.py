@@ -395,6 +395,206 @@ class TestChartQualityValidator:
         assert result.passed is False  # Error should set passed=False
 
 
+class TestValidateChart:
+    """Tests for ChartQualityValidator.validate_chart() method.
+
+    This method was previously missing (hidden by silent exception handling).
+    These tests ensure it exists and handles all code paths correctly.
+    """
+
+    def test_validate_chart_method_exists(self):
+        """Test that validate_chart method exists on ChartQualityValidator."""
+        validator = ChartQualityValidator(enable_visual_qa=False)
+        assert hasattr(validator, "validate_chart")
+        assert callable(validator.validate_chart)
+
+    def test_validate_chart_disabled_returns_pass(self):
+        """Test that validate_chart returns pass when visual QA is disabled."""
+        validator = ChartQualityValidator(enable_visual_qa=False)
+        from engine.qa import QAResult
+
+        result = validator.validate_chart(
+            chart=MagicMock(),
+            original_request="Show revenue by month",
+            chart_slug="/chart/abc-123",
+        )
+
+        assert isinstance(result, QAResult)
+        assert result.passed is True
+        assert "disabled" in result.summary.lower()
+
+    def test_validate_chart_enabled_calls_chart_qa(self):
+        """Test that validate_chart calls ChartQA.validate when enabled."""
+        from engine.qa import QAResult
+
+        mock_qa_result = QAResult(
+            passed=True,
+            summary="Chart looks good",
+            critical_issues=[],
+            suggestions=[],
+        )
+
+        validator = ChartQualityValidator(enable_visual_qa=True)
+
+        with patch("engine.qa.ChartQA") as MockChartQA:
+            mock_instance = MagicMock()
+            mock_instance.validate.return_value = mock_qa_result
+            MockChartQA.return_value = mock_instance
+
+            result = validator.validate_chart(
+                chart=MagicMock(),
+                original_request="Show revenue trend",
+                chart_slug="/chart/test-chart-id",
+            )
+
+            MockChartQA.assert_called_once()
+            mock_instance.validate.assert_called_once_with("test-chart-id", "Show revenue trend")
+            assert result.passed is True
+
+    def test_validate_chart_strips_chart_prefix(self):
+        """Test that /chart/ prefix is stripped from slug."""
+        from engine.qa import QAResult
+
+        mock_qa_result = QAResult(
+            passed=True, summary="OK", critical_issues=[], suggestions=[],
+        )
+
+        validator = ChartQualityValidator(enable_visual_qa=True)
+
+        with patch("engine.qa.ChartQA") as MockChartQA:
+            mock_instance = MagicMock()
+            mock_instance.validate.return_value = mock_qa_result
+            MockChartQA.return_value = mock_instance
+
+            validator.validate_chart(
+                chart=MagicMock(),
+                original_request="test",
+                chart_slug="/chart/my-chart-uuid",
+            )
+
+            # Should pass "my-chart-uuid", not "/chart/my-chart-uuid"
+            mock_instance.validate.assert_called_once_with("my-chart-uuid", "test")
+
+    def test_validate_chart_connection_error_skips_gracefully(self):
+        """Test that connection errors skip QA (service unavailable is expected)."""
+        validator = ChartQualityValidator(enable_visual_qa=True)
+
+        with patch("engine.qa.ChartQA") as MockChartQA:
+            mock_instance = MagicMock()
+            mock_instance.validate.side_effect = ConnectionError("Cannot connect to app")
+            MockChartQA.return_value = mock_instance
+
+            result = validator.validate_chart(
+                chart=MagicMock(),
+                original_request="test",
+                chart_slug="/chart/test-id",
+            )
+
+            # Should skip gracefully — not a bug, service just unavailable
+            assert result.passed is True
+            assert "unavailable" in result.summary.lower() or "skipped" in result.summary.lower()
+
+    def test_validate_chart_timeout_skips_gracefully(self):
+        """Test that timeout errors skip QA gracefully."""
+        validator = ChartQualityValidator(enable_visual_qa=True)
+
+        with patch("engine.qa.ChartQA") as MockChartQA:
+            mock_instance = MagicMock()
+            mock_instance.validate.side_effect = TimeoutError("Screenshot timed out")
+            MockChartQA.return_value = mock_instance
+
+            result = validator.validate_chart(
+                chart=MagicMock(),
+                original_request="test",
+                chart_slug="/chart/test-id",
+            )
+
+            assert result.passed is True
+
+    def test_validate_chart_attribute_error_fails_loudly(self):
+        """Test that AttributeError (programming bug) fails validation."""
+        validator = ChartQualityValidator(enable_visual_qa=True)
+
+        with patch("engine.qa.ChartQA") as MockChartQA:
+            mock_instance = MagicMock()
+            mock_instance.validate.side_effect = AttributeError("missing method")
+            MockChartQA.return_value = mock_instance
+
+            result = validator.validate_chart(
+                chart=MagicMock(),
+                original_request="test",
+                chart_slug="/chart/test-id",
+            )
+
+            # Programming bugs must NOT pass silently
+            assert result.passed is False
+            assert len(result.critical_issues) > 0
+
+    def test_validate_chart_type_error_fails_loudly(self):
+        """Test that TypeError (programming bug) fails validation."""
+        validator = ChartQualityValidator(enable_visual_qa=True)
+
+        with patch("engine.qa.ChartQA") as MockChartQA:
+            mock_instance = MagicMock()
+            mock_instance.validate.side_effect = TypeError("wrong argument type")
+            MockChartQA.return_value = mock_instance
+
+            result = validator.validate_chart(
+                chart=MagicMock(),
+                original_request="test",
+                chart_slug="/chart/test-id",
+            )
+
+            assert result.passed is False
+            assert len(result.critical_issues) > 0
+
+    def test_validate_chart_unexpected_error_fails(self):
+        """Test that unexpected exceptions fail (not silently passed)."""
+        validator = ChartQualityValidator(enable_visual_qa=True)
+
+        with patch("engine.qa.ChartQA") as MockChartQA:
+            mock_instance = MagicMock()
+            mock_instance.validate.side_effect = OSError("disk full")
+            MockChartQA.return_value = mock_instance
+
+            result = validator.validate_chart(
+                chart=MagicMock(),
+                original_request="test",
+                chart_slug="/chart/test-id",
+            )
+
+            # Unexpected errors should NOT return passed=True
+            assert result.passed is False
+
+    def test_validate_chart_qa_failure_propagates(self):
+        """Test that QA failure results are returned correctly."""
+        from engine.qa import QAResult
+
+        mock_qa_result = QAResult(
+            passed=False,
+            summary="Chart missing data labels",
+            critical_issues=["No value labels on bars", "Missing axis title"],
+            suggestions=["Add grid lines"],
+        )
+
+        validator = ChartQualityValidator(enable_visual_qa=True)
+
+        with patch("engine.qa.ChartQA") as MockChartQA:
+            mock_instance = MagicMock()
+            mock_instance.validate.return_value = mock_qa_result
+            MockChartQA.return_value = mock_instance
+
+            result = validator.validate_chart(
+                chart=MagicMock(),
+                original_request="Show top customers",
+                chart_slug="/chart/test-id",
+            )
+
+            assert result.passed is False
+            assert len(result.critical_issues) == 2
+            assert "data labels" in result.summary.lower() or "missing" in result.summary.lower()
+
+
 class TestIntegration:
     """Integration tests combining multiple validators."""
 
@@ -437,6 +637,107 @@ class TestIntegration:
         except Exception:
             # OK if database not available
             pass
+
+    def test_full_flow_with_visual_qa_mocked(self):
+        """Integration test: full chart creation flow with visual QA enabled.
+
+        This test exercises the full validation pipeline including validate_chart,
+        with the QA service mocked. Previously this code path was untested, which
+        allowed a missing method bug to hide for weeks.
+        """
+        from engine.qa import QAResult
+
+        spec = ChartSpec(
+            title="Revenue by Segment",
+            description="Bar chart of revenue breakdown",
+            original_request="Show revenue by customer segment",
+            metric="revenue",
+            aggregation="SUM",
+            dimension="segment",
+            chart_type=ChartType.BAR_CHART,
+        )
+
+        sql = """
+        SELECT segment, SUM(amount) as revenue
+        FROM customers c JOIN invoices i ON c.id = i.customer_id
+        GROUP BY segment
+        ORDER BY revenue DESC
+        """
+
+        # Create validator with ALL features enabled
+        validator = ChartQualityValidator(
+            enable_spec_verification=False,  # Skip LLM (no API key needed)
+            enable_data_validation=True,
+            enable_aggregation_check=True,
+            enable_chart_type_check=True,
+            enable_visual_qa=True,
+        )
+
+        # 1. Spec validation (runs chart type check)
+        spec_result = validator.validate_spec(spec)
+        # Bar chart for breakdown is appropriate — no mismatch expected
+        assert not any(i.code == "CHART_TYPE_MISMATCH" for i in spec_result.issues)
+
+        # 2. Visual QA via validate_chart (mocked)
+        mock_qa_result = QAResult(
+            passed=True,
+            summary="Chart displays correctly",
+            critical_issues=[],
+            suggestions=["Consider adding data labels"],
+        )
+
+        with patch("engine.qa.ChartQA") as MockChartQA:
+            mock_instance = MagicMock()
+            mock_instance.validate.return_value = mock_qa_result
+            MockChartQA.return_value = mock_instance
+
+            qa_result = validator.validate_chart(
+                chart=MagicMock(),
+                original_request=spec.original_request,
+                chart_slug="/chart/test-uuid",
+            )
+
+            assert qa_result.passed is True
+            assert len(qa_result.suggestions) == 1
+            mock_instance.validate.assert_called_once_with(
+                "test-uuid", "Show revenue by customer segment"
+            )
+
+    def test_validate_chart_then_handle_failure(self):
+        """Integration test: simulate QA finding issues and verify the failure path.
+
+        This mirrors what ChartConversationManager does when validate_chart returns
+        a failure — the caller should see the issues and know QA failed.
+        """
+        from engine.qa import QAResult
+
+        validator = ChartQualityValidator(
+            enable_spec_verification=False,
+            enable_visual_qa=True,
+        )
+
+        mock_qa_result = QAResult(
+            passed=False,
+            summary="Chart has data rendering issues",
+            critical_issues=["Y-axis values are all zero", "Legend overlaps chart"],
+            suggestions=["Increase chart height"],
+        )
+
+        with patch("engine.qa.ChartQA") as MockChartQA:
+            mock_instance = MagicMock()
+            mock_instance.validate.return_value = mock_qa_result
+            MockChartQA.return_value = mock_instance
+
+            qa_result = validator.validate_chart(
+                chart=MagicMock(),
+                original_request="Show monthly revenue",
+                chart_slug="/chart/fail-chart",
+            )
+
+            # Caller should see the failure
+            assert qa_result.passed is False
+            assert len(qa_result.critical_issues) == 2
+            assert "zero" in qa_result.critical_issues[0].lower()
 
 
 if __name__ == "__main__":

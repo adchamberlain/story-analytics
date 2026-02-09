@@ -79,7 +79,7 @@ export function LineChart({ data, config }: LineChartProps) {
         if (config.showValues) {
           trace.text = yValues as string[]
           trace.textposition = 'top center'
-          trace.mode = 'lines+markers+text'
+          trace.mode = 'text+lines+markers'
         }
 
         traces.push(trace)
@@ -100,12 +100,12 @@ export function LineChart({ data, config }: LineChartProps) {
         line: {
           ...defaultLineStyle.line,
           width: lineWidth,
-          color: customColor || defaultLineStyle.line?.color,
+          color: customColor,
         },
         marker: {
           ...defaultLineStyle.marker,
           size: markerSize,
-          color: customColor || defaultLineStyle.marker?.color,
+          color: customColor,
         },
         hovertemplate: createHoverTemplate(xLabel, yColumn, {
           showName: yColumns.length > 1,
@@ -116,7 +116,7 @@ export function LineChart({ data, config }: LineChartProps) {
       if (config.showValues) {
         trace.text = yValues as string[]
         trace.textposition = 'top center'
-        trace.mode = 'lines+markers+text'
+        trace.mode = 'text+lines+markers'
       }
 
       traces.push(trace)

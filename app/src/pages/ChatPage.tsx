@@ -645,58 +645,6 @@ function TerminalCard({
   )
 }
 
-interface ActionButtonLargeProps {
-  label: string
-  primary?: boolean
-  onClick: () => void
-}
-
-function ActionButtonLarge({ label, primary = false, onClick }: ActionButtonLargeProps) {
-  return (
-    <button
-      onClick={onClick}
-      style={{
-        padding: 'var(--space-2) var(--space-4)',
-        fontSize: 'var(--text-sm)',
-        fontWeight: 'var(--font-medium)' as unknown as number,
-        fontFamily: 'var(--font-brand)',
-        borderRadius: 'var(--radius-md)',
-        cursor: 'pointer',
-        transition: 'all var(--transition-fast)',
-        ...(primary
-          ? {
-              backgroundColor: 'var(--color-brand)',
-              color: 'white',
-              border: 'none',
-            }
-          : {
-              backgroundColor: 'var(--color-gray-800)',
-              color: 'var(--color-gray-300)',
-              border: '1px solid var(--color-gray-600)',
-            }),
-      }}
-      onMouseEnter={(e) => {
-        if (primary) {
-          e.currentTarget.style.backgroundColor = 'var(--color-brand-dim)'
-        } else {
-          e.currentTarget.style.borderColor = 'var(--color-brand)'
-          e.currentTarget.style.color = 'var(--color-brand)'
-        }
-      }}
-      onMouseLeave={(e) => {
-        if (primary) {
-          e.currentTarget.style.backgroundColor = 'var(--color-brand)'
-        } else {
-          e.currentTarget.style.borderColor = 'var(--color-gray-600)'
-          e.currentTarget.style.color = 'var(--color-gray-300)'
-        }
-      }}
-    >
-      {label}
-    </button>
-  )
-}
-
 // =============================================================================
 // Chart Templates Grid Component
 // =============================================================================
