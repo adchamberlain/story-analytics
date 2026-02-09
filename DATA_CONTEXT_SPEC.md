@@ -1,4 +1,4 @@
-# Story Semantic Layer Specification
+# Story Data Context Specification
 
 **Version:** 0.1.0-draft
 **Date:** 2026-02-09
@@ -18,11 +18,11 @@ This format is designed for an AI-native world where:
 
 ### Key Insight: Compile-Time + Runtime Hybrid
 
-Traditional semantic layers are compile-time: rigid YAML → deterministic SQL. An AI-native approach is runtime: rich context → LLM generates SQL → validated against known-good results.
+Traditional semantic layers are compile-time: rigid YAML → deterministic SQL. An AI-native data context is runtime: rich context → LLM generates SQL → validated against known-good results.
 
 We support **both modes**:
 - **Compiled queries:** For core metrics (revenue, active users, churn), the metric compiler generates guaranteed-correct SQL from definitions. No LLM in the path. Instant, deterministic, auditable.
-- **Contextual queries:** For ad-hoc questions ("why did revenue drop?"), the LLM uses the semantic layer as a knowledge base — reading descriptions, business rules, data quirks, validated examples — to generate appropriate SQL. The output is then validated against metric definitions.
+- **Contextual queries:** For ad-hoc questions ("why did revenue drop?"), the LLM uses the data context as a knowledge base — reading descriptions, business rules, data quirks, validated examples — to generate appropriate SQL. The output is then validated against metric definitions.
 
 This hybrid approach gives you the consistency of MetricFlow with the flexibility of an LLM analyst.
 
@@ -30,17 +30,17 @@ This hybrid approach gives you the consistency of MetricFlow with the flexibilit
 
 ## Format Overview
 
-A Story semantic layer is a directory containing YAML files:
+A Story data context is a directory containing YAML files:
 
 ```
-semantic_layer/
-├── manifest.yaml           # Metadata, source info, adapter config
-├── models/                 # One file per model (or grouped)
+data_context/
+├── metadata.yaml           # Metadata, source info, adapter config
+├── tables/                 # One file per table (or grouped)
 │   ├── orders.yaml
 │   ├── customers.yaml
 │   └── subscriptions.yaml
 ├── metrics.yaml            # Metric definitions
-├── explores.yaml           # Join graphs / explore definitions
+├── joins.yaml              # Join graphs / join definitions
 ├── knowledge/              # Rich context for LLM consumption
 │   ├── business_context.yaml
 │   ├── data_quirks.yaml
@@ -49,21 +49,21 @@ semantic_layer/
     └── benchmarks.yaml
 ```
 
-The format uses YAML for human readability and LLM parseability. Every file is independently valid — you can load just the models, or just the metrics, or just the knowledge base.
+The format uses YAML for human readability and LLM parseability. Every file is independently valid — you can load just the tables, or just the metrics, or just the knowledge base.
 
 ---
 
-## 1. Manifest
+## 1. Metadata
 
-The manifest contains metadata about the semantic layer: where it came from, what database it targets, and configuration.
+The metadata file describes the data context: where it came from, what database it targets, and configuration.
 
 ```yaml
-# manifest.yaml
-story_semantic_layer: "0.1.0"
+# metadata.yaml
+story_data_context: "0.1.0"
 
 metadata:
   name: "acme-analytics"
-  description: "Semantic layer for Acme Corp's analytics warehouse"
+  description: "Data context for Acme Corp's analytics warehouse"
   created_at: "2026-02-15T10:30:00Z"
   updated_at: "2026-02-15T10:30:00Z"
 
@@ -98,12 +98,12 @@ time_spine:
   range: ["2020-01-01", "2030-01-01"]
 ```
 
-### Manifest Properties
+### Metadata Properties
 
 | Property | Required | Description |
 |---|---|---|
-| `story_semantic_layer` | Yes | Spec version for compatibility checking |
-| `metadata.name` | Yes | Unique name for this semantic layer |
+| `story_data_context` | Yes | Spec version for compatibility checking |
+| `metadata.name` | Yes | Unique name for this data context |
 | `metadata.source` | No | Provenance — how this was generated |
 | `metadata.source.type` | No | `lookml`, `dbt`, `schema`, `manual`, `hybrid` |
 | `metadata.source.confidence` | No | Extraction confidence score (0-1) |
@@ -113,15 +113,15 @@ time_spine:
 
 ---
 
-## 2. Models
+## 2. Tables
 
-A model represents a table or view in the warehouse. It contains typed columns organized as **entities** (join keys), **dimensions** (group-by columns), and **measures** (aggregations).
+A table represents a table or view in the warehouse. It contains typed columns organized as **entities** (join keys), **dimensions** (group-by columns), and **measures** (aggregations).
 
-Models are the atoms of the semantic layer. Everything else — metrics, explores, knowledge — references models.
+Tables are the atoms of the data context. Everything else — metrics, joins, knowledge — references tables.
 
 ```yaml
-# models/orders.yaml
-models:
+# tables/orders.yaml
+tables:
 
   - name: order_items
     table: analytics.fct_order_items    # Fully qualified table reference
@@ -149,7 +149,7 @@ models:
       - name: order
         type: foreign
         expr: order_id
-        references: orders.order        # Explicit reference to target model.entity
+        references: orders.order        # Explicit reference to target table.entity
 
       - name: customer
         type: foreign
@@ -303,11 +303,11 @@ models:
         format: currency
 ```
 
-### Model Properties
+### Table Properties
 
 | Property | Required | Description |
 |---|---|---|
-| `name` | Yes | Unique model name |
+| `name` | Yes | Unique table name |
 | `table` | Yes | Fully qualified table/view reference |
 | `description` | Recommended | Rich description (consumed by LLMs) |
 | `grain` | Recommended | Column(s) that uniquely identify a row |
@@ -322,7 +322,7 @@ models:
 | `name` | Yes | Entity name (used as join key identifier) |
 | `type` | Yes | `primary`, `unique`, `foreign`, `natural` |
 | `expr` | No | Column expression (defaults to `name`) |
-| `references` | No | Target model.entity for foreign keys |
+| `references` | No | Target table.entity for foreign keys |
 
 ### Dimension Properties
 
@@ -355,7 +355,7 @@ models:
 
 | Property | Required | Description |
 |---|---|---|
-| `name` | Yes | Unique measure name (across all models) |
+| `name` | Yes | Unique measure name (across all tables) |
 | `agg` | Yes | Aggregation type (see table below) |
 | `expr` | No | Column or SQL expression (defaults to name) |
 | `label` | Recommended | Human-readable label |
@@ -611,47 +611,47 @@ metrics:
 
 ---
 
-## 4. Explores (Join Graphs)
+## 4. Joins (Join Graphs)
 
-Explores define how models are joined together. They are the entry points for queries.
+Joins define how tables are joined together. They are the entry points for queries.
 
 ### Design: Explicit Joins with Inferred Defaults
 
-We combine the best of LookML (explicit join definitions with relationship types) and dbt (entity-based implicit joins). Entities provide the default join graph; explores can override or extend it.
+We combine the best of LookML (explicit join definitions with relationship types) and dbt (entity-based implicit joins). Entities provide the default join graph; joins can override or extend it.
 
 ```yaml
-# explores.yaml
-explores:
+# joins.yaml
+joins:
 
   - name: order_analysis
     description: >
-      Primary explore for revenue and order analysis. Joins order items
+      Primary join graph for revenue and order analysis. Joins order items
       with customer demographics, product categories, and seller info.
-    base_model: order_items
+    base_table: order_items
 
     # Tags and access control
     tags: [revenue, core]
     access: public                        # public | restricted | internal
 
     joins:
-      - model: customers
+      - table: customers
         on: "${order_items.customer_id} = ${customers.customer_id}"
         relationship: many_to_one
         type: left                        # left | inner | full | cross
         description: "Customer who placed the order"
 
-      - model: products
+      - table: products
         on: "${order_items.product_id} = ${products.product_id}"
         relationship: many_to_one
         type: left
 
-      - model: sellers
+      - table: sellers
         on: "${order_items.seller_id} = ${sellers.seller_id}"
         relationship: many_to_one
         type: left
 
-      # Self-join example (join same model twice under different alias)
-      - model: customers
+      # Self-join example (join same table twice under different alias)
+      - table: customers
         alias: referring_customer
         on: "${order_items.referrer_id} = ${referring_customer.customer_id}"
         relationship: many_to_one
@@ -675,24 +675,24 @@ explores:
 
   - name: customer_360
     description: "Complete customer view with orders, reviews, and payments"
-    base_model: customers
+    base_table: customers
     joins:
-      - model: orders
+      - table: orders
         on: "${customers.customer_id} = ${orders.customer_id}"
         relationship: one_to_many
         type: left
-      - model: reviews
+      - table: reviews
         on: "${orders.order_id} = ${reviews.order_id}"
         relationship: one_to_many
         type: left
 ```
 
-### Explore Properties
+### Join Properties (Top-Level)
 
 | Property | Required | Description |
 |---|---|---|
-| `name` | Yes | Unique explore name |
-| `base_model` | Yes | The primary model (FROM table) |
+| `name` | Yes | Unique join graph name |
+| `base_table` | Yes | The primary table (FROM table) |
 | `description` | Recommended | Rich description |
 | `joins` | No | Explicit join definitions |
 | `always_filter` | No | Mandatory filters (user can change value, not remove) |
@@ -702,15 +702,15 @@ explores:
 | `access` | No | Visibility level |
 | `tags` | No | Tags |
 
-### Join Properties
+### Join Entry Properties
 
 | Property | Required | Description |
 |---|---|---|
-| `model` | Yes | Model to join |
-| `on` | Yes | SQL ON condition using `${model.column}` syntax |
+| `table` | Yes | Table to join |
+| `on` | Yes | SQL ON condition using `${table.column}` syntax |
 | `relationship` | Yes | `many_to_one`, `one_to_one`, `one_to_many`, `many_to_many` |
 | `type` | No | `left` (default), `inner`, `full`, `cross` |
-| `alias` | No | Alias for joining the same model multiple times |
+| `alias` | No | Alias for joining the same table multiple times |
 | `description` | No | Join description |
 | `fields` | No | Restrict which fields are available from this join |
 
@@ -805,21 +805,21 @@ data_quirks:
 
   # Column-level quirks that affect query correctness
   columns:
-    - model: order_items
+    - table: order_items
       column: price
       quirk: >
         Price is per-item, not per-order. An order with 3 items has 3 rows.
         SUM(price) gives GMV, not per-order revenue. For per-order revenue,
-        use the orders model which pre-aggregates.
+        use the orders table which pre-aggregates.
 
-    - model: customers
+    - table: customers
       column: customer_id
       quirk: >
         NOT a unique customer identifier. A single person can appear with
         multiple customer_ids. Always use customer_unique_id for counting
         unique customers. This is a known data quality issue.
 
-    - model: reviews
+    - table: reviews
       column: review_score
       quirk: >
         Only ~10% of orders have reviews. The review sample is biased toward
@@ -828,7 +828,7 @@ data_quirks:
 
   # Date range limitations
   date_ranges:
-    - model: order_items
+    - table: order_items
       column: order_date
       min: "2016-10-01"
       max: "2018-08-31"
@@ -927,7 +927,7 @@ Separate from knowledge/validated_examples, the validation directory contains ma
 # validation/benchmarks.yaml
 benchmarks:
 
-  # Metric value benchmarks — run these to verify the semantic layer is correct
+  # Metric value benchmarks — run these to verify the data context is correct
   - metric: gmv
     tests:
       - name: "all_time_total"
@@ -977,10 +977,10 @@ benchmarks:
 
 ## 7. Access Control
 
-Access control definitions can live at any level — model, dimension, measure, metric, or explore.
+Access control definitions can live at any level — table, dimension, measure, metric, or join.
 
 ```yaml
-# Can be in manifest.yaml or a separate access.yaml
+# Can be in metadata.yaml or a separate access.yaml
 access_control:
 
   # Define grants based on user attributes
@@ -995,16 +995,16 @@ access_control:
 
   # Apply grants at different levels
   field_restrictions:
-    - model: customers
+    - table: customers
       dimensions: [email, phone, address]
       required_grants: [pii_access]
 
-    - model: financials
+    - table: financials
       required_grants: [financial_data_access]
 
   # Row-level security
   row_filters:
-    - explore: order_analysis
+    - join: order_analysis
       dimension: customer_state
       user_attribute: allowed_states
 ```
@@ -1017,7 +1017,7 @@ How our concepts map to other formats:
 
 | Story | LookML | dbt MetricFlow | Cube.js |
 |---|---|---|---|
-| `model` | `view` | `semantic_model` | `cube` |
+| `table` | `view` | `semantic_model` | `cube` |
 | `dimension` (categorical) | `dimension type: string` | `dimension type: categorical` | `dimension type: string` |
 | `dimension` (time) | `dimension_group type: time` | `dimension type: time` | `dimension type: time` |
 | `dimension` (boolean) | `dimension type: yesno` | (categorical + expr) | `dimension type: boolean` |
@@ -1030,8 +1030,8 @@ How our concepts map to other formats:
 | `metric` (ratio) | `measure type: number` | `metric type: ratio` | `measure type: number` |
 | `metric` (cumulative) | `measure type: running_total` | `metric type: cumulative` | `measure rollingWindow` |
 | `metric` (conversion) | (N/A) | `metric type: conversion` | (N/A) |
-| `explore` | `explore` | (implicit via entities) | (implicit via joins) |
-| `explore.join` | `join` | (entity-based) | `joins` |
+| `join` (top-level) | `explore` | (implicit via entities) | (implicit via joins) |
+| `join.joins[]` | `join` | (entity-based) | `joins` |
 | `knowledge` | (descriptions only) | (descriptions only) | (N/A) |
 | `validated_examples` | (N/A) | (N/A) | (N/A) |
 | `access_control` | `access_grant` + `required_access_grants` | (N/A) | `SECURITY_CONTEXT` |
@@ -1052,33 +1052,33 @@ How our concepts map to other formats:
 When extracting from LookML, here's how concepts map:
 
 ```
-LookML view                    → Story model
-  sql_table_name               → model.table
-  derived_table.sql            → model.table (materialize or inline)
-  dimension                    → model.dimensions[]
-  dimension_group type: time   → model.dimensions[] type: time
-  dimension type: yesno        → model.dimensions[] type: boolean
-  dimension type: tier         → model.dimensions[] type: tier
-  measure type: sum            → model.measures[] agg: sum
-  measure type: count          → model.measures[] agg: count
-  measure type: count_distinct → model.measures[] agg: count_distinct
+LookML view                    → Story table
+  sql_table_name               → table.source (fully qualified table ref)
+  derived_table.sql            → table.source (materialize or inline)
+  dimension                    → table.dimensions[]
+  dimension_group type: time   → table.dimensions[] type: time
+  dimension type: yesno        → table.dimensions[] type: boolean
+  dimension type: tier         → table.dimensions[] type: tier
+  measure type: sum            → table.measures[] agg: sum
+  measure type: count          → table.measures[] agg: count
+  measure type: count_distinct → table.measures[] agg: count_distinct
   measure type: number         → metrics[] type: derived (promoted to metric)
-  measure filters:             → model.measures[].filter
-  primary_key: yes             → model.grain
+  measure filters:             → table.measures[].filter
+  primary_key: yes             → table.grain
   value_format_name            → format + format_pattern
 
-LookML explore                 → Story explore
-  join                         → explore.joins[]
-  join.type                    → join.type (left_outer → left)
-  join.relationship            → join.relationship
-  join.sql_on                  → join.on
-  always_filter                → explore.always_filter
-  conditionally_filter         → explore.default_filters (simplified)
-  access_filter                → explore.access_filters
-  sql_always_where             → explore.sql_always_where
+LookML explore                 → Story join
+  join                         → join.joins[]
+  join.type                    → join entry.type (left_outer → left)
+  join.relationship            → join entry.relationship
+  join.sql_on                  → join entry.on
+  always_filter                → join.always_filter
+  conditionally_filter         → join.default_filters (simplified)
+  access_filter                → join.access_filters
+  sql_always_where             → join.sql_always_where
   required_access_grants       → access_control
 
-LookML model                   → Story manifest (partial)
+LookML model                   → Story metadata (partial)
   connection                   → adapter.type
   datagroup                    → (not directly mapped — persistence is adapter-level)
   named_value_format           → (absorbed into format_pattern)
@@ -1100,7 +1100,7 @@ These LookML features have no direct equivalent and require special handling:
 | **Refinements** | Apply all refinements before extraction (resolve to final state) |
 | **Extends** | Resolve inheritance before extraction (flatten to final state) |
 | **Native derived tables** | Convert to SQL derived tables or materialize |
-| **PDT persistence** | Note in manifest but don't replicate (persistence is adapter-specific) |
+| **PDT persistence** | Note in metadata but don't replicate (persistence is adapter-specific) |
 | **Drill fields** | Capture as metadata on measures but not core functionality |
 | **HTML/Links** | Not extracted (presentation layer concern) |
 
@@ -1120,23 +1120,23 @@ When building converters to/from other formats:
 7. Profile the database to populate `known_values`, `cardinality`, `date_ranges`
 
 ### From dbt MetricFlow → Story
-1. Semantic models map directly to models
+1. Semantic models map directly to tables
 2. Entities provide explicit join information
 3. Metrics map directly (same types, similar properties)
 4. `non_additive_dimension` → `semi_additive`
-5. Saved queries → explore definitions or saved queries in our format
+5. Saved queries → join definitions or saved queries in our format
 
 ### Story → LookML (for backward compatibility during migration)
-1. Models → views with `sql_table_name`
+1. Tables → views with `sql_table_name`
 2. Dimensions → dimensions (time → dimension_group)
 3. Measures → measures with appropriate types
 4. Derived metrics → `type: number` measures
-5. Explores → explores with explicit joins
+5. Joins → joins with explicit join entries
 6. Access control → access_grants + required_access_grants
 7. Knowledge → descriptions (simplified — LookML can't hold rich context)
 
 ### Story → dbt MetricFlow
-1. Models → semantic_models
+1. Tables → semantic_models
 2. Entities extracted from explicit join definitions
 3. Metrics map directly to dbt metric types
 4. Cumulative/ratio/derived map naturally
@@ -1145,7 +1145,7 @@ When building converters to/from other formats:
 
 ## Query Interface
 
-When querying the semantic layer (via compiler or LLM), the interface is:
+When querying the data context (via compiler or LLM), the interface is:
 
 ```
 Query:
@@ -1159,8 +1159,8 @@ Query:
 ```
 
 The metric compiler resolves this to SQL:
-1. Identify which models are needed (from metric → measure → model)
-2. Build the join graph (from explore definitions or entity relationships)
+1. Identify which tables are needed (from metric → measure → table)
+2. Build the join graph (from join definitions or entity relationships)
 3. Generate SELECT with correct aggregations
 4. Apply filters
 5. Validate against benchmarks if available
