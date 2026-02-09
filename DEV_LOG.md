@@ -10,59 +10,57 @@ This log captures development changes made during each session. Review this at t
 
 **Context**: Brainstorming session to evaluate alternative project directions. Reviewed the full codebase, DEV_LOG history, and current architecture to assess where the project's strengths actually lie and what would deliver the most value.
 
-### Decision: Pivot to LookML Workbench
+### Decision: Build an AI-Native Looker Replacement
 
-After evaluating five possible directions (Semantic Layer Product, Conversational Analyst, Embeddable Analytics, Data Storytelling, Open-Source Framework), decided to pivot toward an **LLM-powered LookML workbench** for analytics teams.
+After evaluating five possible directions (Semantic Layer Product, Conversational Analyst, Embeddable Analytics, Data Storytelling, Open-Source Framework), decided to build a **complete AI-native dashboarding platform that replaces Looker**.
+
+**North Star:** Use LookML as the **migration wedge** — parse existing LookML repos to extract the semantic layer (institutional knowledge), then build our own dashboarding suite on top. LookML is the input, not the output.
 
 **Strategic rationale:**
 1. The Tier 3 semantic layer pipeline (73% exact name match, 92% with near-misses) is the project's strongest technical asset
-2. LookML generation is a concrete, verifiable problem — output either works in Looker or it doesn't
-3. The target user is clear: data analysts/scientists on Looker teams who need to move fast from stakeholder request to dashboard
-4. This creates a foundation for the broader AI-powered analytics vision later (Phase 5)
-5. Real-world deployment planned: internal tool at a large public company, with a known Looker implementation to target
+2. LookML is the **input** — we extract semantic layers from existing LookML repos, then build our own platform
+3. The target user is data analysts/scientists currently using Looker who need to move fast
+4. North Star is a **complete Looker replacement** — extract semantic layer → build catalog → build dashboards
+5. Real-world deployment planned: internal tool at a large public company with existing Looker
+6. Existing React/Plotly frontend, FastAPI backend, conversation engine, and chart components are all directly reusable for the dashboard suite (Phase 3+)
 
-**Key use cases for the tool:**
-1. **Ingest & Index** — Parse an existing LookML repo, build a searchable catalog of views/explores/measures/dimensions
-2. **Generate** — Take schema + SQL queries + business docs → produce production-ready LookML
-3. **Navigate & Recommend** — "Does this metric exist?" / "What explore should I use?" / "What's missing for this request?"
-4. **Modify & Extend** — Add measures, dimensions, joins to existing LookML safely
+**The strategic sequence:**
+```
+Existing LookML repo (years of institutional knowledge)
+  → Phase 1: Extract into our portable semantic layer
+  → Phase 2: Metric catalog + structured queries (replaces Looker Explore)
+  → Phase 3: Dashboard builder (replaces Looker Dashboards)
+  → Phase 4: Production features (permissions, scheduling, alerting)
+  → Phase 5: AI-native analytics (auto-insights, investigation, prediction)
+```
 
 ### Files Modified
 
-- `DEV_PLAN.md` — Complete rewrite with new LookML workbench strategic plan, 5 implementation phases, architecture diagrams, success criteria, and code reuse mapping
+- `DEV_PLAN.md` — Complete rewrite: "Story Analytics — The Looker Replacement" with 5 implementation phases, semantic layer format design, architecture diagrams, competitive positioning, and detailed code reuse mapping
 
 ### Key Architectural Decisions
 
-1. **Use the `lkml` Python package** (MIT license) for parsing LookML rather than writing our own parser. Focus effort on the knowledge base and LLM integration.
-2. **Reuse the Tier 3 pipeline** — The SQL extraction → business logic → generation architecture maps directly to LookML generation. Retarget the output format.
-3. **CLI-first** — Start with a CLI tool (`lookml ingest`, `lookml generate`, `lookml chat`) before building the web UI. Faster iteration, easier to test.
-4. **Keep the React frontend and FastAPI backend** for later phases (catalog UI, team features) but don't invest in them until the core generation quality is proven.
-
-### What Gets Kept vs. Discarded
-
-**Keep & adapt:** LLM providers, Tier 3 pipeline, metric compiler, YAML prompt architecture, SQL validator, conversation patterns, pipeline architecture, dialect configs.
-
-**Keep for later:** React app, FastAPI backend, chart components, visual QA.
-
-**Build new:** LookML parser integration, knowledge base/catalog, LookML output generator, LookML validator, naming convention learning, gap analysis agent, modification agent, CLI.
-
-**Likely discard:** Chart pipeline, chart conversation, chart models, dashboard composer, branding, chart templates/styles.
+1. **LookML is input, not output.** We extract from LookML to bootstrap our semantic layer, then build everything on our own format.
+2. **Use the `lkml` Python package** (MIT license) for parsing LookML. Focus effort on extraction and enrichment, not parsing.
+3. **Our semantic layer format** is the core — portable, LLM-readable, compilable to SQL, richer than LookML (AI-enriched descriptions, lineage, domain classification).
+4. **The metric compiler is the query engine** — SQL is compiled from metric definitions, never hallucinated by the LLM. The LLM's job is selection (which metrics/dimensions), not generation.
+5. **Most existing code is reusable** — React charts, FastAPI backend, conversation engine, pipeline architecture all serve the dashboard suite. This isn't a rewrite, it's a retargeting.
 
 ### Implementation Phases (Summary)
 
-1. **Phase 1: LookML Parser & Knowledge Base** — Ingest `.lkml` files, build searchable catalog
-2. **Phase 2: LookML Generator** — Retarget Tier 3 pipeline to output LookML instead of dbt YAML
-3. **Phase 3: Conversational Interface** — CLI chat for LookML questions, generation, and modification
-4. **Phase 4: Web UI & Git Integration** — Catalog browser, visual diffs, Looker API validation
-5. **Phase 5: AI-Powered Dashboard Layer** — Full circle to the original vision, built on a solid semantic foundation
+1. **Phase 1: LookML Extraction Engine** — Parse LookML → our semantic layer format + AI enrichment
+2. **Phase 2: Metric Catalog & Structured Queries** — Browse/search metrics, structured query builder, conversational queries
+3. **Phase 3: Dashboard Builder** — Grid layout, multi-chart dashboards, cross-filtering (replaces Looker dashboards)
+4. **Phase 4: Production & Team Features** — Permissions, scheduling, alerting, caching
+5. **Phase 5: AI-Native Analytics** — Auto-insights, investigation agent, predictive analytics
 
 ### Next Steps
 
 - [ ] Research the `lkml` Python package — capabilities, limitations, parse output format
-- [ ] Find or create a sample LookML repo to use as test data (equivalent to our Olist dataset)
-- [ ] Build Phase 1: LookML parser integration and knowledge base
-- [ ] Write LookML-specific prompts for the generation pipeline
-- [ ] Set up validation: can we programmatically check if generated LookML is syntactically valid?
+- [ ] Find or create a sample LookML repo to use as test data
+- [ ] Design the portable semantic layer format in detail (YAML schema)
+- [ ] Build Phase 1: LookML parser integration and semantic layer extractor
+- [ ] Validate: parse LookML → our format → compile SQL → execute against DB
 
 ---
 
