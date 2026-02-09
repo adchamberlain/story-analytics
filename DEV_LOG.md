@@ -4,6 +4,68 @@ This log captures development changes made during each session. Review this at t
 
 ---
 
+## Session: 2026-02-09
+
+### Focus: Strategic Pivot — LookML Workbench Direction
+
+**Context**: Brainstorming session to evaluate alternative project directions. Reviewed the full codebase, DEV_LOG history, and current architecture to assess where the project's strengths actually lie and what would deliver the most value.
+
+### Decision: Pivot to LookML Workbench
+
+After evaluating five possible directions (Semantic Layer Product, Conversational Analyst, Embeddable Analytics, Data Storytelling, Open-Source Framework), decided to pivot toward an **LLM-powered LookML workbench** for analytics teams.
+
+**Strategic rationale:**
+1. The Tier 3 semantic layer pipeline (73% exact name match, 92% with near-misses) is the project's strongest technical asset
+2. LookML generation is a concrete, verifiable problem — output either works in Looker or it doesn't
+3. The target user is clear: data analysts/scientists on Looker teams who need to move fast from stakeholder request to dashboard
+4. This creates a foundation for the broader AI-powered analytics vision later (Phase 5)
+5. Real-world deployment planned: internal tool at a large public company, with a known Looker implementation to target
+
+**Key use cases for the tool:**
+1. **Ingest & Index** — Parse an existing LookML repo, build a searchable catalog of views/explores/measures/dimensions
+2. **Generate** — Take schema + SQL queries + business docs → produce production-ready LookML
+3. **Navigate & Recommend** — "Does this metric exist?" / "What explore should I use?" / "What's missing for this request?"
+4. **Modify & Extend** — Add measures, dimensions, joins to existing LookML safely
+
+### Files Modified
+
+- `DEV_PLAN.md` — Complete rewrite with new LookML workbench strategic plan, 5 implementation phases, architecture diagrams, success criteria, and code reuse mapping
+
+### Key Architectural Decisions
+
+1. **Use the `lkml` Python package** (MIT license) for parsing LookML rather than writing our own parser. Focus effort on the knowledge base and LLM integration.
+2. **Reuse the Tier 3 pipeline** — The SQL extraction → business logic → generation architecture maps directly to LookML generation. Retarget the output format.
+3. **CLI-first** — Start with a CLI tool (`lookml ingest`, `lookml generate`, `lookml chat`) before building the web UI. Faster iteration, easier to test.
+4. **Keep the React frontend and FastAPI backend** for later phases (catalog UI, team features) but don't invest in them until the core generation quality is proven.
+
+### What Gets Kept vs. Discarded
+
+**Keep & adapt:** LLM providers, Tier 3 pipeline, metric compiler, YAML prompt architecture, SQL validator, conversation patterns, pipeline architecture, dialect configs.
+
+**Keep for later:** React app, FastAPI backend, chart components, visual QA.
+
+**Build new:** LookML parser integration, knowledge base/catalog, LookML output generator, LookML validator, naming convention learning, gap analysis agent, modification agent, CLI.
+
+**Likely discard:** Chart pipeline, chart conversation, chart models, dashboard composer, branding, chart templates/styles.
+
+### Implementation Phases (Summary)
+
+1. **Phase 1: LookML Parser & Knowledge Base** — Ingest `.lkml` files, build searchable catalog
+2. **Phase 2: LookML Generator** — Retarget Tier 3 pipeline to output LookML instead of dbt YAML
+3. **Phase 3: Conversational Interface** — CLI chat for LookML questions, generation, and modification
+4. **Phase 4: Web UI & Git Integration** — Catalog browser, visual diffs, Looker API validation
+5. **Phase 5: AI-Powered Dashboard Layer** — Full circle to the original vision, built on a solid semantic foundation
+
+### Next Steps
+
+- [ ] Research the `lkml` Python package — capabilities, limitations, parse output format
+- [ ] Find or create a sample LookML repo to use as test data (equivalent to our Olist dataset)
+- [ ] Build Phase 1: LookML parser integration and knowledge base
+- [ ] Write LookML-specific prompts for the generation pipeline
+- [ ] Set up validation: can we programmatically check if generated LookML is syntactically valid?
+
+---
+
 ## Session: 2026-02-07 (Part 2 & 3)
 
 ### Focus: Advanced SQL Patterns + Fix Test Screenshot Infrastructure

@@ -1,342 +1,335 @@
-# Strategic Architecture Review: Story Analytics
+# Strategic Plan: LookML Workbench
 
-## Executive Summary
+## Vision
 
-After reviewing the codebase, test results, and generated outputs, we've identified fundamental architectural constraints that limit visual quality. The core issue isn't the LLM's capability—it's that **Evidence was designed for humans writing markdown, not for LLMs generating polished dashboards**. The indirection (LLM → Markdown → Evidence → ECharts) loses too much control.
+An LLM-powered LookML workbench that lets analytics teams move fast from stakeholder request to Looker dashboard. The tool handles the LookML plumbing — parsing existing models, generating new views and explores, recommending existing measures — so analysts can focus on analysis, not YAML syntax.
 
-## Current Architecture Limitations
+**Target user:** Data analyst or data scientist on an analytics team that uses Looker. They understand the data but don't want to spend hours writing LookML for every new request.
 
-### 1. The "Markdown as Dashboard" Problem
+**Day-one scenario:** Walk into a company with an existing Looker implementation. Ingest the LookML repo, build a searchable catalog, and immediately start helping analysts find existing measures or generate new LookML for stakeholder requests.
 
-Looking at the generated pages like `revenue-and-customer-count-by-industry/+page.md`:
+---
 
-```markdown
-<BarChart
-    data={query}
-    x="industry"
-    y={["total_revenue", "customer_count"]}
-    echartsOptions={{"grid": {...}, "series": [...]}}
-/>
+## Why LookML
+
+1. **Concrete pain point.** Writing and maintaining LookML is tedious, specialized work. Most teams have 1-2 LookML experts. When they leave, knowledge leaves.
+2. **Large addressable market.** Looker has 10K+ enterprise customers, all with this problem.
+3. **Verifiable output.** Generated LookML either works in Looker or it doesn't. Unlike "AI dashboards," quality is measurable.
+4. **Foundation for more.** A working semantic layer (which LookML is) unlocks structured AI analytics later — the LLM selects from known metrics instead of hallucinating SQL.
+5. **Existing proof of concept.** Our Tier 3 semantic layer pipeline achieves 73% exact metric name match (92% including near-misses) on a real dataset.
+
+---
+
+## Core Capabilities
+
+### 1. Ingest & Index (understand what exists)
+
+Parse an existing LookML repo and build a searchable, LLM-queryable catalog:
+
+- **Views:** All views, their SQL table references, dimensions, dimension groups, measures
+- **Explores:** How views are joined, relationship types, access filters
+- **Models:** Which explores are in which models, access grants, datagroups
+- **Derived tables:** Native and SQL derived tables, their persistence strategy
+- **Cross-references:** Which measures reference which dimensions, field-level lineage
+- **Usage patterns:** (future) Which fields are actually used in dashboards/looks
+
+**Output:** An internal representation (likely our existing semantic layer YAML format or an extended version) that the LLM can reason over efficiently.
+
+### 2. Generate (create new LookML)
+
+Take inputs and produce production-ready LookML:
+
+**Inputs (any combination of):**
+- Database schema (table DDL, column types)
+- Sample SQL queries (analyst's existing work)
+- Business documentation (wiki pages, data dictionaries, Confluence)
+- Natural language description ("I need revenue metrics by product category")
+- Existing LookML (the context of what already exists)
+
+**Outputs:**
+- LookML view files with dimensions, dimension groups, measures
+- Explore definitions with joins
+- Derived table SQL when needed
+- Model file updates
+
+**Quality targets:**
+- Generated LookML passes `lookml-linter` and Looker's validator
+- Metric names follow the team's existing naming conventions (learned from ingested LookML)
+- Joins use correct relationship types (many_to_one, etc.)
+- Proper use of `type:`, `sql:`, `label:`, `description:`, `group_label:`
+
+### 3. Navigate & Recommend (find the right answer fast)
+
+When an analyst gets a stakeholder request, the tool helps them figure out what to do:
+
+- **"Does this metric already exist?"** — Search the catalog by concept, not just name
+- **"What explore should I use for this?"** — Recommend based on the tables/fields needed
+- **"What's missing?"** — Gap analysis: "You need a `product_category` dimension, which requires joining `dim_products`. Here's the LookML."
+- **"Explain this measure."** — Show the SQL, the view it lives in, what explore exposes it, and what dashboards use it
+
+### 4. Modify & Extend (evolve existing LookML)
+
+Help analysts modify existing LookML safely:
+
+- **Add a measure to an existing view** — "Add a count of distinct customers to the orders view"
+- **Add a dimension group** — "Add a created_at time dimension with date, week, month, quarter, year"
+- **Extend an explore** — "Join the products table to the orders explore"
+- **Refactor** — "This derived table SQL is slow, optimize it" or "Extract this repeated logic into a common view"
+
+---
+
+## Architecture
+
+### How It Maps to Existing Code
+
+```
+EXISTING CODE (reuse)              NEW CODE (build)
+─────────────────────              ────────────────
+Tier 3 pipeline                    LookML parser/reader
+  SQL extraction agent      →      LookML output generator
+  Business logic extraction →      LookML catalog/index
+  Metric compilation        →      LookML validator
+
+Multi-LLM support                  Request-to-LookML pipeline
+  Claude, OpenAI, Gemini    →      Conversational interface
+
+YAML config architecture           Git integration (LookML repos)
+  Prompts, dialects         →      Looker API integration (future)
+
+DuckDB SQL validation       →      LookML SQL validation
 ```
 
-The LLM generates text that Evidence interprets. This creates several problems:
-- **No layout control**: One chart per page, no grid positioning
-- **Limited component API**: Evidence exposes only specific props
-- **Styling constraints**: echartsOptions helps but can't override Evidence defaults
-- **No dashboard composition**: No way to combine multiple charts, KPIs, text insights
-
-### 2. Visual Quality Gap
-
-Comparing generated output to Tableau/Looker/Mode:
-- **Flat, static appearance** vs. animated, interactive feel
-- **Basic typography** vs. professional information hierarchy
-- **Cluttered sidebar** with auto-generated page names
-- **No contextual insights** or data annotations
-- **Single chart isolation** instead of dashboard context
-
-### 3. What Works Well (Keep This)
-
-- **SQL generation pipeline**: 97% pass rate, handles complex queries
-- **Intent classification**: Good at understanding what users want
-- **Filter integration**: DateRange, Dropdown work correctly
-- **Design system approach**: YAML-based configuration is right idea
-
-## The Vision: What "LLM-Native" Should Mean
-
-The CLAUDE.md states this should be "AI-native" where the "LLM is the core, not a bolted-on feature." For visualization, this means:
-
-1. **The LLM should control the visual output directly**, not generate intermediate formats
-2. **The LLM should reason about visual design**, not just data queries
-3. **Output should match Tableau/Looker quality** in polish and professionalism
-4. **Multi-chart dashboards** with layouts, not isolated single charts
-5. **Contextual intelligence**: automated insights, annotations, explanations
-
-## Recommendation: Custom Rendering Layer with JSON Spec
-
-### Architecture Overview
+### System Architecture
 
 ```
-User Request
-    ↓
-Conversation Engine (keep existing)
-    ├─ Intent Classification
-    ├─ SQL Generation (keep existing - it works)
-    └─ NEW: Dashboard Composition Agent
-    ↓
-Dashboard Specification (JSON)
-    ├─ Layout grid (rows, columns, sizing)
-    ├─ Chart configs (full control)
-    ├─ KPI cards with formatting
-    ├─ Annotations and insights
-    └─ Interactive filters
-    ↓
-Custom React/Vue Frontend
-    ├─ Plotly.js or Highcharts (not ECharts via Evidence)
-    ├─ Grid layout system (CSS Grid or react-grid-layout)
-    ├─ Professional design system
-    └─ Full interactivity (cross-filtering, drill-down)
+┌─────────────────────────────────────────────────────────────┐
+│                    LookML Workbench                          │
+│                                                              │
+│  ┌──────────┐   ┌──────────┐   ┌──────────┐                │
+│  │  Ingest   │   │ Generate  │   │ Navigate  │   ← CLI/Web  │
+│  │  & Index  │   │   New     │   │& Recommend│     Interface │
+│  └────┬──────┘   └─────┬────┘   └─────┬─────┘              │
+│       │                │              │                      │
+│       ▼                ▼              ▼                      │
+│  ┌──────────────────────────────────────────┐               │
+│  │          LookML Knowledge Base            │               │
+│  │  (parsed views, explores, measures,       │               │
+│  │   dimensions, joins, naming conventions)  │               │
+│  └──────────────────────┬───────────────────┘               │
+│                         │                                    │
+│       ┌─────────────────┼─────────────────┐                 │
+│       ▼                 ▼                 ▼                  │
+│  ┌─────────┐    ┌──────────────┐   ┌──────────┐            │
+│  │ LookML  │    │  LLM Pipeline │   │  Schema  │            │
+│  │ Parser  │    │  (Claude/     │   │  Reader  │            │
+│  │         │    │   OpenAI/     │   │ (DB DDL) │            │
+│  │         │    │   Gemini)     │   │          │            │
+│  └─────────┘    └──────────────┘   └──────────┘            │
+│                                                              │
+└─────────────────────────────────────────────────────────────┘
+         │                                    │
+         ▼                                    ▼
+    LookML Repo                         Database
+    (Git)                              (Snowflake, BQ, etc.)
 ```
 
-### Why Not Other Options?
-
-| Option | Verdict | Reason |
-|--------|---------|--------|
-| **Stay with Evidence** | No | Fundamental API limitations can't be fixed without forking |
-| **Apache Superset** | No | Designed as standalone tool, not embeddable; heavy infrastructure |
-| **Metabase/Lightdash** | No | Same issues—designed for point-and-click, not LLM generation |
-| **Vega-Lite** | Maybe | Good spec format, but limited chart types and styling |
-| **Custom Frontend** | Yes | Full control, can achieve Tableau-quality output |
-
-### The Dashboard Specification Format
-
-Instead of markdown, the LLM generates a JSON dashboard spec:
-
-```json
-{
-  "title": "Revenue Analysis Dashboard",
-  "subtitle": "Q4 2025 Performance Overview",
-  "layout": {
-    "rows": [
-      {"height": "auto", "items": [
-        {"type": "kpi", "width": 3, "id": "total_revenue"},
-        {"type": "kpi", "width": 3, "id": "customer_count"},
-        {"type": "kpi", "width": 3, "id": "avg_order"},
-        {"type": "kpi", "width": 3, "id": "growth_rate"}
-      ]},
-      {"height": 400, "items": [
-        {"type": "chart", "width": 8, "id": "revenue_trend"},
-        {"type": "chart", "width": 4, "id": "segment_breakdown"}
-      ]}
-    ]
-  },
-  "components": {
-    "total_revenue": {
-      "type": "kpi",
-      "query": "SELECT SUM(amount) as value FROM invoices",
-      "format": "currency",
-      "label": "Total Revenue",
-      "trend": {"compare": "previous_quarter", "show_delta": true}
-    },
-    "revenue_trend": {
-      "type": "line",
-      "query": "...",
-      "x": "month",
-      "y": ["revenue", "target"],
-      "style": {
-        "colors": ["#6366f1", "#e0e7ff"],
-        "annotations": [
-          {"type": "reference_line", "y": 100000, "label": "Target"}
-        ]
-      }
-    }
-  },
-  "filters": {
-    "date_range": {"type": "daterange", "default": "last_12_months"},
-    "segment": {"type": "dropdown", "query": "SELECT DISTINCT segment FROM customers"}
-  },
-  "insights": [
-    "Revenue increased 12% compared to last quarter",
-    "Technology segment drives 35% of total revenue"
-  ]
-}
-```
-
-### Key Benefits
-
-1. **Full Layout Control**: Grid-based positioning, responsive design
-2. **Rich Chart Types**: Not limited to Evidence's component library
-3. **Professional Styling**: Direct control over every visual element
-4. **Contextual Intelligence**: Insights, annotations, trend indicators
-5. **True Dashboards**: Multiple charts with cross-filtering
-6. **Extensible**: Add new chart types without framework constraints
+---
 
 ## Implementation Phases
 
-### Phase 1: Foundation ✅ COMPLETE
-**Status:** Completed 2026-01-24
+### Phase 1: LookML Parser & Knowledge Base
 
-**Deliverables:**
-- [x] React app scaffold in `app/` with Vite + TypeScript
-- [x] Plotly.js chart components (Line, Bar, Area, Scatter, BigValue, DataTable)
-- [x] Backend render endpoints (`api/routers/render.py`)
-- [x] Feature flag to toggle between Evidence and React renderers
-- [x] Test charts for verification
+**Goal:** Read a LookML repo and build a structured, queryable representation.
 
-**Key Files:**
-- `app/` - React frontend
-- `api/routers/render.py` - Render API
-- `frontend/src/lib/stores/settings.ts` - Renderer toggle
-- `frontend/src/lib/components/ChartEmbed.svelte` - Updated with toggle
+**What to build:**
+- LookML file parser (`.lkml` files → structured Python objects)
+  - Views: name, sql_table_name, dimensions, dimension_groups, measures, sets, parameters
+  - Explores: name, from, joins (with relationship, type, sql_on), access_filters
+  - Models: name, includes, explores, datagroups
+  - Derived tables: SQL and native, persistence settings
+- Knowledge base store (probably SQLite + our YAML format)
+  - Full-text search over field names, labels, descriptions, SQL expressions
+  - Cross-reference index (which views are joined in which explores)
+  - Naming convention extractor (detect patterns like `count_`, `total_`, `avg_` prefixes)
 
----
+**Existing code to reuse:**
+- `engine/semantic.py` — SemanticLayer model (extend for LookML concepts)
+- `engine/config_loader.py` — YAML loading infrastructure
+- `engine/schema.py` — Schema introspection patterns
 
-### Phase 2: Visual Polish ✅ COMPLETE
-**Status:** Completed 2026-01-24
+**Key decision:** Use the existing `lkml` Python package (MIT license, parses LookML to dict) rather than writing our own parser. Focus our effort on the knowledge base and LLM integration, not parsing.
 
-**Goal:** Make React charts look professional (Tableau/Looker quality)
-
-**Deliverables:**
-- [x] Professional design system
-  - Typography scale (text-xs through text-4xl)
-  - Color palette with semantic colors (trend-up, trend-down, trend-neutral)
-  - Spacing system (space-1 through space-12)
-  - Transitions (fast, base, slow)
-- [x] Enhanced BigValue/KPI cards
-  - Trend indicators (TrendIndicator.tsx - up/down arrows with semantic color)
-  - Comparison values (DeltaValue.tsx - formatted change with sign/color)
-  - Sparkline mini-charts (Sparkline.tsx - inline Plotly charts)
-- [x] Chart improvements
-  - Better axis formatting (smart SI prefixes via formatters.ts)
-  - Grid line styling (semi-transparent, zero-line highlighting)
-  - Hover tooltips with formatting (createHoverTemplate)
-  - Smooth animations on load/update (fade-in CSS, Plotly transitions)
-- [x] Loading states
-  - Skeleton loaders (SkeletonBase.tsx, ChartSkeleton.tsx)
-  - Smooth fade transitions
-
-**Key Files Created:**
-- `app/src/utils/formatters.ts` - Number formatting utilities
-- `app/src/components/charts/TrendIndicator.tsx` - Arrow indicators
-- `app/src/components/charts/DeltaValue.tsx` - Change value display
-- `app/src/components/charts/Sparkline.tsx` - Mini inline charts
-- `app/src/components/skeletons/` - Loading skeleton components
+**Deliverable:** `lookml ingest /path/to/lookml-repo` → searchable catalog you can query from Python.
 
 ---
 
-### Phase 3: Chat UI Migration ✅ COMPLETE
-**Status:** Completed 2026-01-24
+### Phase 2: LookML Generator
 
-**Goal:** Move conversation UI from SvelteKit to React (unified frontend)
+**Goal:** Generate valid LookML from schema + context.
 
-**Deliverables:**
-- [x] Chat components in React
-  - Message.tsx - Message display with markdown, action buttons
-  - ChatInput.tsx - Auto-resizing textarea
-  - ProgressSteps.tsx - Streaming progress indicator
-- [x] Conversation state management
-  - conversationStore.ts - Full Zustand store
-  - API client with SSE streaming support
-- [x] Chat page
-  - Welcome state with example prompts
-  - Message list with auto-scroll
-  - Dashboard creation success state
-- [x] Navigation
-  - Sidebar with conversation history
-  - Dashboard list
-  - New conversation button
+**What to build:**
+- LookML output templates (Jinja2 or string-based) for views, explores, models
+- Adaptation of the Tier 3 pipeline:
+  - Input: schema DDL + SQL queries + business docs (same as today)
+  - Middle: LLM extracts business logic + naming conventions (same as today)
+  - Output: LookML files instead of dbt MetricFlow YAML (new)
+- LookML validator integration
+  - Syntax validation (does it parse?)
+  - Semantic validation (do referenced fields exist? are join relationships correct?)
+- Naming convention adherence
+  - If an existing LookML repo was ingested (Phase 1), learn its conventions
+  - Apply them to generated output (e.g., if existing uses `count_distinct_` prefix, so should new measures)
 
-**Key Files:**
-- `app/src/components/chat/` - Chat components
-- `app/src/stores/conversationStore.ts` - Chat state
-- `app/src/pages/ChatPage.tsx` - Main chat page
-- `app/src/components/layout/Sidebar.tsx` - Navigation sidebar
+**Existing code to reuse:**
+- `engine/semantic_generator.py` — Tier 3 generation pipeline (retarget)
+- `engine/metric_compiler.py` — Metric definition validation logic
+- `engine/prompts/semantic/` — Generation prompts (adapt for LookML)
+- `sources/*/dialect.yaml` — SQL dialect knowledge
+
+**Deliverable:** `lookml generate --schema schema.sql --queries queries/ --docs wiki/` → valid LookML files.
 
 ---
 
-### Phase 4: Deprecate SvelteKit ✅ COMPLETE
-**Status:** Completed 2026-01-24
+### Phase 3: Conversational Interface
 
-**Goal:** Single unified React app replaces SvelteKit frontend
+**Goal:** Natural language interaction for analysts.
 
-**Deliverables:**
-- [x] All SvelteKit routes migrated to React
-  - Login page with magic link auth
-  - Auth verify page
-  - Charts list page with search/filter/preview
-  - Dashboards list page
-  - Settings page
-- [x] Authentication flow in React
-  - ProtectedRoute component
-  - JWT token management
-  - Redirect to login when not authenticated
-- [x] Remove SvelteKit from `dev.sh`
-  - React is now the primary frontend
-  - Evidence optional (--evidence flag)
-- [x] Update documentation
+**What to build:**
+- CLI chat interface for LookML questions and generation
+  - "What measures exist for revenue?" → searches catalog
+  - "Generate a view for the new events table" → runs generator
+  - "Add a count of distinct users to the orders view" → modifies existing LookML
+  - "What explore should I use to analyze churn?" → recommends based on catalog
+- Request analysis agent
+  - Takes a stakeholder request ("VP needs revenue by region dashboard")
+  - Searches the catalog for existing measures/explores
+  - Identifies what's missing
+  - Generates a plan: "These 3 measures exist. You need 1 new dimension and 1 new explore join."
+- Modification agent
+  - Takes existing LookML + modification request
+  - Produces a diff (not a full rewrite)
+  - Validates the result
 
-**Key Files:**
-- `app/src/pages/LoginPage.tsx` - Magic link login
-- `app/src/pages/VerifyPage.tsx` - Token verification
-- `app/src/pages/ChartsPage.tsx` - Charts library
-- `app/src/pages/DashboardsPage.tsx` - Dashboard list
-- `app/src/pages/SettingsPage.tsx` - User settings
-- `app/src/components/auth/ProtectedRoute.tsx` - Auth guard
+**Existing code to reuse:**
+- `engine/conversation.py` — Conversation state machine
+- `engine/chart_conversation.py` — Phase-based conversation flow
+- `engine/llm/` — All LLM providers
+- `engine/pipeline/` — Multi-agent pipeline architecture
 
----
-
-### Phase 5: Remove Evidence ✅ COMPLETE
-**Status:** Completed 2026-01-24
-
-**Goal:** Delete Evidence/markdown generation entirely
-
-**Deliverables:**
-- [x] Remove Evidence from `dev.sh`
-- [x] Delete `pages/` markdown generation code
-- [x] Delete `.evidence/` directory
-- [x] Delete `evidence.config.yaml` and `Dockerfile.evidence`
-- [x] Delete `engine/generator.py` (EvidenceGenerator)
-- [x] Delete `engine/components/evidence.yaml`
-- [x] Remove Evidence NPM dependencies from `package.json`
-- [x] Remove `to_evidence_markdown()` methods from models
-- [x] Update `dashboard_composer.py` to not write files
-- [x] Update `conversation.py` and `chart_conversation.py`
-- [x] Update tests to not reference Evidence
+**Deliverable:** `lookml chat` → interactive session for LookML work.
 
 ---
 
-## Alternative: Evidence Fork with Custom Components
+### Phase 4: Web UI & Git Integration
 
-If building from scratch feels too ambitious, consider:
+**Goal:** Production-grade tool for teams.
 
-1. **Fork Evidence** to remove component API restrictions
-2. **Create custom Svelte components** with full ECharts access
-3. **Modify the markdown parser** to support layout directives
+**What to build:**
+- Web UI for browsing the LookML catalog (metrics, dimensions, explores)
+- Visual diff view for generated/modified LookML
+- Git integration — commit generated LookML directly to the repo
+- Looker API integration — validate against live Looker instance
+- Team features — shared catalog, annotation, review workflow
 
-This preserves the SQL/DuckDB infrastructure while unlocking styling control. However, you'd be maintaining a fork indefinitely.
-
-## Charting Library Comparison
-
-| Library | Pros | Cons | Recommendation |
-|---------|------|------|----------------|
-| **Plotly.js** | Excellent defaults, good interactivity, wide chart variety | Larger bundle size | Best balance |
-| **Highcharts** | Most polished, best animations | Commercial license | Good if licensed |
-| **ECharts (direct)** | Powerful, Evidence uses it | Complex API | If familiar |
-| **D3.js** | Ultimate flexibility | Requires building everything | Only for custom needs |
-| **Chart.js** | Lightweight, simple | Limited customization | Too basic |
-| **Observable Plot** | Modern, composable | Newer, less ecosystem | Worth watching |
-
-## Final Recommendation
-
-**Build a custom React frontend with Plotly.js**, keeping the existing SQL generation pipeline. This gives you:
-
-1. **Tableau-level visual quality** through direct chart control
-2. **Dashboard layouts** with multiple charts
-3. **LLM-native design** where the model controls visual output directly
-4. **Future flexibility** to add any visualization type
-5. **Clear separation** between data (SQL) and presentation (JSON spec)
-
-The existing Python engine and SQL generation are strong—the bottleneck is entirely in the Evidence rendering layer. Replacing that layer unlocks the full potential of the LLM-driven approach.
+**Existing code to reuse:**
+- `app/` — Full React frontend (retarget for catalog browsing)
+- `api/` — FastAPI backend (retarget for LookML operations)
+- `app/src/stores/` — Zustand state management patterns
 
 ---
 
-## Appendix: Current Test Results
+### Phase 5: AI-Powered Dashboard Layer (Future)
 
-### Standard Tests (30 tests)
-| Provider | Pass Rate |
-|----------|-----------|
-| Claude | 97% (29/30) |
-| OpenAI | 97% (29/30) |
-| Gemini | 97% (29/30) |
+**Goal:** Full circle back to the original vision, but on solid foundations.
 
-### Advanced Tests (30 tests)
-| Provider | Pass Rate |
-|----------|-----------|
-| Claude | 60% (18/30) |
-| OpenAI | 57% (17/30) |
-| Gemini | 53% (16/30) |
-
-The ~40% drop on advanced tests reflects limitations in complex analytics (MoM growth, conditional aggregation, threshold filtering) rather than visual quality—these would persist regardless of frontend choice.
+Once the semantic layer is solid:
+- Users browse a metric catalog, select what they want to see
+- The LLM conversation is highly structured: "Show me {metric} by {dimension} filtered by {filter}"
+- SQL is compiled from metric definitions, never hallucinated
+- Visualization is just the rendering layer — could be Plotly, could push to Looker itself
+- This is where the existing React charting components come back into play
 
 ---
 
-*Document created: 2026-01-24*
+## What We Keep vs. Discard vs. Build
+
+### Keep & Adapt
+- `engine/llm/` — Multi-LLM provider support (Claude, OpenAI, Gemini)
+- `engine/semantic_generator.py` — Tier 3 pipeline (retarget output to LookML)
+- `engine/metric_compiler.py` — Validation logic for metric definitions
+- `engine/prompts/` — YAML prompt architecture (write new prompts for LookML)
+- `engine/config_loader.py` — Configuration loading
+- `engine/sql_validator.py` — SQL validation (for derived table SQL)
+- `engine/conversation.py` — Conversation patterns
+- `engine/pipeline/` — Multi-agent pipeline architecture
+- `sources/*/dialect.yaml` — SQL dialect knowledge per database
+
+### Keep for Later (Phase 4-5)
+- `app/` — React frontend (retarget for catalog UI)
+- `api/` — FastAPI backend (retarget for LookML operations)
+- `app/src/components/charts/` — Chart components (Phase 5)
+- `engine/qa.py` — Visual QA (Phase 5)
+
+### Build New
+- LookML parser integration (using `lkml` package)
+- LookML knowledge base / catalog store
+- LookML output generator (view, explore, model file generation)
+- LookML validator
+- Naming convention learning/enforcement
+- Request → LookML gap analysis agent
+- LookML modification agent (edit existing, not just generate new)
+- CLI interface (`lookml` command)
+
+### Likely Discard
+- `engine/chart_pipeline.py` — Chart-specific pipeline (replace with LookML pipeline)
+- `engine/chart_conversation.py` — Chart conversation flow (replace with LookML flow)
+- `engine/models/chart.py` — Chart models
+- `engine/dashboard_composer.py` — Dashboard composition
+- `engine/brand.py` — Branding
+- `engine/templates/` — Chart/dashboard templates
+- `engine/components/` — Chart component definitions
+- `engine/styles/` — Chart styling
+
+---
+
+## Success Criteria
+
+### Phase 1 (Parser)
+- Can ingest a real-world LookML repo (50+ views) in under 30 seconds
+- All views, explores, dimensions, measures correctly parsed
+- Full-text search returns relevant results for concept queries
+
+### Phase 2 (Generator)
+- Generated LookML passes `lookml-linter` with zero errors
+- 80%+ of generated measures have correct SQL and type
+- Generated naming conventions match existing repo patterns when available
+- Generates valid join relationships with correct `relationship:` types
+
+### Phase 3 (Conversational)
+- Analyst can go from "VP needs revenue by region" to "here's the LookML you need" in under 2 minutes
+- Tool correctly identifies existing measures 90%+ of the time
+- Modification suggestions produce valid diffs
+
+### Phase 4 (Production)
+- Team of 5+ analysts using it weekly
+- Measurable reduction in time from request to LookML PR
+- Zero LookML syntax errors reaching Looker validation
+
+---
+
+## Open Questions
+
+1. **LookML version targeting.** Looker has evolved its LookML syntax over the years. Which version(s) do we target? Probably latest (Looker 24+), but need to handle legacy patterns in existing repos.
+
+2. **Derived tables strategy.** Derived tables are a big part of real-world LookML. How much do we invest in generating/optimizing SQL derived tables vs. encouraging native derived tables vs. just generating basic views?
+
+3. **Looker API integration priority.** Direct Looker API access would let us validate generated LookML against the live instance, see which fields are actually used in dashboards, etc. But it adds complexity and auth requirements. Phase 4 or earlier?
+
+4. **Multi-dialect SQL.** LookML `sql:` blocks can reference `${TABLE}` and Looker-specific SQL. We need to handle the dialect differences between Snowflake, BigQuery, Redshift, Postgres, etc. Our existing `dialect.yaml` system is a starting point.
+
+5. **Testing strategy.** How do we test generated LookML without a Looker instance? Options: parse validation only, Spectacles integration, or mock Looker validation.
+
+---
+
+*Document updated: 2026-02-09 — Pivoted from dashboard builder to LookML workbench*
+*Previous plan (React chart rendering migration) archived in git history*
