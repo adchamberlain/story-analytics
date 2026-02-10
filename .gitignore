@@ -16,3 +16,5 @@ qa_screenshots/
 app/dist/
 .story-analytics/
 .claude/
+test_data/
+output/
