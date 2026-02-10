@@ -10,6 +10,12 @@ Usage:
 
     # Enrich an already-extracted directory
     python tools/extract_lookml.py --enrich-only <extracted_dir>
+
+    # Full pipeline: extract + enrich + convert to semantic.yaml
+    python tools/extract_lookml.py <repo_path> --output <output_dir> --enrich --to-semantic mattermost
+
+    # Convert already-enriched output to semantic.yaml
+    python tools/extract_lookml.py --convert-to-semantic output/mattermost/enriched/ --source-name mattermost
 """
 
 import argparse
@@ -40,11 +46,29 @@ def main():
                         help="Output directory for enriched files (default: <input>/enriched/)")
     parser.add_argument("--model", default="claude-sonnet-4-5-20250929",
                         help="Anthropic model for enrichment (default: claude-sonnet-4-5-20250929)")
+    parser.add_argument("--to-semantic", metavar="SOURCE_NAME", default=None,
+                        help="After enrichment, convert to semantic.yaml for this source name")
+    parser.add_argument("--semantic-output", default=None,
+                        help="Output path for semantic.yaml (default: sources/<source_name>/semantic.yaml)")
+    parser.add_argument("--convert-to-semantic", metavar="DIR", default=None,
+                        help="Convert an already-enriched Data Context directory to semantic.yaml (no extraction)")
+    parser.add_argument("--source-name", default=None,
+                        help="Source name for --convert-to-semantic (required with that flag)")
     args = parser.parse_args()
+
+    # Mode: convert-to-semantic only
+    if args.convert_to_semantic:
+        if not args.source_name:
+            parser.error("--source-name is required with --convert-to-semantic")
+        _run_convert_to_semantic(args.convert_to_semantic, args.source_name, args.semantic_output)
+        return
 
     # Mode: enrich-only (no extraction)
     if args.enrich_only:
         _run_enrich_only(args.enrich_only, args.enrich_output, args.model)
+        if args.to_semantic:
+            enrich_out = args.enrich_output or os.path.join(args.enrich_only, "enriched")
+            _run_convert_to_semantic(enrich_out, args.to_semantic, args.semantic_output)
         return
 
     # Mode: extraction (with optional enrichment)
@@ -94,6 +118,16 @@ def main():
         print()
         _run_enrich_only(args.output, args.enrich_output, args.model)
 
+    # Step 6: Convert to semantic.yaml (optional)
+    if args.to_semantic:
+        print()
+        # Use enriched output if enrichment ran, otherwise raw extraction
+        if args.enrich:
+            semantic_input = args.enrich_output or os.path.join(args.output, "enriched")
+        else:
+            semantic_input = args.output
+        _run_convert_to_semantic(semantic_input, args.to_semantic, args.semantic_output)
+
 
 def _run_enrich_only(input_dir: str, output_dir: str | None, model: str) -> None:
     """Run LLM enrichment on an already-extracted Data Context directory."""
@@ -125,6 +159,31 @@ def _run_enrich_only(input_dir: str, output_dir: str | None, model: str) -> None
     print(f"  API time:           {summary.total_api_time_s:.1f}s")
     print(f"  Total time:         {elapsed:.1f}s")
     print(f"  Output:             {enrich_out}/")
+
+
+def _run_convert_to_semantic(input_dir: str, source_name: str, output_path: str | None) -> None:
+    """Convert enriched Data Context to SemanticLayer format."""
+    from tools.lookml_extractor.semantic_converter import convert_data_context_to_semantic
+
+    print(f"=== Semantic Layer Conversion ===")
+    print(f"  Input:  {input_dir}/")
+    print(f"  Source: {source_name}")
+    t0 = time.time()
+
+    sl = convert_data_context_to_semantic(input_dir, source_name, output_path)
+
+    elapsed = time.time() - t0
+    out = output_path or os.path.join("sources", source_name, "semantic.yaml")
+
+    print()
+    print("=== Conversion Complete ===")
+    print(f"  Tables:        {len(sl.tables)}")
+    print(f"  Relationships: {len(sl.relationships)}")
+    print(f"  Key metrics:   {len(sl.business_context.key_metrics)}")
+    print(f"  Glossary:      {len(sl.business_context.business_glossary)}")
+    print(f"  Patterns:      {len(sl.query_patterns)}")
+    print(f"  Time:          {elapsed:.1f}s")
+    print(f"  Output:        {out}")
 
 
 if __name__ == "__main__":
