@@ -1174,5 +1174,98 @@ User: "Show me monthly revenue by category for the first half of 2018"
 
 ---
 
+## Creation Workflow
+
+How a data context gets built. The guiding principle: **AI generates, humans review.** No one writes YAML. No one stares at schema dumps. The system does the research and drafts the document; domain experts review it like they'd review a memo from an employee.
+
+### Step 1: Connect & Discover (Fully Automatic)
+
+User provides a database connection. The system crawls every table and profiles the data:
+- Row counts, column types, cardinality, null rates
+- Sample values, min/max ranges, date boundaries
+- Foreign key detection (column name matching + value overlap analysis)
+- Distribution analysis (skew, outliers, top values)
+
+This is Tier 1 from our proof-of-concept work (31% metric name accuracy on its own). No user input needed — it runs in minutes.
+
+### Step 2: Gather Context (Mostly Automatic)
+
+The system automatically pulls as much context as it can from the database connection, then optionally accepts additional inputs. The minimum path is just the database connection — everything else makes the output better but is not required.
+
+**Automatic (no user action needed):**
+- **Query history** — Most warehouses (Snowflake `QUERY_HISTORY`, BigQuery `INFORMATION_SCHEMA.JOBS`, Redshift `STL_QUERYTEXT`) store recent SQL. The system pulls the last 90 days of queries directly from the warehouse, extracts business logic patterns, and identifies commonly-used metrics and joins. No one needs to Slack their colleagues or collect files manually.
+
+**One-click (if available):**
+- **GitHub repo scan** — User connects their GitHub org. The system scans for repos containing `.lkml` files or `dbt_project.yml` and presents a list: "We found these repos. Which ones are relevant?" One click, not a scavenger hunt.
+
+**Optional (user provides if they have it):**
+- Business documentation, data dictionaries, wiki pages, onboarding docs
+- A plain-text description of the business ("We're a Brazilian e-commerce marketplace...")
+- Additional SQL files or saved queries beyond what query history captured
+
+Each input gets processed and compressed into structured context. More inputs → better output. The PoC showed business documentation is the single highest-impact input (Tier 3: 73% accuracy). But the minimum viable path — database profiling + query history — requires nothing from the user beyond a connection string.
+
+### Step 3: Generate Draft (AI Synthesizes Everything)
+
+The LLM synthesizes all inputs into a complete data context: tables, dimensions, measures, metrics, joins, knowledge base. The output is stored as YAML internally, but **users never see the YAML.**
+
+### Step 4: Review (Readable Memo, Not YAML)
+
+The system generates a **plain-language review document** — a bullet-point memo organized by business domain. This is what reviewers actually see:
+
+```markdown
+## Revenue Metrics
+
+- **GMV** — Sum of product prices, excluding freight. Includes all order
+  statuses. For realized revenue, use Realized GMV.
+- **Realized GMV** — GMV filtered to delivered orders only (~97% of total).
+- **AOV** — GMV divided by distinct order count. Currently ~R$137.
+- **Freight Revenue** — Sum of freight charges across all line items.
+
+## How Tables Connect
+
+- Order Items → Customers (via customer_id, many-to-one)
+- Order Items → Products (via product_id, many-to-one)
+- Order Items → Sellers (via seller_id, many-to-one)
+
+## Things to Watch Out For
+
+- customer_id is NOT unique per person. Use customer_unique_id for counts.
+- Price is per line item, not per order. An order with 3 items = 3 rows.
+- Only ~10% of orders have reviews. Review data is biased toward extremes.
+```
+
+**Review process:**
+- Works like a PR review or doc edit. Reviewers read the memo, make corrections in plain language ("We call this Net Revenue, not Realized GMV", "That join is wrong, we use order_unique_id now").
+- Different domain experts review different sections — the revenue team reviews revenue metrics, the product team reviews product metrics. No single person needs to know everything.
+- The AI takes the corrections and updates the data context. Reviewers never touch YAML.
+- Multiple review rounds are fine. Each round produces a cleaner memo.
+
+### Step 5: Validate (Mostly Automated)
+
+Validation is primarily machine-driven. Humans should not be expected to confirm exact numbers — data changes constantly and no one knows the precise value of any metric at any given moment.
+
+**Automated checks (no human needed):**
+- Row count consistency across joined tables
+- Foreign key integrity (do join keys actually match?)
+- No-nonsense checks: negative revenue, future dates, NULL primary keys
+- Internal consistency: do metrics that should be related actually add up? (e.g., GMV = Realized GMV + Canceled GMV)
+- SQL compilation: does every metric definition produce valid, executable SQL?
+
+**Cross-reference checks (minimal human input):**
+- If existing reports or dashboards exist (Looker, Tableau, spreadsheets), compare key numbers. "Your Looker dashboard shows Q1 GMV was R$4.2M. Our calculation gives R$4.18M — within 0.5%, likely a rounding difference."
+- Humans confirm order of magnitude ("yes, GMV is in the millions, not thousands") — not exact values.
+
+**The output of validation is the `validated_examples` section** — but these are machine-generated benchmarks with tolerance ranges, not human-confirmed exact numbers.
+
+### Incremental Updates
+
+Adding a new table to the warehouse next month shouldn't require re-running the whole workflow:
+- System detects schema changes (new tables, new columns, dropped columns)
+- Generates a diff-style review memo: "3 new columns added to order_items. Recommended: add `shipping_method` as a categorical dimension."
+- Same review process — domain expert approves or corrects the diff
+
+---
+
 *Specification version 0.1.0-draft*
 *This is a living document. Version will increment as we validate against real-world LookML repos.*

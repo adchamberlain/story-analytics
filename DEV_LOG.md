@@ -4,6 +4,41 @@ This log captures development changes made during each session. Review this at t
 
 ---
 
+## Session: 2026-02-09 (Part 4)
+
+### Focus: Terminology Overhaul — Replacing Jargon with Plain Language
+
+**Context**: Reviewed the spec and identified several terms that feel like engineer-invented jargon rather than language data scientists actually use. Made four terminology changes throughout `DATA_CONTEXT_SPEC.md` to make the format more intuitive.
+
+### Terminology Changes
+
+| Old Term | New Term | Rationale |
+|---|---|---|
+| **Semantic Layer** | **Data Context** | "Semantic layer" is opaque jargon. "Data context" describes what it actually is — the context an LLM (or human) needs to understand your data. |
+| **Explores** | **Joins** | LookML-specific term that doesn't mean anything outside Looker. "Joins" is what they actually are. |
+| **Manifest** | **Metadata** | Plain English. It's metadata about the data context. |
+| **Models** | **Tables** | "Model" is overloaded (ML models, data models, dbt models). These represent tables/views in the warehouse — just call them tables. |
+
+### Changes Made
+
+- Renamed `SEMANTIC_LAYER_SPEC.md` → `DATA_CONTEXT_SPEC.md`
+- Updated all YAML keys: `explores:` → `joins:`, `model:` → `table:`, `base_model:` → `base_table:`, `manifest.yaml` → `metadata.yaml`, `story_semantic_layer` → `story_data_context`
+- Updated directory structure: `semantic_layer/` → `data_context/`, `models/` → `tables/`
+- Updated all prose, property tables, comments, and cross-format mappings
+- Preserved external tool terminology (LookML "explore", dbt "semantic_model", etc.) in mapping tables
+
+### Files Modified
+
+- `SEMANTIC_LAYER_SPEC.md` → `DATA_CONTEXT_SPEC.md` (renamed + 94 lines changed)
+
+### Next Steps
+
+- [ ] Update DEV_PLAN.md to use new terminology
+- [ ] Update any code references to old terminology (semantic layer generator, metric compiler, etc.)
+- [ ] Continue with spec validation against real LookML repos
+
+---
+
 ## Session: 2026-02-09 (Part 3)
 
 ### Focus: Story Semantic Layer Specification — v0.1.0-draft
