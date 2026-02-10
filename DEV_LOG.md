@@ -4,6 +4,82 @@ This log captures development changes made during each session. Review this at t
 
 ---
 
+## Session: 2026-02-09 (Part 7)
+
+### Focus: Wire LookML Extractor into Creation Workflow
+
+**Context**: The enriched Data Context output (`output/mattermost/enriched/`) uses a different format than the engine's `SemanticLayer` (`sources/{source}/semantic.yaml`). Built a converter to bridge the gap so enriched LookML extractions feed directly into dashboard creation.
+
+### Implementation
+
+New module: `tools/lookml_extractor/semantic_converter.py` with:
+
+| Function | Purpose |
+|----------|---------|
+| `convert_data_context_to_semantic()` | Main converter: reads enriched Data Context, builds SemanticLayer, saves YAML |
+| `_load_all_tables()` | Loads all domain YAML files from tables/ subdirectory |
+| `_parse_join_on()` | Parses LookML-style join ON clauses into from/to column pairs |
+| `_compute_schema_hash()` | Generates schema hash from metadata for change detection |
+
+**Mapping rules implemented:**
+
+| Data Context | SemanticLayer |
+|-------------|---------------|
+| table.dimensions[] | table.columns[] with `role: dimension` (or `role: date` for time dims) |
+| table.measures[] | table.columns[] with `role: measure`, `aggregation_hint` |
+| table.entities[] type=primary | table.columns[] with `role: primary_key` |
+| table.entities[] type=foreign | table.columns[] with `role: foreign_key` |
+| table.default_time_dimension | Marked with `role: date` |
+| certified metrics | business_context.key_metrics |
+| knowledge.glossary | business_context.business_glossary |
+| knowledge.domains | business_context.domain (top 5, comma-joined) |
+| joins[].joins[] | relationships[] with from/to column parsing |
+| derived metrics | query_patterns (expression → pattern) |
+| top dimension names | business_context.key_dimensions (top 10 by frequency) |
+
+CLI integration via `tools/extract_lookml.py`:
+- `--to-semantic <source_name>`: Convert after extraction/enrichment
+- `--convert-to-semantic <dir>`: Convert an already-enriched directory
+- `--source-name <name>`: Source name for --convert-to-semantic
+- `--semantic-output <path>`: Override output path (default: sources/{source}/semantic.yaml)
+
+### Conversion Results (Mattermost)
+
+| Metric | Value |
+|--------|-------|
+| Tables | 248 |
+| Relationships | 353 (from join parsing) |
+| Key metrics | 247 (certified) |
+| Glossary terms | 441 |
+| Key dimensions | 10 (most frequent) |
+| Query patterns | 303 (from derived metrics) |
+| Prompt context | 19,219 lines, 1.3M chars |
+| Conversion time | 3.2s |
+
+### Verification
+
+- SemanticLayer.load() ✓ — parses all 248 tables with columns, roles, aggregations
+- to_prompt_context() ✓ — produces 19K-line structured context with business glossary, tables, relationships
+- Round-trip (save → load → save) ✓ — all counts match exactly
+- Default output path ✓ — writes to sources/mattermost/semantic.yaml for auto-loading
+
+### Files Created/Modified
+
+- `tools/lookml_extractor/semantic_converter.py` (new — 250 lines)
+- `tools/extract_lookml.py` (modified — added --to-semantic, --convert-to-semantic, --source-name, --semantic-output flags)
+- `sources/mattermost/semantic.yaml` (generated — full semantic layer)
+- `DEV_LOG.md` (updated)
+
+### Next Steps
+
+- [ ] Test end-to-end: use `sources/mattermost/semantic.yaml` in the conversation engine to create a dashboard
+- [ ] Add connection.yaml for Mattermost source (currently no database connection)
+- [ ] Re-run enrichment on failed domains (blp, events, finance, mattermost batches)
+- [ ] Add extends resolution for LookML inheritance
+- [ ] Build dbt project extractor (same pipeline, different parser)
+
+---
+
 ## Session: 2026-02-09 (Part 6)
 
 ### Focus: LLM Enrichment of Extracted Data Context
