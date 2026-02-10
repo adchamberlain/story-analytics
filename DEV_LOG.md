@@ -70,13 +70,27 @@ CLI integration via `tools/extract_lookml.py`:
 - `sources/mattermost/semantic.yaml` (generated — full semantic layer)
 - `DEV_LOG.md` (updated)
 
+### End-to-End Test Investigation
+
+Explored what's needed to run Mattermost through the full dashboard creation pipeline. The engine runs SQL against **parquet files loaded into DuckDB**, not a live database. Current blockers for end-to-end:
+
+| Requirement | Status |
+|-------------|--------|
+| `sources/mattermost/semantic.yaml` | Done |
+| `sources/mattermost/connection.yaml` | Needed |
+| `sources/mattermost/dialect.yaml` | Needed (copy from snowflake_saas) |
+| `data/mattermost/**/*.parquet` | **Missing — no actual data** |
+| `engine_config.yaml` → mattermost | Needed |
+
+The LookML repo provides schema definitions but no data. Options: generate synthetic parquet data for key tables, test SQL generation without execution, or export from a real Mattermost/Snowflake instance.
+
 ### Next Steps
 
-- [ ] Test end-to-end: use `sources/mattermost/semantic.yaml` in the conversation engine to create a dashboard
-- [ ] Add connection.yaml for Mattermost source (currently no database connection)
+- [ ] **End-to-end test**: Resolve data gap (synthetic generation or real export), then create connection.yaml, dialect.yaml, and data/mattermost/ parquet files
 - [ ] Re-run enrichment on failed domains (blp, events, finance, mattermost batches)
 - [ ] Add extends resolution for LookML inheritance
 - [ ] Build dbt project extractor (same pipeline, different parser)
+- [ ] Test extractor against Mozilla repo for scale validation
 
 ---
 
