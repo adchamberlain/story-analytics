@@ -4,6 +4,163 @@ This log captures development changes made during each session. Review this at t
 
 ---
 
+## Session: 2026-02-09 (Part 6)
+
+### Focus: LLM Enrichment of Extracted Data Context
+
+**Context**: The LookML extractor produces a faithful mechanical extraction (248 tables, 4,404 measures, 3,574 metrics) but with quality gaps: 159 duplicate `count` metrics, 248 tables with zero descriptions, 1,195 measures without descriptions, no derived metrics. Built an LLM enrichment pipeline that layers business understanding on top of the raw extraction.
+
+### Implementation
+
+New module: `tools/lookml_extractor/enricher.py` with:
+
+| Function | Purpose |
+|----------|---------|
+| `enrich_domain()` | Enriches one domain's tables/metrics via Claude, with automatic batching for large domains |
+| `_enrich_batch()` | Single API call for a batch of tables |
+| `apply_enrichments()` | Merges enrichment deltas into existing tables/metrics (non-destructive) |
+| `enrich_data_context()` | Orchestrator: reads domain YAML, enriches each domain, writes enriched output |
+| `_extract_yaml_from_response()` | Robust YAML extraction handling code fences, double-fences, truncation, prose |
+| `_salvage_truncated_yaml()` | Recovers partial YAML from truncated API responses |
+
+CLI integration via `tools/extract_lookml.py`:
+- `--enrich`: Run enrichment after extraction
+- `--enrich-only <dir>`: Enrich an already-extracted directory
+- `--enrich-output <dir>`: Specify output directory
+- `--model <model>`: Override default model
+
+### Enrichment Results (Mattermost, First Run)
+
+| Metric | Value |
+|--------|-------|
+| Domains processed | 20/24 (4 failed — truncation/token limits, fixed with batching) |
+| Tables described | 165 (from 0 descriptions) |
+| Measures described | 455 new descriptions |
+| Dimensions described | 951 new descriptions |
+| Metrics renamed | 344 (e.g., `count` → `web_traffic_pageviews`) |
+| Derived metrics | 145 suggested (ratios, rates, averages) |
+| Certified metrics | 150 key metrics flagged |
+| Glossary terms | 256 (up from 50 shallow entries) |
+| Data quirks | 143 flagged |
+| API time | ~23 min total |
+
+### Key Design Decisions
+
+- **Delta pattern**: Enrichments are deltas that merge on top of raw extraction. Raw is never destroyed.
+- **Domain-at-a-time**: Each domain processed separately to stay within token limits.
+- **Automatic batching**: Domains with >10 tables split into batches (fixes the `mattermost` 202k token issue).
+- **Robust YAML parsing**: Line-based approach strips fence lines before parsing; truncation salvage removes incomplete trailing lines.
+- **max_tokens=16384**: Doubled from 8192 to reduce truncation on large domains.
+- **Error resilience**: Programming errors (AttributeError, TypeError) fail loudly; API/YAML errors log and continue.
+
+### Issues & Fixes During Development
+
+1. **Code fence extraction**: LLM sometimes returned double-fenced YAML (````yaml\n```yaml...```\n```). Fixed with line-based stripping approach instead of regex matching.
+2. **Truncated YAML**: Large domains exceeded max_tokens, cutting off mid-string. Fixed with salvage function that removes trailing incomplete lines, plus increased max_tokens.
+3. **Token limit overflow**: `mattermost` domain (31 tables, 1404 metrics) exceeded 200k token limit. Fixed with automatic batching (10 tables per batch).
+4. **Python output buffering**: Background shell didn't show output. Fixed with `PYTHONUNBUFFERED=1`.
+
+### Files Created/Modified
+
+- `tools/lookml_extractor/enricher.py` (new — 600+ lines)
+- `tools/extract_lookml.py` (modified — added --enrich, --enrich-only, --model flags)
+- `output/mattermost/enriched/` (generated — enriched Data Context)
+- `DEV_LOG.md` (updated)
+
+### Next Steps
+
+- [ ] Re-run enrichment on failed domains (blp, events, finance, mattermost) — should succeed with batching fix
+- [ ] Add extends resolution for LookML inheritance
+- [ ] Build dbt project extractor (same pipeline, different parser)
+- [ ] Wire extractor into the creation workflow (Step 2 → Step 3 handoff)
+- [ ] Test extractor against Mozilla repo for scale validation
+
+---
+
+## Session: 2026-02-09 (Part 5)
+
+### Focus: LookML → Data Context Extractor
+
+**Context**: With the Data Context spec finalized and terminology overhauled, needed to build the first real extraction pipeline — Step 2 of the creation workflow. Cloned public LookML repos (Mozilla looker-hub, Mattermost) as test data, determined Mattermost is the best PoC target (real SaaS business, 4,500+ measures), and built a deterministic extractor.
+
+### Test Data Selection
+
+Evaluated two public LookML repos:
+- **Mozilla looker-hub**: 2,569 .lkml files, 1,075 views — but auto-generated, telemetry-heavy, almost no measures. Good for scale testing, bad for PoC.
+- **Mattermost**: 246 views, 4,526 measures, hand-written with descriptions. SaaS domains: finance/ARR, CRM, product, sales, billing. Chose this.
+
+Both cloned to `test_data/` (gitignored).
+
+### LookML Extractor Built
+
+New package at `tools/lookml_extractor/` with 5 modules:
+
+| Module | Purpose |
+|--------|---------|
+| `models.py` | Intermediate dataclasses: LookMLView, LookMLDimension, LookMLMeasure, LookMLExplore, ParsedRepo |
+| `parser.py` | Parses `.lkml` files via `lkml` package, handles dimension_groups, from: aliases |
+| `mapper.py` | Maps LookML → Data Context: type mapping, SQL cleaning (`${TABLE}.col` → `col`), entity inference, value format detection |
+| `output_writer.py` | Writes YAML: metadata.yaml, tables/*.yaml (grouped by domain), metrics.yaml, joins.yaml, knowledge/ |
+| `memo_writer.py` | Generates 3,693-line review memo organized by business domain |
+
+CLI entry point: `python tools/extract_lookml.py <repo> --output <dir>`
+
+### Extraction Results (Mattermost)
+
+| Metric | Count |
+|--------|-------|
+| Tables | 248 |
+| Dimensions | 6,587 |
+| Measures | 4,404 |
+| Metrics (simple 1:1) | 3,574 |
+| Join Graphs | 143 |
+| Domains | 24 |
+| Parse time | ~2s |
+| Total time | ~4s |
+
+Output grouped into 24 domain files (orgm.yaml, finance.yaml, mattermost.yaml, etc.) plus cross-cutting metrics.yaml and joins.yaml.
+
+### Design Decisions
+
+- **Pure deterministic** — no LLM calls. This is a faithful extraction, not interpretation.
+- **1:1 measure→metric** — every non-hidden, non-derived measure gets a simple metric wrapper. Derived/ratio metrics left for future LLM-powered inference.
+- **No extends resolution** — 5 instances in Mattermost, skipped for now.
+- **Domain inference** from file paths (views/orgm/ → domain "orgm").
+- **Entity inference** from column naming patterns (_id, _pk) and primary_key flags.
+
+### Creation Workflow Updates
+
+Also updated `DATA_CONTEXT_SPEC.md` and `DEV_PLAN.md` with the refined creation workflow:
+- Step 1: Connect & Discover (automatic profiling)
+- Step 2: Gather Context (automatic query history + GitHub scan, optional manual inputs)
+- Step 3: Generate Draft (LLM)
+- Step 4: Review (readable memo, not YAML — PR-style domain expert review)
+- Step 5: Validate (mostly automated, humans only gut-check magnitude)
+
+### Files Created/Modified
+
+- `tools/lookml_extractor/__init__.py` (new)
+- `tools/lookml_extractor/models.py` (new)
+- `tools/lookml_extractor/parser.py` (new)
+- `tools/lookml_extractor/mapper.py` (new)
+- `tools/lookml_extractor/output_writer.py` (new)
+- `tools/lookml_extractor/memo_writer.py` (new)
+- `tools/extract_lookml.py` (new — CLI)
+- `requirements.txt` (added lkml>=1.3.0)
+- `.gitignore` (added test_data/, output/)
+- `DATA_CONTEXT_SPEC.md` (added Creation Workflow section)
+- `DEV_PLAN.md` (rewrote Phase 1 as Data Context Creation Engine)
+
+### Next Steps
+
+- [ ] Add extends resolution for LookML inheritance
+- [ ] Build dbt project extractor (same pipeline, different parser)
+- [ ] Add LLM-powered derived metric inference (ratios, YoY, etc.)
+- [ ] Test extractor against Mozilla repo for scale validation
+- [ ] Wire extractor into the creation workflow (Step 2 → Step 3 handoff)
+
+---
+
 ## Session: 2026-02-09 (Part 4)
 
 ### Focus: Terminology Overhaul — Replacing Jargon with Plain Language

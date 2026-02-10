@@ -2,10 +2,14 @@
 """Extract LookML repository into Data Context format.
 
 Usage:
+    # Extract only (deterministic, no LLM)
     python tools/extract_lookml.py <repo_path> --output <output_dir>
 
-Example:
-    python tools/extract_lookml.py test_data/mattermost-looker/ --output output/mattermost/
+    # Extract + enrich (extraction then LLM enrichment)
+    python tools/extract_lookml.py <repo_path> --output <output_dir> --enrich
+
+    # Enrich an already-extracted directory
+    python tools/extract_lookml.py --enrich-only <extracted_dir>
 """
 
 import argparse
@@ -26,10 +30,28 @@ def main():
     parser = argparse.ArgumentParser(
         description="Extract LookML repository into Data Context format."
     )
-    parser.add_argument("repo_path", help="Path to LookML repository root")
-    parser.add_argument("--output", "-o", required=True, help="Output directory for Data Context files")
+    parser.add_argument("repo_path", nargs="?", default=None, help="Path to LookML repository root")
+    parser.add_argument("--output", "-o", default=None, help="Output directory for Data Context files")
     parser.add_argument("--memo", "-m", default=None, help="Path for review memo (default: <output>/REVIEW_MEMO.md)")
+    parser.add_argument("--enrich", action="store_true", help="Run LLM enrichment after extraction")
+    parser.add_argument("--enrich-only", metavar="DIR", default=None,
+                        help="Enrich an already-extracted Data Context directory (no extraction)")
+    parser.add_argument("--enrich-output", default=None,
+                        help="Output directory for enriched files (default: <input>/enriched/)")
+    parser.add_argument("--model", default="claude-sonnet-4-5-20250929",
+                        help="Anthropic model for enrichment (default: claude-sonnet-4-5-20250929)")
     args = parser.parse_args()
+
+    # Mode: enrich-only (no extraction)
+    if args.enrich_only:
+        _run_enrich_only(args.enrich_only, args.enrich_output, args.model)
+        return
+
+    # Mode: extraction (with optional enrichment)
+    if not args.repo_path:
+        parser.error("repo_path is required unless using --enrich-only")
+    if not args.output:
+        parser.error("--output is required for extraction")
 
     memo_path = args.memo or f"{args.output}/REVIEW_MEMO.md"
 
@@ -66,6 +88,43 @@ def main():
     print(f"  Connection: {output.connection}")
     print(f"  Output:     {args.output}/")
     print(f"  Memo:       {memo_path}")
+
+    # Step 5: Enrich (optional)
+    if args.enrich:
+        print()
+        _run_enrich_only(args.output, args.enrich_output, args.model)
+
+
+def _run_enrich_only(input_dir: str, output_dir: str | None, model: str) -> None:
+    """Run LLM enrichment on an already-extracted Data Context directory."""
+    from tools.lookml_extractor.enricher import enrich_data_context
+
+    print(f"=== LLM Enrichment ===")
+    print(f"  Input:  {input_dir}/")
+    print(f"  Model:  {model}")
+    t0 = time.time()
+
+    summary = enrich_data_context(input_dir, output_dir, model=model)
+
+    elapsed = time.time() - t0
+    enrich_out = output_dir or os.path.join(input_dir, "enriched")
+
+    print()
+    print("=== Enrichment Complete ===")
+    print(f"  Domains processed:  {summary.domains_processed}")
+    if summary.domains_failed:
+        print(f"  Domains failed:     {summary.domains_failed} ({', '.join(summary.failed_domains)})")
+    print(f"  Tables described:   {summary.tables_described}")
+    print(f"  Measures described: {summary.measures_described}")
+    print(f"  Dims described:     {summary.dimensions_described}")
+    print(f"  Metrics renamed:    {summary.metrics_renamed}")
+    print(f"  Derived metrics:    {summary.metrics_derived}")
+    print(f"  Certified metrics:  {summary.metrics_certified}")
+    print(f"  Glossary terms:     {summary.glossary_terms}")
+    print(f"  Data quirks:        {summary.data_quirks}")
+    print(f"  API time:           {summary.total_api_time_s:.1f}s")
+    print(f"  Total time:         {elapsed:.1f}s")
+    print(f"  Output:             {enrich_out}/")
 
 
 if __name__ == "__main__":
