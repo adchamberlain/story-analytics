@@ -4,6 +4,403 @@ This log captures development changes made during each session. Review this at t
 
 ---
 
+## Session: 2026-02-13 (Part 6)
+
+### Focus: Build Phase 6 — Dashboard Assembly
+
+**Context**: Phases 1-5 complete. Phase 6 adds dashboard composition: pick charts from the library, arrange them in a grid, save, and share.
+
+### Phase 6: Dashboard Assembly
+
+**New Backend Files:**
+
+| File | Purpose |
+|------|---------|
+| `api/services/dashboard_storage.py` | JSON file persistence for dashboards in `data/dashboards/`. Save, load, list, update, delete. DashboardChartRef dataclass (chart_id + width). |
+| `api/routers/dashboards_v2.py` | REST endpoints: POST create, GET list, GET with full chart data (re-executes SQL for each chart), PUT update, DELETE. |
+
+**New Frontend Files:**
+
+| File | Purpose |
+|------|---------|
+| `app/src/stores/dashboardBuilderStore.ts` | Zustand store: title, description, ordered chart refs, addChart/removeChart/moveChart/setChartWidth, save (create or update), load for editing |
+| `app/src/components/dashboard/ChartPicker.tsx` | Modal overlay: fetches chart list, search filter, excludes already-added charts, "+ Add" buttons |
+| `app/src/components/dashboard/DashboardGrid.tsx` | Responsive 2-column grid rendering. Each chart cell maps API data → ChartConfig → ObservableChartFactory. Supports full/half width. |
+| `app/src/pages/DashboardBuilderPage.tsx` | Builder: title/description inputs, ordered chart cards with move up/down + width toggle + remove, "Add Chart" opens picker modal, save navigates to view |
+| `app/src/pages/DashboardViewPage.tsx` | Public view: fetches dashboard with all chart data, renders DashboardGrid, copy URL + embed code sharing |
+
+**Modified Files:**
+
+| File | Change |
+|------|--------|
+| `api/main.py` | Registered `dashboards_v2_router` |
+| `app/src/App.tsx` | Added routes: `/dashboard/new` (builder), `/dashboard/:dashboardId/edit` (edit builder), `/dashboard/v2/:dashboardId` (public view) |
+| `app/src/pages/LibraryPage.tsx` | Added "New Dashboard" button in header alongside "New Chart" |
+
+**API Endpoints:**
+- `POST /api/v2/dashboards/` — create dashboard
+- `GET /api/v2/dashboards/` — list all
+- `GET /api/v2/dashboards/{id}` — get with all chart data (re-executes SQL per chart)
+- `PUT /api/v2/dashboards/{id}` — update title/description/charts
+- `DELETE /api/v2/dashboards/{id}` — delete
+
+**Architecture Decisions:**
+- Dashboard = ordered list of chart references (chart_id + width), not embedded chart configs
+- Each chart can be "full" (span both columns) or "half" (one column) width
+- Builder uses move up/down buttons instead of drag-and-drop library (keeps deps minimal)
+- GET dashboard re-executes SQL for each chart (same as chart view page) — always fresh data
+- v2 dashboard routes use `/dashboard/v2/` prefix to avoid collision with v1 `/dashboard/:slug`
+
+**Verification:**
+- `tsc --noEmit` — zero type errors
+- `npm run build` — production build succeeds (13.0s, 1380 modules)
+- Python imports — all backend modules load cleanly
+
+### End-to-End Test Results (Confirmed Working)
+
+Full pipeline tested with dev server running:
+1. Upload CSV (12 rows, monthly sales by region) → source_id assigned
+2. AI proposes LineChart (revenue by region) + BarChart (units by region) → correct types, SQL, data
+3. Save both charts → persisted to `data/charts/`
+4. GET chart with data → SQL re-executes, returns 12 rows
+5. Chart list → 2 charts returned
+6. Create dashboard with both charts (line=full, bar=half) → saved to `data/dashboards/`
+7. GET dashboard with chart data → both charts' SQL re-executed, data returned
+8. Update dashboard title → works
+9. Delete chart → works
+10. All 4 frontend routes (`/library`, `/chart/:id`, `/dashboard/new`, `/dashboard/v2/:id`) return 200
+11. Vite proxy → FastAPI works for both charts and dashboards APIs
+12. **Visual confirmation**: all pages render correctly in browser
+13. **Realistic data test**: Generated 1,197 invoices with growth trend + seasonality ($40K–$110K/month). AI produced correct `DATE_TRUNC` SQL, line chart shows real trend, bar chart shows paid vs pending breakdown. Dashboard renders both charts — visually confirmed.
+
+### Next Steps
+- Consider adding dashboards section to library page (currently charts-only)
+- Phase 7: Chart hygiene system (data freshness, schema change detection, visual QA)
+
+---
+
+## Session: 2026-02-13 (Part 5)
+
+### Focus: Build Phase 5 — Publishing & Sharing
+
+**Context**: Phases 1-4 complete (Observable Plot rendering, CSV upload, AI chart creation, three-pane editor). Phase 5 adds publishing so charts are shareable, exportable, and browsable.
+
+### Phase 5: Publishing & Sharing
+
+**New Files Created:**
+
+| File | Purpose |
+|------|---------|
+| `app/src/pages/ChartViewPage.tsx` | Public chart view: fetches v2 chart, renders with ChartWrapper + ObservableChartFactory, header with Library/Edit links, SharePanel below chart |
+| `app/src/pages/LibraryPage.tsx` | Chart grid with search, type filter dropdown, sort (updated/created/title). Cards show type badge, title, subtitle, date, View/Edit/Delete actions. Empty state links to /create |
+| `app/src/stores/libraryStore.ts` | Zustand store: charts list, loading, search/filter/sort state, loadCharts/deleteChart actions, filteredCharts() computed |
+| `app/src/components/sharing/SharePanel.tsx` | Copy URL, copy embed code (iframe snippet), SVG/PNG/PDF export buttons. "Copied!" feedback on clipboard actions |
+
+**Modified Files:**
+
+| File | Change |
+|------|--------|
+| `app/src/utils/chartExport.ts` | Extracted shared `svgToCanvas()` helper from PNG logic. Added `exportPDF()` using dynamic `import('jspdf')`. Refactored `exportPNG` to use the shared helper |
+| `app/src/components/charts/ChartWrapper.tsx` | Added PDF export button alongside SVG/PNG. Imports `exportPDF` from chartExport |
+| `app/src/App.tsx` | Replaced `ChartView` → `ChartViewPage` on `/chart/:chartId` route. Added `/library` route → `LibraryPage`. Removed unused ChartView import |
+
+**Dependencies:**
+
+| Package | Purpose |
+|---------|---------|
+| `jspdf` | Client-side PDF generation. Dynamically imported — separate 390KB chunk only loaded on PDF click |
+
+**Architecture Decisions:**
+- Client-side only — no new backend endpoints (existing v2 API covers list/get/delete)
+- Iframe embed code — simplest sharing mechanism; the public view page IS the embed target
+- Dynamic `import('jspdf')` — code-split into separate chunk, zero bundle impact for non-PDF users
+- Library cards show type icon + metadata only (no live chart thumbnails) — avoids N+1 data fetches
+- Replaced v1 `ChartView` route rather than keeping both — clean break from Plotly-based rendering
+
+**Verification:**
+- `tsc --noEmit` — zero type errors
+- `npm run build` — production build succeeds (12.77s, 1375 modules)
+- `jspdf` chunk correctly code-split (389KB separate chunk)
+
+### Next Steps
+- Test full flow end-to-end with running server
+- Consider adding chart thumbnails to library cards (could use static SVG snapshots)
+- Consider adding pagination to library for large chart collections
+- Phase 6: Dashboard composition (multi-chart layouts)
+
+---
+
+## Session: 2026-02-13 (Part 4)
+
+### Focus: Build Phase 4 — Chart Editor (Three-Pane Interface)
+
+**Context**: Phases 1-3 complete (Observable Plot rendering, CSV upload, AI chart creation). Phase 4 adds the editor so users can refine charts after AI proposes one.
+
+### Phase 4: Chart Editor
+
+**New Files Created:**
+
+| File | Purpose |
+|------|---------|
+| `app/src/stores/editorStore.ts` | Zustand store: EditorConfig, undo/redo history (50-deep), chat messages, load/save/updateConfig/sendChatMessage |
+| `app/src/pages/EditorPage.tsx` | Three-pane layout page: Toolbox (280px) + Chart Preview (flex-1) + AI Chat (320px), header with undo/redo/save/discard |
+| `app/src/components/editor/Toolbox.tsx` | Left pane: chart type, column dropdowns, text inputs, palette, toggles, axis labels |
+| `app/src/components/editor/ChartTypeSelector.tsx` | Grid of 5 chart type buttons with active highlight |
+| `app/src/components/editor/PaletteSelector.tsx` | Swatch rows for default/blues/reds/greens palettes |
+| `app/src/components/editor/ColumnDropdown.tsx` | `<select>` populated from data columns with optional "None" |
+| `app/src/components/editor/AIChat.tsx` | Right pane: chat history, auto-resize textarea, send button, loading state |
+| `engine/v2/chart_editor.py` | LLM pipeline: current config + user message → updated config + explanation |
+
+**Modified Files:**
+
+| File | Change |
+|------|--------|
+| `app/src/App.tsx` | Added `/editor/:chartId` route |
+| `app/src/themes/datawrapper.ts` | Added `PaletteKey` type export |
+| `app/src/components/create/ChartProposal.tsx` | Added "Edit chart" link after save |
+| `api/routers/charts_v2.py` | Added `PUT /{chart_id}` (update), `POST /edit` (AI edit) endpoints |
+| `api/services/chart_storage.py` | Added `config: dict | None` field on SavedChart, `update_chart()` function |
+
+**Architecture:**
+- Single `EditorConfig` object shared by Toolbox and AI Chat via Zustand store
+- Palette stored as key (`"blues"`) not color array — mapped to colors at render time
+- AI edit returns full config (not diff) for simplicity
+- `config` blob on SavedChart for visual settings beyond flat fields
+- Keyboard shortcuts: Ctrl+Z undo, Ctrl+Shift+Z redo, Ctrl+S save
+
+**Verification:**
+- `tsc --noEmit` — zero type errors
+- `npm run build` — production build succeeds (11.87s, 1124 modules)
+- Python imports — all engine/v2 and API modules load cleanly
+
+### Next Steps
+- **Phase 5**: Dashboard composition (multi-chart layouts)
+- Test the full edit loop end-to-end with a running server
+- Consider adding more chart types to editor (BigValue, DataTable)
+- Consider streaming for AI chat responses
+
+---
+
+## Session: 2026-02-13 (Part 3)
+
+### Focus: Build Phase 3 — AI Chart Creation (Complete)
+
+**Context**: Phases 1 (Observable Plot rendering) and 2 (CSV data ingestion) are built. Phase 3 wires the AI pipeline: user uploads CSV → LLM analyzes schema → proposes chart type + SQL → executes against DuckDB → renders via Observable Plot.
+
+### Phase 3: AI Chart Creation
+
+**Backend — Engine:**
+| File | Purpose |
+|------|---------|
+| `engine/v2/__init__.py` | Package init |
+| `engine/v2/schema_analyzer.py` | Converts DuckDB column metadata into LLM prompt context (DataProfile, ColumnProfile, build_schema_context()) |
+| `engine/v2/chart_proposer.py` | 2-stage AI pipeline: schema → LLM proposes chart type + SQL → JSON response (ProposedChart dataclass) |
+
+**Backend — API:**
+| File | Purpose |
+|------|---------|
+| `api/services/chart_storage.py` | JSON file persistence in `data/charts/` — save, load, list, delete |
+| `api/routers/charts_v2.py` | REST endpoints: propose, save, get, list, delete charts |
+
+**Endpoints:**
+- `POST /api/v2/charts/propose` — takes source_id + optional user_hint, calls AI proposer, executes SQL, returns config + data
+- `POST /api/v2/charts/save` — persists chart config as JSON
+- `GET /api/v2/charts/` — list all saved charts
+- `GET /api/v2/charts/{chart_id}` — get chart with re-executed data
+- `DELETE /api/v2/charts/{chart_id}` — delete chart
+
+**Frontend:**
+| File | Purpose |
+|------|---------|
+| `app/src/stores/createStore.ts` | Zustand store for creation flow (upload → preview → proposing → result) |
+| `app/src/components/create/ChartProposal.tsx` | AI reasoning display + chart preview + save/retry UI |
+| `app/src/pages/CreatePage.tsx` | Full creation flow orchestrator with URL param support |
+
+**Route:** `/create/ai` (public, no auth)
+
+### Verification
+
+- `tsc --noEmit` ✓ — zero type errors
+- `npm run build` ✓ — production build succeeds (11.93s, 1117 modules)
+- Python imports ✓ — all engine/v2 and API modules load cleanly
+
+### Next Steps
+
+- **Phase 4**: Saved chart gallery — list/view/delete saved charts
+- **Phase 5**: Dashboard builder — compose multiple charts into dashboards
+- Test the full AI creation flow end-to-end with dev server running
+
+---
+
+## Session: 2026-02-13 (Part 2)
+
+### Focus: Build v2 Phases 1 + 2 (Rendering Pipeline + Data Ingestion)
+
+**Context**: Observable Plot won the PoC comparison. Now building the v2 foundation: the Observable Plot rendering pipeline (Phase 1) and CSV data ingestion (Phase 2).
+
+### Phase 1: Observable Plot Rendering Pipeline (Complete)
+
+Built the unified chart rendering system that replaces 17 Plotly components with one:
+
+| File | Purpose |
+|------|---------|
+| `app/src/themes/datawrapper.ts` | Consolidated Datawrapper theme (colors, fonts, plotDefaults()) |
+| `app/src/hooks/useObservablePlot.ts` | Promoted from PoC, added getSvgElement() for export |
+| `app/src/components/charts/ObservableChartFactory.tsx` | Central renderer: ChartConfig → Observable Plot marks |
+| `app/src/components/charts/ChartWrapper.tsx` | Title/subtitle/source + SVG/PNG export buttons |
+| `app/src/utils/chartExport.ts` | Client-side SVG + PNG (2x) export |
+
+**ObservableChartFactory** handles all chart types via a single component:
+- LineChart → `Plot.lineY()` (with multi-series via `stroke`)
+- BarChart → `Plot.barY()` / `Plot.barX()` (vertical/horizontal/stacked)
+- AreaChart → `Plot.areaY()` + `Plot.lineY()` overlay
+- ScatterPlot → `Plot.dot()` (with grouped coloring)
+- Histogram → `Plot.rectY()` + `Plot.binX()`
+- BigValue → styled number with delta indicator (no Plot)
+- DataTable → HTML table (no Plot)
+
+PocPage rewritten to use the factory — all 5 chart types render from a single `ObservableChartFactory` component with `ChartConfig` props.
+
+### Phase 2: CSV Data Ingestion (Complete)
+
+Built end-to-end CSV upload pipeline:
+
+**Backend:**
+| File | Purpose |
+|------|---------|
+| `api/services/duckdb_service.py` | DuckDB in-memory service: CSV ingestion, schema inspection, query execution |
+| `api/routers/data.py` | REST endpoints: upload, preview, query, schema |
+
+**Endpoints:**
+- `POST /api/data/upload` — accepts CSV, returns `{ source_id, schema }`
+- `GET /api/data/preview/{source_id}` — first N rows
+- `POST /api/data/query` — execute SQL against uploaded data
+- `GET /api/data/schema/{source_id}` — column types + stats
+
+**Frontend:**
+| File | Purpose |
+|------|---------|
+| `app/src/stores/dataStore.ts` | Zustand store for upload state, auto-loads preview |
+| `app/src/components/data/FileDropzone.tsx` | Drag-and-drop CSV upload with loading state |
+| `app/src/components/data/DataPreview.tsx` | Schema badges + data table preview |
+| `app/src/pages/UploadPage.tsx` | Full upload flow with "Create with AI" / "Build manually" CTAs |
+
+**Route:** `/create` (public, no auth)
+
+### DEV_PLAN.md Updated
+
+Replaced the old Looker replacement plan with the v2 implementation plan (7 phases). Previous direction archived in git history.
+
+### Verification
+
+- `tsc --noEmit` ✓ — zero type errors
+- `npm run build` ✓ — production build succeeds (11.94s)
+- Python imports ✓ — data router and DuckDB service load cleanly
+- Routes: `/poc` (chart factory demo), `/create` (upload page)
+
+### Next Steps
+
+- **Phase 3**: AI chart creation — wire LLM pipeline to CSV schema, generate ChartConfig from user data
+- Test CSV upload end-to-end with dev server running
+- Build chart proposal UI (ChartProposal component)
+
+---
+
+## Session: 2026-02-13
+
+### Focus: Observable Plot vs Plotly.js Proof of Concept
+
+**Context**: Story Analytics is pivoting to an open-source, publication-ready dashboarding tool. Before building further, we need to compare charting libraries. This PoC builds 5 chart types side by side in both Plotly.js and Observable Plot with identical Datawrapper-inspired styling.
+
+### Implementation
+
+**Branch**: `v2-poc` (from main)
+
+**New dependencies**: `@observablehq/plot`, `d3`, `@types/d3`, `tailwindcss`, `@tailwindcss/vite`
+
+**Infrastructure changes** (minimal, 4 existing files touched):
+- `app/vite.config.ts` — Added `@tailwindcss/vite` plugin
+- `app/src/main.tsx` — Added `import './styles/tailwind.css'`
+- `app/index.html` — Added Inter font `<link>` tags
+- `app/src/App.tsx` — Added `/poc` public route
+
+**New files created** (18 files in `app/src/poc/`):
+
+| File | Purpose |
+|------|---------|
+| `styles/tailwind.css` | Tailwind v4 entry point with design tokens |
+| `poc/data/sampleData.ts` | 4 hardcoded datasets (economic time series, country survey, scatter, CPI) |
+| `poc/themes/plotlyTheme.ts` | Datawrapper-style Plotly layout defaults |
+| `poc/themes/observableTheme.ts` | Datawrapper-style Observable Plot defaults |
+| `poc/hooks/useObservablePlot.ts` | React hook for Observable Plot DOM mounting with ResizeObserver |
+| `poc/components/ChartCard.tsx` | Shared wrapper with title, subtitle, source, library badge |
+| `poc/components/PlotlyLineChart.tsx` | Multi-series line chart (Plotly) |
+| `poc/components/ObservableLineChart.tsx` | Multi-series line chart (Observable Plot) |
+| `poc/components/PlotlyVerticalBar.tsx` | Vertical bar chart (Plotly) |
+| `poc/components/ObservableVerticalBar.tsx` | Vertical bar chart (Observable Plot) |
+| `poc/components/PlotlyHorizontalBar.tsx` | Horizontal bar chart (Plotly) |
+| `poc/components/ObservableHorizontalBar.tsx` | Horizontal bar chart (Observable Plot) |
+| `poc/components/PlotlyScatter.tsx` | Grouped scatter plot (Plotly) |
+| `poc/components/ObservableScatter.tsx` | Grouped scatter plot (Observable Plot) |
+| `poc/components/PlotlyArea.tsx` | Area chart (Plotly) |
+| `poc/components/ObservableArea.tsx` | Area chart (Observable Plot) |
+| `poc/PocPage.tsx` | 2-column grid comparison page |
+| `poc/index.ts` | Barrel export |
+
+### Chart Types Compared
+
+| Chart | Dataset | Tests |
+|-------|---------|-------|
+| Multi-series line | 24-month economic indicators (GDP, unemployment, inflation) | Time series, legend, tooltips |
+| Vertical bar | 8-country satisfaction scores | Categorical axis, sorting |
+| Horizontal bar | Country life expectancy, ranked | Long labels, horizontal orientation |
+| Grouped scatter | Study hours vs scores (2 groups) | Color encoding, tooltips |
+| Area | CPI trend | Fill under line, minimal styling |
+
+### Verification
+
+- `tsc --noEmit` ✓ — zero type errors
+- `npm run build` ✓ — production build succeeds (12.28s)
+- All PoC code isolated in `app/src/poc/`, existing app unaffected
+
+### Decision: Observable Plot wins
+
+After visual comparison at `/poc`, Observable Plot produces noticeably better default output than Plotly.js. **Observable Plot is the charting library for v2.**
+
+Key advantages observed:
+- Cleaner SVG output, more editorial/publication-ready aesthetic
+- Smaller bundle size (Observable Plot + D3 vs full Plotly.js)
+- More concise code per chart (declarative marks API)
+- Better typography and gridline defaults
+
+Trade-offs accepted:
+- No built-in zoom/pan (acceptable for publication-style charts)
+- Requires `useRef`/`useEffect` pattern for React integration (solved by `useObservablePlot` hook)
+- Data must be in long-form for multi-series charts (minor reshaping)
+
+### V2 Implementation Plan Written
+
+Replaced `DEV_PLAN.md` with the v2 implementation plan. Key structure:
+
+| Phase | Scope |
+|-------|-------|
+| Phase 1 | Observable Plot rendering pipeline (chart factory, theme, export) |
+| Phase 2 | CSV upload + DuckDB ingestion + data preview |
+| Phase 3 | AI chart creation — the core loop (propose → render → save) |
+| Phase 4 | Chart editor (three-pane: toolbox + preview + AI chat) |
+| Phase 5 | Publishing, sharing, export (SVG/PNG/PDF, shareable URLs) |
+| Phase 6 | Dashboard assembly (multi-chart grid layout) |
+| Phase 7 | Chart hygiene system (freshness, schema change, visual QA) |
+
+Documented: what carries forward (~8,500 lines of reusable engine + API code), what gets dropped (Evidence pipeline, LookML extractor, Plotly components), and what gets adapted (chart pipeline, semantic layer, sources router).
+
+### Next Steps
+
+- Begin Phase 1: Build `ObservableChartFactory` from PoC components
+- Begin Phase 2 (parallel): CSV upload endpoint + data preview UI
+
+---
+
 ## Session: 2026-02-09 (Part 7)
 
 ### Focus: Wire LookML Extractor into Creation Workflow

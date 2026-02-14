@@ -1,6 +1,5 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import Home from './pages/Home'
-import ChartView from './pages/ChartView'
 import DashboardView from './pages/DashboardView'
 import ChatPage from './pages/ChatPage'
 import { LoginPage } from './pages/LoginPage'
@@ -12,6 +11,14 @@ import { NewDashboardPage } from './pages/NewDashboardPage'
 import { SettingsPage } from './pages/SettingsPage'
 import { AppLayout } from './components/layout/AppLayout'
 import { ProtectedRoute } from './components/auth/ProtectedRoute'
+import { PocPage } from './poc'
+import { UploadPage } from './pages/UploadPage'
+import { CreatePage } from './pages/CreatePage'
+import { EditorPage } from './pages/EditorPage'
+import { ChartViewPage } from './pages/ChartViewPage'
+import { LibraryPage } from './pages/LibraryPage'
+import { DashboardBuilderPage } from './pages/DashboardBuilderPage'
+import { DashboardViewPage } from './pages/DashboardViewPage'
 
 function App() {
   return (
@@ -22,8 +29,16 @@ function App() {
       <Route path="/auth/verify" element={<VerifyPage />} />
 
       {/* Standalone chart/dashboard views (no sidebar, auth optional) */}
-      <Route path="/chart/:chartId" element={<ChartView />} />
+      <Route path="/chart/:chartId" element={<ChartViewPage />} />
       <Route path="/dashboard/:slug" element={<DashboardView />} />
+      <Route path="/poc" element={<PocPage />} />
+      <Route path="/create" element={<UploadPage />} />
+      <Route path="/create/ai" element={<CreatePage />} />
+      <Route path="/editor/:chartId" element={<EditorPage />} />
+      <Route path="/library" element={<LibraryPage />} />
+      <Route path="/dashboard/new" element={<DashboardBuilderPage />} />
+      <Route path="/dashboard/:dashboardId/edit" element={<DashboardBuilderPage />} />
+      <Route path="/dashboard/v2/:dashboardId" element={<DashboardViewPage />} />
 
       {/* Protected app routes (with sidebar, auth required) */}
       <Route
