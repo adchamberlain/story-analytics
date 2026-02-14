@@ -4,6 +4,9 @@ import type { PaletteKey } from '../themes/datawrapper'
 
 // ── Editor Config ──────────────────────────────────────────────────────────
 
+export type AggregationType = 'none' | 'sum' | 'avg' | 'count' | 'min' | 'max'
+export type DataMode = 'table' | 'sql'
+
 export interface EditorConfig {
   chartType: ChartType
   title: string
@@ -21,6 +24,8 @@ export interface EditorConfig {
   palette: PaletteKey
   xAxisTitle: string
   yAxisTitle: string
+  aggregation: AggregationType
+  dataMode: DataMode
 }
 
 const DEFAULT_CONFIG: EditorConfig = {
@@ -40,6 +45,16 @@ const DEFAULT_CONFIG: EditorConfig = {
   palette: 'default',
   xAxisTitle: '',
   yAxisTitle: '',
+  aggregation: 'none',
+  dataMode: 'table',
+}
+
+export interface TableInfoItem {
+  source_id: string
+  table_name: string
+  display_name: string
+  row_count: number
+  column_count: number
 }
 
 // ── Chat Messages ──────────────────────────────────────────────────────────
@@ -60,6 +75,15 @@ interface EditorState {
   data: Record<string, unknown>[]
   columns: string[]
   sql: string | null
+
+  // Column type metadata (column name → DuckDB type)
+  columnTypes: Record<string, string>
+
+  // SQL mode state
+  customSql: string
+  sqlError: string | null
+  sqlExecuting: boolean
+  availableTables: TableInfoItem[]
 
   // Editable config
   config: EditorConfig
@@ -83,7 +107,14 @@ interface EditorState {
 
   // Actions
   loadChart: (chartId: string) => Promise<void>
+  initNew: (sourceId: string) => Promise<void>
+  buildQuery: () => Promise<void>
+  saveNew: () => Promise<string | null>
   updateConfig: (partial: Partial<EditorConfig>) => void
+  setDataMode: (mode: DataMode) => void
+  setCustomSql: (sql: string) => void
+  executeCustomSql: () => Promise<void>
+  fetchAvailableTables: () => Promise<void>
   undo: () => void
   redo: () => void
   save: () => Promise<void>
@@ -94,6 +125,9 @@ interface EditorState {
 
 const MAX_HISTORY = 50
 
+/** Keys that trigger auto build-query in new chart mode */
+const DATA_KEYS: (keyof EditorConfig)[] = ['x', 'y', 'series', 'aggregation', 'chartType']
+
 export const useEditorStore = create<EditorState>((set, get) => ({
   // Initial state
   chartId: null,
@@ -101,6 +135,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   data: [],
   columns: [],
   sql: null,
+  columnTypes: {},
+  customSql: '',
+  sqlError: null,
+  sqlExecuting: false,
+  availableTables: [],
   config: { ...DEFAULT_CONFIG },
   savedConfig: null,
   configHistory: [],
@@ -112,7 +151,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   error: null,
 
   isDirty: () => {
-    const { config, savedConfig } = get()
+    const { config, savedConfig, data, chartId } = get()
+    // New unsaved chart: dirty if we have data
+    if (!chartId && !savedConfig) return data.length > 0
     if (!savedConfig) return false
     return JSON.stringify(config) !== JSON.stringify(savedConfig)
   },
@@ -148,6 +189,24 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         palette: chart.config?.palette ?? 'default',
         xAxisTitle: chart.config?.xAxisTitle ?? '',
         yAxisTitle: chart.config?.yAxisTitle ?? '',
+        aggregation: chart.config?.aggregation ?? 'none',
+        dataMode: (chart.config?.dataMode as DataMode) ?? 'table',
+      }
+
+      const loadedDataMode = config.dataMode
+
+      // Fetch column types from schema
+      let columnTypes: Record<string, string> = {}
+      try {
+        const schemaRes = await fetch(`/api/data/schema/${chart.source_id}`)
+        if (schemaRes.ok) {
+          const schemaData = await schemaRes.json()
+          for (const col of schemaData.columns ?? []) {
+            columnTypes[col.name] = col.type
+          }
+        }
+      } catch {
+        // Non-critical — column types are just UI hints
       }
 
       set({
@@ -155,9 +214,58 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         sourceId: chart.source_id,
         data: result.data ?? [],
         columns: result.columns ?? [],
+        columnTypes,
         sql: chart.sql ?? null,
+        customSql: loadedDataMode === 'sql' ? (chart.sql ?? '') : '',
+        sqlError: null,
+        sqlExecuting: false,
         config,
         savedConfig: { ...config },
+        configHistory: [],
+        configFuture: [],
+        chatMessages: [],
+      })
+
+      // If loading a SQL-mode chart, fetch available tables
+      if (loadedDataMode === 'sql') {
+        get().fetchAvailableTables()
+      }
+    } catch (e) {
+      set({
+        loading: false,
+        error: e instanceof Error ? e.message : String(e),
+      })
+    }
+  },
+
+  initNew: async (sourceId: string) => {
+    set({ loading: true, error: null, chartId: null, sourceId, savedConfig: null })
+
+    try {
+      const res = await fetch(`/api/data/schema/${sourceId}`)
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({ detail: res.statusText }))
+        throw new Error(body.detail ?? `Schema fetch failed: ${res.status}`)
+      }
+
+      const schema = await res.json()
+      const columns = (schema.columns ?? []).map((c: { name: string }) => c.name)
+      const columnTypes: Record<string, string> = {}
+      for (const col of schema.columns ?? []) {
+        columnTypes[col.name] = col.type
+      }
+
+      set({
+        loading: false,
+        columns,
+        columnTypes,
+        data: [],
+        sql: null,
+        customSql: '',
+        sqlError: null,
+        sqlExecuting: false,
+        availableTables: [],
+        config: { ...DEFAULT_CONFIG },
         configHistory: [],
         configFuture: [],
         chatMessages: [],
@@ -170,8 +278,101 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }
   },
 
+  buildQuery: async () => {
+    const { sourceId, config } = get()
+    if (config.dataMode === 'sql') return  // Never auto-build in SQL mode
+    if (!sourceId || !config.x) return
+
+    try {
+      const res = await fetch('/api/v2/charts/build-query', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          source_id: sourceId,
+          x: config.x,
+          y: config.y,
+          series: config.series,
+          aggregation: config.aggregation,
+        }),
+      })
+
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({ detail: res.statusText }))
+        throw new Error(body.detail ?? `Query build failed: ${res.status}`)
+      }
+
+      const result = await res.json()
+      if (result.success) {
+        set({
+          data: result.data ?? [],
+          columns: result.columns ?? [],
+          sql: result.sql ?? null,
+          error: null,
+        })
+      } else {
+        set({ error: result.error ?? 'Query build failed' })
+      }
+    } catch (e) {
+      set({ error: e instanceof Error ? e.message : String(e) })
+    }
+  },
+
+  saveNew: async () => {
+    const { sourceId, config, sql } = get()
+    if (!sourceId || !sql) return null
+
+    set({ saving: true, error: null })
+
+    try {
+      const res = await fetch('/api/v2/charts/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          source_id: sourceId,
+          chart_type: config.chartType,
+          title: config.title || 'Untitled Chart',
+          sql,
+          x: config.x,
+          y: config.y,
+          series: config.series,
+          horizontal: config.horizontal,
+          sort: config.sort,
+          subtitle: config.subtitle || null,
+          source: config.source || null,
+          config: {
+            stacked: config.stacked,
+            showGrid: config.showGrid,
+            showLegend: config.showLegend,
+            showValues: config.showValues,
+            palette: config.palette,
+            xAxisTitle: config.xAxisTitle,
+            yAxisTitle: config.yAxisTitle,
+            aggregation: config.aggregation,
+            dataMode: config.dataMode,
+          },
+        }),
+      })
+
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({ detail: res.statusText }))
+        throw new Error(body.detail ?? `Save failed: ${res.status}`)
+      }
+
+      const saved = await res.json()
+      set({
+        saving: false,
+        chartId: saved.id,
+        savedConfig: { ...config },
+      })
+      return saved.id as string
+    } catch (e) {
+      set({ saving: false, error: e instanceof Error ? e.message : String(e) })
+      return null
+    }
+  },
+
   updateConfig: (partial: Partial<EditorConfig>) => {
-    const { config, configHistory } = get()
+    const { config, configHistory, chartId } = get()
 
     // Push current config to history (for undo)
     const newHistory = [...configHistory, { ...config }].slice(-MAX_HISTORY)
@@ -181,6 +382,106 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       configHistory: newHistory,
       configFuture: [], // Clear redo stack on new change
     })
+
+    // Auto-trigger buildQuery in new chart mode when data-relevant keys change
+    // Skip in SQL mode — user controls query execution manually
+    const currentConfig = get().config
+    if (!chartId && currentConfig.dataMode !== 'sql') {
+      const changedKeys = Object.keys(partial) as (keyof EditorConfig)[]
+      if (changedKeys.some((k) => DATA_KEYS.includes(k))) {
+        // Use setTimeout to let the state update settle before reading it
+        setTimeout(() => get().buildQuery(), 0)
+      }
+    }
+  },
+
+  setDataMode: (mode: DataMode) => {
+    const { config, sql, sourceId } = get()
+    if (mode === config.dataMode) return
+
+    if (mode === 'sql') {
+      // Switching to SQL: populate customSql with current generated SQL, fetch tables
+      set({
+        customSql: sql ?? '',
+        sqlError: null,
+        config: { ...config, dataMode: 'sql' },
+      })
+      get().fetchAvailableTables()
+    } else {
+      // Switching back to Table: restore source columns, clear SQL state
+      set({
+        customSql: '',
+        sqlError: null,
+        sqlExecuting: false,
+        config: { ...config, dataMode: 'table', x: null, y: null, series: null },
+      })
+      // Re-initialize from source to restore original columns
+      if (sourceId) {
+        get().initNew(sourceId)
+      }
+    }
+  },
+
+  setCustomSql: (sql: string) => {
+    set({ customSql: sql, sqlError: null })
+  },
+
+  executeCustomSql: async () => {
+    const { customSql } = get()
+    if (!customSql.trim()) return
+
+    set({ sqlExecuting: true, sqlError: null })
+
+    try {
+      const res = await fetch('/api/data/query-raw', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sql: customSql }),
+      })
+
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({ detail: res.statusText }))
+        throw new Error(body.detail ?? `Query failed: ${res.status}`)
+      }
+
+      const result = await res.json()
+      if (result.success) {
+        // Build columnTypes from result column_types
+        const columnTypes: Record<string, string> = {}
+        result.columns.forEach((col: string, i: number) => {
+          columnTypes[col] = result.column_types?.[i] ?? 'VARCHAR'
+        })
+
+        set({
+          sqlExecuting: false,
+          data: result.rows ?? [],
+          columns: result.columns ?? [],
+          columnTypes,
+          sql: customSql,
+          sqlError: null,
+          error: null,
+        })
+      } else {
+        set({ sqlExecuting: false, sqlError: result.error ?? 'Query failed' })
+      }
+    } catch (e) {
+      set({
+        sqlExecuting: false,
+        sqlError: e instanceof Error ? e.message : String(e),
+      })
+    }
+  },
+
+  fetchAvailableTables: async () => {
+    try {
+      const res = await fetch('/api/data/tables')
+      if (res.ok) {
+        const tables = await res.json()
+        set({ availableTables: tables })
+      }
+    } catch {
+      // Non-critical — table list is a convenience feature
+    }
   },
 
   undo: () => {
@@ -235,6 +536,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
             palette: config.palette,
             xAxisTitle: config.xAxisTitle,
             yAxisTitle: config.yAxisTitle,
+            aggregation: config.aggregation,
+            dataMode: config.dataMode,
           },
         }),
       })
@@ -371,6 +674,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       data: [],
       columns: [],
       sql: null,
+      columnTypes: {},
+      customSql: '',
+      sqlError: null,
+      sqlExecuting: false,
+      availableTables: [],
       config: { ...DEFAULT_CONFIG },
       savedConfig: null,
       configHistory: [],

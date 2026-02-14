@@ -51,7 +51,105 @@ class PreviewResponse(BaseModel):
     row_count: int
 
 
+class SourceSummary(BaseModel):
+    source_id: str
+    name: str
+    row_count: int
+    column_count: int
+
+
+class RawQueryRequest(BaseModel):
+    sql: str
+
+
+class RawQueryResponse(BaseModel):
+    success: bool
+    columns: list[str] = []
+    column_types: list[str] = []
+    rows: list[dict] = []
+    row_count: int = 0
+    error: str | None = None
+
+
+class TableInfo(BaseModel):
+    source_id: str
+    table_name: str       # Internal DuckDB name, e.g. "src_abc123"
+    display_name: str     # Original filename, e.g. "sales_data.csv"
+    row_count: int
+    column_count: int
+
+
 # ── Endpoints ────────────────────────────────────────────────────────────────
+
+@router.get("/sources", response_model=list[SourceSummary])
+async def list_sources():
+    """List all data sources currently loaded in DuckDB."""
+    service = get_duckdb_service()
+    results = []
+    for source_id in service._sources:
+        try:
+            schema = service.get_schema(source_id)
+            results.append(SourceSummary(
+                source_id=schema.source_id,
+                name=schema.filename,
+                row_count=schema.row_count,
+                column_count=len(schema.columns),
+            ))
+        except Exception:
+            continue
+    return results
+
+@router.get("/tables", response_model=list[TableInfo])
+async def list_tables():
+    """List all loaded DuckDB tables with their internal names (for raw SQL queries)."""
+    service = get_duckdb_service()
+    results = []
+    for source_id in service._sources:
+        try:
+            schema = service.get_schema(source_id)
+            results.append(TableInfo(
+                source_id=schema.source_id,
+                table_name=f"src_{source_id}",
+                display_name=schema.filename,
+                row_count=schema.row_count,
+                column_count=len(schema.columns),
+            ))
+        except Exception:
+            continue
+    return results
+
+
+@router.post("/query-raw", response_model=RawQueryResponse)
+async def query_raw(request: RawQueryRequest):
+    """Execute user-written SQL directly on DuckDB, bypassing table name substitution."""
+    service = get_duckdb_service()
+
+    sql = request.sql.strip()
+    if not sql:
+        return RawQueryResponse(success=False, error="SQL query is empty")
+
+    # Safety: append LIMIT 10000 if user SQL has no LIMIT clause
+    sql_upper = sql.rstrip(";").upper()
+    if "LIMIT" not in sql_upper:
+        sql = sql.rstrip(";") + " LIMIT 10000"
+
+    try:
+        result = service._conn.execute(sql)
+        col_names = [desc[0] for desc in result.description]
+        col_types = [str(desc[1]) for desc in result.description]
+        rows_raw = result.fetchall()
+        rows = [dict(zip(col_names, row)) for row in rows_raw]
+
+        return RawQueryResponse(
+            success=True,
+            columns=col_names,
+            column_types=col_types,
+            rows=rows,
+            row_count=len(rows),
+        )
+    except Exception as e:
+        return RawQueryResponse(success=False, error=str(e))
+
 
 @router.post("/upload", response_model=UploadResponse)
 async def upload_csv(file: UploadFile = File(...)):

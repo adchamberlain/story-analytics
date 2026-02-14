@@ -4,14 +4,26 @@ import { PaletteSelector } from './PaletteSelector'
 import { ColumnDropdown } from './ColumnDropdown'
 import type { ChartType } from '../../types/chart'
 import type { PaletteKey } from '../../themes/datawrapper'
+import type { AggregationType, DataMode } from '../../stores/editorStore'
 
 export function Toolbox() {
   const config = useEditorStore((s) => s.config)
   const columns = useEditorStore((s) => s.columns)
+  const columnTypes = useEditorStore((s) => s.columnTypes)
   const updateConfig = useEditorStore((s) => s.updateConfig)
+  const setDataMode = useEditorStore((s) => s.setDataMode)
+  const customSql = useEditorStore((s) => s.customSql)
+  const setCustomSql = useEditorStore((s) => s.setCustomSql)
+  const executeCustomSql = useEditorStore((s) => s.executeCustomSql)
+  const sqlError = useEditorStore((s) => s.sqlError)
+  const sqlExecuting = useEditorStore((s) => s.sqlExecuting)
+  const availableTables = useEditorStore((s) => s.availableTables)
+  const data = useEditorStore((s) => s.data)
 
   const isBar = config.chartType === 'BarChart'
   const hasSeriesOption = ['BarChart', 'LineChart', 'AreaChart', 'ScatterPlot'].includes(config.chartType)
+  const isSqlMode = config.dataMode === 'sql'
+  const sqlHasResults = isSqlMode && data.length > 0
 
   return (
     <div className="p-4 space-y-5">
@@ -23,33 +35,137 @@ export function Toolbox() {
         />
       </Section>
 
-      {/* Column Mapping */}
+      {/* Data Section with Mode Toggle */}
       <Section title="Data">
-        <div className="space-y-2">
-          <ColumnDropdown
-            label="X Axis"
-            value={config.x}
-            columns={columns}
-            onChange={(x) => updateConfig({ x })}
-          />
-          {config.chartType !== 'Histogram' && (
-            <ColumnDropdown
-              label="Y Axis"
-              value={config.y}
-              columns={columns}
-              onChange={(y) => updateConfig({ y })}
+        {/* Mode Toggle */}
+        <ModeToggle value={config.dataMode} onChange={setDataMode} />
+
+        {isSqlMode ? (
+          <div className="space-y-3 mt-3">
+            {/* Table Reference */}
+            {availableTables.length > 0 && (
+              <div className="bg-gray-50 border border-gray-200 rounded-md p-2">
+                <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wider mb-1">Tables</p>
+                {availableTables.map((t) => (
+                  <div key={t.source_id} className="flex items-baseline gap-2 py-0.5">
+                    <code className="text-xs font-mono text-gray-800">{t.table_name}</code>
+                    <span className="text-[10px] text-gray-400 truncate">({t.display_name})</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* SQL Textarea */}
+            <textarea
+              value={customSql}
+              onChange={(e) => setCustomSql(e.target.value)}
+              onKeyDown={(e) => {
+                if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+                  e.preventDefault()
+                  executeCustomSql()
+                }
+              }}
+              placeholder="SELECT * FROM src_..."
+              rows={6}
+              className="w-full px-2 py-1.5 text-xs font-mono border border-gray-200 rounded-md resize-y focus:outline-none focus:border-blue-400 bg-white"
             />
-          )}
-          {hasSeriesOption && (
+
+            {/* Run Button */}
+            <button
+              onClick={executeCustomSql}
+              disabled={!customSql.trim() || sqlExecuting}
+              className="w-full px-3 py-1.5 text-xs font-medium rounded-md bg-emerald-600 text-white hover:bg-emerald-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              {sqlExecuting ? 'Running...' : 'Run Query'}
+            </button>
+
+            {/* Error Display */}
+            {sqlError && (
+              <div className="bg-red-50 border border-red-200 rounded-md px-2 py-1.5">
+                <p className="text-xs text-red-700 font-mono whitespace-pre-wrap">{sqlError}</p>
+              </div>
+            )}
+
+            {/* Column Mapping (after successful execution) */}
+            {sqlHasResults && (
+              <div className="space-y-2 pt-2 border-t border-gray-200">
+                <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wider">Map result columns</p>
+                <ColumnDropdown
+                  label="X Axis"
+                  value={config.x}
+                  columns={columns}
+                  columnTypes={columnTypes}
+                  onChange={(x) => updateConfig({ x })}
+                />
+                {config.chartType !== 'Histogram' && (
+                  <ColumnDropdown
+                    label="Y Axis"
+                    value={config.y}
+                    columns={columns}
+                    columnTypes={columnTypes}
+                    onChange={(y) => updateConfig({ y })}
+                  />
+                )}
+                {hasSeriesOption && (
+                  <ColumnDropdown
+                    label="Series (color)"
+                    value={config.series}
+                    columns={columns}
+                    columnTypes={columnTypes}
+                    allowNone
+                    onChange={(series) => updateConfig({ series })}
+                  />
+                )}
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="space-y-2 mt-3">
             <ColumnDropdown
-              label="Series (color)"
-              value={config.series}
+              label="X Axis"
+              value={config.x}
               columns={columns}
-              allowNone
-              onChange={(series) => updateConfig({ series })}
+              columnTypes={columnTypes}
+              onChange={(x) => updateConfig({ x })}
             />
-          )}
-        </div>
+            {config.chartType !== 'Histogram' && (
+              <ColumnDropdown
+                label="Y Axis"
+                value={config.y}
+                columns={columns}
+                columnTypes={columnTypes}
+                onChange={(y) => updateConfig({ y })}
+              />
+            )}
+            {hasSeriesOption && (
+              <ColumnDropdown
+                label="Series (color)"
+                value={config.series}
+                columns={columns}
+                columnTypes={columnTypes}
+                allowNone
+                onChange={(series) => updateConfig({ series })}
+              />
+            )}
+            {config.chartType !== 'Histogram' && config.y && (
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Aggregation</label>
+                <select
+                  value={config.aggregation}
+                  onChange={(e) => updateConfig({ aggregation: e.target.value as AggregationType })}
+                  className="w-full px-2 py-1.5 text-sm border border-gray-200 rounded-md bg-white focus:outline-none focus:border-blue-400"
+                >
+                  <option value="none">None (raw)</option>
+                  <option value="sum">Sum</option>
+                  <option value="avg">Average</option>
+                  <option value="count">Count</option>
+                  <option value="min">Min</option>
+                  <option value="max">Max</option>
+                </select>
+              </div>
+            )}
+          </div>
+        )}
       </Section>
 
       {/* Text */}
@@ -138,6 +254,26 @@ export function Toolbox() {
 }
 
 // ── Local helper components ────────────────────────────────────────────────
+
+function ModeToggle({ value, onChange }: { value: DataMode; onChange: (mode: DataMode) => void }) {
+  return (
+    <div className="flex bg-gray-100 rounded-md p-0.5">
+      {(['table', 'sql'] as const).map((mode) => (
+        <button
+          key={mode}
+          onClick={() => onChange(mode)}
+          className={`flex-1 px-3 py-1 text-xs font-medium rounded transition-colors ${
+            value === mode
+              ? 'bg-white text-gray-900 shadow-sm'
+              : 'text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          {mode === 'table' ? 'Table' : 'SQL'}
+        </button>
+      ))}
+    </div>
+  )
+}
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
