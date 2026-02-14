@@ -1,10 +1,13 @@
 """
-DuckDB service for CSV ingestion, schema inspection, and query execution.
-Manages in-memory DuckDB connections with uploaded CSV data.
+DuckDB service for data ingestion, schema inspection, and query execution.
+Manages in-memory DuckDB connections with uploaded data from CSV, parquet,
+or Snowflake sources.
 """
 
+import os
 import uuid
 import csv
+import tempfile
 from pathlib import Path
 from dataclasses import dataclass, field
 
@@ -12,6 +15,7 @@ import duckdb
 
 
 DATA_DIR = Path(__file__).parent.parent.parent / "data" / "uploads"
+CACHE_DIR = Path(__file__).parent.parent.parent / "data" / "snowflake_saas"
 
 
 @dataclass
@@ -76,6 +80,117 @@ class DuckDBService:
         # Get schema info
         schema = self._inspect_table(table_name, source_id, filename)
         return schema
+
+    def ingest_parquet(self, parquet_path: Path, table_name_hint: str) -> SourceSchema:
+        """Load a parquet file into DuckDB and return schema information."""
+        source_id = uuid.uuid4().hex[:12]
+        table_name = f"src_{source_id}"
+
+        self._conn.execute(f"""
+            CREATE OR REPLACE TABLE {table_name} AS
+            SELECT * FROM read_parquet('{parquet_path}')
+        """)
+
+        self._sources[source_id] = parquet_path
+        schema = self._inspect_table(table_name, source_id, table_name_hint)
+        return schema
+
+    def ingest_from_snowflake(
+        self,
+        config: dict,
+        credentials: dict,
+        table_names: list[str],
+        cache: bool = True,
+    ) -> list[SourceSchema]:
+        """Connect to Snowflake, fetch tables, load into DuckDB via parquet.
+
+        Args:
+            config: Connection config (account, warehouse, database, schema).
+            credentials: Dict with 'username' and 'password'.
+            table_names: Which tables to sync.
+            cache: Whether to cache parquet files to data/snowflake_saas/.
+
+        Returns:
+            One SourceSchema per synced table.
+        """
+        import snowflake.connector
+        import pyarrow as pa
+        import pyarrow.parquet as pq
+
+        from .connection_service import get_snowflake_pat
+
+        connect_kwargs = {
+            "account": config["account"],
+            "user": credentials["username"],
+            "warehouse": config.get("warehouse", ""),
+            "database": config.get("database", ""),
+            "schema": config.get("schema", ""),
+        }
+        pat = get_snowflake_pat()
+        if pat:
+            connect_kwargs["authenticator"] = "PROGRAMMATIC_ACCESS_TOKEN"
+            connect_kwargs["token"] = pat
+        elif credentials.get("password"):
+            connect_kwargs["password"] = credentials["password"]
+        else:
+            raise RuntimeError(
+                "No Snowflake auth available: no PAT found and no password provided. "
+                "Set SNOWFLAKE_PAT in .env."
+            )
+
+        conn = snowflake.connector.connect(**connect_kwargs)
+
+        results: list[SourceSchema] = []
+        try:
+            cursor = conn.cursor()
+            for table in table_names:
+                cursor.execute(f"SELECT * FROM {table}")
+                columns = [desc[0] for desc in cursor.description]
+                rows = cursor.fetchall()
+                arrow_table = pa.table(
+                    {col: [row[i] for row in rows] for i, col in enumerate(columns)}
+                )
+
+                # Write to temp parquet, then ingest
+                if cache:
+                    cache_subdir = CACHE_DIR / table.lower()
+                    cache_subdir.mkdir(parents=True, exist_ok=True)
+                    pq_path = cache_subdir / f"{table.lower()}.parquet"
+                    pq.write_table(arrow_table, str(pq_path))
+                else:
+                    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".parquet")
+                    pq_path = Path(tmp.name)
+                    pq.write_table(arrow_table, str(pq_path))
+
+                schema = self.ingest_parquet(pq_path, table.lower())
+                results.append(schema)
+
+                if not cache:
+                    pq_path.unlink(missing_ok=True)
+
+            cursor.close()
+        finally:
+            conn.close()
+
+        return results
+
+    def ingest_cached_parquet(self, cache_dir: Path | None = None) -> list[SourceSchema]:
+        """Load all cached parquet files from data/snowflake_saas/ subdirectories.
+
+        This is the offline fallback for environments without Snowflake credentials.
+        """
+        base = cache_dir or CACHE_DIR
+        if not base.exists():
+            return []
+
+        results: list[SourceSchema] = []
+        for subdir in sorted(base.iterdir()):
+            if not subdir.is_dir():
+                continue
+            for pq_file in subdir.glob("*.parquet"):
+                schema = self.ingest_parquet(pq_file, subdir.name)
+                results.append(schema)
+        return results
 
     def get_preview(self, source_id: str, limit: int = 10) -> QueryResult:
         """Get first N rows of an uploaded source."""

@@ -36,20 +36,19 @@ export function DashboardGrid({ charts }: DashboardGridProps) {
   if (charts.length === 0) {
     return (
       <div className="text-center py-16">
-        <p className="text-sm" style={{ color: '#999' }}>No charts in this dashboard yet.</p>
+        <p className="text-sm text-text-muted">No charts in this dashboard yet.</p>
       </div>
     )
   }
 
   return (
     <div
-      className="grid gap-6"
-      style={{ gridTemplateColumns: 'repeat(2, 1fr)' }}
+      className="grid gap-6 grid-cols-2"
     >
       {charts.map((chart) => (
         <div
           key={chart.chart_id}
-          style={{ gridColumn: chart.width === 'full' ? '1 / -1' : undefined }}
+          className={chart.width === 'full' ? 'col-span-full' : undefined}
         >
           <DashboardChartCell chart={chart} />
         </div>

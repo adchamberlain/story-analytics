@@ -63,13 +63,18 @@ export function DashboardBuilderPage() {
 
   const handleSave = useCallback(async () => {
     const id = await store.save()
-    if (id) navigate(`/dashboard/v2/${id}`)
+    if (id) navigate(`/dashboard/${id}`)
   }, [store, navigate])
 
   const handleAddChart = useCallback((chartId: string) => {
     store.addChart(chartId)
     store.setPickerOpen(false)
   }, [store])
+
+  const handleCreateNew = useCallback(() => {
+    store.setPickerOpen(false)
+    navigate('/editor/new/source')
+  }, [store, navigate])
 
   if (store.loading) {
     return (
@@ -79,14 +84,14 @@ export function DashboardBuilderPage() {
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
           </svg>
-          <p className="text-sm" style={{ color: '#666' }}>Loading dashboard...</p>
+          <p className="text-sm text-text-secondary">Loading dashboard...</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gray-50" style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>
+    <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <header className="bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between">
         <button
@@ -127,23 +132,21 @@ export function DashboardBuilderPage() {
             value={store.title}
             onChange={(e) => store.setTitle(e.target.value)}
             placeholder="Dashboard title"
-            className="w-full text-2xl font-semibold bg-transparent border-none focus:outline-none placeholder:text-gray-300"
-            style={{ color: '#1a1a1a' }}
+            className="w-full text-2xl font-semibold bg-transparent border-none focus:outline-none placeholder:text-gray-300 text-text-primary"
           />
           <input
             type="text"
             value={store.description}
             onChange={(e) => store.setDescription(e.target.value)}
             placeholder="Add a description..."
-            className="w-full text-sm bg-transparent border-none focus:outline-none placeholder:text-gray-300"
-            style={{ color: '#666' }}
+            className="w-full text-sm bg-transparent border-none focus:outline-none placeholder:text-gray-300 text-text-secondary"
           />
         </div>
 
         {/* Chart list */}
         {store.charts.length === 0 ? (
           <div className="text-center py-20 border-2 border-dashed border-gray-200 rounded-xl">
-            <p className="text-sm" style={{ color: '#999' }}>
+            <p className="text-sm text-text-muted">
               No charts yet. Click "Add Chart" to get started.
             </p>
             <button
@@ -178,6 +181,7 @@ export function DashboardBuilderPage() {
         <ChartPicker
           excludeIds={store.charts.map((c) => c.chart_id)}
           onAdd={handleAddChart}
+          onCreateNew={handleCreateNew}
           onClose={() => store.setPickerOpen(false)}
         />
       )}
@@ -224,10 +228,10 @@ function BuilderChartCard({
 
       {/* Chart info */}
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium truncate" style={{ color: '#1a1a1a' }}>
+        <p className="text-sm font-medium truncate text-text-primary">
           {meta?.title ?? `Chart ${ref_.chart_id}`}
         </p>
-        <p className="text-xs" style={{ color: '#999' }}>
+        <p className="text-xs text-text-muted">
           {typeLabel}
           {meta?.subtitle ? ` — ${meta.subtitle}` : ''}
         </p>

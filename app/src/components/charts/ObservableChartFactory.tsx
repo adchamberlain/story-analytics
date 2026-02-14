@@ -1,6 +1,6 @@
 import * as Plot from '@observablehq/plot'
 import { useObservablePlot } from '../../hooks/useObservablePlot'
-import { plotDefaults, PRIMARY_COLOR, CHART_COLORS } from '../../themes/datawrapper'
+import { plotDefaults, CHART_COLORS } from '../../themes/datawrapper'
 import type { ChartConfig, ChartType } from '../../types/chart'
 
 interface ObservableChartFactoryProps {
@@ -327,15 +327,14 @@ function BigValueChart({ data, config }: { data: Record<string, unknown>[]; conf
 
   return (
     <div className="flex flex-col items-center justify-center h-full py-8">
-      <div className="text-4xl font-bold" style={{ color: PRIMARY_COLOR }}>
+      <div className="text-4xl font-bold text-chart-blue">
         {formattedValue}
       </div>
       {delta !== null && (
         <div
-          className="text-sm mt-2 font-medium"
-          style={{
-            color: (delta >= 0) === positiveIsGood ? '#4dac26' : '#d6604d',
-          }}
+          className={`text-sm mt-2 font-medium ${
+            (delta >= 0) === positiveIsGood ? 'text-chart-green' : 'text-chart-red'
+          }`}
         >
           {delta >= 0 ? '+' : ''}{delta.toLocaleString()}
           {config.comparisonLabel && (
@@ -360,8 +359,7 @@ function DataTableChart({ data }: { data: Record<string, unknown>[]; config: Cha
             {columns.map((col) => (
               <th
                 key={col}
-                className="text-left px-3 py-2 border-b-2 border-gray-200 font-semibold"
-                style={{ color: '#1a1a1a', fontSize: 12 }}
+                className="text-left px-3 py-2 border-b-2 border-gray-200 font-semibold text-text-primary text-xs"
               >
                 {col}
               </th>

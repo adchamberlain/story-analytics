@@ -15,10 +15,10 @@ export function DataPreview({ filename, rowCount, columns, preview, loadingPrevi
       <div className="px-6 py-4 border-b border-gray-100">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-base font-semibold" style={{ color: '#1a1a1a' }}>
+            <h3 className="text-base font-semibold text-text-primary">
               {filename}
             </h3>
-            <p className="text-xs mt-0.5" style={{ color: '#999999' }}>
+            <p className="text-xs mt-0.5 text-text-muted">
               {rowCount.toLocaleString()} rows, {columns.length} columns
             </p>
           </div>
@@ -30,7 +30,7 @@ export function DataPreview({ filename, rowCount, columns, preview, loadingPrevi
         <div className="flex flex-wrap gap-2">
           {columns.map((col) => (
             <div key={col.name} className="flex items-center gap-1.5 text-xs">
-              <span className="font-medium" style={{ color: '#1a1a1a' }}>{col.name}</span>
+              <span className="font-medium text-text-primary">{col.name}</span>
               <span className="px-1.5 py-0.5 rounded bg-gray-200 text-gray-600 font-mono text-[10px]">
                 {formatType(col.type)}
               </span>
@@ -55,8 +55,7 @@ export function DataPreview({ filename, rowCount, columns, preview, loadingPrevi
                 {preview.columns.map((col) => (
                   <th
                     key={col}
-                    className="text-left px-4 py-2 font-semibold whitespace-nowrap"
-                    style={{ color: '#1a1a1a', fontSize: 12 }}
+                    className="text-left px-4 py-2 font-semibold whitespace-nowrap text-text-primary text-xs"
                   >
                     {col}
                   </th>
@@ -69,8 +68,7 @@ export function DataPreview({ filename, rowCount, columns, preview, loadingPrevi
                   {preview.columns.map((col) => (
                     <td
                       key={col}
-                      className="px-4 py-1.5 border-b border-gray-50 whitespace-nowrap"
-                      style={{ fontSize: 12, color: '#333' }}
+                      className="px-4 py-1.5 border-b border-gray-50 whitespace-nowrap text-xs text-gray-800"
                     >
                       {formatCell(row[col])}
                     </td>

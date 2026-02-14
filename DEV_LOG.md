@@ -4,6 +4,66 @@ This log captures development changes made during each session. Review this at t
 
 ---
 
+## Session: 2026-02-14 (Part 2)
+
+### Focus: Phase 11 — Database Connection UI in Source Picker
+
+Added a "Connect to Database" UI to the SourcePickerPage, closing the gap between the fully-built backend connection infrastructure and the frontend. Users can now create Snowflake connections, test them, browse available tables, and import selected tables into DuckDB — all from the source picker.
+
+### Changes Made
+
+**New: `app/src/components/data/DatabaseConnector.tsx`**
+- Multi-step inline component with states: closed → pick → form → tables → syncing
+- `closed`: Dashed-border button with database icon ("Connect to Database / Snowflake, with more coming soon")
+- `pick`: Lists saved connections (from `GET /api/connections/`) as clickable cards + "New Connection" button. Clicking a saved connection tests it and shows tables.
+- `form`: New Snowflake connection form with fields for Name, Account, Warehouse, Database, Schema, and optional Username/Password (with hint about .env fallback). "Test Connection" button creates connection then tests it.
+- `tables`: Green success banner, Select All/Deselect All toggle, checkbox list of tables, "Import Selected Tables" button that calls sync endpoint.
+- `syncing`: Loading spinner state during import.
+- After sync: calls `onSynced()` callback to refresh parent's source list, resets to closed.
+- Credentials kept in component state only — never persisted.
+
+**Modified: `app/src/pages/SourcePickerPage.tsx`**
+- Three-section layout: Available Sources → Connect to Database → Upload CSV, with "or" dividers between each
+- Added `refreshKey` state counter; incremented by `handleSynced` callback
+- `refreshKey` in `useEffect` dependency array forces source list re-fetch after database sync
+- Dividers always shown (not conditional on sources existing)
+- Updated subtitle copy to mention database connections
+
+**Snowflake Auth: Migrated to PAT (Programmatic Access Token)**
+- Snowflake account now enforces MFA, breaking the old password-based auth
+- Tried `externalbrowser` authenticator → failed (no SAML/SSO configured on account)
+- Tried RSA key-pair auth → generated keys but switched to simpler PAT approach
+- Final solution: `authenticator='PROGRAMMATIC_ACCESS_TOKEN'` + `token=` from `.env`
+- Also required creating a Snowflake network policy (`ALLOW_DEV`) for programmatic access
+- `_snowflake_connect()` helper in `connections.py` centralizes auth for test/list/sync endpoints
+- `duckdb_service.py` `ingest_from_snowflake()` uses PAT when available, falls back to password
+- `SNOWFLAKE_PAT` env var added to `.env`
+
+**Bug fix: Duplicate connections on repeated Test clicks**
+- `handleTestConnection` was calling `POST /api/connections/` every click, creating duplicates
+- Fixed: reuses `activeConnectionId` if a connection was already created in the current form session
+
+**Modified files summary:**
+- `app/src/components/data/DatabaseConnector.tsx` (new) — multi-step connection wizard
+- `app/src/pages/SourcePickerPage.tsx` — integrated DatabaseConnector + refresh logic
+- `api/routers/connections.py` — PAT auth via `_snowflake_connect()` helper, removed password requirement
+- `api/services/connection_service.py` — added `get_snowflake_pat()` helper
+- `api/services/duckdb_service.py` — PAT-first auth in `ingest_from_snowflake()`
+- `.gitignore` — added `.keys/`
+- `data/connections/` — cleaned up duplicate connection files
+
+### Verification
+- `npx tsc --noEmit` — zero TypeScript errors
+- Full flow tested: saved connection → Test Connection → table list returned from live Snowflake
+- Snowflake PAT auth + network policy working
+
+### Next Steps
+- Test table import (select tables → sync → verify they appear in Available Sources)
+- Consider adding connection deletion UI (backend supports it)
+- Live DB query mode (proxy SQL to Snowflake) — deferred, import-to-DuckDB is sufficient for POC
+
+---
+
 ## Session: 2026-02-14
 
 ### Focus: Phase 10 — Custom SQL Mode in Chart Editor

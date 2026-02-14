@@ -20,6 +20,7 @@ from .routers.render import router as render_router
 from .routers.data import router as data_router
 from .routers.charts_v2 import router as charts_v2_router
 from .routers.dashboards_v2 import router as dashboards_v2_router
+from .routers.connections import router as connections_router
 
 settings = get_settings()
 
@@ -50,6 +51,7 @@ app.include_router(render_router, prefix="/api")
 app.include_router(data_router, prefix="/api")
 app.include_router(charts_v2_router, prefix="/api")
 app.include_router(dashboards_v2_router, prefix="/api")
+app.include_router(connections_router, prefix="/api")
 
 
 @app.on_event("startup")

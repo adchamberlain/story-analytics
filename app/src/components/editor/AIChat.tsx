@@ -45,8 +45,8 @@ export function AIChat() {
     <div className="flex flex-col h-full">
       {/* Header */}
       <div className="px-4 py-3 border-b border-gray-200 shrink-0">
-        <h3 className="text-sm font-semibold" style={{ color: '#1a1a1a' }}>AI Assistant</h3>
-        <p className="text-xs mt-0.5" style={{ color: '#999' }}>
+        <h3 className="text-sm font-semibold text-text-primary">AI Assistant</h3>
+        <p className="text-xs mt-0.5 text-text-muted">
           Describe changes in natural language
         </p>
       </div>
@@ -55,7 +55,7 @@ export function AIChat() {
       <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
         {chatMessages.length === 0 && !chatLoading && (
           <div className="text-center py-8">
-            <p className="text-xs" style={{ color: '#999' }}>
+            <p className="text-xs text-text-muted">
               Try: "Make bars horizontal", "Change to line chart", "Use blue palette"
             </p>
           </div>
@@ -75,7 +75,7 @@ export function AIChat() {
             >
               {msg.content}
             </div>
-            <div className="text-[10px] mt-0.5" style={{ color: '#bbb' }}>
+            <div className="text-[10px] mt-0.5 text-gray-400">
               {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
             </div>
           </div>
@@ -103,7 +103,7 @@ export function AIChat() {
             placeholder="Describe a change..."
             rows={1}
             className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg resize-none focus:outline-none focus:border-blue-400"
-            style={{ minHeight: '36px', maxHeight: '120px' }}
+            style={{ minHeight: 36, maxHeight: 120 }}
           />
           <button
             onClick={handleSend}

@@ -12,6 +12,7 @@ interface ChartPickerProps {
   /** IDs of charts already in the dashboard */
   excludeIds: string[]
   onAdd: (chartId: string) => void
+  onCreateNew?: () => void
   onClose: () => void
 }
 
@@ -28,7 +29,7 @@ const CHART_TYPE_LABELS: Record<string, string> = {
 /**
  * Modal overlay to pick charts from the library and add them to a dashboard.
  */
-export function ChartPicker({ excludeIds, onAdd, onClose }: ChartPickerProps) {
+export function ChartPicker({ excludeIds, onAdd, onCreateNew, onClose }: ChartPickerProps) {
   const [charts, setCharts] = useState<PickerChart[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -61,9 +62,22 @@ export function ChartPicker({ excludeIds, onAdd, onClose }: ChartPickerProps) {
       >
         {/* Header */}
         <div className="px-5 py-4 border-b border-gray-200 flex items-center justify-between">
-          <h2 className="text-sm font-semibold" style={{ color: '#1a1a1a' }}>Add Chart</h2>
+          <h2 className="text-sm font-semibold text-text-primary">Add Chart</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-lg">&times;</button>
         </div>
+
+        {/* Create New */}
+        {onCreateNew && (
+          <div className="px-5 py-3 border-b border-gray-100">
+            <button
+              onClick={onCreateNew}
+              className="w-full text-left px-4 py-3 rounded-lg border-2 border-dashed border-blue-300 hover:border-blue-400 hover:bg-blue-50 transition-colors"
+            >
+              <p className="text-sm font-medium text-blue-600">+ Create New Chart</p>
+              <p className="text-xs text-gray-500 mt-0.5">Pick a data source and build a chart</p>
+            </button>
+          </div>
+        )}
 
         {/* Search */}
         <div className="px-5 py-3 border-b border-gray-100">
@@ -80,9 +94,9 @@ export function ChartPicker({ excludeIds, onAdd, onClose }: ChartPickerProps) {
         {/* Chart list */}
         <div className="flex-1 overflow-y-auto px-5 py-3">
           {loading ? (
-            <p className="text-sm text-center py-8" style={{ color: '#666' }}>Loading charts...</p>
+            <p className="text-sm text-center py-8 text-text-secondary">Loading charts...</p>
           ) : filtered.length === 0 ? (
-            <p className="text-sm text-center py-8" style={{ color: '#666' }}>
+            <p className="text-sm text-center py-8 text-text-secondary">
               {charts.length === 0 ? 'No charts available. Create some first.' : 'No matching charts.'}
             </p>
           ) : (
@@ -94,10 +108,10 @@ export function ChartPicker({ excludeIds, onAdd, onClose }: ChartPickerProps) {
                   className="w-full text-left px-4 py-3 rounded-lg border border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-colors flex items-center justify-between"
                 >
                   <div>
-                    <p className="text-sm font-medium" style={{ color: '#1a1a1a' }}>
+                    <p className="text-sm font-medium text-text-primary">
                       {chart.title || 'Untitled'}
                     </p>
-                    <p className="text-xs mt-0.5" style={{ color: '#999' }}>
+                    <p className="text-xs mt-0.5 text-text-muted">
                       {CHART_TYPE_LABELS[chart.chart_type] ?? chart.chart_type}
                       {chart.subtitle ? ` — ${chart.subtitle}` : ''}
                     </p>

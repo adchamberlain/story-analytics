@@ -37,12 +37,12 @@ export function ChartWrapper({ title, subtitle, source, children, className = ''
       {(title || subtitle) && (
         <div className="mb-1">
           {title && (
-            <h3 className="text-lg font-semibold" style={{ color: '#1a1a1a', fontFamily: 'Inter, system-ui, sans-serif' }}>
+            <h3 className="text-lg font-semibold text-text-primary">
               {title}
             </h3>
           )}
           {subtitle && (
-            <p className="text-sm mt-0.5" style={{ color: '#666666' }}>
+            <p className="text-sm mt-0.5 text-text-secondary">
               {subtitle}
             </p>
           )}
@@ -57,7 +57,7 @@ export function ChartWrapper({ title, subtitle, source, children, className = ''
       {/* Footer: source + export */}
       <div className="flex items-center justify-between mt-3">
         {source ? (
-          <p className="text-xs" style={{ color: '#999999' }}>
+          <p className="text-xs text-text-muted">
             Source: {source}
           </p>
         ) : <div />}

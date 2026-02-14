@@ -2,11 +2,25 @@ interface ColumnDropdownProps {
   label: string
   value: string | null
   columns: string[]
+  columnTypes?: Record<string, string>
   allowNone?: boolean
   onChange: (value: string | null) => void
 }
 
-export function ColumnDropdown({ label, value, columns, allowNone = false, onChange }: ColumnDropdownProps) {
+/** Map DuckDB types to short display labels */
+function shortType(duckdbType: string): string {
+  const t = duckdbType.toUpperCase()
+  if (t.includes('VARCHAR') || t.includes('TEXT') || t.includes('STRING')) return 'text'
+  if (t.includes('BIGINT') || t.includes('INTEGER') || t.includes('SMALLINT') || t.includes('TINYINT') || t.includes('HUGEINT')) return 'int'
+  if (t.includes('DOUBLE') || t.includes('FLOAT') || t.includes('DECIMAL') || t.includes('NUMERIC') || t.includes('REAL')) return 'decimal'
+  if (t.includes('TIMESTAMP')) return 'datetime'
+  if (t.includes('DATE')) return 'date'
+  if (t.includes('TIME')) return 'time'
+  if (t.includes('BOOLEAN') || t.includes('BOOL')) return 'bool'
+  return duckdbType.toLowerCase()
+}
+
+export function ColumnDropdown({ label, value, columns, columnTypes, allowNone = false, onChange }: ColumnDropdownProps) {
   return (
     <div>
       <label className="block text-xs font-medium text-gray-500 mb-1">{label}</label>
@@ -18,7 +32,9 @@ export function ColumnDropdown({ label, value, columns, allowNone = false, onCha
         {allowNone && <option value="">None</option>}
         {!allowNone && !value && <option value="">Select...</option>}
         {columns.map((col) => (
-          <option key={col} value={col}>{col}</option>
+          <option key={col} value={col}>
+            {col}{columnTypes?.[col] ? ` (${shortType(columnTypes[col])})` : ''}
+          </option>
         ))}
       </select>
     </div>

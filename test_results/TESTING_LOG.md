@@ -702,3 +702,33 @@ All tests passed.
 
 All tests passed.
 
+
+### v2 Visual QA — 2026-02-13 22:49:29
+
+**Result**: 3/3 passed (33.4s)  
+
+All tests passed.
+
+
+### v2 Visual QA — 2026-02-13 23:10:49
+
+**Result**: 3/3 passed (37.7s)  
+
+All tests passed.
+
+
+### v2 Visual QA — 2026-02-13 23:15:02
+
+**Result**: 8/10 passed (112.5s)  
+
+**Failures**:
+- `line_db` (LineChart/database):  — vision fail
+- `area_db` (AreaChart/database):  — vision fail
+
+
+### v2 Visual QA — 2026-02-13 23:37:37
+
+**Result**: 3/3 passed (69.0s)  
+
+All tests passed.
+

@@ -72,7 +72,7 @@ export function DashboardViewPage() {
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
           </svg>
-          <p className="text-sm" style={{ color: '#666' }}>Loading dashboard...</p>
+          <p className="text-sm text-text-secondary">Loading dashboard...</p>
         </div>
       </div>
     )
@@ -90,11 +90,11 @@ export function DashboardViewPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50" style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>
+    <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <header className="bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between">
-        <Link to="/library" className="text-sm text-gray-500 hover:text-gray-700 transition-colors">
-          &larr; Library
+        <Link to="/" className="text-sm text-gray-500 hover:text-gray-700 transition-colors">
+          &larr; Dashboards
         </Link>
         <Link
           to={`/dashboard/${dashboardId}/edit`}
@@ -107,11 +107,11 @@ export function DashboardViewPage() {
       <main className="max-w-6xl mx-auto px-6 py-8">
         {/* Title + description */}
         <div className="mb-8">
-          <h1 className="text-2xl font-semibold" style={{ color: '#1a1a1a' }}>
+          <h1 className="text-2xl font-semibold text-text-primary">
             {dashboard.title}
           </h1>
           {dashboard.description && (
-            <p className="text-sm mt-1" style={{ color: '#666' }}>
+            <p className="text-sm mt-1 text-text-secondary">
               {dashboard.description}
             </p>
           )}
@@ -139,7 +139,7 @@ function DashboardShareLinks({ dashboardId }: { dashboardId: string }) {
   const [copiedUrl, setCopiedUrl] = useState(false)
   const [copiedEmbed, setCopiedEmbed] = useState(false)
 
-  const url = `${window.location.origin}/dashboard/v2/${dashboardId}`
+  const url = `${window.location.origin}/dashboard/${dashboardId}`
   const embedCode = `<iframe src="${url}" width="100%" height="800" frameborder="0"></iframe>`
 
   const copy = async (text: string, setter: (v: boolean) => void) => {
