@@ -65,10 +65,38 @@ All 10 screenshots verified visually. Charts are publication-quality Observable 
 - Vision validation uses the *actual* proposed chart type (not expected), so if AI proposes a different valid type it still passes
 - `--smoke` flag runs 3 representative tests: LineChart-CSV, BarChart-CSV, ScatterPlot-Snowflake
 
-### Next Steps
-- Run test suite as part of CI or pre-ship validation
-- Consider adding dashboard-level visual QA (multi-chart compositions)
-- Phase 7: Chart hygiene system (data freshness, schema change detection)
+### Current State (pick up here)
+
+**What's done (Phases 1-6 + QA)**:
+- Full v2 pipeline working: CSV upload → AI chart proposal → save → render → publish → dashboard assembly
+- All 5 chart types (Line, Bar, Area, Scatter, Histogram) rendering correctly via Observable Plot
+- Both data paths (CSV upload, Snowflake parquet) working
+- Visual QA test suite: `python tests/v2_visual_qa.py` — 10/10 passing
+- Smoke test: `python tests/v2_visual_qa.py --smoke` — 3 tests, ~35s
+
+**To start the dev server**: `./dev.sh` (API on :8000, frontend on :3001)
+
+**To re-run visual QA**: `python tests/v2_visual_qa.py` (requires dev server running)
+
+### Next Steps (prioritized)
+
+1. **Refine chart quality** — Review the 10 screenshots in `test_results/v2_qa_screenshots/` for polish opportunities:
+   - Legend placement and formatting
+   - Axis tick formatting (currency, date granularity)
+   - Color palette consistency across chart types
+   - Responsive sizing (currently fixed 450px height)
+
+2. **Dashboard-level visual QA** — Extend `v2_visual_qa.py` to test multi-chart dashboard compositions (create 2-3 charts → assemble dashboard → screenshot → validate layout)
+
+3. **Phase 7: Chart Hygiene System** (see DEV_PLAN.md §7):
+   - 7.1 Data freshness monitoring (stale data alerts)
+   - 7.2 Schema change detection (column renames/removals → flag broken charts)
+   - 7.3 Visual quality checks (adapt existing `engine/qa.py` for Observable Plot)
+   - 7.4 Scheduled refresh (manual button + cron for DB sources)
+
+4. **Landing page / onboarding flow** — The `/` route needs a proper upload CTA and first-run experience
+
+5. **CI integration** — Wire `v2_visual_qa.py --smoke` into GitHub Actions for pre-merge validation
 
 ---
 
