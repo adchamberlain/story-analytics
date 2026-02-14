@@ -63,10 +63,10 @@ export function FileDropzone({ onFileSelected, uploading }: FileDropzoneProps) {
         )}
       </div>
 
-      <p className="text-sm font-medium" style={{ color: '#1a1a1a' }}>
+      <p className="text-sm font-medium text-text-primary">
         {uploading ? 'Uploading...' : 'Drop a CSV file here, or click to browse'}
       </p>
-      <p className="text-xs mt-1" style={{ color: '#999999' }}>
+      <p className="text-xs mt-1 text-text-muted">
         CSV files only
       </p>
     </div>

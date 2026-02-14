@@ -3,6 +3,7 @@ node_modules
 *.options.yaml
 .vscode/settings.json
 .env
+.keys/
 credentials.txt
 sources/snowflake_saas/connection.yaml
 sources/olist_ecommerce/connection.yaml

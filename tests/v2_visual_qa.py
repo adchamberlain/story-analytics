@@ -78,27 +78,15 @@ def generate_sales_csv() -> str:
     return buf.getvalue()
 
 
-def convert_parquet_to_csv(parquet_path: Path) -> str:
-    """Convert parquet file to CSV string using pyarrow."""
-    import pyarrow.parquet as pq
-
-    table = pq.read_table(str(parquet_path))
-    buf = io.BytesIO()
-    # Write CSV via pyarrow
-    import pyarrow.csv as pa_csv
-    pa_csv.write_csv(table, buf)
-    return buf.getvalue().decode("utf-8")
-
-
 # ── Test Matrix ──────────────────────────────────────────────────────────────
 
 @dataclass
 class TestCase:
     name: str
     chart_type: str
-    data_path: str          # "csv" or "snowflake"
+    data_path: str          # "csv" or "database"
     user_hint: str
-    csv_content: str = ""   # populated at runtime
+    csv_content: str = ""   # populated at runtime (CSV path only)
     smoke: bool = False     # include in smoke run
 
 
@@ -115,16 +103,16 @@ TEST_MATRIX = [
     TestCase("histogram_csv", "Histogram", "csv",
              "histogram of revenue distribution"),
 
-    # Snowflake path (invoices parquet → CSV upload)
-    TestCase("line_sf", "LineChart", "snowflake",
+    # Database path (connection → sync cached parquet → DuckDB)
+    TestCase("line_db", "LineChart", "database",
              "show amount trend over time"),
-    TestCase("bar_sf", "BarChart", "snowflake",
+    TestCase("bar_db", "BarChart", "database",
              "compare total amount by status as a bar chart"),
-    TestCase("area_sf", "AreaChart", "snowflake",
+    TestCase("area_db", "AreaChart", "database",
              "area chart of amounts over time"),
-    TestCase("scatter_sf", "ScatterPlot", "snowflake",
+    TestCase("scatter_db", "ScatterPlot", "database",
              "scatter plot of customer_id vs amount", smoke=True),
-    TestCase("histogram_sf", "Histogram", "snowflake",
+    TestCase("histogram_db", "Histogram", "database",
              "histogram of amount distribution"),
 ]
 
@@ -220,6 +208,38 @@ def propose_chart(client: httpx.Client, source_id: str, user_hint: str) -> dict:
     )
     resp.raise_for_status()
     return resp.json()
+
+
+def create_connection(client: httpx.Client) -> str:
+    """POST /connections/ → returns connection_id."""
+    resp = client.post(
+        f"{API_BASE}/connections/",
+        json={
+            "name": "Test Snowflake",
+            "db_type": "snowflake",
+            "config": {
+                "account": "test",
+                "warehouse": "COMPUTE_WH",
+                "database": "ANALYTICS_POC",
+                "schema": "SAAS_DEMO",
+            },
+        },
+        timeout=10,
+    )
+    resp.raise_for_status()
+    return resp.json()["connection_id"]
+
+
+def sync_tables(client: httpx.Client, connection_id: str, tables: list[str]) -> dict[str, str]:
+    """POST /connections/{id}/sync → returns {table_name: source_id}."""
+    resp = client.post(
+        f"{API_BASE}/connections/{connection_id}/sync",
+        json={"tables": tables},
+        timeout=30,
+    )
+    resp.raise_for_status()
+    data = resp.json()
+    return {s["table_name"]: s["source_id"] for s in data["sources"]}
 
 
 def save_chart(client: httpx.Client, source_id: str, proposal: dict) -> str:
@@ -431,29 +451,10 @@ def run_tests(smoke: bool = False) -> list[TestResult]:
     print("Preparing test data...")
     sales_csv = generate_sales_csv()
 
-    invoices_csv = None
-    if any(t.data_path == "snowflake" for t in tests):
-        if SNOWFLAKE_PARQUET.exists():
-            print(f"  Converting parquet → CSV: {SNOWFLAKE_PARQUET}")
-            invoices_csv = convert_parquet_to_csv(SNOWFLAKE_PARQUET)
-            # Truncate to first 200 rows for faster tests
-            csv_lines = invoices_csv.strip().split("\n")
-            if len(csv_lines) > 201:
-                invoices_csv = "\n".join(csv_lines[:201]) + "\n"
-            print(f"  Invoices: {len(csv_lines)-1} rows available, using {min(len(csv_lines)-1, 200)}")
-        else:
-            print(f"  WARNING: Parquet not found at {SNOWFLAKE_PARQUET}")
-            print(f"  Snowflake tests will be skipped.")
-
-    # Assign CSV content to each test
+    # Assign CSV content to CSV-path tests
     for t in tests:
         if t.data_path == "csv":
             t.csv_content = sales_csv
-        elif t.data_path == "snowflake":
-            if invoices_csv:
-                t.csv_content = invoices_csv
-            else:
-                t.csv_content = ""  # will be skipped
 
     results: list[TestResult] = []
 
@@ -466,6 +467,21 @@ def run_tests(smoke: bool = False) -> list[TestResult]:
             # Set up Claude vision provider
             provider = ClaudeProvider()
 
+            # Set up database connection once (shared by all database-path tests)
+            db_source_ids: dict[str, str] = {}  # table_name → source_id
+            if any(t.data_path == "database" for t in tests):
+                try:
+                    print("Setting up database connection (cached parquet)...")
+                    conn_id = create_connection(client)
+                    db_source_ids = sync_tables(client, conn_id, ["invoices"])
+                    print(f"  Connection: {conn_id}")
+                    for tbl, sid in db_source_ids.items():
+                        print(f"  Synced {tbl} → source_id={sid}")
+                except Exception as e:
+                    traceback.print_exc()
+                    print(f"  WARNING: Database setup failed: {e}")
+                    print(f"  Database-path tests will be skipped.")
+
             for i, test in enumerate(tests, 1):
                 result = TestResult(
                     name=test.name,
@@ -476,19 +492,35 @@ def run_tests(smoke: bool = False) -> list[TestResult]:
 
                 print(f"[{i}/{len(tests)}] {test.name} ({test.chart_type} / {test.data_path})")
 
-                if not test.csv_content:
-                    result.phase_failed = "data"
-                    result.error = "No test data available (parquet not found)"
-                    result.duration_s = time.time() - start
-                    results.append(result)
-                    print(f"       SKIP — no data\n")
-                    continue
-
                 try:
-                    # Step 1: Upload CSV
-                    filename = "test_sales.csv" if test.data_path == "csv" else "invoices.csv"
-                    print(f"       Uploading {filename}...")
-                    source_id = upload_csv(client, test.csv_content, filename)
+                    # Step 1: Get source_id (CSV upload or database sync)
+                    if test.data_path == "csv":
+                        if not test.csv_content:
+                            result.phase_failed = "data"
+                            result.error = "No CSV content"
+                            result.duration_s = time.time() - start
+                            results.append(result)
+                            print(f"       SKIP — no data\n")
+                            continue
+                        filename = "test_sales.csv"
+                        print(f"       Uploading {filename}...")
+                        source_id = upload_csv(client, test.csv_content, filename)
+                    elif test.data_path == "database":
+                        if "invoices" not in db_source_ids:
+                            result.phase_failed = "data"
+                            result.error = "Database sync failed — no source_id for invoices"
+                            result.duration_s = time.time() - start
+                            results.append(result)
+                            print(f"       SKIP — no database source\n")
+                            continue
+                        source_id = db_source_ids["invoices"]
+                    else:
+                        result.phase_failed = "data"
+                        result.error = f"Unknown data_path: {test.data_path}"
+                        result.duration_s = time.time() - start
+                        results.append(result)
+                        continue
+
                     print(f"       source_id={source_id}")
 
                 except Exception as e:

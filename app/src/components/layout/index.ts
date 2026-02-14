@@ -1,6 +1,2 @@
-/**
- * Re-export layout components
- */
-
-export { ChartCard } from './ChartCard'
-export { DashboardGrid } from './DashboardGrid'
+export { AppShell } from './AppShell'
+export { TopNav } from './TopNav'

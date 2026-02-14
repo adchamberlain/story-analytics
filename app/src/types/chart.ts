@@ -11,14 +11,9 @@ export type ChartType =
   | 'BarChart'
   | 'AreaChart'
   | 'ScatterPlot'
-  | 'BubbleChart'
   | 'Histogram'
-  | 'FunnelChart'
-  | 'SankeyDiagram'
-  | 'Heatmap'
   | 'DataTable'
   | 'BigValue'
-  | 'DualTrendChart'
 
 export type FilterType =
   | 'Dropdown'
@@ -166,14 +161,6 @@ export interface ChartRenderData {
 
   /** Column names from the query */
   columns: string[]
-
-  /** Plotly-specific configuration */
-  plotlyConfig?: {
-    responsive?: boolean
-    displayModeBar?: boolean | 'hover'
-    displaylogo?: boolean
-    modeBarButtonsToRemove?: string[]
-  }
 }
 
 // =============================================================================

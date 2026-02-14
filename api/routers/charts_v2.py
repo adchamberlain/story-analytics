@@ -10,7 +10,7 @@ import traceback
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from ..services.duckdb_service import get_duckdb_service
+from ..services.duckdb_service import get_duckdb_service, q
 from ..services.chart_storage import save_chart, load_chart, list_charts, delete_chart, update_chart
 
 from engine.v2.schema_analyzer import DataProfile
@@ -63,6 +63,9 @@ class SaveRequest(BaseModel):
     subtitle: str | None = None
     source: str | None = None
     reasoning: str | None = None
+    config: dict | None = None
+    connection_id: str | None = None
+    source_table: str | None = None
 
 
 class SavedChartResponse(BaseModel):
@@ -81,6 +84,8 @@ class SavedChartResponse(BaseModel):
     created_at: str
     updated_at: str
     config: dict | None = None
+    connection_id: str | None = None
+    source_table: str | None = None
 
 
 class ChartDataResponse(BaseModel):
@@ -102,6 +107,22 @@ class UpdateChartRequest(BaseModel):
     config: dict | None = None
 
 
+class BuildQueryRequest(BaseModel):
+    source_id: str
+    x: str
+    y: str | None = None
+    series: str | None = None
+    aggregation: str = "none"  # "none", "sum", "avg", "count", "min", "max"
+
+
+class BuildQueryResponse(BaseModel):
+    success: bool
+    sql: str | None = None
+    data: list[dict] = []
+    columns: list[str] = []
+    error: str | None = None
+
+
 class EditRequest(BaseModel):
     chart_id: str
     message: str
@@ -115,6 +136,90 @@ class EditResponse(BaseModel):
 
 
 # ── Endpoints ────────────────────────────────────────────────────────────────
+
+VALID_AGGREGATIONS = {"none", "sum", "avg", "count", "min", "max"}
+
+
+@router.post("/build-query", response_model=BuildQueryResponse)
+async def build_query(request: BuildQueryRequest):
+    """
+    Deterministic SQL builder: user picks columns, we generate and execute SQL.
+    No LLM involved.
+    """
+    if request.aggregation not in VALID_AGGREGATIONS:
+        return BuildQueryResponse(
+            success=False,
+            error=f"Invalid aggregation: {request.aggregation}. Must be one of {VALID_AGGREGATIONS}",
+        )
+
+    db = get_duckdb_service()
+
+    # Validate source exists and columns are valid
+    try:
+        schema = db.get_schema(request.source_id)
+    except Exception as e:
+        return BuildQueryResponse(success=False, error=f"Source not found: {e}")
+
+    valid_cols = {c.name for c in schema.columns}
+
+    for col_name, col_label in [(request.x, "x"), (request.y, "y"), (request.series, "series")]:
+        if col_name and col_name not in valid_cols:
+            return BuildQueryResponse(
+                success=False,
+                error=f"Column {q(col_name)} not found in source. Available: {sorted(valid_cols)}",
+            )
+
+    table_name = f"src_{request.source_id}"
+
+    # Build SQL
+    if request.aggregation == "none":
+        # Raw select
+        select_cols = [q(request.x)]
+        if request.y:
+            select_cols.append(q(request.y))
+        if request.series:
+            select_cols.append(q(request.series))
+        sql = f"SELECT {', '.join(select_cols)} FROM {table_name} ORDER BY {q(request.x)} LIMIT 5000"
+    elif request.aggregation == "count" and not request.y:
+        # COUNT(*) with no y column
+        select_cols = [q(request.x), 'COUNT(*) AS "count"']
+        group_cols = [q(request.x)]
+        if request.series:
+            select_cols.append(q(request.series))
+            group_cols.append(q(request.series))
+        sql = (
+            f"SELECT {', '.join(select_cols)} FROM {table_name} "
+            f"GROUP BY {', '.join(group_cols)} ORDER BY {q(request.x)}"
+        )
+    else:
+        # Aggregated query
+        agg = request.aggregation.upper()
+        y_col = request.y or "*"
+        y_quoted = q(y_col) if request.y else "*"
+        y_alias = request.y or "count"
+        select_cols = [q(request.x), f'{agg}({y_quoted}) AS {q(y_alias)}']
+        group_cols = [q(request.x)]
+        if request.series:
+            select_cols.append(q(request.series))
+            group_cols.append(q(request.series))
+        sql = (
+            f"SELECT {', '.join(select_cols)} FROM {table_name} "
+            f"GROUP BY {', '.join(group_cols)} ORDER BY {q(request.x)}"
+        )
+
+    # Execute
+    try:
+        result = db.execute_query(sql, request.source_id)
+        return BuildQueryResponse(
+            success=True,
+            sql=sql,
+            data=result.rows,
+            columns=result.columns,
+        )
+    except Exception as e:
+        traceback.print_exc()
+        return BuildQueryResponse(success=False, sql=sql, error=f"SQL execution failed: {e}")
+
 
 @router.post("/propose", response_model=ProposeResponse)
 async def propose(request: ProposeRequest):
@@ -226,6 +331,9 @@ async def save(request: SaveRequest):
         subtitle=request.subtitle,
         source=request.source,
         reasoning=request.reasoning,
+        config=request.config,
+        connection_id=request.connection_id,
+        source_table=request.source_table,
     )
 
     return SavedChartResponse(
@@ -244,6 +352,8 @@ async def save(request: SaveRequest):
         created_at=chart.created_at,
         updated_at=chart.updated_at,
         config=chart.config,
+        connection_id=chart.connection_id,
+        source_table=chart.source_table,
     )
 
 
@@ -268,6 +378,8 @@ async def list_all():
             created_at=c.created_at,
             updated_at=c.updated_at,
             config=c.config,
+            connection_id=c.connection_id,
+            source_table=c.source_table,
         )
         for c in charts
     ]
@@ -309,6 +421,8 @@ async def get_chart(chart_id: str):
             created_at=chart.created_at,
             updated_at=chart.updated_at,
             config=chart.config,
+            connection_id=chart.connection_id,
+            source_table=chart.source_table,
         ),
         data=data,
         columns=columns,
@@ -342,6 +456,8 @@ async def update(chart_id: str, request: UpdateChartRequest):
         created_at=chart.created_at,
         updated_at=chart.updated_at,
         config=chart.config,
+        connection_id=chart.connection_id,
+        source_table=chart.source_table,
     )
 
 

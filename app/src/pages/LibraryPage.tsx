@@ -39,11 +39,11 @@ export function LibraryPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50" style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>
+    <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <header className="bg-white border-b border-gray-200 px-6 py-4">
         <div className="max-w-6xl mx-auto flex items-center justify-between">
-          <h1 className="text-lg font-semibold" style={{ color: '#1a1a1a' }}>
+          <h1 className="text-lg font-semibold text-text-primary">
             Chart Library
           </h1>
           <div className="flex items-center gap-2">
@@ -52,12 +52,6 @@ export function LibraryPage() {
               className="px-4 py-2 text-sm rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50 transition-colors font-medium"
             >
               New Dashboard
-            </Link>
-            <Link
-              to="/create"
-              className="px-4 py-2 text-sm rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors font-medium"
-            >
-              New Chart
             </Link>
           </div>
         </div>
@@ -110,7 +104,7 @@ export function LibraryPage() {
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
             </svg>
-            <p className="text-sm" style={{ color: '#666' }}>Loading charts...</p>
+            <p className="text-sm text-text-secondary">Loading charts...</p>
           </div>
         ) : store.error ? (
           <div className="bg-red-50 border border-red-200 rounded-lg px-6 py-4 text-center">
@@ -118,25 +112,22 @@ export function LibraryPage() {
           </div>
         ) : charts.length === 0 ? (
           <div className="text-center py-20">
-            <p className="text-sm" style={{ color: '#666' }}>
+            <p className="text-sm text-text-secondary">
               {store.search || store.typeFilter
                 ? 'No charts match your filters.'
                 : 'No charts yet.'}
             </p>
             {!store.search && !store.typeFilter && (
               <Link
-                to="/create"
+                to="/dashboard/new"
                 className="text-sm text-blue-600 underline mt-2 inline-block"
               >
-                Create your first chart
+                Create your first dashboard
               </Link>
             )}
           </div>
         ) : (
-          <div
-            className="grid gap-4"
-            style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))' }}
-          >
+          <div className="grid gap-4 grid-cols-[repeat(auto-fill,minmax(300px,1fr))]">
             {charts.map((chart) => (
               <ChartCard
                 key={chart.id}
@@ -174,30 +165,21 @@ function ChartCard({
     <div className="bg-white rounded-lg border border-gray-200 p-5 flex flex-col hover:border-gray-300 transition-colors">
       {/* Type badge + date */}
       <div className="flex items-center justify-between mb-3">
-        <span
-          className="text-xs px-2 py-0.5 rounded-full font-medium"
-          style={{ backgroundColor: '#f0f4ff', color: '#2166ac' }}
-        >
+        <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-blue-50 text-chart-blue">
           <span className="font-mono mr-1">{typeInfo.icon}</span>
           {typeInfo.label}
         </span>
-        <span className="text-xs" style={{ color: '#999' }}>{date}</span>
+        <span className="text-xs text-text-muted">{date}</span>
       </div>
 
       {/* Title */}
-      <h3
-        className="text-sm font-semibold mb-1 line-clamp-2"
-        style={{ color: '#1a1a1a' }}
-      >
+      <h3 className="text-sm font-semibold mb-1 line-clamp-2 text-text-primary">
         {chart.title || 'Untitled'}
       </h3>
 
       {/* Subtitle */}
       {chart.subtitle && (
-        <p
-          className="text-xs mb-3 line-clamp-2"
-          style={{ color: '#666' }}
-        >
+        <p className="text-xs mb-3 line-clamp-2 text-text-secondary">
           {chart.subtitle}
         </p>
       )}

@@ -32,6 +32,8 @@ class SavedChart:
     created_at: str
     updated_at: str
     config: dict | None = None  # Visual config blob (palette, toggles, axis labels)
+    connection_id: str | None = None  # Database connection this data came from
+    source_table: str | None = None   # Original table name (e.g., "INVOICES")
 
 
 def save_chart(
@@ -47,6 +49,9 @@ def save_chart(
     subtitle: str | None = None,
     source: str | None = None,
     reasoning: str | None = None,
+    config: dict | None = None,
+    connection_id: str | None = None,
+    source_table: str | None = None,
 ) -> SavedChart:
     """Save a chart configuration to disk."""
     CHARTS_DIR.mkdir(parents=True, exist_ok=True)
@@ -70,6 +75,9 @@ def save_chart(
         reasoning=reasoning,
         created_at=now,
         updated_at=now,
+        config=config,
+        connection_id=connection_id,
+        source_table=source_table,
     )
 
     path = CHARTS_DIR / f"{chart_id}.json"
