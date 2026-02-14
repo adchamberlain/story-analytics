@@ -1,5 +1,5 @@
 import { useEffect, useCallback } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { useEditorStore } from '../stores/editorStore'
 import { ChartWrapper } from '../components/charts/ChartWrapper'
 import { ObservableChartFactory } from '../components/charts/ObservableChartFactory'
@@ -10,17 +10,33 @@ import type { ChartConfig } from '../types/chart'
 
 export function EditorPage() {
   const { chartId } = useParams<{ chartId: string }>()
+  const [searchParams] = useSearchParams()
   const navigate = useNavigate()
   const store = useEditorStore()
 
-  // Load chart on mount
+  const isNew = chartId === 'new'
+  const sourceId = searchParams.get('sourceId')
+
+  // Load chart or init new on mount
   useEffect(() => {
-    if (chartId && chartId !== store.chartId) {
+    if (isNew && sourceId) {
+      store.initNew(sourceId)
+    } else if (chartId && chartId !== 'new' && chartId !== store.chartId) {
       store.loadChart(chartId)
     }
     return () => store.reset()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chartId])
+  }, [chartId, sourceId])
+
+  // Dual save paths
+  const handleSave = useCallback(async () => {
+    if (isNew || !store.chartId) {
+      const newId = await store.saveNew()
+      if (newId) navigate(`/editor/${newId}`, { replace: true })
+    } else {
+      await store.save()
+    }
+  }, [isNew, store, navigate])
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -34,14 +50,21 @@ export function EditorPage() {
         store.redo()
       } else if (mod && e.key === 's') {
         e.preventDefault()
-        store.save()
+        handleSave()
       }
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [store])
+  }, [store, handleSave])
 
   const isDirty = store.isDirty()
+
+  // Save button enabled logic
+  const canSave = isNew || !store.chartId
+    ? store.config.dataMode === 'sql'
+      ? store.data.length > 0  // SQL mode: enabled when query has been run
+      : !!store.sql            // Table mode: enabled when SQL exists (user mapped x column)
+    : isDirty                  // Existing chart: enabled when dirty
 
   // Map EditorConfig → ChartConfig for the renderer
   const chartConfig: ChartConfig = {
@@ -66,8 +89,12 @@ export function EditorPage() {
 
   const handleBack = useCallback(() => {
     if (isDirty && !window.confirm('You have unsaved changes. Discard them?')) return
-    navigate(chartId ? `/chart/${chartId}` : '/create/ai')
-  }, [isDirty, navigate, chartId])
+    if (isNew || !store.chartId) {
+      navigate(-1)
+    } else {
+      navigate(`/chart/${store.chartId}`)
+    }
+  }, [isDirty, navigate, isNew, store.chartId])
 
   if (store.loading) {
     return (
@@ -77,13 +104,13 @@ export function EditorPage() {
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
           </svg>
-          <p className="text-sm" style={{ color: '#666' }}>Loading chart...</p>
+          <p className="text-sm text-text-secondary">Loading chart...</p>
         </div>
       </div>
     )
   }
 
-  if (store.error && !store.data.length) {
+  if (store.error && !store.data.length && !isNew) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="bg-red-50 border border-red-200 rounded-lg px-6 py-4 max-w-md">
@@ -94,8 +121,10 @@ export function EditorPage() {
     )
   }
 
+  const showEmptyState = isNew && store.data.length === 0
+
   return (
-    <div className="h-screen flex flex-col bg-gray-50" style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>
+    <div className="h-screen flex flex-col bg-gray-50">
       {/* Header */}
       <header className="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
@@ -105,8 +134,8 @@ export function EditorPage() {
           >
             &larr; Back
           </button>
-          <span className="text-sm font-medium" style={{ color: '#1a1a1a' }}>
-            {store.config.title || 'Untitled Chart'}
+          <span className="text-sm font-medium text-text-primary">
+            {isNew && !store.chartId ? 'New Chart' : store.config.title || 'Untitled Chart'}
           </span>
           {isDirty && (
             <span className="text-xs px-1.5 py-0.5 rounded bg-amber-100 text-amber-700">
@@ -133,16 +162,18 @@ export function EditorPage() {
             Redo
           </button>
           <div className="w-px h-5 bg-gray-200 mx-1" />
+          {store.chartId && (
+            <button
+              onClick={store.discard}
+              disabled={!isDirty}
+              className="px-3 py-1.5 text-xs rounded border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-30"
+            >
+              Discard
+            </button>
+          )}
           <button
-            onClick={store.discard}
-            disabled={!isDirty}
-            className="px-3 py-1.5 text-xs rounded border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-30"
-          >
-            Discard
-          </button>
-          <button
-            onClick={store.save}
-            disabled={!isDirty || store.saving}
+            onClick={handleSave}
+            disabled={!canSave || store.saving}
             className="px-4 py-1.5 text-xs rounded bg-blue-600 text-white hover:bg-blue-700 transition-colors font-medium disabled:opacity-50"
             title="Save (Ctrl+S)"
           >
@@ -168,18 +199,30 @@ export function EditorPage() {
         {/* Center: Chart Preview */}
         <main className="flex-1 p-6 overflow-y-auto flex items-start justify-center">
           <div className="w-full max-w-3xl">
-            <ChartWrapper
-              title={store.config.title || undefined}
-              subtitle={store.config.subtitle || undefined}
-              source={store.config.source || undefined}
-            >
-              <ObservableChartFactory
-                data={store.data}
-                config={chartConfig}
-                chartType={store.config.chartType}
-                height={420}
-              />
-            </ChartWrapper>
+            {showEmptyState ? (
+              <div className="flex items-center justify-center h-80 border-2 border-dashed border-gray-200 rounded-xl">
+                <div className="text-center">
+                  <p className="text-sm text-text-muted">
+                    {store.config.dataMode === 'sql'
+                      ? 'Write a SQL query and click Run to see your data.'
+                      : 'Pick a chart type and map your columns in the toolbox to get started.'}
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <ChartWrapper
+                title={store.config.title || undefined}
+                subtitle={store.config.subtitle || undefined}
+                source={store.config.source || undefined}
+              >
+                <ObservableChartFactory
+                  data={store.data}
+                  config={chartConfig}
+                  chartType={store.config.chartType}
+                  height={420}
+                />
+              </ChartWrapper>
+            )}
           </div>
         </main>
 
