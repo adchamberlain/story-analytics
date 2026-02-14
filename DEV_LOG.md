@@ -4,6 +4,296 @@ This log captures development changes made during each session. Review this at t
 
 ---
 
+## Session: 2026-02-14
+
+### Focus: Phase 10 — Custom SQL Mode in Chart Editor
+
+Added a "SQL" toggle alongside the existing "Table" mode in the editor toolbox. Users can write raw SQL (JOINs, CTEs, window functions, custom aggregations), run it against DuckDB, and map result columns to chart encodings — analogous to Tableau's "Custom SQL" data source option.
+
+### Changes Made
+
+**Step 1: Backend — Raw SQL Execution + Table Listing (`api/routers/data.py`)**
+- `POST /data/query-raw`: Executes user-written SQL directly on DuckDB via `service._conn.execute()`, bypassing table name substitution. Returns `columns`, `column_types`, `rows`, `row_count`, and `error`. Auto-appends `LIMIT 10000` if no LIMIT clause.
+- `GET /data/tables`: Lists all loaded DuckDB tables with internal names (`src_abc123`), display names (`sales.csv`), row/column counts — so users know what to query.
+- Bug fix: DuckDB `result.description` returns `DuckDBPyType` objects, not strings. Added `str()` cast for `column_types`.
+
+**Step 2: Frontend Store — SQL Mode State + Actions (`app/src/stores/editorStore.ts`)**
+- Added `DataMode` type (`'table' | 'sql'`) and `dataMode` field to `EditorConfig` (default: `'table'`)
+- Added state fields: `customSql`, `sqlError`, `sqlExecuting`, `availableTables`
+- New actions: `setDataMode()` (switches mode, populates SQL from current query), `setCustomSql()`, `executeCustomSql()` (calls `/data/query-raw`, updates columns/data/columnTypes), `fetchAvailableTables()`
+- Guards: `buildQuery()` skips when `dataMode === 'sql'`; `updateConfig()` skips auto-buildQuery in SQL mode
+- `saveNew()` / `save()` persist `dataMode` in config blob
+- `loadChart()` reads `dataMode` from saved config, restores `customSql`
+- `initNew()` / `reset()` clear all SQL mode fields
+
+**Step 3: Frontend UI — Mode Toggle + SQL Controls (`app/src/components/editor/Toolbox.tsx`)**
+- Pill-style Table/SQL toggle at top of Data section (via `ModeToggle` component)
+- SQL mode shows: table reference list (monospace internal names + display names), SQL textarea (6 rows, Cmd+Enter shortcut), green "Run Query" button, red error box on failure
+- After successful execution: "Map result columns" section with X/Y/Series dropdowns populated from query result columns with type hints
+- Table mode unchanged
+
+**Step 4: Frontend — EditorPage Updates (`app/src/pages/EditorPage.tsx`)**
+- `canSave` in SQL mode: enabled when `data.length > 0` (query has been run)
+- Empty state message: "Write a SQL query and click Run to see your data." in SQL mode
+
+### Verification
+1. TypeScript: `npx tsc --noEmit` — clean, zero errors
+2. Python: syntax validated, no errors
+3. Backend: `POST /data/query-raw` returns correct data + column types for aggregation queries; error handling works for empty SQL, bad SQL, nonexistent tables
+4. Backend: `GET /data/tables` returns table list with internal names
+5. E2E Playwright test (13 assertions): upload CSV → editor → SQL toggle → table reference shown → type query → Run → column mapping appears → map X/Y → chart renders → Save enabled → switch back to Table mode → textarea gone
+6. Visual QA: screenshot confirms bar chart renders correctly from SQL aggregation query
+
+### Files Modified
+- `api/routers/data.py` — `POST /data/query-raw`, `GET /data/tables` endpoints
+- `app/src/stores/editorStore.ts` — `DataMode`, `customSql`, SQL actions, guards
+- `app/src/components/editor/Toolbox.tsx` — Table/SQL toggle, `SqlModeControls`
+- `app/src/pages/EditorPage.tsx` — `canSave` and empty state for SQL mode
+
+### Next Steps
+- Save/load round-trip: save chart in SQL mode → reload → verify SQL mode active with correct data
+- SQL mode + AI Chat: ensure AI assistant can modify charts created via custom SQL
+- Consider adding syntax highlighting to SQL textarea (CodeMirror or similar)
+- Consider Cmd+Enter keyboard shortcut hint text below textarea
+
+---
+
+## Session: 2026-02-13 (Part 10)
+
+### Focus: Phase 9 — Human-Driven Chart Creation
+
+Flipped the chart creation flow from AI-driven (LLM picks chart type + columns) to human-driven (user picks chart type, maps columns, system generates SQL deterministically). AI chat remains for refinement after creation.
+
+### Changes Made
+
+**Step 1: Backend — Deterministic SQL Builder (`POST /v2/charts/build-query`)**
+- `api/routers/charts_v2.py`: New `BuildQueryRequest`/`BuildQueryResponse` models and endpoint
+- Generates SQL from column selections: raw SELECT (no aggregation) or GROUP BY (with aggregation)
+- Validates columns exist before building SQL, uses `q()` helper for quoting
+- Special case: `count` aggregation with no `y` column → `COUNT(*)`
+- Imported `q` from `duckdb_service.py`
+
+**Step 2: Backend — Pass `config` Through on Save**
+- `api/services/chart_storage.py`: Added `config: dict | None = None` parameter to `save_chart()`
+- `api/routers/charts_v2.py`: Added `config` to `SaveRequest`, passed through to `save_chart()`
+
+**Step 3: Backend — List Available Sources (`GET /data/sources`)**
+- `api/routers/data.py`: New `SourceSummary` model and `list_sources()` endpoint
+- Returns source_id, name, row_count, column_count for all loaded DuckDB sources
+
+**Step 4: Frontend — EditorStore New Chart Mode**
+- `app/src/stores/editorStore.ts`: Major expansion
+  - Added `AggregationType` and `aggregation` to `EditorConfig`
+  - Added `columnTypes: Record<string, string>` to state
+  - New actions: `initNew(sourceId)` — fetches schema, populates columns/types
+  - New actions: `buildQuery()` — calls `/v2/charts/build-query`, updates data/sql
+  - New actions: `saveNew()` — calls `/v2/charts/save`, returns new chart ID
+  - Modified `updateConfig()`: auto-triggers `buildQuery()` in new chart mode when data keys change
+  - Modified `isDirty()`: new unsaved chart is dirty if data.length > 0
+  - Modified `loadChart()`: also fetches column types from schema endpoint
+
+**Step 5: Frontend — EditorPage New Chart Route**
+- `app/src/pages/EditorPage.tsx`: Handles `chartId === 'new'` with `sourceId` query param
+  - Dual save paths: `saveNew()` for new charts, `save()` for existing
+  - URL replaces to `/editor/{newId}` after first save
+  - Empty state prompt when no columns mapped yet
+  - Back button: navigate(-1) for new charts, `/chart/{id}` for existing
+  - Ctrl+S calls `handleSave()` (which handles both paths)
+
+**Step 6: Frontend — Toolbox Aggregation Dropdown + Column Type Hints**
+- `app/src/components/editor/Toolbox.tsx`: Added aggregation dropdown after Y Axis when Y is set
+- `app/src/components/editor/ColumnDropdown.tsx`: Added `columnTypes` prop with `shortType()` mapper
+  - Shows type hints: VARCHAR→text, BIGINT→int, DOUBLE→decimal, DATE→date, TIMESTAMP→datetime
+
+**Step 7: Frontend — Source Picker Page**
+- `app/src/pages/SourcePickerPage.tsx` (new): Two-section page
+  - Available Sources: cards from `GET /api/data/sources`, click navigates to editor
+  - Upload CSV: reuses `FileDropzone`, navigates to editor after upload
+- `app/src/App.tsx`: Added route `/editor/new/source` before `/editor/:chartId`
+
+**Step 8: Frontend — Dashboard Builder "Create New" Option**
+- `app/src/components/dashboard/ChartPicker.tsx`: Added optional `onCreateNew` prop
+  - Dashed blue "Create New Chart" button at top of picker modal
+- `app/src/pages/DashboardBuilderPage.tsx`: `handleCreateNew` → navigates to source picker
+
+### Verification Steps
+1. TypeScript: `npx tsc --noEmit` — clean, zero errors
+2. Python: All imports validated — no syntax errors
+3. Full flow: Dashboard Builder → Create New → pick source → map columns → save → back to builder → add chart → save dashboard
+
+### Files Created
+- `app/src/pages/SourcePickerPage.tsx`
+
+### Files Modified
+- `api/routers/charts_v2.py` — build-query endpoint, config on SaveRequest
+- `api/routers/data.py` — list sources endpoint
+- `api/services/chart_storage.py` — config parameter on save_chart()
+- `app/src/stores/editorStore.ts` — aggregation, columnTypes, initNew, buildQuery, saveNew
+- `app/src/pages/EditorPage.tsx` — new chart mode, dual save, empty state
+- `app/src/components/editor/Toolbox.tsx` — aggregation dropdown, columnTypes passthrough
+- `app/src/components/editor/ColumnDropdown.tsx` — columnTypes prop, type hints
+- `app/src/components/dashboard/ChartPicker.tsx` — onCreateNew prop
+- `app/src/pages/DashboardBuilderPage.tsx` — handleCreateNew handler
+- `app/src/App.tsx` — source picker route
+
+### Next Steps
+1. **Manual QA**: Start dev server, upload CSV, test full create flow end-to-end
+2. **AI-suggest fallback**: Wire existing `propose_chart()` as optional "AI suggest" button in toolbox
+3. **Smoke tests**: Extend `v2_visual_qa.py` to cover the new human-driven creation path
+
+---
+
+## Session: 2026-02-13 (Part 9)
+
+### Focus: Phase 8 — Database-First Data Pipeline
+
+Added Snowflake connections as a first-class data path. DuckDB stays as the sole query engine — we sync data from Snowflake (or cached parquet) into DuckDB, and the chart pipeline works unchanged.
+
+### Changes Made
+
+**Step 1: DuckDB Service — Parquet & Snowflake Ingestion**
+- `api/services/duckdb_service.py`: Added `ingest_parquet()`, `ingest_from_snowflake()`, and `ingest_cached_parquet()` methods
+- `ingest_parquet()` creates DuckDB table via `read_parquet()`, reuses `_inspect_table()` for schema
+- `ingest_from_snowflake()` connects via `snowflake.connector`, fetches tables → writes temp parquet → calls `ingest_parquet()`, optionally caches to `data/snowflake_saas/`
+- `ingest_cached_parquet()` scans all subdirs of `data/snowflake_saas/` for `.parquet` files — offline fallback
+
+**Step 2: Connection Service (New)**
+- `api/services/connection_service.py`: CRUD for database connection metadata as JSON files in `data/connections/`
+- Stores `connection_id`, `name`, `db_type`, `config` (no credentials) — same pattern as `chart_storage.py`
+- Functions: `save_connection()`, `load_connection()`, `list_connections()`, `delete_connection()`
+
+**Step 3: Connections Router (New)**
+- `api/routers/connections.py`: 7 endpoints for connection lifecycle
+  - `POST /connections/` — create connection
+  - `GET /connections/` — list all
+  - `GET /connections/{id}` — get by ID
+  - `DELETE /connections/{id}` — delete
+  - `POST /connections/{id}/test` — test live connection
+  - `POST /connections/{id}/tables` — list tables from database
+  - `POST /connections/{id}/sync` — sync tables into DuckDB → returns `source_id` per table
+- Sync endpoint has 3-tier credential resolution: explicit → `.env` → offline cached parquet
+- Snowflake failures automatically fall back to cached parquet when available
+- `api/main.py`: Wired `connections_router` into the app
+
+**Step 4: Chart Storage — Connection Fields (Backward Compatible)**
+- `api/services/chart_storage.py`: Added optional `connection_id` and `source_table` fields to `SavedChart`
+- `api/routers/charts_v2.py`: Added same fields to `SaveRequest`, `SavedChartResponse`, and all response constructors
+- Defaults to `None` — existing CSV-based charts unaffected
+
+**Step 5: Updated Smoke Tests**
+- `tests/v2_visual_qa.py`: Rewrote database-path tests to use connection/sync API
+  - Was: convert parquet → CSV → upload (fake Snowflake path)
+  - Now: `POST /connections/` → `POST /connections/{id}/sync` → `source_id` from sync
+  - Renamed data_path `"snowflake"` → `"database"`, test names `*_sf` → `*_db`
+  - Database connection created once, all 5 database tests share the synced `source_id`
+  - Removed `convert_parquet_to_csv()` function — no longer needed
+
+**Step 6: Connection Integration Test (New)**
+- `tests/test_connections.py`: 8 offline tests + 2 optional live tests
+  - Tests: create, list, get, sync, schema, propose, save-with-connection, delete
+  - All offline tests use cached parquet (no Snowflake credentials needed)
+  - `--live` flag enables live Snowflake tests
+
+### Test Results
+- `python tests/test_connections.py` — **8/8 passed** (10.3s)
+- `python tests/v2_visual_qa.py --smoke` — **3/3 passed** (37.7s) — CSV + database paths both work
+
+### Architecture Decision: Sync Fallback
+When a live Snowflake connection fails, the sync endpoint falls back to cached parquet if available. This makes tests work in CI/offline environments without special configuration — the endpoint is resilient rather than brittle.
+
+### Current State
+
+**What's done (Phases 1-8)**:
+- Full v2 pipeline: CSV upload + database connection → AI chart proposal → save → render → publish → dashboard assembly
+- Database connections as first-class data path with offline fallback
+- Connection metadata persisted to `data/connections/`
+- Charts can track their `connection_id` + `source_table` for future refresh capability
+- Dashboard-first navigation with TopNav
+- All v1 code removed
+- All inline styles migrated to Tailwind
+- Visual QA: smoke tests passing on both data paths
+
+### Files Created/Modified
+- **New**: `api/services/connection_service.py`, `api/routers/connections.py`, `tests/test_connections.py`
+- **Modified**: `api/services/duckdb_service.py`, `api/services/chart_storage.py`, `api/routers/charts_v2.py`, `api/main.py`, `tests/v2_visual_qa.py`
+
+### Next Steps
+1. **Full QA suite** — Run `python tests/v2_visual_qa.py` (all 10 tests) to validate all chart types on database path
+2. **Frontend connection UI** — Settings page with connection form, sync button, table picker
+3. **Multi-table sync** — Sync multiple tables at once (customers, events, subscriptions) and test cross-table chart proposals
+4. **Refresh capability** — Use `connection_id` + `source_table` on saved charts to re-sync data from source
+
+---
+
+## Session: 2026-02-13 (Part 8)
+
+### Focus: Phase 7 — Frontend Architecture Reset
+
+Removed all v1 code, established dashboard-first navigation with top nav bar, and unified styling on Tailwind.
+
+### Changes Made
+
+**Step 1: Fix Foundational CSS**
+- `app/index.html`: Changed body `font-family` to `'Inter', ui-sans-serif, system-ui, sans-serif`
+- `app/src/styles/index.css`: Removed v1-era sections: heading overrides (`h1,h2,h3` with monospace blue), Plotly modebar CSS, `.loading-spinner`, `.error-message`, `.skeleton` classes, `@keyframes blink`, `--font-sans`/`--font-brand` variables, Plotly animation timing variables
+
+**Step 2: Create New Shell Components**
+- `app/src/components/layout/TopNav.tsx` — Top navigation bar with NavLinks (Dashboards, Library, Settings, + New Dashboard)
+- `app/src/components/layout/AppShell.tsx` — Layout wrapper: `<TopNav />` + `<Outlet />`
+- `app/src/pages/DashboardsHome.tsx` — New home page, fetches `GET /api/v2/dashboards/`, shows grid of dashboard cards
+- `app/src/pages/v2/SettingsPage.tsx` — Lightweight placeholder (no store dependencies)
+
+**Step 3: Rewrite Routes**
+- `app/src/App.tsx` — Complete rewrite with AppShell routes (`/`, `/library`, `/settings`, `/dashboard/new`, `/dashboard/:id/edit`), full-screen routes (`/dashboard/:id`, `/editor/:id`, `/chart/:id`), and redirects for old URLs (`/create`, `/chat`, `/login`, `/charts`, `/dashboard/v2/:id`, etc.)
+- Fixed cross-nav links: EditorPage fallback `/create/ai`→`/`, LibraryPage "Create first chart"→"Create first dashboard" to `/dashboard/new`, removed "New Chart" button, DashboardViewPage back link→`/`, share URL `/dashboard/v2/`→`/dashboard/`, DashboardBuilderPage save nav→`/dashboard/${id}`
+
+**Step 4: Delete All v1 Code**
+- Deleted 13 v1 pages, 5 v1 stores, 8 component directories (chat, sources, modals, brand, create, skeletons, filters, editors), auth directory, v1 layout files (Sidebar, AppLayout, ChartCard, DashboardGrid), 17 v1 chart components, entire `poc/` directory, `types/conversation.ts`
+- Updated barrel exports: `stores/index.ts`, `components/charts/index.ts`, `components/layout/index.ts`, `types/index.ts`
+
+**Step 5: Migrate Inline Styles to Tailwind**
+- Replaced all `style={{ fontFamily: 'Inter...' }}` with nothing (body-level now)
+- Replaced all `style={{ color: '#1a1a1a' }}` → `text-text-primary`
+- Replaced all `style={{ color: '#666' }}` → `text-text-secondary`
+- Replaced all `style={{ color: '#999' }}` → `text-text-muted`
+- Replaced all `style={{ color: '#333' }}` → `text-gray-800`
+- Replaced all `style={{ color: '#bbb' }}` → `text-gray-400`
+- Replaced `style={{ backgroundColor: '#f0f4ff', color: '#2166ac' }}` → `bg-blue-50 text-chart-blue`
+- Replaced `style={{ gridTemplateColumns: ... }}` → Tailwind grid classes
+- Replaced `style={{ gridColumn: '1 / -1' }}` → `col-span-full`
+- Files updated: EditorPage, LibraryPage, DashboardBuilderPage, DashboardViewPage, ChartViewPage, ChartWrapper, ChartPicker, DashboardGrid, AIChat, FileDropzone, DataPreview, ObservableChartFactory
+
+**Step 6: Clean Up Dependencies**
+- Removed `plotly.js`, `react-plotly.js`, `@types/react-plotly.js` from `package.json`
+- Removed unsupported chart types from `ChartType`: BubbleChart, FunnelChart, SankeyDiagram, Heatmap, DualTrendChart
+- Removed `plotlyConfig` from `ChartRenderData`
+- Cleaned `api/client.ts`: removed all v1 API functions (auth, conversation, v1 chart/dashboard, schema, settings, templates, semantic layer)
+- `npm install` removed 317 packages
+
+### Build Results
+- `npm run build` passes cleanly
+- Total bundle: ~1.3MB (down from ~2.9MB — Plotly's ~1.6MB removed)
+
+### Current State
+
+**What's done (Phases 1-7)**:
+- Full v2 pipeline: CSV upload → AI chart proposal → save → render → publish → dashboard assembly
+- Dashboard-first navigation with TopNav (Dashboards, Library, Settings)
+- All v1 code removed — zero legacy imports
+- All inline styles migrated to Tailwind semantic tokens
+- Plotly removed from bundle (317 fewer packages)
+- Visual QA: `python tests/v2_visual_qa.py` — 10/10 passing (from Part 7)
+
+**To start the dev server**: `./dev.sh` (API on :8000, frontend on :3001)
+
+### Next Steps
+1. **Visual QA re-run** — Run `python tests/v2_visual_qa.py --smoke` to confirm chart rendering still works after all changes
+2. **DashboardsHome API** — Verify `GET /api/v2/dashboards/` endpoint returns the expected shape (`id`, `title`, `description`, `chart_count`, `created_at`, `updated_at`)
+3. **Polish TopNav** — Active link styling, responsive breakpoints
+4. **Phase 8: Database connections** — Settings page placeholder ready
+
+---
+
 ## Session: 2026-02-13 (Part 7)
 
 ### Focus: Autonomous Visual QA Test Suite
