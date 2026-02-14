@@ -1,464 +1,517 @@
-# Strategic Plan: Story Analytics — The Looker Replacement
+# Implementation Plan: Story Analytics v2
 
 ## North Star
 
-Build a complete, AI-native dashboarding platform that replaces Looker. Use LookML as the **migration wedge** — parse a company's existing LookML repo to extract their entire data context (years of institutional knowledge encoded in views, explores, measures, joins), then build our own dashboarding suite on top of that extracted foundation.
+**Datawrapper-quality charts, open-source, from any data source, maintained by AI.**
 
-LookML is the **input**, not the output. The product is the replacement.
+The only open-source tool that combines publication-ready visual quality, AI-powered chart creation, and automated dashboard maintenance. Target users: researchers, data analysts, economists who want beautiful charts from their data without design effort.
 
-```
-Existing Looker instance
-  (years of institutional knowledge in LookML)
-      ↓
-  EXTRACT: Parse LookML → our data context
-      ↓
-  Our data context (AI-native, richer, portable)
-      ↓
-  Our dashboard suite
-    - Metric catalog (browse, search, understand)
-    - Conversational analytics (ask questions, get answers)
-    - Visual dashboards (React + Plotly, professional quality)
-    - AI-powered: LLM selects from known metrics, never hallucinates SQL
-```
-
-**Target user:** Data analyst or data scientist on an analytics team currently using Looker. They understand the data, they know what metrics they need, but Looker is slow, rigid, and expensive.
-
-**Day-one scenario:** Walk into a company with an existing Looker implementation. Parse their LookML repo. In hours, have a working data context with every metric, dimension, and join they've built over years — now portable and powering our platform.
+**Day-one scenario:** A researcher uploads a CSV of monthly employment figures. In under 30 seconds, they have a publication-ready line chart with proper axis formatting, a source note, and a downloadable SVG. No styling required.
 
 ---
 
-## Why This Approach Wins
+## Key Architectural Decisions (Locked)
 
-### 1. The LookML Migration Wedge
-
-Every Looker customer has invested months or years encoding business logic into LookML. That investment is trapped — it only works inside Looker. By parsing LookML into a portable data context, we:
-
-- **Capture institutional knowledge** without rebuilding it from scratch
-- **Reduce migration risk** — the data context is proven (it's what they're already using)
-- **Create immediate value** — day one, every metric they had in Looker is available in our platform
-- **Lower switching costs** — the hardest part of leaving Looker (recreating the data model) is automated
-
-### 2. AI-Native Architecture
-
-Looker was built for point-and-click exploration. Our platform is built for conversation. The data context makes this work:
-
-- **Structured conversations:** The LLM selects from known metrics and dimensions, not hallucinating SQL
-- **Guaranteed accuracy:** SQL is compiled from metric definitions, not generated from vague schema descriptions
-- **Rich context:** Every metric has a definition, description, and lineage the LLM can reference
-- **Our Tier 3 proof of concept:** 73% exact metric name match (92% with near-misses) shows this approach works
-
-### 3. The Existing Codebase is 60% There
-
-We've already built:
-- Multi-LLM conversation engine (Claude, OpenAI, Gemini)
-- React + Plotly.js frontend with professional chart components
-- FastAPI backend with auth, persistence, and API routes
-- 3-stage pipeline (Requirements → SQL → Layout)
-- Metric compiler (data context YAML → SQL)
-- Visual QA validation (Playwright + vision API)
-- SQL validation against DuckDB
-- 97% chart generation pass rate on standard tests
-
-What's missing is the **data context extraction from LookML** and the **structured metric catalog UI**. The rendering and conversation infrastructure exists.
+| Decision | Choice | Rationale |
+|----------|--------|-----------|
+| Charting library | **Observable Plot** | Cleaner SVG, publication-ready defaults, smaller bundle. Confirmed by PoC (2026-02-13). |
+| UI framework | **React 18 + TypeScript** | Existing codebase, strong ecosystem |
+| Styling | **Tailwind v4** | Set up in PoC, `@tailwindcss/vite` plugin, design tokens via `@theme {}` |
+| Typography | **Inter** | Clean, readable, Datawrapper-inspired. Loaded from Google Fonts. |
+| Data engine | **DuckDB** | CSV/Parquet/JSON ingestion, SQL validation, local-first |
+| State management | **Zustand** | Already in use, lightweight |
+| Backend | **FastAPI** | Existing, proven |
+| AI layer | **Provider-agnostic** (Claude, OpenAI, Gemini) | Existing abstraction works |
+| React integration | **`useObservablePlot` hook** | `useRef` + `useEffect` + `ResizeObserver`. Canonical pattern from PoC. |
+| Chart config | **JSON** | Serializable, Git-friendly. Maps to Observable Plot `plot()` options. |
 
 ---
 
-## Architecture
+## What Carries Forward from v1
 
-### Our Data Context Format
+### Keep Directly
+| Component | Location | Lines | Why |
+|-----------|----------|-------|-----|
+| LLM providers | `engine/llm/` | ~250 | Clean abstraction, all 3 providers working |
+| Chart requirements prompt | `engine/prompts/chart/requirements.yaml` | 347 | Battle-tested, 80+ examples, pattern detection |
+| Chart pipeline (3-stage) | `engine/chart_pipeline.py` | 1,151 | Proven: Requirements → SQL → Assembly |
+| Chart models | `engine/models/chart.py` | 700+ | `ChartSpec`, `ChartConfig`, `Chart`, `Dashboard` |
+| Quality validators | `engine/validators/` | 1,964 | Data shape checks, pattern detection, scale analysis |
+| Config loader (YAML) | `engine/config_loader.py` | 555 | YAML-driven prompts, themes, QA rules |
+| Schema context generator | `engine/schema.py` | 400 | Schema → LLM prompt text |
+| SQL validator (DuckDB) | `engine/sql_validator.py` | 501 | Query parsing + validation |
+| QA system (vision) | `engine/qa.py` | 729 | Playwright screenshots + Claude vision |
+| Design system prompts | `engine/prompts/base.yaml` | — | System role, chart type guidance |
+| API infrastructure | `api/main.py`, `config.py` | ~200 | FastAPI app shell, CORS, config |
+| Frontend types | `app/src/types/` | 350+ | `ChartConfig`, `ChartSpec`, `FilterSpec` |
+| Zustand store patterns | `app/src/stores/` | ~1,000 | State management patterns |
+| API client | `app/src/api/client.ts` | ~400 | Typed Axios wrapper |
 
-The core of the system. Everything — LookML extraction, metric catalog, conversation engine, SQL generation — connects through this. Full spec in `DATA_CONTEXT_SPEC.md`.
+### Adapt
+| Component | Change Needed |
+|-----------|---------------|
+| Chart conversation manager (`chart_conversation.py`) | Adapt state machine for new editor UI (toolbox + AI chat) |
+| Semantic layer (`semantic.py`) | Simplify for CSV: auto-generate from DuckDB column inspection |
+| Sources router (`api/routers/sources.py`) | Replace DB connection wizard with CSV upload endpoint |
+| Chart router (`api/routers/chart.py`) | Simplify persistence, add Observable Plot config generation |
 
-```yaml
-# What we extract from LookML and enrich with AI
-data_context:
-  source: "extracted from company-lookml-repo, 2026-02-15"
+### Drop
+| Component | Reason |
+|-----------|--------|
+| Dashboard pipeline (`pipeline/pipeline.py`) | Evidence markdown is dead |
+| Dashboard composer (`dashboard_composer.py`) | Evidence-based composition |
+| Metric compiler (`metric_compiler.py`) | Over-engineered for CSV-first tool |
+| LookML extractor (`tools/lookml_extractor/`) | Looker replacement direction |
+| Semantic layer generator (`tools/build_semantic_layer.py`) | Looker replacement direction |
+| All Plotly chart components (`app/src/components/charts/`) | Replaced by Observable Plot |
+| Conversation router (`api/routers/conversation.py`) | Legacy dashboard conversations |
 
-  tables:
-    - name: order_items
-      table: analytics.fct_order_items
-      description: "Revenue fact table at the line-item level"
-      grain: order_item_id
+---
 
-      dimensions:
-        - name: product_category
-          type: categorical
-          description: "Product category (English names)"
-          tags: [product, categorical]
+## Observable Plot Chart Architecture
 
-        - name: order_date
-          type: time
-          granularities: [day, week, month, quarter, year]
+### How It Works
 
-      measures:
-        - name: gmv
-          agg: sum
-          expr: price
-          label: "Gross Merchandise Value"
-          description: "Total revenue before freight. Primary revenue metric."
-          format: currency
-
-        - name: order_count
-          agg: count_distinct
-          expr: order_id
-
-  metrics:
-    - name: average_order_value
-      type: derived
-      expression: "gmv / order_count"
-      description: "Revenue per order. Key efficiency metric."
-
-  joins:
-    - name: order_analysis
-      base_table: order_items
-      joins:
-        - table: customers
-          relationship: many_to_one
-          on: "${order_items.customer_id} = ${customers.customer_id}"
-      description: "Primary join graph for revenue and order analysis"
-```
-
-This format is:
-- **Portable** — not locked to any BI tool
-- **LLM-readable** — structured enough for the LLM to reason over
-- **Compilable** — the metric compiler can generate correct SQL from it
-- **Richer than LookML** — includes knowledge base, validated examples, data quirks
-
-### System Architecture
+The engine generates a **chart configuration JSON** that the frontend translates into Observable Plot `plot()` calls. This is the central abstraction:
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                     Story Analytics Platform                     │
-│                                                                  │
-│  ┌─────────────┐  ┌─────────────┐  ┌────────────────────────┐  │
-│  │   Extract    │  │   Catalog   │  │   Dashboard Suite      │  │
-│  │   (Phase 1)  │  │   (Phase 2) │  │   (Phase 3-4)          │  │
-│  │             │  │             │  │                        │  │
-│  │ LookML repo │  │ Browse      │  │ Conversational charts  │  │
-│  │ → parse     │  │ Search      │  │ Visual dashboards      │  │
-│  │ → extract   │  │ Understand  │  │ Auto-insights          │  │
-│  │ → enrich    │  │ Recommend   │  │ Collaboration          │  │
-│  └──────┬──────┘  └──────┬──────┘  └───────────┬────────────┘  │
-│         │                │                      │               │
-│         ▼                ▼                      ▼               │
-│  ┌──────────────────────────────────────────────────────────┐  │
-│  │              Our Data Context                             │  │
-│  │  (tables, metrics, joins, knowledge, validated examples) │  │
-│  │  Extracted from LookML + enriched by AI                  │  │
-│  └─────────────────────────┬────────────────────────────────┘  │
-│                             │                                   │
-│         ┌───────────────────┼───────────────────┐              │
-│         ▼                   ▼                   ▼              │
-│  ┌───────────┐    ┌──────────────┐    ┌──────────────┐        │
-│  │  Metric   │    │     LLM      │    │   Database    │        │
-│  │  Compiler │    │   Pipeline   │    │   Connector   │        │
-│  │ YAML→SQL  │    │  Claude/etc  │    │  Snowflake/BQ │        │
-│  └───────────┘    └──────────────┘    └──────────────┘        │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
+User request → LLM pipeline → ChartConfig JSON → React component → Observable Plot SVG
 ```
+
+### Chart Config → Observable Plot Mapping
+
+The existing `ChartConfig` type maps naturally to Observable Plot:
+
+```typescript
+// ChartConfig (from engine)          →  Observable Plot (in React)
+{
+  chartType: 'LineChart',
+  x: 'month',                        →  Plot.lineY(data, { x: 'month',
+  y: 'revenue',                      →    y: 'revenue',
+  series: 'region',                   →    stroke: 'region' })
+  colors: ['#2166ac', '#d6604d'],     →  color: { range: [...] }
+  title: 'Revenue by Region',         →  ChartCard title prop
+  xAxisTitle: 'Month',               →  x: { label: 'Month' }
+  yAxisTitle: 'Revenue ($)',          →  y: { label: 'Revenue ($)' }
+  showGrid: true,                     →  grid: true
+}
+```
+
+### Observable Plot Chart Factory
+
+A single `ObservableChartFactory` component replaces the 17 Plotly chart components:
+
+```typescript
+function ObservableChartFactory({ data, config }: { data: any[], config: ChartConfig }) {
+  // Maps ChartConfig.chartType → Plot marks
+  // LINE_CHART    → Plot.lineY()
+  // BAR_CHART     → Plot.barY() or Plot.barX() (if horizontal)
+  // AREA_CHART    → Plot.areaY() + Plot.lineY()
+  // SCATTER_PLOT  → Plot.dot()
+  // DATA_TABLE    → HTML table (no Plot needed)
+  // BIG_VALUE     → Styled number (no Plot needed)
+}
+```
+
+This is dramatically simpler than the current 17-component Plotly approach. Observable Plot's declarative marks API means one component handles all chart types.
 
 ---
 
 ## Implementation Phases
 
-### Phase 1: Data Context Creation Engine
+### Phase 1: Foundation (Observable Plot Rendering Pipeline)
 
-**Goal:** Build the end-to-end workflow for creating a data context. Two entry points: (1) LookML migration (richest path), (2) starting from scratch with just a database. Both follow the same five-step creation workflow defined in `DATA_CONTEXT_SPEC.md`.
+**Goal:** Replace the Plotly rendering pipeline with Observable Plot. A `ChartConfig` JSON renders as a publication-ready Observable Plot chart.
 
-**Design principle: AI generates, humans review.** No one writes YAML. No one stares at schema dumps. The system does the research and drafts the document; domain experts review it like they'd review a memo from an employee.
+**This phase answers:** "Given chart config + data, can we render a beautiful chart?"
 
-**What to build:**
+#### 1.1 Observable Plot Chart Factory
+Create `app/src/components/charts/ObservableChartFactory.tsx` — single component that:
+- Takes `{ data: any[], config: ChartConfig }` props
+- Maps `config.chartType` to the correct Observable Plot marks
+- Applies Datawrapper-style theme defaults
+- Handles all chart types: line, bar (vertical/horizontal/stacked), area, scatter, data table, big value
 
-#### 1a. Connect & Discover (Step 1)
-- Database connection setup (Snowflake, BigQuery, Postgres, DuckDB)
-- Schema crawler: enumerate tables, columns, types
-- Data profiler: row counts, cardinality, null rates, sample values, date ranges, distribution analysis
-- Foreign key detector: column name matching + value overlap analysis
-- Output: raw profile data that feeds into the generation step
+**Builds on:** PoC components (`app/src/poc/components/Observable*.tsx`), `useObservablePlot` hook, `observableTheme.ts`.
 
-#### 1b. Context Gathering (Step 2)
+**Files:**
+| File | Action | Purpose |
+|------|--------|---------|
+| `app/src/components/charts/ObservableChartFactory.tsx` | Create | Central chart renderer |
+| `app/src/components/charts/ChartWrapper.tsx` | Create | Shared wrapper: title, subtitle, source note, export buttons |
+| `app/src/components/charts/useObservablePlot.ts` | Move from poc | React hook (promoted from PoC) |
+| `app/src/themes/datawrapper.ts` | Create | Consolidated theme: colors, fonts, spacing, Observable Plot defaults |
+| `app/src/types/chart.ts` | Modify | Add Observable Plot-specific config fields if needed |
 
-The minimum path is just the database connection — everything else is additive. No step here should require the user to leave the flow and manually collect files from colleagues.
+#### 1.2 Chart Export
+Static export from Observable Plot SVG output:
+- **SVG**: Direct DOM extraction (Observable Plot renders SVG natively)
+- **PNG**: Canvas-based rasterization at 2x resolution
+- **PDF**: SVG → PDF conversion (client-side via jsPDF or similar)
 
-**Automatic (from the database connection itself):**
-- **Query history extractor** — Pull recent SQL directly from the warehouse:
-  - Snowflake: `SNOWFLAKE.ACCOUNT_USAGE.QUERY_HISTORY`
-  - BigQuery: `INFORMATION_SCHEMA.JOBS`
-  - Redshift: `STL_QUERYTEXT` / `SVL_STATEMENTTEXT`
-  - Postgres: `pg_stat_statements`
-  - Extract the last 90 days, deduplicate, identify commonly-used metrics, joins, and filter patterns
-  - This replaces the "ask your colleagues for SQL" step entirely
+**Files:**
+| File | Action | Purpose |
+|------|--------|---------|
+| `app/src/utils/chartExport.ts` | Create | `exportSVG()`, `exportPNG()`, `exportPDF()` |
 
-**One-click (if available):**
-- **GitHub org scan** — User connects their GitHub org (OAuth). System scans for:
-  - `.lkml` files → LookML parser (`lkml` package, MIT license). Handle views, explores, models, derived tables, refinements, extends. Map `view` → `table`, `explore` → `join`, `dimension_group` → `time dimension`.
-  - `dbt_project.yml` → dbt ingester. Parse `schema.yml`, `metrics.yml`, model SQL files.
-  - Present a list: "We found these repos. Which ones are relevant?" One click to select.
+#### 1.3 Verify with Hardcoded Data
+Wire up the factory to the existing PoC sample data at `/poc` to verify all chart types render correctly with the unified component.
 
-**Optional (user provides if they have it):**
-- Business documentation, data dictionaries, wiki pages, onboarding docs
-- Plain-text business description
-- Additional SQL files beyond what query history captured
-
-Each input gets compressed into structured context for the LLM. More inputs → better output, but the minimum viable path (profiling + query history) requires nothing beyond the database connection.
-
-#### 1c. Draft Generation (Step 3)
-- LLM synthesizes all inputs (profile + ingested context) into a complete data context
-- Generates: tables, dimensions, measures, metrics, joins, knowledge base (business rules, data quirks, glossary)
-- Output stored as YAML internally — **users never see YAML**
-- Leverages Tier 3 patterns from PoC (73% metric name accuracy with business docs)
-
-#### 1d. Review Memo Generator (Step 4)
-- Converts YAML data context into a **plain-language review document**
-- Organized by business domain (Revenue, Customers, Product, etc.)
-- Each section is a bullet-point memo: metric name, plain-English definition, how it's calculated
-- Includes "How Tables Connect" section (joins in plain English) and "Things to Watch Out For" (data quirks)
-- **Review process modeled on PR/doc review:**
-  - Different domain experts review different sections (revenue team reviews revenue metrics, etc.)
-  - Reviewers make corrections in plain language ("We call this Net Revenue, not Realized GMV")
-  - AI takes corrections and updates the data context. Reviewers never touch YAML.
-  - Multiple rounds are fine — each produces a cleaner memo
-
-#### 1e. Automated Validation (Step 5)
-- **Automated checks (no human needed):**
-  - SQL compilation: every metric definition produces valid, executable SQL
-  - Row count consistency across joined tables
-  - Foreign key integrity (do join keys actually match?)
-  - Sanity checks: no negative revenue, no future dates, no NULL primary keys
-  - Internal consistency: metrics that should be related actually add up (GMV = Realized GMV + Canceled GMV)
-- **Cross-reference checks (minimal human input):**
-  - Compare key numbers against existing trusted sources (Looker dashboards, board decks, spreadsheets)
-  - Present as: "Your Looker dashboard shows Q1 GMV was $4.2M. Our calculation gives $4.18M — within 0.5%."
-  - Humans confirm order of magnitude only — not exact values
-- **Output:** `validated_examples` with machine-generated benchmarks and tolerance ranges
-
-#### 1f. Incremental Updates
-- Detect schema changes (new tables, new columns, dropped columns)
-- Generate diff-style review memo: "3 new columns added to order_items. Recommended: add shipping_method as a categorical dimension."
-- Same review process — domain expert approves or corrects the diff
-
-**Key decision:** Use `lkml` for LookML parsing, don't build our own. Focus on the creation workflow and review experience.
-
-**Existing code to reuse:**
-- `engine/semantic.py` — Data context models (extend for richer concepts)
-- `engine/metric_compiler.py` — Validation that extracted metrics compile to valid SQL
-- `engine/semantic_generator.py` — AI enrichment patterns from Tier 3
-- `tools/build_semantic_layer.py` — PoC profiling and generation pipeline
-
-**Deliverable:** `story create` → connect, ingest, generate, review memo, validate → working data context.
-
-**Success criteria:**
-- LookML path: Parse a real-world repo (50+ views) and produce a reviewable memo in under 5 minutes
-- From-scratch path: Profile a database and produce a reviewable memo in under 10 minutes
-- Extract 95%+ of dimensions and measures correctly from LookML
-- Generated SQL for every metric executes successfully against the database
-- Review memo is clear enough that a product manager can read and correct it
+**Deliverable:** Visit `/poc`, see all chart types rendered by `ObservableChartFactory` with publication-ready styling and working export buttons.
 
 ---
 
-### Phase 2: Metric Catalog & Structured Queries
+### Phase 2: Data Ingestion (CSV → DuckDB → Queryable)
 
-**Goal:** A browsable, searchable metric catalog that analysts use instead of Looker's Explore interface. Every query is structured against the data context — no SQL hallucination.
+**Goal:** User uploads a CSV and sees a data preview. The data is queryable via DuckDB.
 
-**What to build:**
+**This phase answers:** "Can we get user data into the system cleanly?"
 
-1. **Metric Catalog UI** (React)
-   - Browse metrics by domain (revenue, growth, customers, etc.)
-   - Search by name, description, or SQL fragment
-   - View metric details: definition, SQL, which join graph it uses, related metrics
-   - Dimension browser: what can you slice each metric by?
-   - "Metric lineage" — which measures compose a derived metric
+#### 2.1 CSV Upload Endpoint
+Backend endpoint that accepts a CSV file, loads it into DuckDB, and returns schema info.
 
-2. **Structured Query Builder**
-   - Users select: metric(s) + dimension(s) + filters + time range
-   - The metric compiler generates guaranteed-correct SQL
-   - No LLM in the query path — pure compilation, instant and deterministic
-   - Preview results in a data table before charting
+**Files:**
+| File | Action | Purpose |
+|------|--------|---------|
+| `api/routers/data.py` | Create | `POST /api/data/upload` — accepts CSV, returns `{ source_id, schema }` |
+| `api/services/duckdb_service.py` | Create | DuckDB connection management, CSV loading, query execution |
 
-3. **Conversational Query Layer**
-   - "Show me revenue by product category for Q4" → LLM maps to:
-     `metric: gmv, dimension: product_category, filter: order_date in Q4 2025`
-   - The LLM's job is only **selection** (which metrics/dimensions), not **generation** (no SQL)
-   - The metric compiler handles SQL
-   - This is where 97%+ accuracy becomes achievable — the LLM can't generate bad SQL because it never generates SQL
+**Endpoint behavior:**
+```
+POST /api/data/upload
+  Body: multipart form with CSV file
+  Response: {
+    source_id: "abc123",
+    filename: "employment.csv",
+    row_count: 240,
+    columns: [
+      { name: "month", type: "DATE", sample_values: ["2023-01", "2023-02", ...] },
+      { name: "employment", type: "FLOAT", min: 145.2, max: 158.7, nulls: 0 },
+      ...
+    ]
+  }
+```
 
-4. **Saved Queries & Sharing**
-   - Save metric + dimension + filter combos as named queries
-   - Share with team members
-   - Schedule for refresh
+#### 2.2 Data Preview UI
+Frontend page for CSV upload and data preview.
 
-**Existing code to reuse:**
-- `engine/metric_compiler.py` — Core of the query engine
-- `engine/conversation.py` — Conversation state machine
-- `engine/llm/` — LLM providers for the conversational layer
-- `engine/pipeline/requirements_agent.py` — Requirements extraction (adapt for metric selection)
-- `app/src/components/charts/` — All Plotly chart components
-- `app/src/stores/` — Zustand state management
-- `api/` — FastAPI backend (extend with catalog endpoints)
+**Files:**
+| File | Action | Purpose |
+|------|--------|---------|
+| `app/src/pages/UploadPage.tsx` | Create | Drag-and-drop CSV upload + data preview table |
+| `app/src/components/data/DataPreview.tsx` | Create | Column headers, first 10 rows, type badges, row count |
+| `app/src/components/data/FileDropzone.tsx` | Create | Drag-and-drop file upload area |
+| `app/src/stores/dataStore.ts` | Create | Upload state, source_id, schema, preview data |
 
-**Deliverable:** Web UI where analysts browse metrics, build queries visually or conversationally, and see results.
+#### 2.3 Query Execution Endpoint
+Backend endpoint to execute SQL against uploaded data and return results.
 
-**Success criteria:**
-- Every query in the catalog returns correct results (compiled from data context, never hallucinated)
-- Conversational queries resolve to the correct metrics 90%+ of the time
-- Analysts can find "does this metric exist?" in under 10 seconds
+**Files:**
+| File | Action | Purpose |
+|------|--------|---------|
+| `api/routers/data.py` | Extend | `POST /api/data/query` — executes SQL, returns `{ columns, rows }` |
 
----
-
-### Phase 3: Dashboard Builder
-
-**Goal:** Create, save, and share multi-chart dashboards. This replaces Looker's dashboard functionality.
-
-**What to build:**
-
-1. **Dashboard Canvas**
-   - Grid-based layout (drag and drop)
-   - Multiple chart types: line, bar, area, scatter, KPI cards, tables
-   - Cross-filtering between charts
-   - Responsive layout for different screen sizes
-
-2. **Chart Creation Flow**
-   - Select from the data context (not freeform SQL)
-   - Choose visualization type (with smart defaults)
-   - Configure: colors, labels, formatting, axis scales
-   - AI-assisted: "make this a stacked bar chart with the top 5 categories"
-
-3. **Dashboard Templates**
-   - Auto-generate dashboard suggestions based on the data context
-   - "Executive Overview" template that picks key metrics automatically
-   - Domain-specific templates (sales, marketing, product, etc.)
-
-4. **Filters & Interactivity**
-   - Global dashboard filters (date range, segment, etc.)
-   - Drill-down from summary to detail
-   - Click-through from KPI to underlying data
-
-**Existing code to reuse:**
-- `app/src/components/charts/` — Full Plotly chart component library (Line, Bar, Area, Scatter, BigValue, DataTable, Histogram, Heatmap, Funnel, Sankey, Bubble, DualTrend)
-- `app/src/components/layout/DashboardGrid.tsx` — Grid layout
-- `app/src/components/layout/ChartCard.tsx` — Chart card container
-- `app/src/components/filters/` — DateRange, Dropdown filter components
-- `app/src/components/editors/` — Chart config editor with AI assistant
-- `app/src/components/chat/` — Chat interface components
-- `engine/pipeline/` — Multi-agent pipeline for chart creation
-- `engine/qa.py` — Visual QA validation
-
-**Deliverable:** Full dashboard builder that replaces Looker dashboards.
+**Deliverable:** Upload a CSV, see a clean data preview with column types and sample values. Backend can execute SQL against the data.
 
 ---
 
-### Phase 4: Production & Team Features
+### Phase 3: AI Chart Creation (The Core Loop)
 
-**Goal:** Production-grade deployment for a team of 20+ analysts.
+**Goal:** User uploads data, AI proposes a chart, chart renders instantly. This is the product's signature moment.
 
-**What to build:**
-- User management & permissions (viewer, analyst, admin)
-- Row-level security (filtered data based on user role)
-- Scheduled dashboard refresh & email delivery
-- Alerting (notify when a metric crosses a threshold)
-- Git integration for data context changes
-- Audit log (who queried what, when)
-- Performance optimization (query caching, materialized views)
-- Looker API integration for migration tooling (import existing dashboards, not just LookML)
+**This phase answers:** "Can AI look at data and produce a good chart automatically?"
 
-**Existing code to reuse:**
-- `api/models/` — User, session, dashboard models
-- `api/security.py` — JWT auth
-- `api/database.py` — SQLAlchemy setup
+#### 3.1 Chart Proposal Endpoint
+Adapt the existing `ChartPipeline` for CSV data:
+1. **Requirements stage:** LLM examines schema + sample data → proposes `ChartSpec` (chart type, axis mappings, title)
+2. **SQL stage:** LLM generates DuckDB SQL to shape the data for the chart
+3. **Assembly:** SQL executes against DuckDB, results + config sent to frontend
 
----
+**Files:**
+| File | Action | Purpose |
+|------|--------|---------|
+| `engine/v2/chart_proposer.py` | Create | Simplified 2-stage pipeline: schema → ChartSpec → SQL |
+| `engine/v2/schema_analyzer.py` | Create | CSV schema → LLM prompt context (column types, sample values, distributions) |
+| `api/routers/charts_v2.py` | Create | `POST /api/v2/charts/propose` — takes `source_id`, returns chart config + data |
 
-### Phase 5: AI-Native Analytics
+**Key adaptation:** The existing `chart/requirements.yaml` prompt is the most valuable asset. It already handles chart type selection, axis mapping, and pattern detection. We adapt it to work with CSV-derived schemas instead of semantic layers.
 
-**Goal:** Go beyond what Looker can do. This is where AI-native becomes a competitive advantage.
+#### 3.2 AI Creation Flow UI
+The core user flow: upload → AI proposes → chart renders.
 
-- **Auto-insights:** System proactively identifies anomalies, trends, and interesting patterns
-- **Investigation agent:** "Why did revenue drop?" → multi-step analysis with narrative
-- **Natural language definitions:** Define new metrics in English, system writes the SQL
-- **Predictive analytics:** Forecasting, what-if scenarios
-- **Data storytelling:** Auto-generated narrative reports with embedded charts
-- **Data context evolution:** AI suggests new metrics based on query patterns
+**Files:**
+| File | Action | Purpose |
+|------|--------|---------|
+| `app/src/pages/CreatePage.tsx` | Create | Full creation flow: upload → preview → AI proposal → chart |
+| `app/src/components/create/ChartProposal.tsx` | Create | Shows AI reasoning + rendered chart + accept/modify buttons |
+| `app/src/stores/createStore.ts` | Create | Creation flow state: step, source_id, proposal, chart config |
 
----
+**Flow:**
+```
+[Upload CSV] → [Data Preview] → [Create with AI] → [Chart renders]
+                                                      ↓
+                                              [Accept] or [Try different approach]
+```
 
-## What We Keep vs. Build vs. Discard
+#### 3.3 Chart Persistence
+Save chart configurations as JSON files (local-first, Git-friendly).
 
-### Keep & Use Directly
-- `engine/llm/` — Multi-LLM provider support (**all phases**)
-- `engine/metric_compiler.py` — Core query engine (**Phase 2+**)
-- `engine/conversation.py` — Conversation patterns (**Phase 2+**)
-- `engine/pipeline/` — Multi-agent pipeline (**Phase 2+**)
-- `engine/prompts/` — YAML prompt architecture (**all phases**)
-- `engine/config_loader.py` — Configuration loading (**all phases**)
-- `engine/sql_validator.py` — SQL validation (**Phase 1+**)
-- `engine/semantic.py` — Data context models (**Phase 1, extend**)
-- `engine/semantic_generator.py` — AI enrichment (**Phase 1**)
-- `app/src/components/charts/` — All Plotly chart components (**Phase 3**)
-- `app/src/components/layout/` — Dashboard grid, sidebar (**Phase 3**)
-- `app/src/components/filters/` — Filter components (**Phase 3**)
-- `app/src/components/editors/` — Chart config editors (**Phase 3**)
-- `app/src/components/chat/` — Chat interface (**Phase 2+**)
-- `app/src/stores/` — Zustand state management (**Phase 2+**)
-- `api/` — FastAPI backend (**Phase 2+**)
-- `engine/qa.py` — Visual QA (**Phase 3+**)
-- `sources/*/dialect.yaml` — SQL dialect knowledge (**all phases**)
+**Files:**
+| File | Action | Purpose |
+|------|--------|---------|
+| `api/services/chart_storage.py` | Create | Save/load chart configs as JSON files |
+| `api/routers/charts_v2.py` | Extend | `POST /api/v2/charts/save`, `GET /api/v2/charts/:id` |
 
-### Build New
-- **Phase 1:** Data context creation engine (connect, ingest, generate, review, validate)
-- **Phase 2:** Metric catalog UI, structured query builder, conversational query layer
-- **Phase 3:** Dashboard canvas, chart creation flow, cross-filtering
-- **Phase 4:** Permissions, scheduling, alerting, caching
-- **Phase 5:** Auto-insights, investigation agent, predictive analytics
+**Storage format:**
+```
+charts/
+  {chart_id}.json    # ChartConfig + metadata + SQL + source reference
+data/
+  {source_id}/
+    raw.csv          # Original uploaded file
+    schema.json      # Detected schema
+```
 
-### Discard (replaced by better versions)
-- `engine/chart_pipeline.py` — Replaced by structured metric queries (Phase 2)
-- `engine/chart_conversation.py` — Replaced by catalog-aware conversation (Phase 2)
-- `engine/models/chart.py` — Replaced by metric-catalog-based chart models
-- `engine/dashboard_composer.py` — Replaced by dashboard canvas (Phase 3)
-- `engine/brand.py` — Replaced by proper theming system
-- `engine/templates/` — Replaced by catalog-driven suggestions
+**Deliverable:** Upload a CSV → AI proposes a chart → chart renders with Observable Plot → save it. The core product loop works end to end.
 
 ---
 
-## Competitive Positioning
+### Phase 4: Chart Editor (Three-Pane Interface)
 
-### vs. Looker (Google)
-| Dimension | Looker | Story Analytics |
-|---|---|---|
-| Data context | LookML (manual, tedious) | Extracted from LookML + AI-enriched |
-| Query interface | Point-and-click explores | Conversational + visual catalog |
-| Dashboard creation | Drag-and-drop, manual | AI-assisted with smart defaults |
-| New metric creation | Write LookML, PR, deploy | Describe in English, validate, deploy |
-| Cost | $50K-500K/year | Internal tool (free), then ??? |
-| Migration | Locked in | Designed for migration FROM Looker |
+**Goal:** Users can refine charts via direct controls (toolbox) or natural language (AI chat). Both modify the same `ChartConfig`.
 
-### vs. Other BI tools (Tableau, Mode, Metabase)
-- They don't have data context layers (or weak ones)
-- We start with a proven data context extracted from LookML
-- AI-native from the ground up, not bolted on
+**This phase answers:** "Can users refine charts easily after the AI proposes one?"
 
-### vs. AI BI tools (ThoughtSpot, etc.)
-- They generate SQL from schema → hallucination risk
-- We compile SQL from metric definitions → guaranteed accuracy
-- Our data context has richer context (extracted from LookML + AI-enriched)
+#### 4.1 Editor Layout
+Three-pane layout: toolbox (left) + chart preview (center) + AI chat (right).
+
+**Files:**
+| File | Action | Purpose |
+|------|--------|---------|
+| `app/src/pages/EditorPage.tsx` | Create | Three-pane layout shell |
+| `app/src/components/editor/Toolbox.tsx` | Create | Left pane: chart-type-specific controls |
+| `app/src/components/editor/ChartPreview.tsx` | Create | Center pane: live Observable Plot rendering |
+| `app/src/components/editor/AIChat.tsx` | Create | Right pane: natural language adjustments |
+| `app/src/stores/editorStore.ts` | Create | Editor state: chart config, undo/redo stack, dirty flag |
+
+#### 4.2 Toolbox Controls
+Dynamic controls that change based on chart type.
+
+**Controls (all chart types):**
+- Title, subtitle, source note (text inputs)
+- Color palette selector (curated palettes + custom hex)
+- Legend position (top, bottom, right, none)
+- Grid line toggle
+
+**Chart-type-specific:**
+- Line/area: line width, smoothing, point markers
+- Bar: sort order, horizontal toggle, stacked toggle
+- Scatter: point size, opacity, trend line toggle
+- All: axis labels, number formatting, min/max overrides
+
+**Files:**
+| File | Action | Purpose |
+|------|--------|---------|
+| `app/src/components/editor/controls/TextControl.tsx` | Create | Title/subtitle/source inputs |
+| `app/src/components/editor/controls/ColorPalette.tsx` | Create | Palette picker with preview |
+| `app/src/components/editor/controls/AxisControls.tsx` | Create | Axis labels, formatting, scale |
+| `app/src/components/editor/controls/ChartTypeControls.tsx` | Create | Type-specific options |
+
+#### 4.3 AI Chat for Adjustments
+Natural language chart modifications. The LLM reads the current `ChartConfig` + user request → outputs a modified `ChartConfig`.
+
+**Files:**
+| File | Action | Purpose |
+|------|--------|---------|
+| `engine/v2/chart_editor.py` | Create | LLM takes current config + user message → returns updated config |
+| `api/routers/charts_v2.py` | Extend | `POST /api/v2/charts/edit` — streaming SSE response |
+
+**Examples:**
+- "Make the bars horizontal" → `config.horizontal = true`
+- "Use a red-to-blue color scale" → `config.colors = [...]`
+- "Add a trend line" → adds `Plot.linearRegressionY()` mark
+- "Change to area chart" → `config.chartType = 'AreaChart'`
+
+#### 4.4 Undo/Redo
+Config history stack in the editor store.
+
+#### 4.5 Manual Wizard (Path B)
+For users who know what they want: chart type picker + column mapping dropdowns.
+
+**Files:**
+| File | Action | Purpose |
+|------|--------|---------|
+| `app/src/components/create/ManualWizard.tsx` | Create | Chart type thumbnails + column mapping dropdowns |
+
+**Deliverable:** Full chart editor with toolbox controls, live preview, AI chat, and undo/redo. Both AI-led and manual creation paths work.
 
 ---
 
-## Open Questions
+### Phase 5: Publishing & Sharing
 
-1. **What database(s) does the target company use?** Snowflake, BigQuery, Redshift? This determines which SQL dialect we prioritize. Our `dialect.yaml` system handles this, but we need to know the primary target.
+**Goal:** Charts are shareable, embeddable, and exportable at publication quality.
 
-2. **LookML complexity.** How heavily do they use advanced LookML features — refinements, extends, liquid templating, access grants, PDTs? This determines how robust Phase 1 parsing needs to be.
+#### 5.1 Shareable URLs
+Each saved chart gets a permanent URL that renders without auth.
 
-3. **Migration scope.** Do we need to migrate existing Looker dashboards (import the dashboard definitions, not just the LookML model)? Or is it OK to rebuild dashboards fresh on the new platform?
+**Files:**
+| File | Action | Purpose |
+|------|--------|---------|
+| `app/src/pages/ChartViewPage.tsx` | Create | Public chart view (no sidebar, no auth) |
+| `api/routers/charts_v2.py` | Extend | `GET /api/v2/charts/:id/public` — returns chart + data for public rendering |
 
-4. **Coexistence period.** Will Looker and Story Analytics run in parallel during migration? If so, we might need to support syncing data context changes bidirectionally.
+#### 5.2 Embed Codes
+Generate iframe snippet and standalone HTML embed.
 
-5. **Team adoption sequence.** Start with power users (data team) and expand, or launch for the whole org at once? This affects Phase 4 scope.
+#### 5.3 Static Export Pipeline
+High-quality export for publication:
+- **SVG**: Native Observable Plot output, cleaned up
+- **PNG**: 2x resolution, with title/subtitle/source baked in
+- **PDF**: Single-page, publication-ready
+
+**Files:**
+| File | Action | Purpose |
+|------|--------|---------|
+| `api/routers/export.py` | Create | `GET /api/v2/charts/:id/export?format=svg|png|pdf` |
+| `api/services/export_service.py` | Create | Server-side rendering via Playwright for PNG/PDF |
+
+#### 5.4 Chart Library
+Browse and manage saved charts.
+
+**Files:**
+| File | Action | Purpose |
+|------|--------|---------|
+| `app/src/pages/LibraryPage.tsx` | Create | Grid of saved charts with search, filter, and sort |
+
+**Deliverable:** Saved charts have shareable URLs, embed codes, and downloadable SVG/PNG/PDF exports.
 
 ---
 
-*Document updated: 2026-02-09*
-*Vision: Extract data context from LookML → build AI-native Looker replacement*
-*Previous versions archived in git history*
+### Phase 6: Dashboard Assembly
+
+**Goal:** Compose multiple charts into a responsive dashboard.
+
+#### 6.1 Dashboard Builder
+Grid-based layout with drag-and-drop ordering.
+
+**Files:**
+| File | Action | Purpose |
+|------|--------|---------|
+| `app/src/pages/DashboardBuilderPage.tsx` | Create | Dashboard composition canvas |
+| `app/src/components/dashboard/DashboardGrid.tsx` | Create | Responsive 2-column grid |
+| `app/src/components/dashboard/ChartPicker.tsx` | Create | Select charts from library to add |
+| `app/src/stores/dashboardStore.ts` | Create | Dashboard state: layout, chart references |
+
+#### 6.2 Dashboard Features
+- Dashboard title and description
+- Shareable URL
+- Global date range filter (applies to all charts with date axes)
+- Embed code for full dashboard
+- Export full dashboard as PDF
+
+**Deliverable:** Multi-chart dashboards with shareable URLs and PDF export.
+
+---
+
+### Phase 7: Chart Hygiene System
+
+**Goal:** Automated maintenance so dashboards don't silently break.
+
+#### 7.1 Data Freshness Monitoring
+- Track data source timestamps vs expected refresh schedules
+- Alert on stale data (info → warning → critical severity)
+
+#### 7.2 Schema Change Detection
+- Detect column renames, additions, removals in data sources
+- Propose SQL adjustments
+- Flag charts referencing missing columns
+
+#### 7.3 Visual Quality Checks
+- Playwright screenshots + Claude vision validation
+- Detect: blank charts, rendering errors, overlapping labels, impossible values
+- Compare against previous known-good screenshot
+
+**Builds on:** Existing `engine/qa.py` (729 lines) — adapt from Plotly screenshots to Observable Plot screenshots.
+
+#### 7.4 Scheduled Refresh
+- Manual refresh button
+- Cron-based scheduled refresh for database-connected charts
+- Re-upload prompt for CSV-based charts
+
+**Deliverable:** Automated health monitoring for all charts. Health badge (green/yellow/red) on each chart and dashboard.
+
+---
+
+## App Navigation Structure (v2)
+
+```
+/                   → Landing page (upload CTA)
+/create             → Upload CSV → data preview → AI proposes chart
+/create/manual      → Manual wizard (chart type + column mapping)
+/editor/:chartId    → Three-pane chart editor
+/chart/:chartId     → Public chart view (no auth, shareable)
+/library            → Saved charts browser
+/dashboard/new      → Dashboard builder
+/dashboard/:slug    → Public dashboard view
+/settings           → API key config, theme preferences
+/poc                → Observable Plot PoC (temporary, for comparison)
+```
+
+---
+
+## Tech Stack Summary
+
+```
+Frontend:
+  React 18 + TypeScript
+  Observable Plot + D3 (charting)
+  Tailwind v4 (UI styling, @tailwindcss/vite)
+  Inter font (Google Fonts)
+  Zustand (state management)
+  Vite (build)
+
+Backend:
+  Python + FastAPI
+  DuckDB (CSV/Parquet/JSON ingestion + SQL)
+  File-based chart storage (JSON)
+
+AI:
+  Claude / OpenAI / Gemini (provider-agnostic)
+  Claude Vision (chart QA)
+  Playwright (screenshot rendering)
+```
+
+---
+
+## Priority Order
+
+| Phase | Scope | Depends On |
+|-------|-------|------------|
+| **Phase 1** | Observable Plot rendering pipeline | PoC (done) |
+| **Phase 2** | CSV upload + data preview | — |
+| **Phase 3** | AI chart creation (core loop) | Phases 1 + 2 |
+| **Phase 4** | Chart editor (toolbox + AI chat) | Phase 3 |
+| **Phase 5** | Publishing + sharing + export | Phase 3 |
+| **Phase 6** | Dashboard assembly | Phase 5 |
+| **Phase 7** | Chart hygiene system | Phase 6 |
+
+Phases 1 and 2 can be built in parallel. Phase 3 is the critical path — it's the product's signature moment. Phases 4 and 5 can overlap. Phases 6 and 7 are post-launch polish.
+
+---
+
+## Success Criteria
+
+| Criterion | Target |
+|-----------|--------|
+| CSV → rendered chart | < 30 seconds end-to-end |
+| Chart visual quality | Indistinguishable from Datawrapper at a glance |
+| AI chart proposal accuracy | Correct chart type + axis mapping 90%+ |
+| SVG export quality | Clean, publication-ready, suitable for print |
+| Bundle size | < 500KB gzipped (Observable Plot is ~150KB vs Plotly's ~1.6MB) |
+| Chart types supported | Line, bar (v/h/stacked), area, scatter, table, big value |
+| Manual chart creation time | < 60 seconds from data preview to rendered chart |
+
+---
+
+*Document updated: 2026-02-13*
+*Previous direction (Looker replacement) archived in git history*

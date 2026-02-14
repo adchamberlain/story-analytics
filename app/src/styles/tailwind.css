@@ -1,0 +1,15 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --color-chart-blue: #2166ac;
+  --color-chart-red: #d6604d;
+  --color-chart-green: #4dac26;
+  --color-chart-purple: #b2abd2;
+  --color-chart-orange: #e08214;
+  --color-text-primary: #1a1a1a;
+  --color-text-secondary: #666666;
+  --color-text-muted: #999999;
+  --color-grid: #e5e5e5;
+  --color-axis: #333333;
+}
