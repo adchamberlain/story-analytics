@@ -1,7 +1,9 @@
+import { useState } from 'react'
 import { useEditorStore } from '../../stores/editorStore'
 import { ChartTypeSelector } from './ChartTypeSelector'
 import { PaletteSelector } from './PaletteSelector'
 import { ColumnDropdown } from './ColumnDropdown'
+import { AnnotationEditor } from './AnnotationEditor'
 import type { ChartType } from '../../types/chart'
 import type { PaletteKey } from '../../themes/datawrapper'
 import type { AggregationType, DataMode } from '../../stores/editorStore'
@@ -249,6 +251,14 @@ export function Toolbox() {
           />
         </div>
       </Section>
+
+      {/* Annotations */}
+      <CollapsibleSection
+        title="Annotations"
+        count={config.annotations.lines.length + config.annotations.texts.length + config.annotations.ranges.length}
+      >
+        <AnnotationEditor />
+      </CollapsibleSection>
     </div>
   )
 }
@@ -280,6 +290,31 @@ function Section({ title, children }: { title: string; children: React.ReactNode
     <div>
       <h4 className="text-xs font-semibold text-text-icon uppercase tracking-wider mb-2">{title}</h4>
       {children}
+    </div>
+  )
+}
+
+function CollapsibleSection({ title, count, children }: { title: string; count?: number; children: React.ReactNode }) {
+  const [open, setOpen] = useState((count ?? 0) > 0)
+
+  return (
+    <div>
+      <button
+        onClick={() => setOpen(!open)}
+        className="flex items-center gap-1.5 w-full text-left group"
+      >
+        <svg
+          width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+          className={`text-text-icon transition-transform ${open ? 'rotate-90' : ''}`}
+        >
+          <path d="M9 18l6-6-6-6" />
+        </svg>
+        <h4 className="text-xs font-semibold text-text-icon uppercase tracking-wider">{title}</h4>
+        {(count ?? 0) > 0 && (
+          <span className="text-[10px] font-medium text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded-full">{count}</span>
+        )}
+      </button>
+      {open && <div className="mt-2">{children}</div>}
     </div>
   )
 }

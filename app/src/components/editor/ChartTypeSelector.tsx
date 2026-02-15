@@ -6,6 +6,10 @@ const CHART_TYPES: { type: ChartType; label: string; icon: string }[] = [
   { type: 'AreaChart', label: 'Area', icon: '/' },
   { type: 'ScatterPlot', label: 'Scatter', icon: '::' },
   { type: 'Histogram', label: 'Histogram', icon: '|_|' },
+  { type: 'HeatMap', label: 'Heatmap', icon: '#' },
+  { type: 'BoxPlot', label: 'Box Plot', icon: 'H' },
+  { type: 'PieChart', label: 'Pie', icon: 'O' },
+  { type: 'Treemap', label: 'Treemap', icon: '[]' },
 ]
 
 interface ChartTypeSelectorProps {

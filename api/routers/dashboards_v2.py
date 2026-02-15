@@ -13,12 +13,18 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
+from fastapi.responses import HTMLResponse
+
 from ..services.dashboard_storage import (
     save_dashboard, load_dashboard, list_dashboards,
     update_dashboard, delete_dashboard,
 )
 from ..services.chart_storage import load_chart
 from ..services.duckdb_service import get_duckdb_service
+from ..services.static_export import export_dashboard_html
+from ..services.metadata_db import (
+    get_dashboard_meta, set_dashboard_meta, update_dashboard_visibility,
+)
 
 
 router = APIRouter(prefix="/v2/dashboards", tags=["dashboards-v2"])
@@ -31,16 +37,39 @@ class ChartRefSchema(BaseModel):
     width: str = "half"  # "full" or "half"
 
 
+class FilterSpecSchema(BaseModel):
+    name: str
+    filterType: str
+    title: str | None = None
+    optionsColumn: str | None = None
+    optionsSourceId: str | None = None
+    optionsQuery: str | None = None
+    dateColumn: str | None = None
+    defaultStart: str | None = None
+    defaultEnd: str | None = None
+    minValue: float | None = None
+    maxValue: float | None = None
+    step: float | None = None
+    defaultValue: str | None = None
+
+
 class CreateDashboardRequest(BaseModel):
     title: str
     description: str | None = None
     charts: list[ChartRefSchema] = []
+    filters: list[FilterSpecSchema] = []
 
 
 class UpdateDashboardRequest(BaseModel):
     title: str | None = None
     description: str | None = None
     charts: list[ChartRefSchema] | None = None
+    filters: list[FilterSpecSchema] | None = None
+
+
+class FilterQueryRequest(BaseModel):
+    """Request body for re-querying dashboard charts with filter params."""
+    params: dict[str, str | int | float] = {}
 
 
 class DashboardResponse(BaseModel):
@@ -48,6 +77,7 @@ class DashboardResponse(BaseModel):
     title: str
     description: str | None
     charts: list[dict]
+    filters: list[dict] = []
     created_at: str
     updated_at: str
 
@@ -84,6 +114,7 @@ class DashboardWithDataResponse(BaseModel):
     title: str
     description: str | None
     charts: list[ChartWithData]
+    filters: list[dict] = []
     created_at: str
     updated_at: str
     has_stale_data: bool = False
@@ -220,16 +251,19 @@ _health_cache: dict[str, HealthCheckResponse] = {}
 async def create(request: CreateDashboardRequest):
     """Create a new dashboard."""
     charts_dicts = [c.model_dump() for c in request.charts]
+    filters_dicts = [f.model_dump(exclude_none=True) for f in request.filters]
     dashboard = save_dashboard(
         title=request.title,
         description=request.description,
         charts=charts_dicts,
+        filters=filters_dicts or None,
     )
     return DashboardResponse(
         id=dashboard.id,
         title=dashboard.title,
         description=dashboard.description,
         charts=dashboard.charts,
+        filters=dashboard.filters or [],
         created_at=dashboard.created_at,
         updated_at=dashboard.updated_at,
     )
@@ -245,6 +279,7 @@ async def list_all():
             title=d.title,
             description=d.description,
             charts=d.charts,
+            filters=d.filters or [],
             created_at=d.created_at,
             updated_at=d.updated_at,
         )
@@ -253,11 +288,25 @@ async def list_all():
 
 
 @router.get("/{dashboard_id}", response_model=DashboardWithDataResponse)
-async def get_dashboard(dashboard_id: str):
-    """Get a dashboard with all chart data (re-executes SQL for each chart)."""
+async def get_dashboard(dashboard_id: str, filters: str | None = None):
+    """Get a dashboard with all chart data (re-executes SQL for each chart).
+
+    Args:
+        dashboard_id: The dashboard to load.
+        filters: Optional JSON-encoded dict of filter params ({name: value}).
+    """
     dashboard = load_dashboard(dashboard_id)
     if not dashboard:
         raise HTTPException(status_code=404, detail="Dashboard not found")
+
+    # Parse filter params from query string
+    import json as _json
+    filter_params: dict[str, str | int | float] = {}
+    if filters:
+        try:
+            filter_params = _json.loads(filters)
+        except (ValueError, TypeError):
+            pass
 
     db = get_duckdb_service()
     charts_with_data: list[ChartWithData] = []
@@ -292,7 +341,7 @@ async def get_dashboard(dashboard_id: str):
 
         if chart.sql:
             try:
-                result = db.execute_query(chart.sql, chart.source_id)
+                result = db.execute_query(chart.sql, chart.source_id, params=filter_params or None)
                 data = result.rows
                 columns = result.columns
             except Exception as e:
@@ -343,6 +392,7 @@ async def get_dashboard(dashboard_id: str):
         title=dashboard.title,
         description=dashboard.description,
         charts=charts_with_data,
+        filters=dashboard.filters or [],
         created_at=dashboard.created_at,
         updated_at=dashboard.updated_at,
         has_stale_data=any_stale,
@@ -419,9 +469,90 @@ async def update(dashboard_id: str, request: UpdateDashboardRequest):
     )
 
 
+@router.get("/{dashboard_id}/export/html")
+async def export_html(dashboard_id: str):
+    """Export a dashboard as a self-contained HTML file."""
+    dashboard_data = await get_dashboard(dashboard_id)
+
+    charts_for_export = []
+    for chart in dashboard_data.charts:
+        charts_for_export.append({
+            "chart_id": chart.chart_id,
+            "chart_type": chart.chart_type,
+            "title": chart.title,
+            "subtitle": chart.subtitle,
+            "source": chart.source,
+            "width": chart.width,
+            "config": {
+                "x": chart.x,
+                "y": chart.y,
+                "series": chart.series,
+                "horizontal": chart.horizontal,
+                "sort": chart.sort,
+                **(chart.config or {}),
+            },
+            "data": chart.data,
+        })
+
+    html = export_dashboard_html(
+        title=dashboard_data.title,
+        charts=charts_for_export,
+    )
+
+    filename = f"{dashboard_data.title.replace(' ', '_').lower()}.html"
+    return HTMLResponse(
+        content=html,
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+        },
+    )
+
+
 @router.delete("/{dashboard_id}")
 async def remove_dashboard(dashboard_id: str):
     """Delete a dashboard."""
     if not delete_dashboard(dashboard_id):
         raise HTTPException(status_code=404, detail="Dashboard not found")
     return {"deleted": True}
+
+
+# ── Sharing Endpoints ────────────────────────────────────────────────────────
+
+
+class SharingResponse(BaseModel):
+    dashboard_id: str
+    visibility: str
+
+
+class UpdateSharingRequest(BaseModel):
+    visibility: str  # "private", "team", "public"
+
+
+@router.get("/{dashboard_id}/sharing", response_model=SharingResponse)
+async def get_sharing(dashboard_id: str):
+    """Get dashboard sharing/visibility settings."""
+    meta = get_dashboard_meta(dashboard_id)
+    return SharingResponse(
+        dashboard_id=dashboard_id,
+        visibility=meta["visibility"] if meta else "private",
+    )
+
+
+@router.put("/{dashboard_id}/sharing", response_model=SharingResponse)
+async def update_sharing(dashboard_id: str, request: UpdateSharingRequest):
+    """Update dashboard visibility."""
+    if request.visibility not in ("private", "team", "public"):
+        raise HTTPException(status_code=400, detail="Invalid visibility. Use: private, team, public")
+
+    meta = get_dashboard_meta(dashboard_id)
+    if not meta:
+        # Create metadata with default owner
+        from ..services.metadata_db import DEFAULT_USER_ID
+        set_dashboard_meta(dashboard_id, DEFAULT_USER_ID, request.visibility)
+    else:
+        update_dashboard_visibility(dashboard_id, request.visibility)
+
+    return SharingResponse(
+        dashboard_id=dashboard_id,
+        visibility=request.visibility,
+    )

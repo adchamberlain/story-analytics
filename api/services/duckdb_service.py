@@ -204,8 +204,14 @@ class DuckDBService:
         table_name = f"src_{source_id}"
         return self.execute_query(f"SELECT * FROM {table_name} LIMIT {limit}", source_id)
 
-    def execute_query(self, sql: str, source_id: str) -> QueryResult:
-        """Execute a SQL query against an uploaded source's table."""
+    def execute_query(self, sql: str, source_id: str, params: dict[str, str | int | float] | None = None) -> QueryResult:
+        """Execute a SQL query against an uploaded source's table.
+
+        Args:
+            sql: SQL query, optionally containing ${inputs.name} placeholders.
+            source_id: The source to query against.
+            params: Optional dict of filter param values to substitute for ${inputs.name}.
+        """
         table_name = f"src_{source_id}"
 
         # Replace generic table references with the actual table name
@@ -228,12 +234,46 @@ class DuckDBService:
                     if "FROM" not in processed_sql.upper():
                         processed_sql = f"SELECT * FROM {table_name} LIMIT 100"
 
+        # Substitute ${inputs.name} filter placeholders with parameterized values
+        if params:
+            processed_sql = self._substitute_filter_params(processed_sql, params)
+
         result = self._conn.execute(processed_sql)
         columns = [desc[0] for desc in result.description]
         rows_raw = result.fetchall()
         rows = [dict(zip(columns, row)) for row in rows_raw]
 
         return QueryResult(columns=columns, rows=rows, row_count=len(rows))
+
+    def get_distinct_values(self, source_id: str, column: str, limit: int = 500) -> list[str]:
+        """Get distinct values for a column, useful for dropdown filter options."""
+        table_name = f"src_{source_id}"
+        result = self._conn.execute(
+            f"SELECT DISTINCT CAST({q(column)} AS VARCHAR) AS val "
+            f"FROM {table_name} WHERE {q(column)} IS NOT NULL "
+            f"ORDER BY val LIMIT {limit}"
+        )
+        return [row[0] for row in result.fetchall()]
+
+    @staticmethod
+    def _substitute_filter_params(sql: str, params: dict[str, str | int | float]) -> str:
+        """Replace ${inputs.name} placeholders with escaped literal values.
+
+        Uses DuckDB-safe string escaping (single-quote doubling) to prevent injection.
+        """
+        import re as _re
+        def _replacer(match: _re.Match) -> str:
+            name = match.group(1)
+            if name not in params:
+                return match.group(0)  # Leave unmatched placeholders as-is
+            val = params[name]
+            if isinstance(val, (int, float)):
+                return str(val)
+            # String: escape single quotes by doubling
+            escaped = str(val).replace("'", "''")
+            return f"'{escaped}'"
+
+        return _re.sub(r'\$\{inputs\.(\w+)\}', _replacer, sql)
 
     def get_ingested_at(self, source_id: str) -> datetime | None:
         """Return the UTC timestamp when a source was ingested, or None."""
