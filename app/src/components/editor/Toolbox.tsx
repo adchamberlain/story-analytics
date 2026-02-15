@@ -6,7 +6,13 @@ import { ColumnDropdown } from './ColumnDropdown'
 import { AnnotationEditor } from './AnnotationEditor'
 import type { ChartType } from '../../types/chart'
 import type { PaletteKey } from '../../themes/datawrapper'
-import type { AggregationType, DataMode, EditorConfig, TableInfoItem } from '../../stores/editorStore'
+import type { AggregationType, TimeGrain, DataMode, EditorConfig, TableInfoItem } from '../../stores/editorStore'
+
+function isDateColumn(type: string | undefined): boolean {
+  if (!type) return false
+  const t = type.toUpperCase()
+  return t === 'DATE' || t.startsWith('TIMESTAMP')
+}
 
 export function Toolbox() {
   const config = useEditorStore((s) => s.config)
@@ -167,9 +173,27 @@ export function Toolbox() {
                       <option value="none">None (raw)</option>
                       <option value="sum">Sum</option>
                       <option value="avg">Average</option>
+                      <option value="median">Median</option>
                       <option value="count">Count</option>
                       <option value="min">Min</option>
                       <option value="max">Max</option>
+                    </select>
+                  </div>
+                )}
+                {config.aggregation !== 'none' && config.x && isDateColumn(columnTypes[config.x]) && (
+                  <div>
+                    <label className="block text-xs font-medium text-text-secondary mb-1">Time grain</label>
+                    <select
+                      value={config.timeGrain}
+                      onChange={(e) => updateConfig({ timeGrain: e.target.value as TimeGrain })}
+                      className="w-full px-2 py-1.5 text-sm border border-border-default rounded-md bg-surface text-text-primary focus:outline-none focus:border-blue-400"
+                    >
+                      <option value="none">As-is</option>
+                      <option value="day">Daily</option>
+                      <option value="week">Weekly</option>
+                      <option value="month">Monthly</option>
+                      <option value="quarter">Quarterly</option>
+                      <option value="year">Yearly</option>
                     </select>
                   </div>
                 )}

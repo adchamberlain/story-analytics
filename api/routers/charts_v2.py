@@ -138,6 +138,7 @@ class BuildQueryRequest(BaseModel):
     y: str | None = None
     series: str | None = None
     aggregation: str = "none"  # "none", "sum", "avg", "count", "min", "max"
+    time_grain: str = "none"  # "none", "day", "week", "month", "quarter", "year"
 
 
 class BuildQueryResponse(BaseModel):
@@ -162,7 +163,8 @@ class EditResponse(BaseModel):
 
 # ── Endpoints ────────────────────────────────────────────────────────────────
 
-VALID_AGGREGATIONS = {"none", "sum", "avg", "count", "min", "max"}
+VALID_AGGREGATIONS = {"none", "sum", "avg", "median", "count", "min", "max"}
+VALID_TIME_GRAINS = {"none", "day", "week", "month", "quarter", "year"}
 
 
 @router.post("/build-query", response_model=BuildQueryResponse)
@@ -175,6 +177,11 @@ async def build_query(request: BuildQueryRequest):
         return BuildQueryResponse(
             success=False,
             error=f"Invalid aggregation: {request.aggregation}. Must be one of {VALID_AGGREGATIONS}",
+        )
+    if request.time_grain not in VALID_TIME_GRAINS:
+        return BuildQueryResponse(
+            success=False,
+            error=f"Invalid time grain: {request.time_grain}. Must be one of {VALID_TIME_GRAINS}",
         )
 
     db = get_duckdb_service()
@@ -196,25 +203,34 @@ async def build_query(request: BuildQueryRequest):
 
     table_name = f"src_{request.source_id}"
 
+    # X column expression — apply DATE_TRUNC when a time grain is set
+    use_grain = request.time_grain != "none" and request.aggregation != "none"
+    if use_grain:
+        x_expr = f"DATE_TRUNC('{request.time_grain}', {q(request.x)})"
+        x_select = f"{x_expr} AS {q(request.x)}"
+    else:
+        x_expr = q(request.x)
+        x_select = q(request.x)
+
     # Build SQL
     if request.aggregation == "none":
         # Raw select
-        select_cols = [q(request.x)]
+        select_cols = [x_select]
         if request.y:
             select_cols.append(q(request.y))
         if request.series:
             select_cols.append(q(request.series))
-        sql = f"SELECT {', '.join(select_cols)} FROM {table_name} ORDER BY {q(request.x)} LIMIT 5000"
+        sql = f"SELECT {', '.join(select_cols)} FROM {table_name} ORDER BY {x_expr} LIMIT 5000"
     elif request.aggregation == "count" and not request.y:
         # COUNT(*) with no y column
-        select_cols = [q(request.x), 'COUNT(*) AS "count"']
-        group_cols = [q(request.x)]
+        select_cols = [x_select, 'COUNT(*) AS "count"']
+        group_cols = [x_expr]
         if request.series:
             select_cols.append(q(request.series))
             group_cols.append(q(request.series))
         sql = (
             f"SELECT {', '.join(select_cols)} FROM {table_name} "
-            f"GROUP BY {', '.join(group_cols)} ORDER BY {q(request.x)}"
+            f"GROUP BY {', '.join(group_cols)} ORDER BY {x_expr}"
         )
     else:
         # Aggregated query
@@ -222,14 +238,14 @@ async def build_query(request: BuildQueryRequest):
         y_col = request.y or "*"
         y_quoted = q(y_col) if request.y else "*"
         y_alias = request.y or "count"
-        select_cols = [q(request.x), f'{agg}({y_quoted}) AS {q(y_alias)}']
-        group_cols = [q(request.x)]
+        select_cols = [x_select, f'{agg}({y_quoted}) AS {q(y_alias)}']
+        group_cols = [x_expr]
         if request.series:
             select_cols.append(q(request.series))
             group_cols.append(q(request.series))
         sql = (
             f"SELECT {', '.join(select_cols)} FROM {table_name} "
-            f"GROUP BY {', '.join(group_cols)} ORDER BY {q(request.x)}"
+            f"GROUP BY {', '.join(group_cols)} ORDER BY {x_expr}"
         )
 
     # Execute
