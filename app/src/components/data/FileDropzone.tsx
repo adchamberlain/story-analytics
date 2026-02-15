@@ -7,22 +7,37 @@ interface FileDropzoneProps {
 
 export function FileDropzone({ onFileSelected, uploading }: FileDropzoneProps) {
   const [dragOver, setDragOver] = useState(false)
+  const [hint, setHint] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
   const handleDrop = useCallback(
     (e: React.DragEvent) => {
       e.preventDefault()
       setDragOver(false)
-      const file = e.dataTransfer.files[0]
-      if (file && file.name.toLowerCase().endsWith('.csv')) {
-        onFileSelected(file)
+      setHint(null)
+
+      const files = Array.from(e.dataTransfer.files)
+      const csvFiles = files.filter((f) => f.name.toLowerCase().endsWith('.csv'))
+
+      if (csvFiles.length === 0) {
+        setHint(files.length === 1
+          ? `"${files[0].name}" is not a CSV file.`
+          : 'None of the dropped files are CSVs.')
+        return
       }
+
+      if (csvFiles.length > 1) {
+        setHint(`Uploading "${csvFiles[0].name}" — only one file at a time is supported.`)
+      }
+
+      onFileSelected(csvFiles[0])
     },
     [onFileSelected]
   )
 
   const handleChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
+      setHint(null)
       const file = e.target.files?.[0]
       if (file) onFileSelected(file)
     },
@@ -50,7 +65,7 @@ export function FileDropzone({ onFileSelected, uploading }: FileDropzoneProps) {
         ref={inputRef}
         type="file"
         accept=".csv"
-        className="hidden"
+        style={{ display: 'none' }}
         onChange={handleChange}
       />
 
@@ -73,6 +88,12 @@ export function FileDropzone({ onFileSelected, uploading }: FileDropzoneProps) {
       <p className="text-[13px] text-text-muted" style={{ marginTop: '6px' }}>
         CSV files only
       </p>
+
+      {hint && (
+        <p className="text-[13px] text-amber-500" style={{ marginTop: '10px' }}>
+          {hint}
+        </p>
+      )}
     </div>
   )
 }

@@ -169,8 +169,14 @@ async def upload_csv(file: UploadFile = File(...)):
     try:
         service = get_duckdb_service()
         schema = service.ingest_csv(tmp_path, file.filename)
+    except ValueError as e:
+        # User-friendly message from ingest_csv retry logic
+        raise HTTPException(status_code=422, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=422, detail=f"Failed to parse CSV: {e}")
+        raise HTTPException(
+            status_code=422,
+            detail=f"Could not parse \"{file.filename}\". Check that the file is a valid CSV with a header row.",
+        )
     finally:
         tmp_path.unlink(missing_ok=True)
 

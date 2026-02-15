@@ -97,7 +97,11 @@ class DuckDBService:
             print(f"[DuckDB] Reloaded {count} CSV source(s) from disk")
 
     def ingest_csv(self, file_path: Path, filename: str) -> SourceSchema:
-        """Load a CSV file into DuckDB and return schema information."""
+        """Load a CSV file into DuckDB and return schema information.
+
+        If the initial parse fails (e.g. extra header/metadata lines), retries
+        by skipping 1–5 leading rows before giving up.
+        """
         source_id = uuid.uuid4().hex[:12]
 
         # Store file for persistence
@@ -114,11 +118,41 @@ class DuckDBService:
         # Detect delimiter
         delimiter = self._detect_delimiter(stored_path)
 
-        # Create table from CSV
-        self._conn.execute(f"""
-            CREATE OR REPLACE TABLE {table_name} AS
-            SELECT * FROM read_csv_auto('{stored_path}', delim='{delimiter}', header=true)
-        """)
+        # Try parsing, retrying with skip=N if the file has extra lines at the top
+        first_error = None
+        for skip in [0, 1, 2, 3, 4, 5]:
+            try:
+                skip_clause = f", skip={skip}" if skip > 0 else ""
+                self._conn.execute(f"""
+                    CREATE OR REPLACE TABLE {table_name} AS
+                    SELECT * FROM read_csv_auto(
+                        '{stored_path}', delim='{delimiter}', header=true{skip_clause}
+                    )
+                """)
+                # Verify we got at least 1 column and 1 row
+                row_count = self._conn.execute(
+                    f"SELECT COUNT(*) FROM {table_name}"
+                ).fetchone()[0]
+                col_count = len(self._conn.execute(
+                    f"DESCRIBE {table_name}"
+                ).fetchall())
+                if col_count >= 1 and row_count >= 1:
+                    if skip > 0:
+                        print(f"[DuckDB] Parsed {filename} after skipping {skip} leading line(s)")
+                    break
+            except (duckdb.Error, UnicodeDecodeError) as e:
+                if first_error is None:
+                    first_error = e
+                continue
+        else:
+            # All attempts failed — clean up and raise a user-friendly message
+            import shutil
+            shutil.rmtree(dest, ignore_errors=True)
+            del self._sources[source_id]
+            raise ValueError(
+                f"Could not parse \"{filename}\". "
+                "Check that the file is a valid CSV with a header row."
+            )
 
         # Get schema info
         schema = self._inspect_table(table_name, source_id, filename)
