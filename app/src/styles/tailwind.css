@@ -7,9 +7,61 @@
   --color-chart-green: #4dac26;
   --color-chart-purple: #b2abd2;
   --color-chart-orange: #e08214;
+
+  /* Semantic surface tokens (light defaults) */
+  --color-surface: #ffffff;
+  --color-surface-secondary: #f9fafb;
+  --color-surface-raised: #ffffff;
+  --color-surface-inset: #f3f4f6;
+
+  /* Semantic border tokens */
+  --color-border-default: #e5e7eb;
+  --color-border-subtle: #f3f4f6;
+  --color-border-strong: #d1d5db;
+
+  /* Semantic text tokens */
   --color-text-primary: #1a1a1a;
   --color-text-secondary: #666666;
   --color-text-muted: #999999;
+  --color-text-on-surface: #374151;
+  --color-text-icon: #9ca3af;
+  --color-text-icon-hover: #6b7280;
+
+  /* Overlay */
+  --color-overlay: rgb(0 0 0 / 0.3);
+
+  /* Chart tokens */
   --color-grid: #e5e5e5;
   --color-axis: #333333;
+
+  /* Shadows for card depth */
+  --shadow-card: 0 1px 3px 0 rgb(0 0 0 / 0.06), 0 1px 2px -1px rgb(0 0 0 / 0.06);
+  --shadow-card-hover: 0 4px 6px -1px rgb(0 0 0 / 0.07), 0 2px 4px -2px rgb(0 0 0 / 0.07);
+}
+
+/* Dark mode overrides */
+.dark {
+  --color-surface: #0f172a;
+  --color-surface-secondary: #020617;
+  --color-surface-raised: #1e293b;
+  --color-surface-inset: #1e293b;
+
+  --color-border-default: #334155;
+  --color-border-subtle: #1e293b;
+  --color-border-strong: #475569;
+
+  --color-text-primary: #f1f5f9;
+  --color-text-secondary: #94a3b8;
+  --color-text-muted: #64748b;
+  --color-text-on-surface: #cbd5e1;
+  --color-text-icon: #64748b;
+  --color-text-icon-hover: #94a3b8;
+
+  --color-overlay: rgb(0 0 0 / 0.6);
+
+  --color-grid: #334155;
+  --color-axis: #94a3b8;
+
+  --shadow-card: 0 1px 3px 0 rgb(0 0 0 / 0.2), 0 1px 2px -1px rgb(0 0 0 / 0.2);
+  --shadow-card-hover: 0 4px 6px -1px rgb(0 0 0 / 0.3), 0 2px 4px -2px rgb(0 0 0 / 0.3);
 }

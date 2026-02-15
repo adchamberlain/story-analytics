@@ -4,6 +4,242 @@ This log captures development changes made during each session. Review this at t
 
 ---
 
+## Session: 2026-02-14 (Part 6)
+
+### Focus: Dark Mode QA, Chart Rendering Fixes, Clean Demo Dashboard
+
+Continuation of Part 5. Verified dark mode + pin-to-default implementation via Playwright tests and visual screenshots. Found and fixed two chart rendering bugs. Created clean demo dashboard.
+
+### Automated Testing (8 Playwright tests — all passed)
+
+- Light/dark mode dashboard rendering
+- `.dark` class toggling on `<html>`
+- Library page, settings page in dark mode
+- Home redirect without pin → `/dashboards`
+- Home redirect with pin → `/dashboard/{id}`
+- System theme preference detection
+
+### Bug Fix: Observable Plot Ordinal X-Axis Sorting
+
+**Problem:** Observable Plot sorts ordinal (string) x-axis values alphabetically by default. Month names like "Jan", "Feb" were rendered as "Apr, Aug, Dec, Feb, Jan..." regardless of SQL `ORDER BY`. Line and area charts looked chaotic with lines crossing randomly.
+
+**Fix** (`ObservableChartFactory.tsx:buildPlotOptions`): When x-values are non-date strings, extract unique values from data in their original order and set as explicit `x: { domain: [...] }`. This preserves SQL ordering on the rendered chart.
+
+### Bug Fix: Multi-Series Line Chart
+
+**Problem:** "Revenue vs Expenses" line chart only showed one line because `y: "revenue"` plots a single column. The SQL selected both columns but without a `series` channel, only revenue rendered.
+
+**Fix:** Restructured SQL to use `UNION ALL` to unpivot revenue and expenses into long format with `month`, `metric`, `amount` columns. Set `series: "metric"` to render both lines with distinct colors.
+
+### Enhancement: Auto-Legend for Series Charts
+
+Added `legend: true` to Observable Plot color options when `config.series` is defined. Legend now renders automatically above the chart with color swatches and series labels. Works in both light and dark modes.
+
+### Clean Demo Dashboard Created
+
+Deleted all legacy charts (41) and dashboards (3) that had stale data source errors. Created fresh dashboard "Financial Overview" with 4 charts from `test_financials.csv` (12 months, revenue + expenses):
+
+1. **BigValue** — Total Revenue: $275,000
+2. **BarChart** — Monthly Revenue (Jan→Dec, chronological)
+3. **LineChart** — Revenue vs Expenses (two-line, with legend)
+4. **AreaChart** — Revenue Growth (filled area trend)
+
+Dashboard ID: `b2b53ea6a348`. Verified rendering in both light and dark modes via Playwright screenshots.
+
+### Files Modified
+
+- `app/src/components/charts/ObservableChartFactory.tsx` — Ordinal domain preservation, data param to buildPlotOptions, auto-legend for series charts
+
+### Key Learnings
+
+- Observable Plot alphabetically sorts string x-axis domains by default — must set explicit `x.domain` to preserve data order
+- Always visually verify chart output before presenting — don't rush past broken renders
+
+### Next Steps
+
+- Consider adding `transition-colors` animation on theme switch
+- Legend styling could be theme-aware (currently uses Plot defaults)
+- The chart proposer (AI) should generate unpivoted SQL when multiple numeric columns need comparison
+
+---
+
+## Session: 2026-02-14 (Part 5)
+
+### Focus: Dark Mode + Pin-to-Default Dashboard
+
+Implemented dark mode via semantic CSS tokens (no `dark:` variants) and added pin-to-default dashboard feature. This completes DEV_PLAN Phase 12.
+
+### Phase 1: Dark Mode Infrastructure
+
+- **`app/src/styles/tailwind.css`** — Added 14 semantic tokens to `@theme` (surface, border, text, overlay categories). Added `.dark` block overriding all tokens with slate palette (slate-900 backgrounds, slate-100 text, slate-700 borders).
+- **`app/src/stores/themeStore.ts`** — NEW. Zustand store with `choice` (light/dark/system) + `resolved` (light/dark). Reads `localStorage('theme')`, resolves system via `prefers-color-scheme`, syncs `.dark` class on `<html>`. Listens for OS theme changes.
+- **`app/src/main.tsx`** — Import theme store before React renders to prevent FOUC.
+- **`app/src/styles/index.css`** — Body gets `background-color: var(--color-surface-secondary)` and `color: var(--color-text-primary)`.
+- **`app/src/components/layout/TopNav.tsx`** — Three-state theme toggle (system/dark/light) with sun/moon/monitor icons. Nav links updated to `/dashboards`.
+- **`app/src/themes/datawrapper.ts`** — `plotDefaults()` now reads CSS vars via `getComputedStyle()` at render time for theme-aware chart backgrounds, grid, and axis colors. Removed hardcoded `COLORS` and `FONT.*.color` objects.
+- **`app/src/components/charts/ObservableChartFactory.tsx`** — Added `useThemeStore(s => s.resolved)` as dep to trigger chart re-render on theme change.
+
+### Phase 2: Semantic Token Migration (~20 files)
+
+Mechanical replacement across all components. Zero hardcoded `bg-white`, `bg-gray-*`, `border-gray-*`, `text-gray-*`, `hover:bg-gray-*`, or `bg-black/*` classes remain in any TSX file.
+
+**Files migrated:** AppShell, TopNav, DashboardsHome, DashboardViewPage, EditorPage, LibraryPage, SourcePickerPage, ChartViewPage, DashboardBuilderPage, SettingsPage, ChartWrapper, DashboardGrid, ObservableChartFactory, Toolbox, AIChat, ChartTypeSelector, PaletteSelector, ColumnDropdown, FileDropzone, DatabaseConnector, DataPreview, SharePanel, ChartPicker.
+
+### Phase 3: Pin-to-Default Dashboard
+
+- **`app/src/App.tsx`** — Added `/dashboards` route (always shows list). `/` → `HomeRedirect` component.
+- **`app/src/components/HomeRedirect.tsx`** — NEW. Checks `localStorage('pinnedDashboardId')`, redirects to pinned dashboard or `/dashboards`.
+- **`app/src/components/layout/TopNav.tsx`** — "Dashboards" NavLink and logo → `/dashboards` (always list, never redirect loop).
+- **`app/src/pages/DashboardViewPage.tsx`** — Pin/unpin toggle button in header. Sets/removes `localStorage('pinnedDashboardId')`. Stale pin cleanup on 404.
+- **`app/src/pages/DashboardsHome.tsx`** — Pin icon on pinned dashboard's card.
+
+### Verification
+
+- `npx tsc --noEmit` — zero errors
+- `grep` for hardcoded gray/white/black classes — zero matches
+- All semantic tokens swap correctly via `.dark` class on `<html>`
+
+### Next Steps
+
+- Manual QA: verify light mode identical to before, dark mode looks correct
+- Test system preference detection and theme persistence across refresh
+- Consider adding transition animation on theme switch (`transition-colors` on body)
+
+---
+
+## Session: 2026-02-14 (Part 4)
+
+### Focus: Frontend Architecture Cleanup + Visual Design Refresh
+
+Completed DEV_PLAN Phase 7 final polish — removed all dead CSS/code from v1 era and refreshed visual design across every page to modern SaaS quality (Linear/Vercel style).
+
+### Changes Made
+
+**Step 1: CSS & Dead Code Cleanup**
+- `app/src/styles/index.css` — Gutted ~130 lines of unused CSS custom properties (colors, typography, spacing, radii, shadows, transitions, fade animations, trend indicators). None were referenced by any component. Only body/root resets remain.
+- `app/src/App.tsx` — Removed 7 old URL redirect routes (`/create`, `/create/ai`, `/chat`, `/dashboards`, `/login`, `/charts`, `/dashboard/v2/:id`) and the `RedirectDashboardV2` helper. Catch-all `*` route still redirects to `/`.
+- `app/src/pages/v2/SettingsPage.tsx` — Moved to `app/src/pages/SettingsPage.tsx` (flattened `v2/` subfolder). Updated import in App.tsx. Deleted empty `v2/` directory.
+- `package.json` — Uninstalled `react-markdown` (79 packages removed, zero imports existed).
+
+**Step 2: Design Token Expansion**
+- `app/src/styles/tailwind.css` — Added `--shadow-card` and `--shadow-card-hover` tokens to `@theme` for consistent card depth across all pages.
+
+**Step 3: TopNav Polish**
+- Height `h-14` → `h-16`, logo `text-sm font-semibold` → `text-base font-bold`, increased nav gap, CTA button `px-3 py-1.5` → `px-4 py-2`, added `shadow-sm`, settings icon gets hover background.
+
+**Step 4: DashboardsHome Visual Refresh**
+- Heading `text-lg` → `text-2xl font-bold`, page padding `py-8` → `py-10`, grid gap `gap-4` → `gap-5`.
+- Dashboard cards: `rounded-lg` → `rounded-xl`, added `shadow-card hover:shadow-card-hover`, padding `p-5` → `p-6`, title `text-sm` → `text-base`.
+- Empty state: replaced bare dashed box with rich empty state (dashboard grid icon, bold heading, descriptive text, prominent "+ New Dashboard" CTA button).
+
+**Step 5: LibraryPage Visual Refresh**
+- Removed duplicate `<header>` that was creating a double-header inside AppShell.
+- Same card/heading/empty state treatment as DashboardsHome.
+- Added `focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500` to all filter inputs.
+- Chart type badges slightly larger (`px-2.5 py-1`).
+
+**Step 6: DashboardViewPage Polish**
+- Header gets `shadow-sm`, all buttons standardized to `px-4 py-2 rounded-lg`.
+- Title `font-semibold` → `font-bold`.
+
+**Step 7: DashboardGrid Card Depth**
+- Grid cell wrapper gets `rounded-xl shadow-card`.
+
+**Step 8: ChartWrapper Polish**
+- Outer container `rounded-lg` → `rounded-xl`, added `shadow-card`.
+
+**Step 9: SourcePickerPage Polish**
+- Heading `text-xl font-semibold` → `text-2xl font-bold`.
+- Source cards get `shadow-card hover:shadow-card-hover rounded-xl`.
+- Empty state gets database icon + descriptive text.
+
+**Step 10: EditorPage Header Polish**
+- Header padding `px-4 py-3` → `px-5 py-4`, added `shadow-sm`.
+- Title label `text-sm font-medium` → `text-base font-semibold`.
+- All buttons standardized to `px-3 py-2 rounded-lg`.
+
+**Step 11: DEV_PLAN Sync**
+- Marked Phases 7–11 complete with status details.
+- Added summary note at top of Priority Order section.
+
+### Modified Files
+- `app/src/styles/index.css` — Gutted legacy CSS custom properties
+- `app/src/styles/tailwind.css` — Added shadow tokens
+- `app/src/App.tsx` — Removed old redirects, updated SettingsPage import
+- `app/src/pages/v2/SettingsPage.tsx` → `app/src/pages/SettingsPage.tsx` (moved + polished)
+- `app/src/components/layout/TopNav.tsx` — Typography, spacing, button, shadow polish
+- `app/src/pages/DashboardsHome.tsx` — Heading, cards, empty state, spacing
+- `app/src/pages/LibraryPage.tsx` — Removed inner header, heading, cards, empty state, focus rings
+- `app/src/pages/DashboardViewPage.tsx` — Button sizes, title weight, shadow
+- `app/src/components/dashboard/DashboardGrid.tsx` — Card shadows + rounded corners
+- `app/src/components/charts/ChartWrapper.tsx` — Card shadow + rounded corners
+- `app/src/pages/SourcePickerPage.tsx` — Heading, card depth, empty state
+- `app/src/pages/EditorPage.tsx` — Header height, button consistency, shadow
+- `DEV_PLAN.md` — Phases 7–11 marked complete
+
+### Verification
+- `npx tsc --noEmit` — zero TypeScript errors
+- No broken imports (confirmed: no references to `v2/SettingsPage`, `RedirectDashboardV2`, or `react-markdown`)
+- All old URL redirects cleanly removed
+
+### Design Decisions
+- Gutted all legacy CSS rather than selectively pruning — zero components referenced any `var(--` tokens, so the entire `:root` block was dead weight
+- Used `shadow-card` / `shadow-card-hover` as Tailwind tokens (not arbitrary values) for consistency
+- Kept card borders (`border border-gray-200`) alongside shadows for definition at all zoom levels
+- Removed LibraryPage's inner `<header>` since AppShell already provides the nav — this was creating a visual double-header
+
+### Next Steps
+- Visual QA: start dev server, visit every page, verify polished appearance
+- Consider dark mode tokens (future)
+- Phase 12 (Team & Sharing) is the next major milestone
+
+---
+
+## Session: 2026-02-14 (Part 3)
+
+### Focus: Phase 11.2–11.4 — Data Freshness, Schema Change Detection, Health Checks
+
+Implemented the remaining three sub-phases of Phase 11 (Data Refresh & Maintenance), making dashboards "living" with freshness monitoring, actionable schema-change errors, and health check capabilities.
+
+### Changes Made
+
+**11.2: Data Freshness Monitoring**
+- `api/services/duckdb_service.py`: Added `SourceMeta` dataclass wrapping `Path` + `ingested_at: datetime`. Changed `_sources` from `dict[str, Path]` to `dict[str, SourceMeta]`. Updated all reads (`.path.stem`, `.path.name`) and writes. Added `get_ingested_at(source_id)` method.
+- `api/routers/dashboards_v2.py`: Added `data_ingested_at`, `freshness` fields to `ChartWithData`. Added `has_stale_data` to `DashboardWithDataResponse`. Added `_compute_freshness()` helper (fresh <1h / aging 1-24h / stale >24h).
+- Frontend: Stale data amber banner in `DashboardViewPage` with "Refresh now" link.
+
+**11.3: Schema Change Detection**
+- `api/routers/dashboards_v2.py`: Added `error_type` (schema_change/sql_error/source_missing) and `error_suggestion` fields to `ChartWithData`. Added `_classify_sql_error()` helper that regex-matches DuckDB error messages, uses `difflib.get_close_matches` for "Did you mean..." suggestions.
+- `DashboardGrid.tsx`: Differentiated error cards — amber bg for schema changes (with suggestion + edit link), red bg for SQL errors and missing sources.
+
+**11.4: Health Status & Health Check**
+- `api/routers/dashboards_v2.py`: Added `health_status` (healthy/warning/error) and `health_issues` fields. Added `_compute_health_status()` helper. Added `POST /v2/dashboards/{id}/health-check` and `GET /v2/dashboards/{id}/health` endpoints with module-level cache.
+- `DashboardViewPage.tsx`: Health Check button in header, loading state during check, result banner (green/amber/red) with issue count.
+- `DashboardGrid.tsx`: `StatusDot` component — colored dot (amber/red) in top-right of chart card for warning/error, hidden for healthy. Tooltip shows health issues.
+
+**Modified files:**
+- `api/services/duckdb_service.py` — SourceMeta dataclass, updated _sources type, get_ingested_at()
+- `api/routers/dashboards_v2.py` — New fields, helpers, health check endpoints
+- `app/src/pages/DashboardViewPage.tsx` — Updated interfaces, stale banner, health check button
+- `app/src/components/dashboard/DashboardGrid.tsx` — StatusDot, differentiated error cards, dashboardId prop
+
+### Verification
+- `npx tsc --noEmit` — zero TypeScript errors
+- All new API fields use defaults, so existing consumers won't break
+
+### Design Decisions
+- Freshness is computed from in-memory `ingested_at` timestamps (no persistence needed for POC)
+- Health check reuses `get_dashboard()` logic to avoid duplicating SQL execution
+- `_classify_sql_error` uses regex on DuckDB error strings — pragmatic for the error message format
+- StatusDot is hidden for healthy charts (clean look by default)
+
+### Next Steps
+- Manual testing: upload CSV → create chart → dashboard → verify freshness/health in UI
+- Test schema change detection: edit a chart's SQL to reference nonexistent column
+- Consider persisting health check results across restarts (currently in-memory cache)
+
+---
+
 ## Session: 2026-02-14 (Part 2)
 
 ### Focus: Phase 11 — Database Connection UI in Source Picker

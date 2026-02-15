@@ -62,7 +62,7 @@ export function ChartViewPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-surface-secondary flex items-center justify-center">
         <div className="text-center">
           <svg className="animate-spin h-8 w-8 mx-auto text-blue-500 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
@@ -76,7 +76,7 @@ export function ChartViewPage() {
 
   if (error || !chartData) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-surface-secondary flex items-center justify-center">
         <div className="bg-red-50 border border-red-200 rounded-lg px-6 py-4 max-w-md text-center">
           <p className="text-sm text-red-700 font-medium">Chart not found</p>
           <p className="text-sm text-red-600 mt-1">{error ?? 'Unknown error'}</p>
@@ -114,15 +114,15 @@ export function ChartViewPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-surface-secondary">
       {/* Header */}
-      <header className="bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between">
-        <Link to="/library" className="text-sm text-gray-500 hover:text-gray-700 transition-colors">
+      <header className="bg-surface border-b border-border-default px-6 py-3 flex items-center justify-between">
+        <Link to="/library" className="text-sm text-text-secondary hover:text-text-on-surface transition-colors">
           &larr; Library
         </Link>
         <Link
           to={`/editor/${chartId}`}
-          className="text-sm px-3 py-1.5 rounded border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors"
+          className="text-sm px-3 py-1.5 rounded border border-border-default text-text-on-surface hover:bg-surface-secondary transition-colors"
         >
           Edit
         </Link>

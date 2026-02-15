@@ -51,7 +51,7 @@ export function SharePanel({ chartId, title, source, chartRef }: SharePanelProps
     }
   }, [getSvg, title, source])
 
-  const btnClass = 'text-xs px-3 py-1.5 rounded border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors'
+  const btnClass = 'text-xs px-3 py-1.5 rounded border border-border-default text-text-on-surface hover:bg-surface-secondary transition-colors'
   const successBtnClass = 'text-xs px-3 py-1.5 rounded border border-green-300 text-green-700 bg-green-50'
 
   return (
@@ -72,7 +72,7 @@ export function SharePanel({ chartId, title, source, chartRef }: SharePanelProps
         {copiedEmbed ? 'Copied!' : 'Embed'}
       </button>
 
-      <div className="w-px h-5 bg-gray-200" />
+      <div className="w-px h-5 bg-border-default" />
 
       {/* Export buttons */}
       <button onClick={handleExportSVG} className={btnClass}>SVG</button>

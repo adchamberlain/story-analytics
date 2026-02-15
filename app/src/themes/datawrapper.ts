@@ -3,7 +3,7 @@
  * Consolidated from the PoC observableTheme.ts.
  */
 
-// ── Color Palettes ──────────────────────────────────────────────────────────
+// -- Color Palettes ----------------------------------------------------------
 
 /** Default multi-series palette (steel blue primary) */
 export const CHART_COLORS = [
@@ -27,34 +27,43 @@ export const PALETTES = {
 
 export type PaletteKey = keyof typeof PALETTES
 
-// ── Typography & Spacing ────────────────────────────────────────────────────
+// -- Typography & Spacing ----------------------------------------------------
 
 export const FONT = {
   family: 'Inter, system-ui, sans-serif',
-  title: { size: 18, weight: 600, color: '#1a1a1a' },
-  subtitle: { size: 14, weight: 400, color: '#666666' },
-  source: { size: 11, weight: 400, color: '#999999' },
-  axis: { size: 12, weight: 400, color: '#666666' },
+  title: { size: 18, weight: 600 },
+  subtitle: { size: 14, weight: 400 },
+  source: { size: 11, weight: 400 },
+  axis: { size: 12, weight: 400 },
 } as const
 
-export const COLORS = {
-  background: '#ffffff',
-  grid: '#e5e5e5',
-  axis: '#333333',
-  textPrimary: '#1a1a1a',
-  textSecondary: '#666666',
-  textMuted: '#999999',
-} as const
+// -- CSS-var-aware color readers ---------------------------------------------
 
-// ── Observable Plot Defaults ────────────────────────────────────────────────
+/** Read current theme colors from CSS custom properties at render time. */
+function themeColors() {
+  const s = getComputedStyle(document.documentElement)
+  return {
+    background: s.getPropertyValue('--color-surface').trim() || '#ffffff',
+    grid: s.getPropertyValue('--color-grid').trim() || '#e5e5e5',
+    axis: s.getPropertyValue('--color-axis').trim() || '#333333',
+    textPrimary: s.getPropertyValue('--color-text-primary').trim() || '#1a1a1a',
+    textSecondary: s.getPropertyValue('--color-text-secondary').trim() || '#666666',
+    textMuted: s.getPropertyValue('--color-text-muted').trim() || '#999999',
+  }
+}
+
+// -- Observable Plot Defaults ------------------------------------------------
 
 /** Standard plot options to spread into Plot.plot() */
 export function plotDefaults(overrides: Record<string, unknown> = {}) {
+  const colors = themeColors()
+
   return {
     style: {
       fontFamily: FONT.family,
       fontSize: `${FONT.axis.size}px`,
-      background: COLORS.background,
+      background: colors.background,
+      color: colors.textSecondary,
     },
     marginTop: 8,
     marginRight: 16,

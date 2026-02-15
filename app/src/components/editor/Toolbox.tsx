@@ -44,12 +44,12 @@ export function Toolbox() {
           <div className="space-y-3 mt-3">
             {/* Table Reference */}
             {availableTables.length > 0 && (
-              <div className="bg-gray-50 border border-gray-200 rounded-md p-2">
-                <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wider mb-1">Tables</p>
+              <div className="bg-surface-secondary border border-border-default rounded-md p-2">
+                <p className="text-[10px] font-medium text-text-icon uppercase tracking-wider mb-1">Tables</p>
                 {availableTables.map((t) => (
                   <div key={t.source_id} className="flex items-baseline gap-2 py-0.5">
-                    <code className="text-xs font-mono text-gray-800">{t.table_name}</code>
-                    <span className="text-[10px] text-gray-400 truncate">({t.display_name})</span>
+                    <code className="text-xs font-mono text-text-primary">{t.table_name}</code>
+                    <span className="text-[10px] text-text-icon truncate">({t.display_name})</span>
                   </div>
                 ))}
               </div>
@@ -67,7 +67,7 @@ export function Toolbox() {
               }}
               placeholder="SELECT * FROM src_..."
               rows={6}
-              className="w-full px-2 py-1.5 text-xs font-mono border border-gray-200 rounded-md resize-y focus:outline-none focus:border-blue-400 bg-white"
+              className="w-full px-2 py-1.5 text-xs font-mono border border-border-default rounded-md resize-y focus:outline-none focus:border-blue-400 bg-surface text-text-primary"
             />
 
             {/* Run Button */}
@@ -88,8 +88,8 @@ export function Toolbox() {
 
             {/* Column Mapping (after successful execution) */}
             {sqlHasResults && (
-              <div className="space-y-2 pt-2 border-t border-gray-200">
-                <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wider">Map result columns</p>
+              <div className="space-y-2 pt-2 border-t border-border-default">
+                <p className="text-[10px] font-medium text-text-icon uppercase tracking-wider">Map result columns</p>
                 <ColumnDropdown
                   label="X Axis"
                   value={config.x}
@@ -149,11 +149,11 @@ export function Toolbox() {
             )}
             {config.chartType !== 'Histogram' && config.y && (
               <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">Aggregation</label>
+                <label className="block text-xs font-medium text-text-secondary mb-1">Aggregation</label>
                 <select
                   value={config.aggregation}
                   onChange={(e) => updateConfig({ aggregation: e.target.value as AggregationType })}
-                  className="w-full px-2 py-1.5 text-sm border border-gray-200 rounded-md bg-white focus:outline-none focus:border-blue-400"
+                  className="w-full px-2 py-1.5 text-sm border border-border-default rounded-md bg-surface text-text-primary focus:outline-none focus:border-blue-400"
                 >
                   <option value="none">None (raw)</option>
                   <option value="sum">Sum</option>
@@ -257,15 +257,15 @@ export function Toolbox() {
 
 function ModeToggle({ value, onChange }: { value: DataMode; onChange: (mode: DataMode) => void }) {
   return (
-    <div className="flex bg-gray-100 rounded-md p-0.5">
+    <div className="flex bg-surface-inset rounded-md p-0.5">
       {(['table', 'sql'] as const).map((mode) => (
         <button
           key={mode}
           onClick={() => onChange(mode)}
           className={`flex-1 px-3 py-1 text-xs font-medium rounded transition-colors ${
             value === mode
-              ? 'bg-white text-gray-900 shadow-sm'
-              : 'text-gray-500 hover:text-gray-700'
+              ? 'bg-surface text-text-primary shadow-sm'
+              : 'text-text-secondary hover:text-text-on-surface'
           }`}
         >
           {mode === 'table' ? 'Table' : 'SQL'}
@@ -278,7 +278,7 @@ function ModeToggle({ value, onChange }: { value: DataMode; onChange: (mode: Dat
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div>
-      <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">{title}</h4>
+      <h4 className="text-xs font-semibold text-text-icon uppercase tracking-wider mb-2">{title}</h4>
       {children}
     </div>
   )
@@ -287,12 +287,12 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 function TextInput({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
   return (
     <div>
-      <label className="block text-xs font-medium text-gray-500 mb-1">{label}</label>
+      <label className="block text-xs font-medium text-text-secondary mb-1">{label}</label>
       <input
         type="text"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full px-2 py-1.5 text-sm border border-gray-200 rounded-md focus:outline-none focus:border-blue-400"
+        className="w-full px-2 py-1.5 text-sm border border-border-default rounded-md bg-surface text-text-primary focus:outline-none focus:border-blue-400"
       />
     </div>
   )
@@ -305,9 +305,9 @@ function Toggle({ label, checked, onChange }: { label: string; checked: boolean;
         type="checkbox"
         checked={checked}
         onChange={(e) => onChange(e.target.checked)}
-        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+        className="rounded border-border-strong text-blue-600 focus:ring-blue-500"
       />
-      <span className="text-sm text-gray-700">{label}</span>
+      <span className="text-sm text-text-on-surface">{label}</span>
     </label>
   )
 }
