@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Story - AI-native analytics</title>
-    <meta name="description" content="Create dashboards with AI. Connect your data, describe what you need, and let AI agents write SQL, design charts, and deploy. Story is the AI-native analytics platform.">
+    <title>Story Analytics - Publication-ready dashboards from any data source</title>
+    <meta name="description" content="Open-source dashboarding tool. Connect to Snowflake, Postgres, BigQuery, or CSV. Build publication-ready charts with a visual editor and AI assistant. Export to SVG, PNG, PDF.">
 
     <!-- Favicon -->
     <link rel="icon" href="favicon.ico" sizes="32x32">
@@ -13,67 +13,218 @@
 
     <!-- OpenGraph -->
     <meta property="og:type" content="website">
-    <meta property="og:title" content="Story - AI-native analytics">
-    <meta property="og:description" content="Create dashboards with AI. Connect your data, describe what you need, and let AI agents handle the rest.">
+    <meta property="og:title" content="Story Analytics - Publication-ready dashboards from any data source">
+    <meta property="og:description" content="Open-source dashboarding tool. Visual chart editor, SQL workbench, AI assistant, and export to SVG/PNG/PDF. Connect to any database.">
     <meta property="og:url" content="https://storyanalytics.dev">
-    <meta property="og:site_name" content="Story">
+    <meta property="og:site_name" content="Story Analytics">
 
     <!-- Twitter Card -->
     <meta name="twitter:card" content="summary">
-    <meta name="twitter:title" content="Story - AI-native analytics">
-    <meta name="twitter:description" content="Create dashboards with AI. Connect your data, describe what you need, and let AI agents handle the rest.">
+    <meta name="twitter:title" content="Story Analytics - Publication-ready dashboards">
+    <meta name="twitter:description" content="Open-source dashboarding tool. Visual chart editor, SQL workbench, AI assistant, and export to SVG/PNG/PDF.">
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div class="terminal">
-        <header>
-            <nav>
-                <a href="privacy.html">Privacy</a>
-                <a href="terms.html">Terms</a>
-            </nav>
+    <div class="page">
+        <!-- Nav -->
+        <header class="nav">
+            <div class="nav-inner">
+                <a href="/" class="nav-brand">
+                    <svg class="nav-logo" viewBox="0 0 1080 1080" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <rect x="230" y="135" width="280" height="810" rx="40" fill="currentColor"/>
+                        <rect x="570" y="135" width="280" height="810" rx="40" fill="currentColor"/>
+                    </svg>
+                    Story Analytics
+                </a>
+                <nav class="nav-links">
+                    <a href="#features">Features</a>
+                    <a href="#how-it-works">How It Works</a>
+                    <a href="https://github.com/andrewchamberlain/story-analytics" class="nav-cta">GitHub</a>
+                </nav>
+            </div>
         </header>
 
-        <main>
-            <section class="hero">
-                <h1 class="logo">STORY<span class="cursor"></span><span class="cursor"></span></h1>
-                <p class="tagline">AI-native analytics.</p>
-            </section>
-
-            <section class="coming-soon">
-                <p class="status">Coming Soon</p>
-            </section>
-
-            <section class="description">
-                <p>
-                    Describe the dashboard you need. Story's AI agents write the SQL,
-                    design the visualizations, and catch errors automatically.
+        <!-- Hero -->
+        <section class="hero">
+            <div class="hero-inner">
+                <p class="hero-badge">Open Source</p>
+                <h1 class="hero-title">Publication-ready dashboards<br>from any data source</h1>
+                <p class="hero-subtitle">
+                    Connect to your database. Build charts with a visual editor and built-in SQL workbench.
+                    Get Datawrapper-quality output you can export to SVG, PNG, or PDF.
                 </p>
-                <p>
-                    Connect to Snowflake, BigQuery, Postgres, or any SQL database.
-                    Choose Claude, OpenAI, or Gemini as your AI. Get production-ready
-                    dashboards in minutes, not days.
-                </p>
-            </section>
+                <div class="hero-actions">
+                    <a href="https://github.com/andrewchamberlain/story-analytics" class="btn btn-primary">Get Started</a>
+                    <a href="#features" class="btn btn-secondary">See Features</a>
+                </div>
+            </div>
+        </section>
 
-            <section class="features">
-                <ul>
-                    <li><span class="prompt">></span> Natural language to dashboard in minutes</li>
-                    <li><span class="prompt">></span> Choose your AI: Claude, OpenAI, or Gemini</li>
-                    <li><span class="prompt">></span> Connect to Snowflake, BigQuery, Postgres, and more</li>
-                    <li><span class="prompt">></span> Automatic QA catches errors before you see them</li>
-                    <li><span class="prompt">></span> Edit with AI chat or split-pane markdown editor</li>
-                    <li><span class="prompt">></span> Share dashboards with a simple link</li>
-                </ul>
-            </section>
+        <!-- Value Props -->
+        <section class="value-props">
+            <div class="value-props-grid">
+                <div class="value-card">
+                    <div class="value-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M7 17V13M12 17V8M17 17V11"/></svg>
+                    </div>
+                    <h3>11 Chart Types</h3>
+                    <p>Bar, line, area, scatter, histogram, heatmap, box plot, pie, treemap, KPI, and data table. All rendered as clean SVG with Observable Plot.</p>
+                </div>
+                <div class="value-card">
+                    <div class="value-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+                    </div>
+                    <h3>Any Data Source</h3>
+                    <p>Connect to Snowflake, PostgreSQL, or BigQuery. Or just drag and drop a CSV. Your data stays local.</p>
+                </div>
+                <div class="value-card">
+                    <div class="value-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+                    </div>
+                    <h3>AI Assistant</h3>
+                    <p>Use Claude, GPT, or Gemini to help write SQL, add calculated fields, and refine your charts through natural language.</p>
+                </div>
+            </div>
+        </section>
 
-            <section class="sign-off">
-                <p class="motto">Your data has a story. Let AI help write it.</p>
-            </section>
-        </main>
+        <!-- Features -->
+        <section id="features" class="features">
+            <div class="features-inner">
+                <h2 class="section-title">Everything you need to build great charts</h2>
+                <p class="section-subtitle">A complete chart editor with the tools analysts actually use.</p>
 
-        <footer>
-            <p>Built by <a href="https://andrewchamberlain.com">Andrew Chamberlain</a></p>
+                <div class="features-grid">
+                    <div class="feature">
+                        <h4>Visual Chart Editor</h4>
+                        <p>Pick a chart type, map your columns, adjust colors and labels. Live preview updates instantly as you make changes.</p>
+                    </div>
+                    <div class="feature">
+                        <h4>SQL Workbench</h4>
+                        <p>Write custom SQL, run queries, and see results in a data table. Map result columns to chart axes. Full DuckDB engine built in.</p>
+                    </div>
+                    <div class="feature">
+                        <h4>Drag-and-Drop Dashboards</h4>
+                        <p>Arrange charts on a responsive grid. Drag to reposition, resize to adjust. Dashboards auto-layout based on chart types.</p>
+                    </div>
+                    <div class="feature">
+                        <h4>Publication-Ready Export</h4>
+                        <p>Export individual charts as SVG, PNG, or PDF. Clean vector output with proper typography, ready for reports and presentations.</p>
+                    </div>
+                    <div class="feature">
+                        <h4>Annotations</h4>
+                        <p>Add reference lines, text labels, and highlighted ranges to tell the story behind your data.</p>
+                    </div>
+                    <div class="feature">
+                        <h4>Color Palettes</h4>
+                        <p>Curated palettes following publication-ready conventions. Datawrapper-quality defaults out of the box.</p>
+                    </div>
+                    <div class="feature">
+                        <h4>KPI Cards</h4>
+                        <p>Single-number displays with comparison values, trend indicators, and color-coded deltas. Track actuals vs. goals at a glance.</p>
+                    </div>
+                    <div class="feature">
+                        <h4>Dark Mode</h4>
+                        <p>Full light and dark theme support. Toggle in the UI or follow your system preference.</p>
+                    </div>
+                    <div class="feature">
+                        <h4>Local-First</h4>
+                        <p>All data stays on your machine. Charts and dashboards stored as JSON files. No cloud account required.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- How It Works -->
+        <section id="how-it-works" class="how-it-works">
+            <div class="how-inner">
+                <h2 class="section-title">How it works</h2>
+                <p class="section-subtitle">Three steps from data to dashboard.</p>
+
+                <div class="steps">
+                    <div class="step">
+                        <div class="step-number">1</div>
+                        <h4>Connect your data</h4>
+                        <p>Upload a CSV or connect to Snowflake, PostgreSQL, or BigQuery. Story ingests your data into a local DuckDB engine for fast queries.</p>
+                    </div>
+                    <div class="step">
+                        <div class="step-number">2</div>
+                        <h4>Build your charts</h4>
+                        <p>Use the visual editor to pick chart types, map columns, and style your output. Write custom SQL when you need more control. The AI assistant can help with queries and formatting.</p>
+                    </div>
+                    <div class="step">
+                        <div class="step-number">3</div>
+                        <h4>Assemble and share</h4>
+                        <p>Drag charts onto a dashboard, arrange the layout, and export. Share via link or download as SVG, PNG, or PDF.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Tech Stack -->
+        <section class="tech-stack">
+            <div class="tech-inner">
+                <h2 class="section-title">Built with</h2>
+                <div class="tech-grid">
+                    <div class="tech-item">
+                        <strong>Observable Plot</strong>
+                        <span>D3-based charting</span>
+                    </div>
+                    <div class="tech-item">
+                        <strong>React</strong>
+                        <span>Frontend framework</span>
+                    </div>
+                    <div class="tech-item">
+                        <strong>DuckDB</strong>
+                        <span>SQL engine</span>
+                    </div>
+                    <div class="tech-item">
+                        <strong>FastAPI</strong>
+                        <span>Python backend</span>
+                    </div>
+                    <div class="tech-item">
+                        <strong>Tailwind CSS</strong>
+                        <span>Styling</span>
+                    </div>
+                    <div class="tech-item">
+                        <strong>Zustand</strong>
+                        <span>State management</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- CTA -->
+        <section class="cta">
+            <div class="cta-inner">
+                <h2>Your data has a story.</h2>
+                <p>Story Analytics is free, open source, and runs locally. Clone the repo, connect your data, and start building.</p>
+                <a href="https://github.com/andrewchamberlain/story-analytics" class="btn btn-primary">View on GitHub</a>
+            </div>
+        </section>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <div class="footer-inner">
+                <div class="footer-brand">
+                    <svg class="footer-logo" viewBox="0 0 1080 1080" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <rect x="230" y="135" width="280" height="810" rx="40" fill="currentColor"/>
+                        <rect x="570" y="135" width="280" height="810" rx="40" fill="currentColor"/>
+                    </svg>
+                    Story Analytics
+                </div>
+                <div class="footer-links">
+                    <a href="https://github.com/andrewchamberlain/story-analytics">GitHub</a>
+                    <a href="privacy.html">Privacy</a>
+                    <a href="terms.html">Terms</a>
+                </div>
+                <p class="footer-credit">Built by <a href="https://andrewchamberlain.com">Andrew Chamberlain</a></p>
+            </div>
         </footer>
     </div>
 

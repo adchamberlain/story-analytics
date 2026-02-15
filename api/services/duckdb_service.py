@@ -59,6 +59,43 @@ class DuckDBService:
         self._conn = duckdb.connect(":memory:")
         self._sources: dict[str, SourceMeta] = {}
         DATA_DIR.mkdir(parents=True, exist_ok=True)
+        self._reload_uploaded_sources()
+
+    def _reload_uploaded_sources(self) -> None:
+        """Re-ingest all CSVs from data/uploads/ on startup.
+
+        Each subdirectory name is the original source_id. This ensures charts
+        that reference src_{source_id} tables survive server restarts.
+        """
+        if not DATA_DIR.exists():
+            return
+
+        count = 0
+        for subdir in sorted(DATA_DIR.iterdir()):
+            if not subdir.is_dir():
+                continue
+            source_id = subdir.name
+            csv_file = next(subdir.glob("*.csv"), None)
+            if not csv_file:
+                continue
+
+            table_name = f"src_{source_id}"
+            try:
+                delimiter = self._detect_delimiter(csv_file)
+                self._conn.execute(f"""
+                    CREATE OR REPLACE TABLE {table_name} AS
+                    SELECT * FROM read_csv_auto('{csv_file}', delim='{delimiter}', header=true)
+                """)
+                self._sources[source_id] = SourceMeta(
+                    path=csv_file,
+                    ingested_at=datetime.now(timezone.utc),
+                )
+                count += 1
+            except (duckdb.Error, UnicodeDecodeError, ValueError) as e:
+                print(f"[DuckDB] Skipping {source_id}/{csv_file.name}: {e}")
+
+        if count:
+            print(f"[DuckDB] Reloaded {count} CSV source(s) from disk")
 
     def ingest_csv(self, file_path: Path, filename: str) -> SourceSchema:
         """Load a CSV file into DuckDB and return schema information."""

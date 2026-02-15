@@ -27,6 +27,12 @@ export interface EditorConfig {
   aggregation: AggregationType
   dataMode: DataMode
   annotations: Annotations
+  // BigValue / KPI fields
+  value: string | null
+  comparisonValue: string | null
+  comparisonLabel: string
+  valueFormat: 'currency' | 'percent' | 'number' | ''
+  positiveIsGood: boolean
 }
 
 const DEFAULT_CONFIG: EditorConfig = {
@@ -49,6 +55,11 @@ const DEFAULT_CONFIG: EditorConfig = {
   aggregation: 'none',
   dataMode: 'table',
   annotations: { lines: [], texts: [], ranges: [] },
+  value: null,
+  comparisonValue: null,
+  comparisonLabel: '',
+  valueFormat: '',
+  positiveIsGood: true,
 }
 
 export interface TableInfoItem {
@@ -194,6 +205,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         aggregation: chart.config?.aggregation ?? 'none',
         dataMode: (chart.config?.dataMode as DataMode) ?? 'table',
         annotations: chart.config?.annotations ?? { lines: [], texts: [], ranges: [] },
+        value: chart.config?.value ?? null,
+        comparisonValue: chart.config?.comparisonValue ?? null,
+        comparisonLabel: chart.config?.comparisonLabel ?? '',
+        valueFormat: chart.config?.valueFormat ?? '',
+        positiveIsGood: chart.config?.positiveIsGood ?? true,
       }
 
       const loadedDataMode = config.dataMode
@@ -353,6 +369,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
             aggregation: config.aggregation,
             dataMode: config.dataMode,
             annotations: config.annotations,
+            value: config.value,
+            comparisonValue: config.comparisonValue,
+            comparisonLabel: config.comparisonLabel,
+            valueFormat: config.valueFormat || undefined,
+            positiveIsGood: config.positiveIsGood,
           },
         }),
       })
@@ -543,6 +564,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
             aggregation: config.aggregation,
             dataMode: config.dataMode,
             annotations: config.annotations,
+            value: config.value,
+            comparisonValue: config.comparisonValue,
+            comparisonLabel: config.comparisonLabel,
+            valueFormat: config.valueFormat || undefined,
+            positiveIsGood: config.positiveIsGood,
           },
         }),
       })

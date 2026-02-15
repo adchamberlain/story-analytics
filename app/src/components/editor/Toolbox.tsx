@@ -6,7 +6,7 @@ import { ColumnDropdown } from './ColumnDropdown'
 import { AnnotationEditor } from './AnnotationEditor'
 import type { ChartType } from '../../types/chart'
 import type { PaletteKey } from '../../themes/datawrapper'
-import type { AggregationType, DataMode } from '../../stores/editorStore'
+import type { AggregationType, DataMode, EditorConfig, TableInfoItem } from '../../stores/editorStore'
 
 export function Toolbox() {
   const config = useEditorStore((s) => s.config)
@@ -20,9 +20,11 @@ export function Toolbox() {
   const sqlError = useEditorStore((s) => s.sqlError)
   const sqlExecuting = useEditorStore((s) => s.sqlExecuting)
   const availableTables = useEditorStore((s) => s.availableTables)
+  const sourceId = useEditorStore((s) => s.sourceId)
   const data = useEditorStore((s) => s.data)
 
   const isBar = config.chartType === 'BarChart'
+  const isBigValue = config.chartType === 'BigValue'
   const hasSeriesOption = ['BarChart', 'LineChart', 'AreaChart', 'ScatterPlot'].includes(config.chartType)
   const isSqlMode = config.dataMode === 'sql'
   const sqlHasResults = isSqlMode && data.length > 0
@@ -44,18 +46,8 @@ export function Toolbox() {
 
         {isSqlMode ? (
           <div className="space-y-3 mt-3">
-            {/* Table Reference */}
-            {availableTables.length > 0 && (
-              <div className="bg-surface-secondary border border-border-default rounded-md p-2">
-                <p className="text-[10px] font-medium text-text-icon uppercase tracking-wider mb-1">Tables</p>
-                {availableTables.map((t) => (
-                  <div key={t.source_id} className="flex items-baseline gap-2 py-0.5">
-                    <code className="text-xs font-mono text-text-primary">{t.table_name}</code>
-                    <span className="text-[10px] text-text-icon truncate">({t.display_name})</span>
-                  </div>
-                ))}
-              </div>
-            )}
+            {/* Current table hint */}
+            <SqlTableHint sourceId={sourceId} availableTables={availableTables} />
 
             {/* SQL Textarea */}
             <textarea
@@ -83,15 +75,61 @@ export function Toolbox() {
 
             {/* Error Display */}
             {sqlError && (
-              <div className="bg-red-50 border border-red-200 rounded-md px-2 py-1.5">
-                <p className="text-xs text-red-700 font-mono whitespace-pre-wrap">{sqlError}</p>
+              <div className="bg-red-500/10 border border-red-500/30 rounded-md px-2 py-1.5">
+                <p className="text-xs text-red-400 font-mono whitespace-pre-wrap">{sqlError}</p>
               </div>
+            )}
+
+            {/* Results Preview */}
+            {sqlHasResults && (
+              <SqlResultsTable data={data} columns={columns} />
             )}
 
             {/* Column Mapping (after successful execution) */}
             {sqlHasResults && (
               <div className="space-y-2 pt-2 border-t border-border-default">
                 <p className="text-[10px] font-medium text-text-icon uppercase tracking-wider">Map result columns</p>
+                {isBigValue ? (
+                  <BigValueColumnMapping columns={columns} columnTypes={columnTypes} config={config} updateConfig={updateConfig} />
+                ) : (
+                  <>
+                    <ColumnDropdown
+                      label="X Axis"
+                      value={config.x}
+                      columns={columns}
+                      columnTypes={columnTypes}
+                      onChange={(x) => updateConfig({ x })}
+                    />
+                    {config.chartType !== 'Histogram' && (
+                      <ColumnDropdown
+                        label="Y Axis"
+                        value={config.y}
+                        columns={columns}
+                        columnTypes={columnTypes}
+                        onChange={(y) => updateConfig({ y })}
+                      />
+                    )}
+                    {hasSeriesOption && (
+                      <ColumnDropdown
+                        label="Series (color)"
+                        value={config.series}
+                        columns={columns}
+                        columnTypes={columnTypes}
+                        allowNone
+                        onChange={(series) => updateConfig({ series })}
+                      />
+                    )}
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="space-y-2 mt-3">
+            {isBigValue ? (
+              <BigValueColumnMapping columns={columns} columnTypes={columnTypes} config={config} updateConfig={updateConfig} />
+            ) : (
+              <>
                 <ColumnDropdown
                   label="X Axis"
                   value={config.x}
@@ -118,53 +156,24 @@ export function Toolbox() {
                     onChange={(series) => updateConfig({ series })}
                   />
                 )}
-              </div>
-            )}
-          </div>
-        ) : (
-          <div className="space-y-2 mt-3">
-            <ColumnDropdown
-              label="X Axis"
-              value={config.x}
-              columns={columns}
-              columnTypes={columnTypes}
-              onChange={(x) => updateConfig({ x })}
-            />
-            {config.chartType !== 'Histogram' && (
-              <ColumnDropdown
-                label="Y Axis"
-                value={config.y}
-                columns={columns}
-                columnTypes={columnTypes}
-                onChange={(y) => updateConfig({ y })}
-              />
-            )}
-            {hasSeriesOption && (
-              <ColumnDropdown
-                label="Series (color)"
-                value={config.series}
-                columns={columns}
-                columnTypes={columnTypes}
-                allowNone
-                onChange={(series) => updateConfig({ series })}
-              />
-            )}
-            {config.chartType !== 'Histogram' && config.y && (
-              <div>
-                <label className="block text-xs font-medium text-text-secondary mb-1">Aggregation</label>
-                <select
-                  value={config.aggregation}
-                  onChange={(e) => updateConfig({ aggregation: e.target.value as AggregationType })}
-                  className="w-full px-2 py-1.5 text-sm border border-border-default rounded-md bg-surface text-text-primary focus:outline-none focus:border-blue-400"
-                >
-                  <option value="none">None (raw)</option>
-                  <option value="sum">Sum</option>
-                  <option value="avg">Average</option>
-                  <option value="count">Count</option>
-                  <option value="min">Min</option>
-                  <option value="max">Max</option>
-                </select>
-              </div>
+                {config.chartType !== 'Histogram' && config.y && (
+                  <div>
+                    <label className="block text-xs font-medium text-text-secondary mb-1">Aggregation</label>
+                    <select
+                      value={config.aggregation}
+                      onChange={(e) => updateConfig({ aggregation: e.target.value as AggregationType })}
+                      className="w-full px-2 py-1.5 text-sm border border-border-default rounded-md bg-surface text-text-primary focus:outline-none focus:border-blue-400"
+                    >
+                      <option value="none">None (raw)</option>
+                      <option value="sum">Sum</option>
+                      <option value="avg">Average</option>
+                      <option value="count">Count</option>
+                      <option value="min">Min</option>
+                      <option value="max">Max</option>
+                    </select>
+                  </div>
+                )}
+              </>
             )}
           </div>
         )}
@@ -344,5 +353,175 @@ function Toggle({ label, checked, onChange }: { label: string; checked: boolean;
       />
       <span className="text-sm text-text-on-surface">{label}</span>
     </label>
+  )
+}
+
+function SqlResultsTable({ data, columns }: { data: Record<string, unknown>[]; columns: string[] }) {
+  const MAX_PREVIEW = 10
+  const preview = data.slice(0, MAX_PREVIEW)
+  const hasMore = data.length > MAX_PREVIEW
+
+  return (
+    <div className="border border-border-default rounded-md overflow-hidden">
+      <div className="flex items-center justify-between px-2 py-1.5 bg-surface-secondary border-b border-border-default">
+        <p className="text-[10px] font-medium text-text-icon uppercase tracking-wider">
+          Results
+        </p>
+        <span className="text-[10px] text-text-muted">
+          {data.length.toLocaleString()} row{data.length !== 1 ? 's' : ''}
+        </span>
+      </div>
+      <div className="overflow-x-auto max-h-[240px] overflow-y-auto">
+        <table className="w-full text-[11px] font-mono">
+          <thead>
+            <tr className="bg-surface-secondary sticky top-0">
+              {columns.map((col) => (
+                <th
+                  key={col}
+                  className="px-2 py-1 text-left font-semibold text-text-secondary whitespace-nowrap border-b border-border-default"
+                >
+                  {col}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {preview.map((row, i) => (
+              <tr key={i} className="border-b border-border-default last:border-b-0 hover:bg-surface-secondary/50">
+                {columns.map((col) => (
+                  <td
+                    key={col}
+                    className="px-2 py-1 text-text-primary whitespace-nowrap max-w-[160px] truncate"
+                    title={String(row[col] ?? '')}
+                  >
+                    {row[col] == null ? <span className="text-text-muted italic">null</span> : String(row[col])}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {hasMore && (
+        <div className="px-2 py-1 bg-surface-secondary border-t border-border-default">
+          <p className="text-[10px] text-text-muted text-center">
+            Showing {MAX_PREVIEW} of {data.length.toLocaleString()} rows
+          </p>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function SqlTableHint({ sourceId, availableTables }: { sourceId: string | null; availableTables: TableInfoItem[] }) {
+  const [showAll, setShowAll] = useState(false)
+
+  // Find the current chart's table
+  const currentTable = sourceId
+    ? availableTables.find((t) => t.source_id === sourceId)
+    : null
+  const tableName = currentTable?.table_name ?? (sourceId ? `src_${sourceId}` : null)
+
+  const otherTables = availableTables.filter((t) => t.source_id !== sourceId)
+
+  return (
+    <div className="bg-surface-secondary border border-border-default rounded-md p-2">
+      {tableName ? (
+        <div>
+          <p className="text-[10px] font-medium text-text-icon uppercase tracking-wider mb-1">Your table</p>
+          <code className="text-xs font-mono text-blue-400 select-all">{tableName}</code>
+          {currentTable && (
+            <span className="text-[10px] text-text-icon ml-2">
+              {currentTable.row_count.toLocaleString()} rows, {currentTable.column_count} cols
+            </span>
+          )}
+        </div>
+      ) : (
+        <p className="text-[10px] text-text-icon">No table loaded</p>
+      )}
+      {otherTables.length > 0 && (
+        <div className="mt-1.5">
+          <button
+            onClick={() => setShowAll(!showAll)}
+            className="text-[10px] text-text-muted hover:text-text-secondary transition-colors"
+          >
+            {showAll ? 'Hide' : 'Show'} {otherTables.length} other table{otherTables.length !== 1 ? 's' : ''}
+          </button>
+          {showAll && (
+            <div className="mt-1 space-y-0.5">
+              {otherTables.map((t) => (
+                <div key={t.source_id} className="flex items-baseline gap-2">
+                  <code className="text-[11px] font-mono text-text-secondary">{t.table_name}</code>
+                  <span className="text-[10px] text-text-icon truncate">({t.display_name})</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function BigValueColumnMapping({
+  columns,
+  columnTypes,
+  config,
+  updateConfig,
+}: {
+  columns: string[]
+  columnTypes: Record<string, string>
+  config: EditorConfig
+  updateConfig: (partial: Partial<EditorConfig>) => void
+}) {
+  const selectClass =
+    'w-full px-2 py-1.5 text-sm border border-border-default rounded-md bg-surface text-text-primary focus:outline-none focus:border-blue-400'
+
+  return (
+    <div className="space-y-2">
+      <ColumnDropdown
+        label="Value column"
+        value={config.value}
+        columns={columns}
+        columnTypes={columnTypes}
+        onChange={(value) => updateConfig({ value })}
+      />
+      <ColumnDropdown
+        label="Goal / comparison column"
+        value={config.comparisonValue}
+        columns={columns}
+        columnTypes={columnTypes}
+        allowNone
+        onChange={(comparisonValue) => updateConfig({ comparisonValue })}
+      />
+      <div>
+        <label className="block text-xs font-medium text-text-secondary mb-1">Comparison label</label>
+        <input
+          type="text"
+          value={config.comparisonLabel}
+          onChange={(e) => updateConfig({ comparisonLabel: e.target.value })}
+          placeholder="e.g. vs Goal"
+          className="w-full px-2 py-1.5 text-sm border border-border-default rounded-md bg-surface text-text-primary focus:outline-none focus:border-blue-400"
+        />
+      </div>
+      <div>
+        <label className="block text-xs font-medium text-text-secondary mb-1">Format</label>
+        <select
+          value={config.valueFormat}
+          onChange={(e) => updateConfig({ valueFormat: e.target.value as EditorConfig['valueFormat'] })}
+          className={selectClass}
+        >
+          <option value="">Auto</option>
+          <option value="number">Number</option>
+          <option value="currency">Currency ($)</option>
+          <option value="percent">Percent (%)</option>
+        </select>
+      </div>
+      <Toggle
+        label="Positive is good"
+        checked={config.positiveIsGood}
+        onChange={(positiveIsGood) => updateConfig({ positiveIsGood })}
+      />
+    </div>
   )
 }

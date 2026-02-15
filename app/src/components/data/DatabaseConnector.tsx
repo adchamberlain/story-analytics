@@ -21,12 +21,6 @@ const DB_LABELS: Record<DbType, string> = {
   bigquery: 'BigQuery',
 }
 
-const DB_ICONS: Record<DbType, string> = {
-  snowflake: '\u2744', // snowflake
-  postgres: '\u{1F418}', // elephant
-  bigquery: '\u{1F50D}', // magnifying glass
-}
-
 export function DatabaseConnector({ onSynced }: DatabaseConnectorProps) {
   const [step, setStep] = useState<Step>('closed')
   const [savedConnections, setSavedConnections] = useState<SavedConnection[]>([])
@@ -259,13 +253,16 @@ export function DatabaseConnector({ onSynced }: DatabaseConnectorProps) {
     return (
       <button
         onClick={handleOpen}
-        className="w-full border-2 border-dashed border-border-strong rounded-xl p-8 text-center cursor-pointer hover:border-blue-300 hover:bg-blue-50 transition-colors bg-surface"
+        className="w-full border-2 border-dashed border-border-strong rounded-2xl text-center cursor-pointer hover:border-text-icon transition-colors bg-surface"
+        style={{ padding: '40px 32px' }}
+        onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(59,130,246,0.04)' }}
+        onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '' }}
       >
-        <svg className="h-10 w-10 mx-auto text-text-icon mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+        <svg style={{ width: '40px', height: '40px', margin: '0 auto 16px auto', display: 'block' }} className="text-text-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 0v3.75m-16.5-3.75v3.75m16.5 0v3.75C20.25 16.153 16.556 18 12 18s-8.25-1.847-8.25-4.125v-3.75m16.5 0c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125" />
         </svg>
-        <p className="text-sm font-medium text-text-primary">Connect to Database</p>
-        <p className="text-xs mt-1 text-text-muted">PostgreSQL, Snowflake, or BigQuery</p>
+        <p style={{ fontSize: '15px', fontWeight: 500 }} className="text-text-primary">Connect to Database</p>
+        <p style={{ fontSize: '13px', marginTop: '6px' }} className="text-text-muted">PostgreSQL, Snowflake, or BigQuery</p>
       </button>
     )
   }
@@ -273,14 +270,27 @@ export function DatabaseConnector({ onSynced }: DatabaseConnectorProps) {
   // ── Pick saved connection ─────────────────────────────────────────────────
   if (step === 'pick') {
     return (
-      <div className="rounded-lg border border-border-default bg-surface overflow-hidden">
-        <div className="px-5 py-4 border-b border-border-subtle flex items-center justify-between">
-          <h3 className="text-sm font-medium text-text-primary">Connect to Database</h3>
-          <button onClick={handleClose} className="text-xs text-text-icon hover:text-text-icon-hover">&times; Close</button>
+      <div className="rounded-2xl border border-border-default bg-surface-raised overflow-hidden">
+        <div
+          className="border-b border-border-default flex items-center justify-between"
+          style={{ padding: '20px 28px' }}
+        >
+          <h3 className="text-[17px] font-semibold text-text-primary">Connect to Database</h3>
+          <button
+            onClick={handleClose}
+            className="flex items-center justify-center rounded-lg text-text-icon hover:text-text-primary hover:bg-surface-secondary transition-colors"
+            style={{ width: '36px', height: '36px' }}
+          >
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
         </div>
-        <div className="p-5 space-y-3">
+        <div style={{ padding: '20px 28px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
           {loadingConnections ? (
-            <p className="text-sm text-text-muted text-center py-4">Loading saved connections...</p>
+            <div className="flex items-center justify-center" style={{ padding: '32px 0' }}>
+              <Spinner className="h-6 w-6 text-blue-500" />
+            </div>
           ) : (
             <>
               {savedConnections.map((conn) => (
@@ -288,34 +298,37 @@ export function DatabaseConnector({ onSynced }: DatabaseConnectorProps) {
                   key={conn.connection_id}
                   onClick={() => handleSelectSaved(conn)}
                   disabled={testing}
-                  className="w-full text-left px-4 py-3 rounded-lg border border-border-default hover:border-blue-300 hover:bg-blue-50 transition-colors flex items-center justify-between disabled:opacity-50"
+                  className="w-full text-left rounded-xl border border-border-default hover:border-blue-400 transition-all flex items-center justify-between disabled:opacity-50"
+                  style={{ padding: '16px 20px' }}
+                  onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(59,130,246,0.06)' }}
+                  onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '' }}
                 >
                   <div>
-                    <p className="text-sm font-medium text-text-primary">
-                      <span className="mr-1.5">{DB_ICONS[conn.db_type as DbType] ?? ''}</span>
+                    <p className="text-[15px] font-medium text-text-primary">
                       {conn.name}
                     </p>
-                    <p className="text-xs mt-0.5 text-text-muted">
-                      {conn.db_type === 'bigquery'
+                    <p className="text-[13px] text-text-muted" style={{ marginTop: '2px' }}>
+                      {DB_LABELS[conn.db_type as DbType] ?? conn.db_type} · {conn.db_type === 'bigquery'
                         ? `${conn.config.project_id}.${conn.config.dataset}`
                         : `${conn.config.database}${conn.config.schema ? '.' + conn.config.schema : ''}`
                       }
                     </p>
                   </div>
-                  <span className="text-xs text-blue-600 font-medium shrink-0 ml-3">
+                  <span className="text-[13px] font-medium shrink-0" style={{ color: '#3b82f6', marginLeft: '16px' }}>
                     {testing && activeConnectionId === conn.connection_id ? 'Testing...' : 'Connect'}
                   </span>
                 </button>
               ))}
               <button
                 onClick={handleNewConnection}
-                className="w-full px-4 py-3 rounded-lg border border-dashed border-border-strong hover:border-blue-300 hover:bg-blue-50 transition-colors text-sm text-text-muted text-center"
+                className="w-full rounded-xl border-2 border-dashed border-border-strong hover:border-text-icon transition-colors text-[15px] text-text-muted text-center"
+                style={{ padding: '16px 20px' }}
               >
                 + New Connection
               </button>
             </>
           )}
-          {error && <p className="text-sm text-red-600">{error}</p>}
+          {error && <p className="text-[14px]" style={{ color: '#ef4444' }}>{error}</p>}
         </div>
       </div>
     )
@@ -324,23 +337,35 @@ export function DatabaseConnector({ onSynced }: DatabaseConnectorProps) {
   // ── New connection form ───────────────────────────────────────────────────
   if (step === 'form') {
     return (
-      <div className="rounded-lg border border-border-default bg-surface overflow-hidden">
-        <div className="px-5 py-4 border-b border-border-subtle flex items-center justify-between">
-          <h3 className="text-sm font-medium text-text-primary">New Connection</h3>
-          <button onClick={handleClose} className="text-xs text-text-icon hover:text-text-icon-hover">&times; Close</button>
+      <div className="rounded-2xl border border-border-default bg-surface-raised overflow-hidden">
+        <div
+          className="border-b border-border-default flex items-center justify-between"
+          style={{ padding: '20px 28px' }}
+        >
+          <h3 className="text-[17px] font-semibold text-text-primary">New Connection</h3>
+          <button
+            onClick={handleClose}
+            className="flex items-center justify-center rounded-lg text-text-icon hover:text-text-primary hover:bg-surface-secondary transition-colors"
+            style={{ width: '36px', height: '36px' }}
+          >
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
         </div>
-        <div className="p-5 space-y-4">
+        <div style={{ padding: '24px 28px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
           {/* Database Type Tabs */}
-          <div className="flex bg-surface-inset rounded-lg p-1 gap-1">
+          <div className="flex bg-surface-inset rounded-xl" style={{ padding: '4px', gap: '4px' }}>
             {(['postgres', 'snowflake', 'bigquery'] as DbType[]).map((t) => (
               <button
                 key={t}
                 onClick={() => setDbType(t)}
-                className={`flex-1 px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                className={`flex-1 text-[14px] font-medium rounded-lg transition-colors ${
                   dbType === t
-                    ? 'bg-surface text-text-primary shadow-sm'
+                    ? 'bg-surface-raised text-text-primary shadow-sm'
                     : 'text-text-secondary hover:text-text-on-surface'
                 }`}
+                style={{ padding: '10px 16px' }}
               >
                 {DB_LABELS[t]}
               </button>
@@ -348,33 +373,24 @@ export function DatabaseConnector({ onSynced }: DatabaseConnectorProps) {
           </div>
 
           {/* Connection Name */}
-          <div>
-            <label className="block text-xs font-medium text-text-secondary mb-1">Connection Name</label>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="My Analytics DB"
-              className="w-full px-3 py-2 text-sm border border-border-default rounded-lg bg-surface text-text-primary focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-          </div>
+          <FormField label="Connection Name" value={name} onChange={setName} placeholder="My Analytics DB" />
 
           {/* Dynamic fields per DB type */}
           {dbType === 'snowflake' && (
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2" style={{ gap: '16px' }}>
               <FormField label="Account" value={account} onChange={setAccount} placeholder="abc12345.us-east-1" />
               <FormField label="Warehouse" value={warehouse} onChange={setWarehouse} placeholder="COMPUTE_WH" />
               <FormField label="Database" value={database} onChange={setDatabase} placeholder="ANALYTICS_POC" />
               <FormField label="Schema" value={schema} onChange={setSchema} placeholder="SAAS_DEMO" />
-              <div className="col-span-2 border-t border-border-subtle pt-3">
-                <p className="text-xs text-text-muted mb-2">Username falls back to .env if blank.</p>
+              <div className="col-span-2 border-t border-border-subtle" style={{ paddingTop: '16px' }}>
+                <p className="text-[13px] text-text-muted" style={{ marginBottom: '12px' }}>Username falls back to .env if blank.</p>
                 <FormField label="Username (optional)" value={username} onChange={setUsername} placeholder="From .env if blank" />
               </div>
             </div>
           )}
 
           {dbType === 'postgres' && (
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2" style={{ gap: '16px' }}>
               <FormField label="Host" value={host} onChange={setHost} placeholder="localhost" />
               <FormField label="Port" value={port} onChange={setPort} placeholder="5432" />
               <FormField label="Database" value={database} onChange={setDatabase} placeholder="mydb" />
@@ -385,38 +401,41 @@ export function DatabaseConnector({ onSynced }: DatabaseConnectorProps) {
           )}
 
           {dbType === 'bigquery' && (
-            <div className="space-y-3">
-              <div className="grid grid-cols-2 gap-3">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div className="grid grid-cols-2" style={{ gap: '16px' }}>
                 <FormField label="Project ID" value={projectId} onChange={setProjectId} placeholder="my-gcp-project" />
                 <FormField label="Dataset" value={dataset} onChange={setDataset} placeholder="analytics" />
               </div>
               <div>
-                <label className="block text-xs font-medium text-text-secondary mb-1">Service Account JSON</label>
+                <label className="block text-[13px] font-medium text-text-secondary" style={{ marginBottom: '6px' }}>Service Account JSON</label>
                 <textarea
                   value={serviceAccountJson}
                   onChange={(e) => setServiceAccountJson(e.target.value)}
-                  placeholder='Paste service account JSON key or upload file...'
+                  placeholder='Paste service account JSON key...'
                   rows={4}
-                  className="w-full px-3 py-2 text-xs font-mono border border-border-default rounded-lg bg-surface text-text-primary focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-y"
+                  className="w-full text-[14px] font-mono border border-border-default rounded-xl bg-surface text-text-primary focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 resize-y transition-colors"
+                  style={{ padding: '12px 16px' }}
                 />
               </div>
             </div>
           )}
 
-          {error && <p className="text-sm text-red-600">{error}</p>}
+          {error && <p className="text-[14px]" style={{ color: '#ef4444' }}>{error}</p>}
 
-          <div className="flex items-center gap-3 pt-2">
+          <div className="flex items-center" style={{ gap: '12px', paddingTop: '4px' }}>
             <button
               onClick={handleTestConnection}
               disabled={testing}
-              className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center gap-2"
+              className="text-[14px] rounded-xl bg-blue-600 text-white hover:bg-blue-700 transition-colors font-medium disabled:opacity-50 flex items-center gap-2"
+              style={{ padding: '10px 24px' }}
             >
               {testing && <Spinner />}
               {testing ? 'Testing...' : 'Test Connection'}
             </button>
             <button
               onClick={() => setStep('pick')}
-              className="px-4 py-2 text-sm text-text-muted hover:text-text-primary transition-colors"
+              className="text-[14px] text-text-muted hover:text-text-primary transition-colors font-medium"
+              style={{ padding: '10px 16px' }}
             >
               Back
             </button>
@@ -429,46 +448,68 @@ export function DatabaseConnector({ onSynced }: DatabaseConnectorProps) {
   // ── Table picker ──────────────────────────────────────────────────────────
   if (step === 'tables') {
     return (
-      <div className="rounded-lg border border-border-default bg-surface overflow-hidden">
-        <div className="px-5 py-4 border-b border-border-subtle flex items-center justify-between">
-          <h3 className="text-sm font-medium text-text-primary">Select Tables to Import</h3>
-          <button onClick={handleClose} className="text-xs text-text-icon hover:text-text-icon-hover">&times; Close</button>
+      <div className="rounded-2xl border border-border-default bg-surface-raised overflow-hidden">
+        <div
+          className="border-b border-border-default flex items-center justify-between"
+          style={{ padding: '20px 28px' }}
+        >
+          <h3 className="text-[17px] font-semibold text-text-primary">Select Tables to Import</h3>
+          <button
+            onClick={handleClose}
+            className="flex items-center justify-center rounded-lg text-text-icon hover:text-text-primary hover:bg-surface-secondary transition-colors"
+            style={{ width: '36px', height: '36px' }}
+          >
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
         </div>
-        <div className="p-5 space-y-4">
+        <div style={{ padding: '24px 28px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
           {testMessage && (
-            <div className="px-4 py-3 rounded-lg bg-green-50 border border-green-200">
-              <p className="text-sm text-green-700">{testMessage}</p>
+            <div className="rounded-xl" style={{ padding: '14px 18px', backgroundColor: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.2)' }}>
+              <p className="text-[14px]" style={{ color: '#22c55e' }}>{testMessage}</p>
             </div>
           )}
           <div className="flex items-center justify-between">
-            <button onClick={handleToggleAll} className="text-xs text-blue-600 hover:text-blue-700 font-medium">
+            <button onClick={handleToggleAll} className="text-[14px] font-medium transition-colors" style={{ color: '#3b82f6' }}>
               {selectedTables.size === tables.length ? 'Deselect All' : 'Select All'}
             </button>
-            <span className="text-xs text-text-muted">{selectedTables.size} of {tables.length} selected</span>
+            <span className="text-[13px] text-text-muted">{selectedTables.size} of {tables.length} selected</span>
           </div>
-          <div className="max-h-64 overflow-y-auto border border-border-subtle rounded-lg divide-y divide-border-subtle">
+          <div className="overflow-y-auto border border-border-default rounded-xl divide-y divide-border-subtle" style={{ maxHeight: '280px' }}>
             {tables.map((table) => (
-              <label key={table} className="flex items-center gap-3 px-4 py-2.5 hover:bg-surface-secondary cursor-pointer">
+              <label
+                key={table}
+                className="flex items-center cursor-pointer hover:bg-surface-secondary transition-colors"
+                style={{ gap: '14px', padding: '14px 20px' }}
+              >
                 <input
                   type="checkbox"
                   checked={selectedTables.has(table)}
                   onChange={() => handleToggleTable(table)}
                   className="rounded border-border-strong text-blue-600 focus:ring-blue-500"
                 />
-                <span className="text-sm text-text-primary">{table}</span>
+                <span className="text-[15px] text-text-primary">{table}</span>
               </label>
             ))}
           </div>
-          {error && <p className="text-sm text-red-600">{error}</p>}
-          <div className="flex items-center gap-3 pt-2">
+          {error && <p className="text-[14px]" style={{ color: '#ef4444' }}>{error}</p>}
+          <div className="flex items-center" style={{ gap: '12px', paddingTop: '4px' }}>
             <button
               onClick={handleSync}
               disabled={selectedTables.size === 0}
-              className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+              className="text-[14px] rounded-xl bg-blue-600 text-white hover:bg-blue-700 transition-colors font-medium disabled:opacity-50"
+              style={{ padding: '10px 24px' }}
             >
               Import {selectedTables.size} Table{selectedTables.size !== 1 ? 's' : ''}
             </button>
-            <button onClick={handleClose} className="px-4 py-2 text-sm text-text-muted hover:text-text-primary transition-colors">Cancel</button>
+            <button
+              onClick={handleClose}
+              className="text-[14px] text-text-muted hover:text-text-primary transition-colors font-medium"
+              style={{ padding: '10px 16px' }}
+            >
+              Cancel
+            </button>
           </div>
         </div>
       </div>
@@ -478,10 +519,10 @@ export function DatabaseConnector({ onSynced }: DatabaseConnectorProps) {
   // ── Syncing state ─────────────────────────────────────────────────────────
   if (step === 'syncing') {
     return (
-      <div className="rounded-lg border border-border-default bg-surface p-8 text-center">
-        <Spinner className="h-8 w-8 mx-auto text-blue-500 mb-4" />
-        <p className="text-sm font-medium text-text-primary">Importing tables...</p>
-        <p className="text-xs mt-1 text-text-muted">This may take a moment</p>
+      <div className="rounded-2xl border border-border-default bg-surface-raised text-center" style={{ padding: '48px 32px' }}>
+        <Spinner className="h-8 w-8 mx-auto text-blue-500" />
+        <p className="text-[15px] font-medium text-text-primary" style={{ marginTop: '16px' }}>Importing tables...</p>
+        <p className="text-[13px] text-text-muted" style={{ marginTop: '6px' }}>This may take a moment</p>
       </div>
     )
   }
@@ -506,13 +547,14 @@ function FormField({
 }) {
   return (
     <div>
-      <label className="block text-xs font-medium text-text-secondary mb-1">{label}</label>
+      <label className="block text-[13px] font-medium text-text-secondary" style={{ marginBottom: '6px' }}>{label}</label>
       <input
         type={type}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="w-full px-3 py-2 text-sm border border-border-default rounded-lg bg-surface text-text-primary focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+        className="w-full text-[15px] border border-border-default rounded-xl bg-surface text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors"
+        style={{ padding: '11px 16px' }}
       />
     </div>
   )

@@ -29,6 +29,8 @@ interface ChartWithData {
   // 11.4: Health status
   health_status: string
   health_issues: string[]
+  // Grid layout position
+  layout?: { x: number; y: number; w: number; h: number } | null
 }
 
 interface DashboardData {
@@ -199,15 +201,18 @@ export function DashboardViewPage() {
   return (
     <div className="min-h-screen bg-surface-secondary">
       {/* Header */}
-      <header className="bg-surface border-b border-border-default shadow-sm px-6 py-3 flex items-center justify-between">
-        <Link to="/dashboards" className="text-sm text-text-secondary hover:text-text-on-surface transition-colors">
-          &larr; Dashboards
+      <header className="bg-surface border-b border-border-default shadow-sm px-16 py-4 flex items-center justify-between">
+        <Link to="/dashboards" className="text-[14px] text-text-secondary hover:text-text-primary transition-colors inline-flex items-center gap-2">
+          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+          </svg>
+          Dashboards
         </Link>
         <div className="flex items-center gap-2">
           <button
             onClick={handleHealthCheck}
             disabled={healthChecking}
-            className="text-sm px-4 py-2 rounded-lg border border-border-default text-text-on-surface hover:bg-surface-secondary transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+            className="text-[14px] px-4 py-2 rounded-xl border border-border-default text-text-on-surface hover:bg-surface-secondary transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
           >
             {healthChecking ? (
               <svg className="animate-spin h-3.5 w-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -223,7 +228,7 @@ export function DashboardViewPage() {
           </button>
           <button
             onClick={() => setShowShareModal(true)}
-            className="text-sm px-4 py-2 rounded-lg border border-border-default text-text-on-surface hover:bg-surface-secondary transition-colors flex items-center gap-1.5"
+            className="text-[14px] px-4 py-2 rounded-xl border border-border-default text-text-on-surface hover:bg-surface-secondary transition-colors flex items-center gap-1.5"
           >
             <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
               <path strokeLinecap="round" strokeLinejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
@@ -233,7 +238,7 @@ export function DashboardViewPage() {
           <a
             href={`/api/v2/dashboards/${dashboardId}/export/html`}
             download
-            className="text-sm px-4 py-2 rounded-lg border border-border-default text-text-on-surface hover:bg-surface-secondary transition-colors flex items-center gap-1.5"
+            className="text-[14px] px-4 py-2 rounded-xl border border-border-default text-text-on-surface hover:bg-surface-secondary transition-colors flex items-center gap-1.5"
           >
             <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
               <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
@@ -243,7 +248,7 @@ export function DashboardViewPage() {
           <button
             onClick={handleRefresh}
             disabled={refreshing}
-            className="text-sm px-4 py-2 rounded-lg border border-border-default text-text-on-surface hover:bg-surface-secondary transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+            className="text-[14px] px-4 py-2 rounded-xl border border-border-default text-text-on-surface hover:bg-surface-secondary transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
           >
             <svg
               className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin' : ''}`}
@@ -259,7 +264,7 @@ export function DashboardViewPage() {
           </button>
           <button
             onClick={handleTogglePin}
-            className={`text-sm px-4 py-2 rounded-lg border transition-colors flex items-center gap-1.5 ${
+            className={`text-[14px] px-4 py-2 rounded-xl border transition-colors flex items-center gap-1.5 ${
               isPinned
                 ? 'border-blue-300 text-blue-600 bg-blue-50 hover:bg-blue-100'
                 : 'border-border-default text-text-on-surface hover:bg-surface-secondary'
@@ -273,21 +278,21 @@ export function DashboardViewPage() {
           </button>
           <Link
             to={`/dashboard/${dashboardId}/edit`}
-            className="text-sm px-4 py-2 rounded-lg border border-border-default text-text-on-surface hover:bg-surface-secondary transition-colors"
+            className="text-[14px] px-4 py-2 rounded-xl border border-border-default text-text-on-surface hover:bg-surface-secondary transition-colors"
           >
             Edit
           </Link>
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto px-6 py-8">
+      <main className="px-16 py-12">
         {/* Title + description */}
         <div className="mb-2">
-          <h1 className="text-2xl font-bold text-text-primary">
+          <h1 className="text-[28px] font-bold text-text-primary">
             {dashboard.title}
           </h1>
           {dashboard.description && (
-            <p className="text-sm mt-1 text-text-secondary">
+            <p className="text-[15px] mt-1 text-text-secondary">
               {dashboard.description}
             </p>
           )}
@@ -295,20 +300,20 @@ export function DashboardViewPage() {
 
         {/* Last refreshed timestamp */}
         {lastRefreshed && (
-          <p className="text-xs text-text-muted mb-6">
+          <p className="text-[13px] text-text-muted mb-6">
             Updated {formatTimeAgo(lastRefreshed)}
           </p>
         )}
 
         {/* Stale data banner */}
         {dashboard.has_stale_data && (
-          <div className="mb-4 flex items-center justify-between bg-amber-50 border border-amber-200 rounded-lg px-4 py-2.5">
-            <p className="text-sm text-amber-700">
+          <div className="mb-4 flex items-center justify-between bg-amber-50 border border-amber-200 rounded-xl px-4 py-2.5">
+            <p className="text-[14px] text-amber-700">
               Some charts have stale data (over 24 hours old).
             </p>
             <button
               onClick={handleRefresh}
-              className="text-sm text-amber-700 underline hover:text-amber-900 ml-4"
+              className="text-[14px] text-amber-700 underline hover:text-amber-900 ml-4"
             >
               Refresh now
             </button>
@@ -318,7 +323,7 @@ export function DashboardViewPage() {
         {/* Health check result banner */}
         {healthResult && (
           <div
-            className={`mb-4 flex items-center justify-between rounded-lg px-4 py-2.5 border ${
+            className={`mb-4 flex items-center justify-between rounded-xl px-4 py-2.5 border ${
               healthResult.overall_status === 'healthy'
                 ? 'bg-green-50 border-green-200'
                 : healthResult.overall_status === 'warning'
@@ -327,7 +332,7 @@ export function DashboardViewPage() {
             }`}
           >
             <p
-              className={`text-sm ${
+              className={`text-[14px] ${
                 healthResult.overall_status === 'healthy'
                   ? 'text-green-700'
                   : healthResult.overall_status === 'warning'
@@ -352,8 +357,8 @@ export function DashboardViewPage() {
 
         {/* Refresh error banner */}
         {refreshError && (
-          <div className="mb-4 flex items-center justify-between bg-red-50 border border-red-200 rounded-lg px-4 py-2.5">
-            <p className="text-sm text-red-700">Refresh failed: {refreshError}</p>
+          <div className="mb-4 flex items-center justify-between bg-red-50 border border-red-200 rounded-xl px-4 py-2.5">
+            <p className="text-[14px] text-red-700">Refresh failed: {refreshError}</p>
             <button
               onClick={() => setRefreshError(null)}
               className="text-red-400 hover:text-red-600 ml-4"

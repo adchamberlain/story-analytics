@@ -1,5 +1,12 @@
 import { useState, useRef, useEffect } from 'react'
+import { Link } from 'react-router-dom'
 import { useEditorStore } from '../../stores/editorStore'
+
+const PROVIDER_LABELS: Record<string, string> = {
+  anthropic: 'Anthropic (Claude)',
+  openai: 'OpenAI (GPT)',
+  google: 'Google (Gemini)',
+}
 
 export function AIChat() {
   const chatMessages = useEditorStore((s) => s.chatMessages)
@@ -41,14 +48,31 @@ export function AIChat() {
     el.style.height = `${Math.min(el.scrollHeight, 120)}px`
   }
 
+  const [aiStatus, setAiStatus] = useState<{ available: boolean; provider: string } | null>(null)
   const [aiAvailable, setAiAvailable] = useState<boolean | null>(null)
 
-  // Check if AI is available (API key configured)
+  // Check if AI is available and which provider
   useEffect(() => {
     fetch('/api/v2/charts/ai-status')
-      .then((res) => setAiAvailable(res.ok))
+      .then((res) => {
+        if (!res.ok) {
+          setAiAvailable(false)
+          return
+        }
+        return res.json()
+      })
+      .then((data) => {
+        if (data) {
+          setAiStatus(data)
+          setAiAvailable(true)
+        }
+      })
       .catch(() => setAiAvailable(false))
   }, [])
+
+  const providerLabel = aiStatus?.provider
+    ? PROVIDER_LABELS[aiStatus.provider] ?? aiStatus.provider
+    : null
 
   if (aiAvailable === false) {
     return (
@@ -61,10 +85,10 @@ export function AIChat() {
             <svg className="w-8 h-8 mx-auto text-text-icon mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
               <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 00-2.455 2.456z" />
             </svg>
-            <p className="text-sm font-medium text-text-secondary mb-1">AI features available</p>
+            <p className="text-sm font-medium text-text-secondary mb-1">No AI provider configured</p>
             <p className="text-xs text-text-muted">
               Add an API key in Settings to enable AI-assisted chart editing.
-              All direct controls work without AI.
+              Supports Anthropic, OpenAI, Google, or local models.
             </p>
           </div>
         </div>
@@ -78,7 +102,11 @@ export function AIChat() {
       <div className="px-4 py-3 border-b border-border-default shrink-0">
         <h3 className="text-sm font-semibold text-text-primary">AI Assistant</h3>
         <p className="text-xs mt-0.5 text-text-muted">
-          Describe changes in natural language
+          {providerLabel ? (
+            <>Using <Link to="/settings" className="underline hover:text-text-secondary transition-colors">{providerLabel}</Link></>
+          ) : (
+            'Describe changes in natural language'
+          )}
         </p>
       </div>
 

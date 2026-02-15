@@ -1,5 +1,11 @@
-import { useEffect, useState, useCallback } from 'react'
+import React, { useEffect, useState, useCallback, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import {
+  GridLayout,
+  useContainerWidth,
+  type LayoutItem,
+  type Layout,
+} from 'react-grid-layout'
 import { useDashboardBuilderStore } from '../stores/dashboardBuilderStore'
 import { ChartPicker } from '../components/dashboard/ChartPicker'
 import type { DashboardChartRef } from '../stores/dashboardBuilderStore'
@@ -12,6 +18,10 @@ const CHART_TYPE_LABELS: Record<string, string> = {
   Histogram: 'Histogram',
   BigValue: 'KPI',
   DataTable: 'Table',
+  HeatMap: 'Heatmap',
+  BoxPlot: 'Box Plot',
+  PieChart: 'Pie',
+  Treemap: 'Treemap',
 }
 
 /** Minimal chart metadata fetched for the builder cards. */
@@ -76,6 +86,62 @@ export function DashboardBuilderPage() {
     navigate('/editor/new/source')
   }, [store, navigate])
 
+  // Generate strict 2-column layout from store charts
+  const gridLayout = useMemo((): Layout => {
+    const items: LayoutItem[] = []
+    let x = 0
+    let y = 0
+
+    for (const chart of store.charts) {
+      if (chart.layout) {
+        const w = chart.layout.w >= 2 ? 2 : 1
+        items.push({
+          i: chart.chart_id,
+          x: w === 2 ? 0 : (chart.layout.x >= 1 ? 1 : 0),
+          y: chart.layout.y,
+          w,
+          h: chart.layout.h,
+          minW: 1,
+          maxW: 2,
+          minH: 2,
+        })
+        continue
+      }
+
+      // Auto-generate: full → w=2, half → w=1
+      const w = chart.width === 'full' ? 2 : 1
+      const h = 5
+
+      if (x + w > 2) {
+        x = 0
+        y += h
+      }
+
+      items.push({ i: chart.chart_id, x, y, w, h, minW: 1, maxW: 2, minH: 2 })
+      x += w
+      if (x >= 2) {
+        x = 0
+        y += h
+      }
+    }
+
+    return items
+  }, [store.charts, chartMeta])
+
+  const { width, containerRef, mounted } = useContainerWidth()
+
+  const handleLayoutChange = useCallback((layout: Layout) => {
+    // Clamp to strict 2-col: w must be 1 or 2, x must be 0 or 1
+    const clamped = [...layout].map(l => ({
+      i: l.i,
+      x: l.w >= 2 ? 0 : (l.x >= 1 ? 1 : 0),
+      y: l.y,
+      w: l.w >= 2 ? 2 : 1,
+      h: l.h,
+    }))
+    store.updateLayouts(clamped)
+  }, [store])
+
   if (store.loading) {
     return (
       <div className="min-h-screen bg-surface-secondary flex items-center justify-center">
@@ -93,24 +159,27 @@ export function DashboardBuilderPage() {
   return (
     <div className="min-h-screen bg-surface-secondary">
       {/* Header */}
-      <header className="bg-surface border-b border-border-default px-6 py-3 flex items-center justify-between">
+      <header className="bg-surface border-b border-border-default px-16 py-4 flex items-center justify-between">
         <button
           onClick={() => navigate(-1)}
-          className="text-sm text-text-secondary hover:text-text-on-surface transition-colors"
+          className="text-[15px] text-text-secondary hover:text-text-primary transition-colors inline-flex items-center gap-2"
         >
-          &larr; Back
+          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+          </svg>
+          Back
         </button>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           <button
             onClick={() => store.setPickerOpen(true)}
-            className="px-3 py-1.5 text-sm rounded border border-border-default text-text-on-surface hover:bg-surface-secondary transition-colors"
+            className="text-[14px] px-5 py-2.5 rounded-xl border border-border-default text-text-on-surface hover:bg-surface-secondary transition-colors font-medium"
           >
             + Add Chart
           </button>
           <button
             onClick={handleSave}
             disabled={store.saving || !store.title.trim()}
-            className="px-4 py-1.5 text-sm rounded bg-blue-600 text-white hover:bg-blue-700 transition-colors font-medium disabled:opacity-50"
+            className="text-[14px] px-6 py-2.5 rounded-xl bg-blue-600 text-white hover:bg-blue-700 transition-colors font-medium disabled:opacity-50"
           >
             {store.saving ? 'Saving...' : 'Save Dashboard'}
           </button>
@@ -119,59 +188,77 @@ export function DashboardBuilderPage() {
 
       {/* Error banner */}
       {store.error && (
-        <div className="bg-red-50 border-b border-red-200 px-6 py-2 text-xs text-red-700">
+        <div className="border-b text-[14px] px-16 py-3 bg-red-50 border-red-200 text-red-600">
           {store.error}
         </div>
       )}
 
-      <main className="max-w-5xl mx-auto px-6 py-8">
+      <main className="px-16 py-12">
         {/* Title & description */}
-        <div className="space-y-3 mb-8">
+        <div className="mb-10">
           <input
             type="text"
             value={store.title}
             onChange={(e) => store.setTitle(e.target.value)}
             placeholder="Dashboard title"
-            className="w-full text-2xl font-semibold bg-transparent border-none focus:outline-none placeholder:text-text-icon text-text-primary"
+            className="w-full text-[28px] font-bold bg-transparent border-none focus:outline-none placeholder:text-text-muted text-text-primary tracking-tight mb-2"
           />
           <input
             type="text"
             value={store.description}
             onChange={(e) => store.setDescription(e.target.value)}
             placeholder="Add a description..."
-            className="w-full text-sm bg-transparent border-none focus:outline-none placeholder:text-text-icon text-text-secondary"
+            className="w-full text-[16px] bg-transparent border-none focus:outline-none placeholder:text-text-muted text-text-secondary"
           />
         </div>
 
-        {/* Chart list */}
+        {/* Chart grid */}
         {store.charts.length === 0 ? (
-          <div className="text-center py-20 border-2 border-dashed border-border-default rounded-xl">
-            <p className="text-sm text-text-muted">
-              No charts yet. Click "Add Chart" to get started.
+          <div className="text-center border-2 border-dashed border-border-default rounded-2xl py-20 px-10">
+            <svg className="mx-auto h-12 w-12 text-text-icon mb-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" />
+            </svg>
+            <h2 className="text-[17px] font-semibold text-text-primary mb-2">
+              No charts yet
+            </h2>
+            <p className="text-[15px] text-text-secondary mb-6">
+              Click "Add Chart" to get started.
             </p>
             <button
               onClick={() => store.setPickerOpen(true)}
-              className="mt-3 text-sm text-blue-600 underline hover:text-blue-800"
+              className="text-[14px] px-6 py-2.5 rounded-xl bg-blue-600 text-white hover:bg-blue-700 transition-colors font-medium"
             >
-              Add your first chart
+              + Add Chart
             </button>
           </div>
         ) : (
-          <div className="space-y-3">
-            {store.charts.map((ref, idx) => (
-              <BuilderChartCard
-                key={ref.chart_id}
-                ref_={ref}
-                index={idx}
-                total={store.charts.length}
-                meta={chartMeta[ref.chart_id]}
-                onMove={(dir) => store.moveChart(ref.chart_id, dir)}
-                onWidthToggle={() =>
-                  store.setChartWidth(ref.chart_id, ref.width === 'full' ? 'half' : 'full')
-                }
-                onRemove={() => store.removeChart(ref.chart_id)}
-              />
-            ))}
+          <div ref={containerRef as React.RefObject<HTMLDivElement>}>
+            {mounted && (
+              <GridLayout
+                className="builder-grid"
+                width={width}
+                gridConfig={{
+                  cols: 2,
+                  rowHeight: 60,
+                  margin: [24, 24] as [number, number],
+                  containerPadding: [0, 0] as [number, number],
+                }}
+                layout={gridLayout}
+                dragConfig={{ enabled: true }}
+                resizeConfig={{ enabled: true, handles: ['se'] }}
+                onLayoutChange={handleLayoutChange}
+              >
+                {store.charts.map((ref) => (
+                  <div key={ref.chart_id}>
+                    <BuilderGridCard
+                      ref_={ref}
+                      meta={chartMeta[ref.chart_id]}
+                      onRemove={() => store.removeChart(ref.chart_id)}
+                    />
+                  </div>
+                ))}
+              </GridLayout>
+            )}
           </div>
         )}
       </main>
@@ -189,73 +276,60 @@ export function DashboardBuilderPage() {
   )
 }
 
-// ── Builder Chart Card ──────────────────────────────────────────────────────
+// ── Builder Grid Card ───────────────────────────────────────────────────────
 
-function BuilderChartCard({
+function BuilderGridCard({
   ref_,
-  index,
-  total,
   meta,
-  onMove,
-  onWidthToggle,
   onRemove,
 }: {
   ref_: DashboardChartRef
-  index: number
-  total: number
   meta?: ChartMeta
-  onMove: (dir: 'up' | 'down') => void
-  onWidthToggle: () => void
   onRemove: () => void
 }) {
   const typeLabel = meta
     ? CHART_TYPE_LABELS[meta.chart_type] ?? meta.chart_type
     : '...'
 
-  const btnClass = 'text-xs px-2 py-1 rounded border border-border-default text-text-secondary hover:bg-surface-secondary transition-colors disabled:opacity-30'
-
   return (
-    <div className="bg-surface-raised rounded-lg border border-border-default px-5 py-4 flex items-center gap-4">
-      {/* Order controls */}
-      <div className="flex flex-col gap-1">
-        <button onClick={() => onMove('up')} disabled={index === 0} className={btnClass}>
-          &uarr;
-        </button>
-        <button onClick={() => onMove('down')} disabled={index === total - 1} className={btnClass}>
-          &darr;
+    <div className="group bg-surface-raised rounded-2xl border border-border-default shadow-card h-full flex flex-col cursor-grab active:cursor-grabbing">
+      {/* Drag handle area */}
+      <div className="flex items-center justify-between px-5 pt-4 pb-2">
+        <div className="flex items-center gap-2 min-w-0 flex-1">
+          {/* Drag grip icon */}
+          <svg className="h-4 w-4 text-text-muted opacity-0 group-hover:opacity-100 transition-opacity shrink-0" fill="currentColor" viewBox="0 0 24 24">
+            <circle cx="9" cy="7" r="1.5" /><circle cx="15" cy="7" r="1.5" />
+            <circle cx="9" cy="12" r="1.5" /><circle cx="15" cy="12" r="1.5" />
+            <circle cx="9" cy="17" r="1.5" /><circle cx="15" cy="17" r="1.5" />
+          </svg>
+          <span className="text-[11px] font-medium uppercase tracking-wider text-text-muted">
+            {typeLabel}
+          </span>
+        </div>
+        <button
+          onClick={(e) => {
+            e.stopPropagation()
+            onRemove()
+          }}
+          className="text-[12px] text-red-400 hover:text-red-300 transition-colors opacity-0 group-hover:opacity-100 px-2 py-1 rounded-lg"
+        >
+          Remove
         </button>
       </div>
 
-      {/* Chart info */}
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium truncate text-text-primary">
-          {meta?.title ?? `Chart ${ref_.chart_id}`}
-        </p>
-        <p className="text-xs text-text-muted">
-          {typeLabel}
-          {meta?.subtitle ? ` — ${meta.subtitle}` : ''}
-        </p>
+      {/* Chart title */}
+      <div className="flex-1 flex items-start px-5 pb-4">
+        <div className="min-w-0">
+          <p className="text-[15px] font-semibold truncate text-text-primary">
+            {meta?.title ?? `Chart ${ref_.chart_id.slice(0, 8)}...`}
+          </p>
+          {meta?.subtitle && (
+            <p className="text-[13px] text-text-muted mt-0.5 truncate">
+              {meta.subtitle}
+            </p>
+          )}
+        </div>
       </div>
-
-      {/* Width toggle */}
-      <button
-        onClick={onWidthToggle}
-        className={`text-xs px-3 py-1.5 rounded border transition-colors ${
-          ref_.width === 'full'
-            ? 'border-blue-300 text-blue-600 bg-blue-50'
-            : 'border-border-default text-text-secondary hover:bg-surface-secondary'
-        }`}
-      >
-        {ref_.width === 'full' ? 'Full width' : 'Half width'}
-      </button>
-
-      {/* Remove */}
-      <button
-        onClick={onRemove}
-        className="text-xs px-2.5 py-1.5 rounded border border-red-200 text-red-500 hover:bg-red-50 transition-colors"
-      >
-        Remove
-      </button>
     </div>
   )
 }

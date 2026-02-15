@@ -4,6 +4,152 @@ This log captures development changes made during each session. Review this at t
 
 ---
 
+## Session: 2026-02-15 (Part 3)
+
+### Focus: Settings Page, KPI Editor, SQL Results, Website v2
+
+#### Settings Page — Full Implementation
+- **Backend**: Created `api/services/settings_storage.py` — `AppSettings` dataclass, `load_settings()` bootstraps from env vars, `save_settings()` persists to `data/settings.json` and pushes keys into `os.environ`
+- **Backend**: Created `api/routers/settings.py` — `GET/PUT /api/settings` (masked keys), `GET /api/settings/sources` (combined DuckDB + connections)
+- **Frontend**: Rewrote `SettingsPage.tsx` with four sections: AI Provider (3-button grid + API key input with show/hide), Data Sources (type badges, row/column counts, "Manage Sources" link), About, removed Account placeholder
+- Updated `ai_status()` in `charts_v2.py` to read from `load_settings()` instead of raw env vars
+
+#### KPI / BigValue Editor Config
+- Added BigValue to `ChartTypeSelector.tsx` (was missing from the grid despite full backend/renderer support)
+- Added 5 new fields to `EditorConfig`: `value`, `comparisonValue`, `comparisonLabel`, `valueFormat`, `positiveIsGood`
+- Wired through load/save (both POST and PUT paths) and all three `ChartConfig` mapping points (EditorPage, ChartViewPage, DashboardGrid)
+- Added `BigValueColumnMapping` component to Toolbox: Value column, Goal/comparison column, Comparison label, Format selector (Auto/Number/Currency/Percent), Positive is good toggle
+- When chart type is BigValue, X/Y/Series dropdowns replaced with KPI-specific fields
+
+#### SQL Tab Improvements
+- Replaced massive `availableTables` dump with `SqlTableHint` — shows current chart's table prominently, collapsed "show N other tables" for the rest
+- Added `SqlResultsTable` — scrollable data preview (10 rows max) appears after running a query, with column headers, null styling, truncation, and row count
+- Fixed SQL error display for dark mode (was using light-only red-50/red-700)
+
+#### Website v2 Rewrite
+- Completely rewrote all website files from retro terminal "Coming Soon" to modern product page
+- **index.html**: Hero ("Publication-ready dashboards from any data source"), 3 value prop cards, 9-feature grid, 3-step "How it works", tech stack section, CTA
+- **style.css**: Clean modern design with Inter font, dark theme matching the app's palette, responsive grid layouts
+- **privacy.html**: Updated for local-first/open-source reality (no servers, data stays local, third-party services at user direction)
+- **terms.html**: Updated for open-source license, local-first data ownership, third-party service integration
+- **script.js**: Simplified to smooth-scroll helper
+- Kept existing `icon.svg` (two-bar mark matches app's LogoMark)
+
+### Files Created
+- `api/services/settings_storage.py`
+- `api/routers/settings.py`
+
+### Files Modified
+- `api/main.py` — registered settings router
+- `api/routers/charts_v2.py` — ai_status uses load_settings()
+- `app/src/pages/SettingsPage.tsx` — full rewrite
+- `app/src/components/editor/ChartTypeSelector.tsx` — added BigValue/KPI
+- `app/src/components/editor/Toolbox.tsx` — SqlTableHint, SqlResultsTable, BigValueColumnMapping
+- `app/src/stores/editorStore.ts` — BigValue fields in EditorConfig, load, save
+- `app/src/pages/EditorPage.tsx` — pass BigValue fields to ChartConfig
+- `app/src/pages/ChartViewPage.tsx` — pass BigValue fields to ChartConfig
+- `app/src/components/dashboard/DashboardGrid.tsx` — pass BigValue fields to ChartConfig
+- `website/index.html` — complete v2 rewrite
+- `website/style.css` — modern design system
+- `website/script.js` — simplified
+- `website/privacy.html` — local-first privacy policy
+- `website/terms.html` — open-source terms
+
+### TypeScript: Zero errors (`npx tsc --noEmit`)
+
+---
+
+## Session: 2026-02-15
+
+### Focus: Fix Tailwind CSS Root Cause + Modern Dashboard with Drag-and-Drop
+
+#### Part 1: Tailwind CSS Fix
+- **Root cause**: `app/index.html` had unlayered `* { margin: 0; padding: 0 }` CSS. In Tailwind v4, all utilities live in `@layer utilities`. Per CSS cascade spec, unlayered styles always beat layered styles — so this reset overrode every `p-*`, `m-*`, `px-*`, `py-*` class.
+- **Fix**: Removed the entire `<style>` block from `index.html`. Moved body font styles to `app/src/styles/index.css`. Tailwind v4's preflight already provides `box-sizing: border-box` and resets.
+
+#### Part 2: react-grid-layout Integration
+- Installed `react-grid-layout` v2.2.2 (ships its own TypeScript types — removed conflicting `@types/react-grid-layout`)
+- Added CSS imports (`react-grid-layout/css/styles.css`, `react-resizable/css/styles.css`) to `main.tsx`
+- v2 uses hook-based API: `useContainerWidth` + `ResponsiveGridLayout` with `width` prop (no `WidthProvider` HOC)
+
+#### Part 3: Dashboard Store Updates
+- Extended `DashboardChartRef` with optional `layout?: { x, y, w, h }` field
+- Added `GridLayout` type and `updateLayouts` action to `dashboardBuilderStore.ts`
+- Load preserves layout data from API, save persists it (backend stores charts as `list[dict]` — backwards compatible)
+
+#### Part 4: Modern Dashboard Spacing
+- **DashboardViewPage**: `px-16` (64px sides), removed `max-w-6xl` for full-width, `text-[28px]` title, `text-[15px]` description, `text-[13px]` timestamp, all buttons `rounded-xl text-[14px]`, SVG back arrow, banners `rounded-xl`
+- **ChartWrapper**: `rounded-2xl`, `p-7` (28px), `text-[18px]` title, `text-[14px]` subtitle, `text-[12px]` export buttons with `rounded-lg`
+
+#### Part 5: DashboardGrid Rewrite
+- Replaced CSS grid with `ResponsiveGridLayout` (react-grid-layout v2)
+- Auto-generates layout from chart width/type: `full` → 12 cols, `half` → 6 cols, `BigValue/KPI` → 3 cols compact
+- Supports `editable` prop: view mode (static), builder mode (drag + resize)
+- `onLayoutChange` callback persists positions to store
+
+#### Part 6: DashboardBuilderPage Live Grid Preview
+- Replaced `BuilderChartCard` list with live draggable/resizable grid preview
+- Cards show chart type label, title, subtitle with drag grip icon
+- Remove button appears on hover
+- Grid handles layout persistence via `updateLayouts` store action
+
+### Files Modified
+- `app/index.html` — removed `<style>` block (Tailwind fix)
+- `app/src/styles/index.css` — added body font styles
+- `app/src/main.tsx` — added react-grid-layout CSS imports
+- `app/src/stores/dashboardBuilderStore.ts` — GridLayout type, layout field, updateLayouts
+- `app/src/components/charts/ChartWrapper.tsx` — modern spacing (rounded-2xl, p-7, larger fonts)
+- `app/src/components/dashboard/DashboardGrid.tsx` — rewritten with react-grid-layout v2
+- `app/src/pages/DashboardViewPage.tsx` — modern spacing (px-16, full-width, larger fonts)
+- `app/src/pages/DashboardBuilderPage.tsx` — live grid preview with drag-and-drop
+
+### Key Decision
+- react-grid-layout v2 uses fundamentally different API from v1 (`useContainerWidth` hook, `dragConfig`/`resizeConfig` objects, `Layout = readonly LayoutItem[]`). The `@types/react-grid-layout` package is for v1 only — v2 ships its own `.d.ts` files.
+
+### TypeScript: Zero errors (`npx tsc --noEmit`)
+
+---
+
+## Session: 2026-02-15 (Part 2)
+
+### Focus: UI Polish — Grid Alignment, Chart Icons, AI Provider Display, Brand Logo
+
+#### Grid Title Alignment Fix
+- Added `containerPadding: [0, 0]` to `gridConfig` in both `DashboardGrid.tsx` and `DashboardBuilderPage.tsx`
+- Without this, react-grid-layout defaults `containerPadding` to the `margin` value (`[24, 24]`), which pushed chart items 24px right of the title/subtitle
+- Now the left edge of the first chart column aligns with the `px-16` page padding
+
+#### Chart Type Selector — SVG Icons
+- Replaced ASCII art icons (`|||`, `~`, `/`, `::`, `|_|`, `#`, `H`, `O`, `[]`) with proper SVG icons in `ChartTypeSelector.tsx`
+- Each chart type has a distinct, recognizable icon: vertical bars (Bar), polyline (Line), filled area (Area), dots (Scatter), adjacent bars (Histogram), opacity grid (Heatmap), box-and-whisker (Box Plot), pie slices (Pie), nested rectangles (Treemap)
+
+#### AI Assistant — Provider Display
+- Extended `/api/v2/charts/ai-status` endpoint to return `{ available: true, provider: "anthropic" | "openai" | "google" }`
+- `AIChat.tsx` header now shows "AI Assistant" title with "Using Anthropic (Claude)" (or OpenAI/Gemini) as a clickable link to `/settings`
+- When no provider configured, shows "No AI provider configured" with list of supported providers
+
+#### Brand Logo — Two-Bar Mark
+- Created `LogoMark` component at `app/src/components/brand/Logo.tsx` — two vertical rounded rectangles using `currentColor`
+- Updated favicon (`app/public/vite.svg`) from indigo "S" to the two-bar mark in `#7B93FF`
+- Added logo to **TopNav** (inline with "Story Analytics" text), **LoginPage** (centered above title), and **OnboardingWizard** (centered above welcome text)
+- Uses `text-blue-500` for the logo color — works in both light and dark mode since blue has good contrast on both white and dark backgrounds
+
+### Files Modified
+- `app/src/components/dashboard/DashboardGrid.tsx` — added containerPadding: [0, 0]
+- `app/src/pages/DashboardBuilderPage.tsx` — added containerPadding: [0, 0]
+- `app/src/components/editor/ChartTypeSelector.tsx` — replaced ASCII icons with SVGs
+- `app/src/components/editor/AIChat.tsx` — provider display + clickable settings link
+- `api/routers/charts_v2.py` — ai-status returns provider name
+- `app/src/components/brand/Logo.tsx` — NEW: LogoMark component
+- `app/public/vite.svg` — replaced with two-bar logo
+- `app/src/components/layout/TopNav.tsx` — added LogoMark
+- `app/src/pages/LoginPage.tsx` — added LogoMark
+- `app/src/components/onboarding/OnboardingWizard.tsx` — added LogoMark
+
+### TypeScript: Zero errors (`npx tsc --noEmit`)
+
+---
+
 ## Session: 2026-02-14 (Part 7)
 
 ### Focus: Open-Source Release Roadmap — Full Implementation (Phases 1-6)

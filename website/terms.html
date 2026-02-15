@@ -4,91 +4,132 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Terms of Service - Story Analytics</title>
-    <meta name="description" content="Terms of service for Story Analytics.">
+    <meta name="description" content="Terms of service for Story Analytics, an open-source dashboarding tool.">
 
     <!-- Favicon -->
     <link rel="icon" href="favicon.ico" sizes="32x32">
     <link rel="icon" href="icon.svg" type="image/svg+xml">
     <link rel="apple-touch-icon" href="apple-touch-icon.png">
 
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div class="terminal">
-        <header>
-            <nav>
-                <a href="index.html">Home</a>
-                <a href="privacy.html">Privacy</a>
-            </nav>
+    <div class="page">
+        <header class="nav">
+            <div class="nav-inner">
+                <a href="/" class="nav-brand">
+                    <svg class="nav-logo" viewBox="0 0 1080 1080" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <rect x="230" y="135" width="280" height="810" rx="40" fill="currentColor"/>
+                        <rect x="570" y="135" width="280" height="810" rx="40" fill="currentColor"/>
+                    </svg>
+                    Story Analytics
+                </a>
+                <nav class="nav-links">
+                    <a href="index.html">Home</a>
+                    <a href="privacy.html">Privacy</a>
+                </nav>
+            </div>
         </header>
 
         <main class="legal-page">
             <h1>Terms of Service</h1>
-            <p class="last-updated">Last updated: January 2025</p>
+            <p class="last-updated">Last updated: February 2026</p>
 
             <section>
-                <h2>> Acceptance of Terms</h2>
+                <h2>Open Source License</h2>
                 <p>
-                    By using Story Analytics, you agree to these terms. If you
-                    do not agree, please do not use the service.
+                    Story Analytics is open-source software. Your use of the software is
+                    governed by the license included in the repository. These terms apply
+                    to the storyanalytics.dev website and any hosted services.
                 </p>
             </section>
 
             <section>
-                <h2>> Description of Service</h2>
+                <h2>Description of Software</h2>
                 <p>
-                    Story Analytics is a platform that helps you transform data into
-                    visual narratives. The service includes data visualization tools,
-                    LLM-powered insight generation, and sharing capabilities.
+                    Story Analytics is a local-first dashboarding tool that helps you build
+                    publication-ready charts and dashboards from your data. The software
+                    includes a visual chart editor, SQL workbench, AI assistant integration,
+                    database connectors, and export capabilities.
                 </p>
             </section>
 
             <section>
-                <h2>> User Responsibilities</h2>
+                <h2>Your Data</h2>
                 <p>
-                    You are responsible for the data you upload and the content you
-                    create. You agree not to use the service for any unlawful purpose
-                    or to violate any applicable laws or regulations.
+                    You own your data. Story Analytics processes your data locally to generate
+                    charts and dashboards. Your data is never sent to us. When you connect to
+                    databases or AI providers, data flows directly between your machine and
+                    those services.
                 </p>
             </section>
 
             <section>
-                <h2>> Limitation of Liability</h2>
+                <h2>Third-Party Services</h2>
                 <p>
-                    Story Analytics is provided "as is" without warranties of any kind.
-                    The developer is not liable for any damages arising from the use
-                    or inability to use the service.
+                    Story Analytics integrates with third-party services at your direction,
+                    including database providers (Snowflake, PostgreSQL, BigQuery) and AI
+                    providers (Anthropic, OpenAI, Google). Your use of these services is
+                    governed by their respective terms.
                 </p>
             </section>
 
             <section>
-                <h2>> Intellectual Property</h2>
+                <h2>Disclaimer</h2>
                 <p>
-                    The Story Analytics platform, including its design, code, and visual
-                    elements, is the property of Andrew Chamberlain. Content you create
-                    using the service remains your property.
+                    Story Analytics is provided "as is" without warranties of any kind,
+                    express or implied. The developer is not liable for any damages arising
+                    from the use or inability to use the software.
                 </p>
             </section>
 
             <section>
-                <h2>> Changes to Terms</h2>
+                <h2>Intellectual Property</h2>
                 <p>
-                    These terms may be updated from time to time. Continued use of the
-                    service after changes constitutes acceptance of the new terms.
+                    The Story Analytics name, logo, and website design are the property of
+                    Andrew Chamberlain. The software source code is available under its
+                    open-source license. Charts, dashboards, and other content you create
+                    using the software are entirely yours.
                 </p>
             </section>
 
             <section>
-                <h2>> Contact</h2>
+                <h2>Changes</h2>
                 <p>
-                    For questions about these terms, please visit
+                    These terms may be updated from time to time. Changes will be reflected
+                    on this page with an updated date.
+                </p>
+            </section>
+
+            <section>
+                <h2>Contact</h2>
+                <p>
+                    For questions about these terms, visit
                     <a href="https://andrewchamberlain.com">andrewchamberlain.com</a>.
                 </p>
             </section>
         </main>
 
-        <footer>
-            <p><a href="index.html">Back to Story Analytics</a></p>
+        <footer class="footer">
+            <div class="footer-inner">
+                <div class="footer-brand">
+                    <svg class="footer-logo" viewBox="0 0 1080 1080" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <rect x="230" y="135" width="280" height="810" rx="40" fill="currentColor"/>
+                        <rect x="570" y="135" width="280" height="810" rx="40" fill="currentColor"/>
+                    </svg>
+                    Story Analytics
+                </div>
+                <div class="footer-links">
+                    <a href="index.html">Home</a>
+                    <a href="privacy.html">Privacy</a>
+                </div>
+                <p class="footer-credit">Built by <a href="https://andrewchamberlain.com">Andrew Chamberlain</a></p>
+            </div>
         </footer>
     </div>
 </body>
