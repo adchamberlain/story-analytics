@@ -181,14 +181,23 @@ export function LibraryPage() {
     <div style={{ padding: '48px 64px' }}>
       <div className="flex items-center justify-between" style={{ marginBottom: '40px' }}>
         <h1 className="text-[28px] font-bold text-text-primary tracking-tight">Chart Library</h1>
-        {charts.length > 0 && (
-          <button
-            onClick={() => { if (selectMode) { setSelectMode(false); setSelectedIds(new Set()); setBulkConfirm(false) } else setSelectMode(true) }}
-            className="text-[14px] font-medium text-text-secondary hover:text-text-primary transition-colors"
+        <div className="flex items-center gap-4">
+          <Link
+            to="/editor/new/source"
+            className="text-[14px] font-medium rounded-lg border border-border-default text-text-secondary hover:text-text-primary hover:border-border-hover transition-colors inline-flex items-center gap-1.5"
+            style={{ padding: '7px 16px' }}
           >
-            {selectMode ? 'Cancel selection' : 'Select'}
-          </button>
-        )}
+            + New Chart
+          </Link>
+          {charts.length > 0 && (
+            <button
+              onClick={() => { if (selectMode) { setSelectMode(false); setSelectedIds(new Set()); setBulkConfirm(false) } else setSelectMode(true) }}
+              className="text-[14px] font-medium text-text-secondary hover:text-text-primary transition-colors"
+            >
+              {selectMode ? 'Cancel selection' : 'Select'}
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Bulk action bar */}
@@ -300,12 +309,12 @@ export function LibraryPage() {
           </h2>
           {!store.search && !store.typeFilter && (
             <>
-              <p className="text-[15px] text-text-secondary mb-6">Create a dashboard to start building charts.</p>
+              <p className="text-[15px] text-text-secondary mb-6">Upload a data source and create your first chart.</p>
               <Link
-                to="/dashboard/new"
+                to="/editor/new/source"
                 className="inline-flex items-center px-6 py-3 text-[15px] rounded-xl bg-blue-600 text-white hover:bg-blue-700 transition-colors font-medium"
               >
-                + New Dashboard
+                + New Chart
               </Link>
             </>
           )}

@@ -4,7 +4,8 @@ import type { PaletteKey } from '../themes/datawrapper'
 
 // ── Editor Config ──────────────────────────────────────────────────────────
 
-export type AggregationType = 'none' | 'sum' | 'avg' | 'count' | 'min' | 'max'
+export type AggregationType = 'none' | 'sum' | 'avg' | 'median' | 'count' | 'min' | 'max'
+export type TimeGrain = 'none' | 'day' | 'week' | 'month' | 'quarter' | 'year'
 export type DataMode = 'table' | 'sql'
 
 export interface EditorConfig {
@@ -25,6 +26,7 @@ export interface EditorConfig {
   xAxisTitle: string
   yAxisTitle: string
   aggregation: AggregationType
+  timeGrain: TimeGrain
   dataMode: DataMode
   annotations: Annotations
   // BigValue / KPI fields
@@ -53,6 +55,7 @@ const DEFAULT_CONFIG: EditorConfig = {
   xAxisTitle: '',
   yAxisTitle: '',
   aggregation: 'none',
+  timeGrain: 'none',
   dataMode: 'table',
   annotations: { lines: [], texts: [], ranges: [] },
   value: null,
@@ -139,7 +142,7 @@ interface EditorState {
 const MAX_HISTORY = 50
 
 /** Keys that trigger auto build-query in new chart mode */
-const DATA_KEYS: (keyof EditorConfig)[] = ['x', 'y', 'series', 'aggregation', 'chartType']
+const DATA_KEYS: (keyof EditorConfig)[] = ['x', 'y', 'series', 'aggregation', 'timeGrain', 'chartType']
 
 export const useEditorStore = create<EditorState>((set, get) => ({
   // Initial state
@@ -203,6 +206,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         xAxisTitle: chart.config?.xAxisTitle ?? '',
         yAxisTitle: chart.config?.yAxisTitle ?? '',
         aggregation: chart.config?.aggregation ?? 'none',
+        timeGrain: chart.config?.timeGrain ?? 'none',
         dataMode: (chart.config?.dataMode as DataMode) ?? 'table',
         annotations: chart.config?.annotations ?? { lines: [], texts: [], ranges: [] },
         value: chart.config?.value ?? null,
@@ -312,6 +316,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           y: config.y,
           series: config.series,
           aggregation: config.aggregation,
+          time_grain: config.timeGrain,
         }),
       })
 
@@ -366,6 +371,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
             xAxisTitle: config.xAxisTitle,
             yAxisTitle: config.yAxisTitle,
             aggregation: config.aggregation,
+            timeGrain: config.timeGrain,
             dataMode: config.dataMode,
             annotations: config.annotations,
             value: config.value,
@@ -400,6 +406,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
     // Push current config to history (for undo)
     const newHistory = [...configHistory, { ...config }].slice(-MAX_HISTORY)
+
+    // Reset timeGrain when aggregation is turned off
+    if (partial.aggregation === 'none' && config.timeGrain !== 'none') {
+      partial = { ...partial, timeGrain: 'none' }
+    }
 
     set({
       config: { ...config, ...partial },
@@ -561,6 +572,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
             xAxisTitle: config.xAxisTitle,
             yAxisTitle: config.yAxisTitle,
             aggregation: config.aggregation,
+            timeGrain: config.timeGrain,
             dataMode: config.dataMode,
             annotations: config.annotations,
             value: config.value,
