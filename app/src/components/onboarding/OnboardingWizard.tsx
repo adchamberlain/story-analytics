@@ -1,4 +1,5 @@
 import { useNavigate } from 'react-router-dom'
+import { LogoMark } from '../brand/Logo'
 
 interface OnboardingWizardProps {
   onDismiss: () => void
@@ -25,6 +26,7 @@ export function OnboardingWizard({ onDismiss }: OnboardingWizardProps) {
   return (
     <div className="max-w-2xl mx-auto py-16 px-4">
       <div className="text-center mb-10">
+        <LogoMark className="h-10 w-10 text-blue-500 mx-auto mb-4" />
         <h1 className="text-3xl font-bold text-text-primary mb-3">
           Welcome to Story Analytics
         </h1>

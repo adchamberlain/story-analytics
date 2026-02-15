@@ -13,6 +13,7 @@
   --color-surface-secondary: #f9fafb;
   --color-surface-raised: #ffffff;
   --color-surface-inset: #f3f4f6;
+  --color-surface-input: #f9fafb;
 
   /* Semantic border tokens */
   --color-border-default: #e5e7eb;
@@ -35,8 +36,8 @@
   --color-axis: #333333;
 
   /* Shadows for card depth */
-  --shadow-card: 0 1px 3px 0 rgb(0 0 0 / 0.06), 0 1px 2px -1px rgb(0 0 0 / 0.06);
-  --shadow-card-hover: 0 4px 6px -1px rgb(0 0 0 / 0.07), 0 2px 4px -2px rgb(0 0 0 / 0.07);
+  --shadow-card: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+  --shadow-card-hover: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
 }
 
 /* Dark mode overrides */
@@ -45,6 +46,7 @@
   --color-surface-secondary: #020617;
   --color-surface-raised: #1e293b;
   --color-surface-inset: #1e293b;
+  --color-surface-input: #1a2438;
 
   --color-border-default: #334155;
   --color-border-subtle: #1e293b;

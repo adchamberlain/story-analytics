@@ -36,6 +36,7 @@ def save_dashboard(
     title: str,
     description: str | None = None,
     charts: list[dict] | None = None,
+    filters: list[dict] | None = None,
 ) -> SavedDashboard:
     """Save a new dashboard to disk."""
     DASHBOARDS_DIR.mkdir(parents=True, exist_ok=True)
@@ -50,6 +51,7 @@ def save_dashboard(
         charts=charts or [],
         created_at=now,
         updated_at=now,
+        filters=filters,
     )
 
     path = DASHBOARDS_DIR / f"{dashboard_id}.json"

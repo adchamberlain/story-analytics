@@ -80,6 +80,11 @@ export function EditorPage() {
     xAxisTitle: store.config.xAxisTitle || undefined,
     yAxisTitle: store.config.yAxisTitle || undefined,
     annotations: store.config.annotations,
+    value: store.config.value ?? undefined,
+    comparisonValue: store.config.comparisonValue ?? undefined,
+    comparisonLabel: store.config.comparisonLabel || undefined,
+    valueFormat: store.config.valueFormat || undefined,
+    positiveIsGood: store.config.positiveIsGood,
   }
 
   // Apply palette colors

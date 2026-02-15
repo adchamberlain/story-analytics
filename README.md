@@ -1,110 +1,117 @@
 # Story Analytics
 
-AI-native analytics. Create dashboards by describing what you need.
+Publication-ready dashboards from any data source.
 
 **Website:** [storyanalytics.dev](https://storyanalytics.dev)
 
-## What is Story?
+## What is Story Analytics?
 
-Story is an AI-powered dashboard builder. Describe what you want to see, and Story's AI agents write the SQL, design the visualizations, and catch errors automatically.
+Story Analytics is an open-source dashboarding tool that produces Datawrapper-quality charts from any SQL database or CSV file. You build charts with a visual editor and built-in SQL workbench, arrange them on drag-and-drop dashboards, and export to SVG, PNG, or PDF.
 
-Built with React + Plotly.js for professional chart rendering. Choose Claude, OpenAI, or Gemini as your AI.
+An AI assistant (Claude, GPT, or Gemini) is available to help write SQL, add calculated fields, and refine chart styling — but you're always in control.
 
 ## Features
 
-- **Natural language to dashboard** - Describe what you want, Story builds it
-- **Button-driven workflow** - Explicit actions (Generate, Modify, Done) instead of magic words
-- **Choose your AI** - Claude, OpenAI, or Gemini
-- **Automatic SQL generation** - No need to write queries manually
-- **QA validation** - Screenshots and validates dashboards automatically
-- **Auto-fix** - Detects and fixes broken dashboards
-- **Professional charts** - React + Plotly.js with Tableau-quality visuals
+- **11 chart types** — Bar, line, area, scatter, histogram, heatmap, box plot, pie, treemap, KPI, and data table
+- **Observable Plot rendering** — Clean SVG output with publication-ready defaults
+- **Visual chart editor** — Pick chart types, map columns, adjust colors and labels with instant live preview
+- **SQL workbench** — Write custom queries, see results in a data table, map columns to chart axes
+- **Drag-and-drop dashboards** — Responsive grid layout, drag to reposition, resize to adjust
+- **Any data source** — Snowflake, PostgreSQL, BigQuery, or CSV upload
+- **AI assistant** — Claude, GPT, or Gemini helps with SQL, derived metrics, and chart refinement
+- **Export** — SVG, PNG, and PDF for individual charts and full dashboards
+- **Annotations** — Reference lines, text labels, and highlighted ranges
+- **KPI cards** — Single-number displays with comparison values, trend indicators, and color-coded deltas
+- **Color palettes** — Curated publication-ready palettes with Datawrapper-quality defaults
+- **Dark mode** — Full light/dark theme support
+- **Local-first** — All data stays on your machine, stored as JSON files
 
 ## Quick Start
 
 ```bash
+# Clone the repo
+git clone https://github.com/andrewchamberlain/story-analytics.git
+cd story-analytics
+
 # Install dependencies
 pip install -r requirements.txt
 cd app && npm install && cd ..
 
-# Set environment variables
-export ANTHROPIC_API_KEY='your-key-here'
-export SECRET_KEY='your-secret-key'
+# Configure your AI provider (at least one key required)
+cp .env.example .env
+# Edit .env and add your API key
 
-# Start dev server (API + React)
+# Start dev server (API on :8000 + React on :3001)
 ./dev.sh
 ```
 
-Open http://localhost:3001 to access the web interface.
+Open **http://localhost:3001** to start building.
 
-## Usage
+## How It Works
 
-1. Click **Create New Chart** or start a chat
-2. Describe what you want to see
-3. Click **Generate** when ready, or **Modify Plan** to refine
-4. After generation, click **Done** or **Modify** to iterate
+1. **Connect your data** — Upload a CSV or connect to Snowflake, PostgreSQL, or BigQuery. Data is ingested into a local DuckDB engine for fast queries.
 
-Example prompts:
-- "Show me MRR trends and churn rates"
-- "Monthly revenue by customer segment"
-- "Top 10 customers by revenue"
+2. **Build your charts** — Use the visual editor to pick a chart type, map columns, and style your output. Switch to SQL mode for custom queries. The AI assistant can help write SQL and refine formatting.
 
-Story will understand your data and generate the chart.
+3. **Assemble dashboards** — Drag charts onto a responsive grid, arrange the layout, and save. Share via link or export as PDF.
 
-## LLM Providers
+## AI Providers
 
-Story supports multiple AI providers. Set your preferred provider in Settings:
+Story Analytics supports multiple LLM providers. Configure your preferred provider in **Settings** or via environment variables:
 
-| Provider | Environment Variable | Models |
-|----------|---------------------|--------|
-| Claude | `ANTHROPIC_API_KEY` | claude-sonnet-4-20250514 |
-| OpenAI | `OPENAI_API_KEY` | gpt-4o |
-| Gemini | `GOOGLE_API_KEY` | gemini-2.0-flash |
+| Provider | Environment Variable | Example Models |
+|----------|---------------------|----------------|
+| Anthropic | `ANTHROPIC_API_KEY` | Claude Sonnet, Claude Opus |
+| OpenAI | `OPENAI_API_KEY` | GPT-4o |
+| Google | `GOOGLE_API_KEY` | Gemini 2.0 Flash |
+
+The AI assistant helps with:
+- Writing SQL queries and window functions
+- Adding calculated fields and derived metrics
+- Adjusting chart configuration (axis labels, colors, formatting)
+- Suggesting chart improvements
 
 ## Architecture
 
 ```
 story-analytics/
-├── api/                 # FastAPI backend
-│   ├── routers/         # API endpoints
-│   ├── models/          # SQLAlchemy models
-│   └── schemas/         # Pydantic schemas
-├── app/                 # React frontend
+├── app/                    # React + TypeScript frontend
 │   └── src/
-│       ├── components/  # Chart and UI components
-│       ├── pages/       # Page components
-│       └── stores/      # Zustand state management
-├── engine/              # LLM conversation engine
-│   ├── prompts/         # YAML prompt templates
-│   ├── qa/              # QA validation rules
-│   └── llm/             # LLM provider integrations
-├── data/                # Parquet data files
-└── sources/             # Database connections
+│       ├── components/     # Charts, editor, dashboard, data
+│       ├── pages/          # All app pages
+│       ├── stores/         # Zustand state management
+│       └── types/          # TypeScript interfaces
+├── api/                    # FastAPI backend
+│   ├── routers/            # REST endpoints
+│   └── services/           # Storage, DuckDB, connectors
+├── engine/                 # LLM integration layer
+│   ├── v2/                 # Chart proposer and editor
+│   └── prompts/            # YAML prompt templates
+├── data/                   # Local data storage (gitignored)
+│   ├── uploads/            # Uploaded CSV files
+│   ├── charts/             # Saved chart configs (JSON)
+│   ├── dashboards/         # Saved dashboard layouts (JSON)
+│   └── settings.json       # App settings (API keys, provider)
+└── website/                # Marketing site (storyanalytics.dev)
 ```
 
-## Configuration
+### Tech Stack
 
-| File | Purpose |
-|------|---------|
-| `engine_config.yaml` | LLM provider and database connection settings |
-| `brand_config.yaml` | Customize colors, fonts, and logo |
-| `sources/*/dialect.yaml` | SQL dialect rules per data source |
-| `engine/qa/rules.yaml` | QA validation behavior |
-
-## Environment Variables
-
-| Variable | Required | Purpose |
-|----------|----------|---------|
-| `ANTHROPIC_API_KEY` | Yes* | Claude API for conversation engine |
-| `SECRET_KEY` | For web app | JWT token signing |
-| `OPENAI_API_KEY` | Optional | OpenAI provider support |
-| `GOOGLE_API_KEY` | Optional | Gemini provider support |
-
-*At least one LLM provider API key required
+| Layer | Technology |
+|-------|-----------|
+| Charting | Observable Plot (D3-based) |
+| Frontend | React 18, TypeScript, Tailwind CSS v4, Zustand |
+| Backend | FastAPI, Python |
+| SQL Engine | DuckDB (in-process) |
+| Dashboards | react-grid-layout v2 |
+| Connectors | Snowflake, PostgreSQL, BigQuery |
 
 ## Requirements
 
 - Node.js 18+
 - Python 3.10+
 - At least one LLM API key (Anthropic, OpenAI, or Google)
-- Data source (Snowflake, BigQuery, PostgreSQL, etc.)
+
+## License
+
+Built by [Andrew Chamberlain](https://andrewchamberlain.com).

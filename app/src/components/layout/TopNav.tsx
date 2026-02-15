@@ -1,5 +1,6 @@
 import { NavLink, Link } from 'react-router-dom'
 import { useThemeStore } from '../../stores/themeStore'
+import { LogoMark } from '../brand/Logo'
 
 export function TopNav() {
   const { choice, setTheme } = useThemeStore()
@@ -10,19 +11,20 @@ export function TopNav() {
   }
 
   const linkClass = ({ isActive }: { isActive: boolean }) =>
-    `text-sm font-medium transition-colors ${
+    `text-[15px] font-medium transition-colors ${
       isActive ? 'text-text-primary' : 'text-text-secondary hover:text-text-on-surface'
     }`
 
   return (
-    <nav className="bg-surface border-b border-border-default shadow-sm h-16 px-6 flex items-center justify-between shrink-0">
+    <nav className="bg-surface border-b border-border-default shadow-sm flex items-center justify-between shrink-0" style={{ height: '72px', padding: '0 64px' }}>
       {/* Left: Logo + nav links */}
       <div className="flex items-center gap-10">
-        <Link to="/dashboards" className="text-base font-bold text-text-primary tracking-tight">
+        <Link to="/dashboards" className="flex items-center gap-2.5 text-lg font-bold text-text-primary tracking-tight">
+          <LogoMark className="h-6 w-6 text-blue-500" />
           Story Analytics
         </Link>
 
-        <div className="flex items-center gap-7">
+        <div className="flex items-center gap-8">
           <NavLink to="/dashboards" end className={linkClass}>
             Dashboards
           </NavLink>
@@ -36,7 +38,8 @@ export function TopNav() {
       <div className="flex items-center gap-3">
         <Link
           to="/dashboard/new"
-          className="px-4 py-2 text-sm rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors font-medium"
+          className="shrink-0 whitespace-nowrap text-sm rounded-xl bg-blue-600 text-white hover:bg-blue-700 transition-colors font-medium"
+          style={{ padding: '10px 20px' }}
         >
           + New Dashboard
         </Link>

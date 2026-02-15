@@ -2,9 +2,17 @@ import { create } from 'zustand'
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
+export interface GridLayout {
+  x: number
+  y: number
+  w: number
+  h: number
+}
+
 export interface DashboardChartRef {
   chart_id: string
   width: 'full' | 'half'
+  layout?: GridLayout
 }
 
 interface DashboardBuilderState {
@@ -30,6 +38,7 @@ interface DashboardBuilderState {
   moveChart: (chartId: string, direction: 'up' | 'down') => void
   setChartWidth: (chartId: string, width: 'full' | 'half') => void
   setPickerOpen: (open: boolean) => void
+  updateLayouts: (layouts: Array<{ i: string; x: number; y: number; w: number; h: number }>) => void
   save: () => Promise<string | null>
   load: (dashboardId: string) => Promise<void>
   reset: () => void
@@ -81,6 +90,16 @@ export const useDashboardBuilderStore = create<DashboardBuilderState>((set, get)
   },
 
   setPickerOpen: (open) => set({ pickerOpen: open }),
+
+  updateLayouts: (layouts) => {
+    set((state) => ({
+      charts: state.charts.map((c) => {
+        const l = layouts.find((lay) => lay.i === c.chart_id)
+        if (!l) return c
+        return { ...c, layout: { x: l.x, y: l.y, w: l.w, h: l.h } }
+      }),
+    }))
+  },
 
   save: async () => {
     const { dashboardId, title, description, charts } = get()
@@ -134,9 +153,10 @@ export const useDashboardBuilderStore = create<DashboardBuilderState>((set, get)
         dashboardId: dashboard.id,
         title: dashboard.title,
         description: dashboard.description ?? '',
-        charts: dashboard.charts.map((c: { chart_id: string; width?: string }) => ({
+        charts: dashboard.charts.map((c: { chart_id: string; width?: string; layout?: GridLayout }) => ({
           chart_id: c.chart_id,
           width: (c.width === 'full' ? 'full' : 'half') as 'full' | 'half',
+          ...(c.layout ? { layout: c.layout } : {}),
         })),
       })
     } catch (e) {

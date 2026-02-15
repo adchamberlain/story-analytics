@@ -32,11 +32,15 @@ export function FileDropzone({ onFileSelected, uploading }: FileDropzoneProps) {
   return (
     <div
       className={`
-        border-2 border-dashed rounded-xl p-12 text-center cursor-pointer
+        border-2 border-dashed rounded-2xl text-center cursor-pointer
         transition-colors duration-150
-        ${dragOver ? 'border-blue-400 bg-blue-50' : 'border-border-strong bg-surface hover:border-text-icon'}
+        ${dragOver ? 'border-blue-400' : 'border-border-strong bg-surface hover:border-text-icon'}
         ${uploading ? 'opacity-50 pointer-events-none' : ''}
       `}
+      style={{
+        padding: '40px 32px',
+        backgroundColor: dragOver ? 'rgba(59,130,246,0.06)' : undefined,
+      }}
       onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
       onDragLeave={() => setDragOver(false)}
       onDrop={handleDrop}
@@ -50,7 +54,7 @@ export function FileDropzone({ onFileSelected, uploading }: FileDropzoneProps) {
         onChange={handleChange}
       />
 
-      <div className="text-4xl mb-4 text-text-icon">
+      <div style={{ marginBottom: '16px' }}>
         {uploading ? (
           <svg className="animate-spin h-10 w-10 mx-auto text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
@@ -63,10 +67,10 @@ export function FileDropzone({ onFileSelected, uploading }: FileDropzoneProps) {
         )}
       </div>
 
-      <p className="text-sm font-medium text-text-primary">
+      <p className="text-[15px] font-medium text-text-primary">
         {uploading ? 'Uploading...' : 'Drop a CSV file here, or click to browse'}
       </p>
-      <p className="text-xs mt-1 text-text-muted">
+      <p className="text-[13px] text-text-muted" style={{ marginTop: '6px' }}>
         CSV files only
       </p>
     </div>

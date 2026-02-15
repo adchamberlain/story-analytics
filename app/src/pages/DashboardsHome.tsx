@@ -51,7 +51,7 @@ export function DashboardsHome() {
 
   if (error) {
     return (
-      <div className="max-w-6xl mx-auto px-6 py-10">
+      <div style={{ padding: '48px 64px' }}>
         <div className="bg-red-50 border border-red-200 rounded-lg px-6 py-4 text-center">
           <p className="text-sm text-red-700">{error}</p>
         </div>
@@ -60,9 +60,9 @@ export function DashboardsHome() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto px-6 py-10">
-      <div className="flex items-center justify-between mb-8">
-        <h1 className="text-2xl font-bold text-text-primary">Dashboards</h1>
+    <div style={{ padding: '48px 64px' }}>
+      <div className="flex items-center justify-between" style={{ marginBottom: '40px' }}>
+        <h1 className="text-[28px] font-bold text-text-primary tracking-tight">Dashboards</h1>
       </div>
 
       {dashboards.length === 0 && !localStorage.getItem('onboarding_complete') ? (
@@ -86,7 +86,7 @@ export function DashboardsHome() {
           </Link>
         </div>
       ) : (
-        <div className="grid gap-5 grid-cols-[repeat(auto-fill,minmax(300px,1fr))]">
+        <div className="grid gap-7" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))' }}>
           {dashboards.map((d) => (
             <DashboardCard key={d.id} dashboard={d} />
           ))}
@@ -107,10 +107,11 @@ function DashboardCard({ dashboard }: { dashboard: DashboardSummary }) {
   return (
     <Link
       to={`/dashboard/${dashboard.id}`}
-      className="bg-surface-raised rounded-xl border border-border-default shadow-card hover:shadow-card-hover p-6 flex flex-col transition-shadow"
+      className="bg-surface-raised rounded-2xl border border-border-default shadow-card hover:shadow-card-hover flex flex-col transition-all hover:-translate-y-0.5"
+      style={{ padding: '28px 32px' }}
     >
-      <div className="flex items-start justify-between gap-2">
-        <h3 className="text-base font-semibold text-text-primary mb-1 line-clamp-2">
+      <div className="flex items-start justify-between gap-3">
+        <h3 className="text-[17px] font-semibold text-text-primary mb-2 line-clamp-2 leading-snug">
           {dashboard.title || 'Untitled'}
         </h3>
         {isPinned && (
@@ -120,16 +121,16 @@ function DashboardCard({ dashboard }: { dashboard: DashboardSummary }) {
         )}
       </div>
       {dashboard.description && (
-        <p className="text-sm text-text-secondary mb-3 line-clamp-2">
+        <p className="text-[15px] text-text-secondary mb-4 line-clamp-2 leading-relaxed">
           {dashboard.description}
         </p>
       )}
       <div className="flex-1" />
-      <div className="flex items-center justify-between mt-4 pt-3 border-t border-border-subtle">
-        <span className="text-xs text-text-muted">
+      <div className="flex items-center justify-between" style={{ marginTop: '24px', paddingTop: '20px', borderTop: '1px solid var(--color-border-subtle)' }}>
+        <span className="text-[13px] text-text-muted">
           {dashboard.chart_count} chart{dashboard.chart_count !== 1 ? 's' : ''}
         </span>
-        <span className="text-xs text-text-muted">{date}</span>
+        <span className="text-[13px] text-text-muted">{date}</span>
       </div>
     </Link>
   )

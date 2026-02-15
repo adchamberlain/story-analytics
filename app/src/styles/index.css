@@ -5,6 +5,9 @@ html, body {
 }
 
 body {
+  font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   background-color: var(--color-surface-secondary);
   color: var(--color-text-primary);
 }

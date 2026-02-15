@@ -35,6 +35,7 @@ router = APIRouter(prefix="/v2/dashboards", tags=["dashboards-v2"])
 class ChartRefSchema(BaseModel):
     chart_id: str
     width: str = "half"  # "full" or "half"
+    layout: dict | None = None  # {x, y, w, h} grid position
 
 
 class FilterSpecSchema(BaseModel):
@@ -107,6 +108,8 @@ class ChartWithData(BaseModel):
     # 11.4: Health status
     health_status: str = "healthy"
     health_issues: list[str] = []
+    # Grid layout position
+    layout: dict | None = None
 
 
 class DashboardWithDataResponse(BaseModel):
@@ -315,6 +318,7 @@ async def get_dashboard(dashboard_id: str, filters: str | None = None):
     for ref in dashboard.charts:
         chart_id = ref.get("chart_id", "")
         width = ref.get("width", "half")
+        layout = ref.get("layout")
 
         chart = load_chart(chart_id)
         if not chart:
@@ -330,6 +334,7 @@ async def get_dashboard(dashboard_id: str, filters: str | None = None):
                 error_type="source_missing",
                 health_status="error",
                 health_issues=[f"Chart {chart_id} not found"],
+                layout=layout,
             ))
             continue
 
@@ -385,6 +390,7 @@ async def get_dashboard(dashboard_id: str, filters: str | None = None):
             error_suggestion=error_suggestion,
             health_status=health_status,
             health_issues=health_issues,
+            layout=layout,
         ))
 
     return DashboardWithDataResponse(

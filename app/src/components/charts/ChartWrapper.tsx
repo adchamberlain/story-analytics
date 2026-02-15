@@ -32,17 +32,17 @@ export function ChartWrapper({ title, subtitle, source, children, className = ''
   }, [title, source])
 
   return (
-    <div className={`bg-surface-raised rounded-xl border border-border-default shadow-card p-6 flex flex-col ${className}`}>
+    <div className={`bg-surface-raised rounded-2xl border border-border-default shadow-card p-7 flex flex-col ${className}`}>
       {/* Header */}
       {(title || subtitle) && (
         <div className="mb-1">
           {title && (
-            <h3 className="text-lg font-semibold text-text-primary">
+            <h3 className="text-[18px] font-semibold text-text-primary">
               {title}
             </h3>
           )}
           {subtitle && (
-            <p className="text-sm mt-0.5 text-text-secondary">
+            <p className="text-[14px] mt-0.5 text-text-secondary">
               {subtitle}
             </p>
           )}
@@ -64,19 +64,19 @@ export function ChartWrapper({ title, subtitle, source, children, className = ''
         <div className="flex gap-2">
           <button
             onClick={handleExportSVG}
-            className="text-xs px-2 py-1 rounded border border-border-default text-text-secondary hover:bg-surface-secondary transition-colors"
+            className="text-[12px] px-2.5 py-1 rounded-lg border border-border-default text-text-secondary hover:bg-surface-secondary transition-colors"
           >
             SVG
           </button>
           <button
             onClick={handleExportPNG}
-            className="text-xs px-2 py-1 rounded border border-border-default text-text-secondary hover:bg-surface-secondary transition-colors"
+            className="text-[12px] px-2.5 py-1 rounded-lg border border-border-default text-text-secondary hover:bg-surface-secondary transition-colors"
           >
             PNG
           </button>
           <button
             onClick={handleExportPDF}
-            className="text-xs px-2 py-1 rounded border border-border-default text-text-secondary hover:bg-surface-secondary transition-colors"
+            className="text-[12px] px-2.5 py-1 rounded-lg border border-border-default text-text-secondary hover:bg-surface-secondary transition-colors"
           >
             PDF
           </button>

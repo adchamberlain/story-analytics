@@ -1,9 +1,17 @@
+import React, { useMemo } from 'react'
 import { Link } from 'react-router-dom'
+import {
+  GridLayout,
+  useContainerWidth,
+  type LayoutItem,
+  type Layout,
+} from 'react-grid-layout'
 import { ChartWrapper } from '../charts/ChartWrapper'
 import { ObservableChartFactory } from '../charts/ObservableChartFactory'
 import { PALETTES } from '../../themes/datawrapper'
 import type { ChartConfig, ChartType } from '../../types/chart'
 import type { PaletteKey } from '../../themes/datawrapper'
+import type { GridLayout as GridLayoutPos } from '../../stores/dashboardBuilderStore'
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -23,27 +31,82 @@ interface ChartWithData {
   data: Record<string, unknown>[]
   columns: string[]
   error: string | null
-  // 11.2: Data freshness
   data_ingested_at?: string | null
   freshness?: string | null
-  // 11.3: Schema change detection
   error_type?: string | null
   error_suggestion?: string | null
-  // 11.4: Health status
   health_status?: string
   health_issues?: string[]
+  layout?: GridLayoutPos | null
 }
 
 interface DashboardGridProps {
   charts: ChartWithData[]
   dashboardId?: string
+  editable?: boolean
+  onLayoutChange?: (items: LayoutItem[]) => void
+}
+
+// ── Strict 2-Column Layout Generator ────────────────────────────────────────
+
+/**
+ * Generates a 2-column grid layout. Each item is either:
+ * - w=1 (half-width, one column)
+ * - w=2 (full-width, spans both columns)
+ * Items are placed left-to-right, top-to-bottom.
+ */
+function generateLayout(charts: ChartWithData[]): Layout {
+  const items: LayoutItem[] = []
+  let x = 0
+  let y = 0
+
+  for (const chart of charts) {
+    // If the chart has a persisted layout, use it (but clamp w to 1 or 2)
+    if (chart.layout) {
+      const w = chart.layout.w >= 2 ? 2 : 1
+      items.push({
+        i: chart.chart_id,
+        x: chart.layout.x >= 1 && w === 1 ? 1 : 0,
+        y: chart.layout.y,
+        w,
+        h: chart.layout.h,
+        minW: 1,
+        maxW: 2,
+        minH: 3,
+      })
+      continue
+    }
+
+    // Auto-generate: full → w=2, half → w=1
+    const w = chart.width === 'full' ? 2 : 1
+    const h = 5
+
+    // If this item won't fit on the current row, wrap
+    if (x + w > 2) {
+      x = 0
+      y += h
+    }
+
+    items.push({ i: chart.chart_id, x, y, w, h, minW: 1, maxW: 2, minH: 3 })
+    x += w
+    if (x >= 2) {
+      x = 0
+      y += h
+    }
+  }
+
+  return items
 }
 
 /**
- * Responsive dashboard grid. Renders charts at full or half width.
- * Read-only — used in both public view and builder preview.
+ * Strict 2-column dashboard grid.
+ * Items are either 1-column or 2-column wide. No intermediate positions.
+ * Supports drag-to-reorder and resize (height only in view, width snaps to 1 or 2 cols).
  */
-export function DashboardGrid({ charts, dashboardId }: DashboardGridProps) {
+export function DashboardGrid({ charts, dashboardId, editable = false, onLayoutChange }: DashboardGridProps) {
+  const { width, containerRef, mounted } = useContainerWidth()
+  const layout = useMemo(() => generateLayout(charts), [charts])
+
   if (charts.length === 0) {
     return (
       <div className="text-center py-16">
@@ -53,17 +116,39 @@ export function DashboardGrid({ charts, dashboardId }: DashboardGridProps) {
   }
 
   return (
-    <div
-      className="grid gap-6 grid-cols-2"
-    >
-      {charts.map((chart) => (
-        <div
-          key={chart.chart_id}
-          className={`rounded-xl shadow-card ${chart.width === 'full' ? 'col-span-full' : ''}`}
+    <div ref={containerRef as React.RefObject<HTMLDivElement>}>
+      {mounted && (
+        <GridLayout
+          className="dashboard-grid"
+          width={width}
+          gridConfig={{
+            cols: 2,
+            rowHeight: 60,
+            margin: [24, 24] as [number, number],
+            containerPadding: [0, 0] as [number, number],
+          }}
+          layout={layout}
+          dragConfig={{ enabled: editable, handle: '.drag-handle' }}
+          resizeConfig={{ enabled: editable, handles: editable ? ['se'] : [] }}
+          onLayoutChange={(currentLayout: Layout) => {
+            if (editable && onLayoutChange) {
+              // Clamp all items to strict 2-col: w must be 1 or 2, x must be 0 or 1
+              const clamped = [...currentLayout].map(item => ({
+                ...item,
+                w: item.w >= 2 ? 2 : 1,
+                x: item.w >= 2 ? 0 : (item.x >= 1 ? 1 : 0),
+              }))
+              onLayoutChange(clamped)
+            }
+          }}
         >
-          <DashboardChartCell chart={chart} dashboardId={dashboardId} />
-        </div>
-      ))}
+          {charts.map((chart) => (
+            <div key={chart.chart_id}>
+              <DashboardChartCell chart={chart} dashboardId={dashboardId} editable={editable} />
+            </div>
+          ))}
+        </GridLayout>
+      )}
     </div>
   )
 }
@@ -89,15 +174,16 @@ function StatusDot({ status, issues }: { status?: string; issues?: string[] }) {
 function DashboardChartCell({
   chart,
   dashboardId,
+  editable,
 }: {
   chart: ChartWithData
   dashboardId?: string
+  editable: boolean
 }) {
   if (chart.error) {
-    // Schema change: amber card with suggestion
     if (chart.error_type === 'schema_change') {
       return (
-        <div className="relative bg-amber-50 border border-amber-200 rounded-lg px-5 py-4">
+        <div className="relative h-full bg-amber-50 border border-amber-200 rounded-2xl px-5 py-4">
           <p className="text-sm text-amber-800 font-medium">Schema changed</p>
           {chart.error_suggestion && (
             <p className="text-xs text-amber-700 mt-1">{chart.error_suggestion}</p>
@@ -114,9 +200,8 @@ function DashboardChartCell({
       )
     }
 
-    // Source missing / generic SQL error: red card
     return (
-      <div className="relative bg-red-50 border border-red-200 rounded-lg px-5 py-4">
+      <div className="relative h-full bg-red-50 border border-red-200 rounded-2xl px-5 py-4">
         <p className="text-sm text-red-700 font-medium">
           {chart.error_type === 'source_missing' ? 'Data source missing' : 'Chart unavailable'}
         </p>
@@ -143,6 +228,11 @@ function DashboardChartCell({
     xAxisTitle: (chart.config?.xAxisTitle as string) || undefined,
     yAxisTitle: (chart.config?.yAxisTitle as string) || undefined,
     annotations: chart.config?.annotations as ChartConfig['annotations'],
+    value: (chart.config?.value as string) ?? undefined,
+    comparisonValue: (chart.config?.comparisonValue as string) ?? undefined,
+    comparisonLabel: (chart.config?.comparisonLabel as string) || undefined,
+    valueFormat: (chart.config?.valueFormat as ChartConfig['valueFormat']) || undefined,
+    positiveIsGood: (chart.config?.positiveIsGood as boolean) ?? true,
   }
 
   const palette = (chart.config?.palette as PaletteKey) ?? 'default'
@@ -152,18 +242,28 @@ function DashboardChartCell({
   }
 
   return (
-    <div className="relative">
+    <div className="relative h-full">
+      {editable && (
+        <div className="drag-handle absolute top-0 left-0 right-0 h-8 cursor-grab active:cursor-grabbing z-10 flex items-center justify-center">
+          <svg className="h-4 w-4 text-text-muted opacity-0 group-hover:opacity-100 transition-opacity" fill="currentColor" viewBox="0 0 24 24">
+            <circle cx="9" cy="7" r="1.5" /><circle cx="15" cy="7" r="1.5" />
+            <circle cx="9" cy="12" r="1.5" /><circle cx="15" cy="12" r="1.5" />
+            <circle cx="9" cy="17" r="1.5" /><circle cx="15" cy="17" r="1.5" />
+          </svg>
+        </div>
+      )}
       <StatusDot status={chart.health_status} issues={chart.health_issues} />
       <ChartWrapper
         title={chart.title ?? undefined}
         subtitle={chart.subtitle ?? undefined}
         source={chart.source ?? undefined}
+        className="h-full"
       >
         <ObservableChartFactory
           data={chart.data}
           config={chartConfig}
           chartType={chartType}
-          height={chart.width === 'full' ? 400 : 320}
+          height={undefined}
         />
       </ChartWrapper>
     </div>

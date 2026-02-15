@@ -23,19 +23,27 @@ router = APIRouter(prefix="/v2/charts", tags=["charts-v2"])
 
 @router.get("/ai-status")
 async def ai_status():
-    """Check if AI features are available (any LLM API key configured)."""
-    import os
-    has_key = bool(
-        os.environ.get("ANTHROPIC_API_KEY")
-        or os.environ.get("OPENAI_API_KEY")
-        or os.environ.get("GOOGLE_API_KEY")
-    )
-    if not has_key:
+    """Check if AI features are available and which provider is configured."""
+    from ..services.settings_storage import load_settings
+
+    settings = load_settings()
+    provider = settings.ai_provider
+
+    # If no explicit provider set, auto-detect from keys
+    if not provider:
+        if settings.anthropic_api_key:
+            provider = "anthropic"
+        elif settings.openai_api_key:
+            provider = "openai"
+        elif settings.google_api_key:
+            provider = "google"
+
+    if not provider:
         raise HTTPException(
             status_code=503,
             detail="No AI API key configured. Add ANTHROPIC_API_KEY, OPENAI_API_KEY, or GOOGLE_API_KEY in Settings.",
         )
-    return {"available": True}
+    return {"available": True, "provider": provider}
 
 
 # ── Request / Response Schemas ───────────────────────────────────────────────
