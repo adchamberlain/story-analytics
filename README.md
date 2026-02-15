@@ -2,7 +2,7 @@
 
 Publication-ready dashboards from any data source.
 
-**Website:** [storyanalytics.dev](https://storyanalytics.dev)
+**Website:** [storyanalytics.ai](https://storyanalytics.ai)
 
 ## What is Story Analytics?
 
@@ -92,7 +92,7 @@ story-analytics/
 │   ├── charts/             # Saved chart configs (JSON)
 │   ├── dashboards/         # Saved dashboard layouts (JSON)
 │   └── settings.json       # App settings (API keys, provider)
-└── website/                # Marketing site (storyanalytics.dev)
+└── website/                # Marketing site (storyanalytics.ai)
 ```
 
 ### Tech Stack

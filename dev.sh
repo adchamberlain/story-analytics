@@ -23,7 +23,7 @@ cd "$SCRIPT_DIR"
 # Check for .env file
 if [ ! -f .env ]; then
     echo -e "${RED}Error: .env file not found${NC}"
-    echo -e "The .env file is required for credentials (ANTHROPIC_API_KEY, SNOWFLAKE_USERNAME, SNOWFLAKE_PASSWORD)."
+    echo -e "The .env file is required for API keys (e.g. ANTHROPIC_API_KEY)."
     echo -e "Create one based on .env.example:"
     echo -e "  ${YELLOW}cp .env.example .env${NC}"
     echo -e "Then edit .env with your credentials."
@@ -69,10 +69,10 @@ echo -e "  ${YELLOW}API Docs:${NC}            http://localhost:8000/docs"
 echo -e ""
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo -e "  ${CYAN}Quick links:${NC}"
-echo -e "    http://localhost:3001/login     (sign in)"
-echo -e "    http://localhost:3001/chat      (chat with AI)"
-echo -e "    http://localhost:3001/charts    (chart library)"
 echo -e "    http://localhost:3001/dashboards (dashboard list)"
+echo -e "    http://localhost:3001/library    (chart library)"
+echo -e "    http://localhost:3001/sources    (data sources)"
+echo -e "    http://localhost:3001/settings   (settings)"
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo -e "  ${CYAN}API Logs:${NC} tail -f /tmp/api.log"
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
@@ -80,7 +80,7 @@ echo -e "Press ${RED}Ctrl+C${NC} to stop all services"
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n"
 
 # Open React frontend login page in browser after a short delay
-(sleep 3 && open "http://localhost:3001/login") &
+(sleep 3 && open "http://localhost:3001/dashboards") &
 
 # Wait for all processes (keeps the script running)
 wait
