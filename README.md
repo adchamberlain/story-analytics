@@ -30,7 +30,7 @@ An AI assistant (Claude, GPT, or Gemini) is available to help write SQL, add cal
 
 ```bash
 # Clone the repo
-git clone https://github.com/andrewchamberlain/story-analytics.git
+git clone https://github.com/adchamberlain/story-analytics.git
 cd story-analytics
 
 # Install dependencies
