@@ -21,6 +21,23 @@ from engine.v2.chart_editor import edit_chart
 router = APIRouter(prefix="/v2/charts", tags=["charts-v2"])
 
 
+@router.get("/ai-status")
+async def ai_status():
+    """Check if AI features are available (any LLM API key configured)."""
+    import os
+    has_key = bool(
+        os.environ.get("ANTHROPIC_API_KEY")
+        or os.environ.get("OPENAI_API_KEY")
+        or os.environ.get("GOOGLE_API_KEY")
+    )
+    if not has_key:
+        raise HTTPException(
+            status_code=503,
+            detail="No AI API key configured. Add ANTHROPIC_API_KEY, OPENAI_API_KEY, or GOOGLE_API_KEY in Settings.",
+        )
+    return {"available": True}
+
+
 # ── Request / Response Schemas ───────────────────────────────────────────────
 
 class ProposeRequest(BaseModel):

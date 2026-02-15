@@ -142,6 +142,7 @@ function DashboardChartCell({
     showValues: (chart.config?.showValues as boolean) ?? false,
     xAxisTitle: (chart.config?.xAxisTitle as string) || undefined,
     yAxisTitle: (chart.config?.yAxisTitle as string) || undefined,
+    annotations: chart.config?.annotations as ChartConfig['annotations'],
   }
 
   const palette = (chart.config?.palette as PaletteKey) ?? 'default'

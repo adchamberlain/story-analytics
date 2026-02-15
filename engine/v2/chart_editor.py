@@ -57,6 +57,17 @@ CONFIG FIELDS:
 - palette: One of "default", "blues", "reds", "greens"
 - x_axis_title: Custom x-axis label (string)
 - y_axis_title: Custom y-axis label (string)
+- annotations: Object with three arrays: lines, texts, ranges
+  - lines: Array of reference lines. Each has: id (string), axis ("x"|"y"), value (number or string), label (optional string), color (optional hex string, default "#e45756")
+  - texts: Array of text annotations. Each has: id (string), x (number or string), y (number or string), text (string), fontSize (optional number, default 12), color (optional hex string)
+  - ranges: Array of highlight ranges. Each has: id (string), axis ("x"|"y"), start (number or string), end (number or string), label (optional string), color (optional hex string, default "#e45756"), opacity (optional number 0-1, default 0.1)
+
+ANNOTATION EXAMPLES:
+- "Add a target line at 1000" → add to annotations.lines: {"id": "ann-1", "axis": "y", "value": 1000, "label": "Target", "color": "#e45756"}
+- "Highlight Q4" → add to annotations.ranges: {"id": "ann-2", "axis": "x", "start": "Oct", "end": "Dec", "label": "Q4", "color": "#4e79a7", "opacity": 0.1}
+- "Add a note at (Jan, 500) saying 'Launch'" → add to annotations.texts: {"id": "ann-3", "x": "Jan", "y": 500, "text": "Launch"}
+
+When adding annotations, generate unique IDs like "ann-{timestamp}". Preserve existing annotations unless the user explicitly asks to remove them.
 
 OUTPUT FORMAT:
 Return a single JSON object (no markdown code fences):

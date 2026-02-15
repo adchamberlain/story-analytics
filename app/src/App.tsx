@@ -8,6 +8,7 @@ import { DashboardViewPage } from './pages/DashboardViewPage'
 import { EditorPage } from './pages/EditorPage'
 import { SourcePickerPage } from './pages/SourcePickerPage'
 import { ChartViewPage } from './pages/ChartViewPage'
+import { LoginPage } from './pages/LoginPage'
 import { HomeRedirect } from './components/HomeRedirect'
 
 function App() {
@@ -24,6 +25,7 @@ function App() {
       </Route>
 
       {/* Full-screen routes (own headers, no top nav) */}
+      <Route path="/login" element={<LoginPage />} />
       <Route path="/dashboard/:dashboardId" element={<DashboardViewPage />} />
       <Route path="/editor/new/source" element={<SourcePickerPage />} />
       <Route path="/editor/:chartId" element={<EditorPage />} />

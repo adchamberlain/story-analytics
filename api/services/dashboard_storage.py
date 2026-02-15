@@ -29,6 +29,7 @@ class SavedDashboard:
     charts: list[dict]  # list of DashboardChartRef as dicts
     created_at: str
     updated_at: str
+    filters: list[dict] | None = None  # list of FilterSpec as dicts
 
 
 def save_dashboard(

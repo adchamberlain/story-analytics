@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { ChartType } from '../types/chart'
+import type { ChartType, Annotations } from '../types/chart'
 import type { PaletteKey } from '../themes/datawrapper'
 
 // ── Editor Config ──────────────────────────────────────────────────────────
@@ -26,6 +26,7 @@ export interface EditorConfig {
   yAxisTitle: string
   aggregation: AggregationType
   dataMode: DataMode
+  annotations: Annotations
 }
 
 const DEFAULT_CONFIG: EditorConfig = {
@@ -47,6 +48,7 @@ const DEFAULT_CONFIG: EditorConfig = {
   yAxisTitle: '',
   aggregation: 'none',
   dataMode: 'table',
+  annotations: { lines: [], texts: [], ranges: [] },
 }
 
 export interface TableInfoItem {
@@ -191,6 +193,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         yAxisTitle: chart.config?.yAxisTitle ?? '',
         aggregation: chart.config?.aggregation ?? 'none',
         dataMode: (chart.config?.dataMode as DataMode) ?? 'table',
+        annotations: chart.config?.annotations ?? { lines: [], texts: [], ranges: [] },
       }
 
       const loadedDataMode = config.dataMode
@@ -349,6 +352,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
             yAxisTitle: config.yAxisTitle,
             aggregation: config.aggregation,
             dataMode: config.dataMode,
+            annotations: config.annotations,
           },
         }),
       })
@@ -538,6 +542,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
             yAxisTitle: config.yAxisTitle,
             aggregation: config.aggregation,
             dataMode: config.dataMode,
+            annotations: config.annotations,
           },
         }),
       })
@@ -606,6 +611,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
             palette: config.palette,
             x_axis_title: config.xAxisTitle,
             y_axis_title: config.yAxisTitle,
+            annotations: config.annotations,
           },
           columns,
         }),
@@ -637,6 +643,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       if (rc.palette !== undefined) newConfig.palette = rc.palette
       if (rc.x_axis_title !== undefined) newConfig.xAxisTitle = rc.x_axis_title
       if (rc.y_axis_title !== undefined) newConfig.yAxisTitle = rc.y_axis_title
+      if (rc.annotations !== undefined) newConfig.annotations = rc.annotations
 
       const assistantMsg: ChatMessage = {
         id: `msg-${Date.now()}`,

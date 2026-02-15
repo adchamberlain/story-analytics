@@ -4,6 +4,104 @@ This log captures development changes made during each session. Review this at t
 
 ---
 
+## Session: 2026-02-14 (Part 7)
+
+### Focus: Open-Source Release Roadmap — Full Implementation (Phases 1-6)
+
+Implemented the complete 6-phase open-source release roadmap in a single session. All TypeScript compilation checks passed at each phase.
+
+### Phase 1: Annotations & Storytelling
+- Added `ReferenceLine`, `TextAnnotation`, `HighlightRange`, `Annotations` types to `chart.ts`
+- Created `buildAnnotationMarks()` in `ObservableChartFactory.tsx` using Plot.ruleX/ruleY, Plot.text, Plot.rectX/rectY
+- Created `AnnotationEditor.tsx` with sub-editors for lines, text, and ranges
+- Added Annotations collapsible section to `Toolbox.tsx`
+- Wired annotations through `editorStore.ts` save/load/edit cycle
+- Updated `chart_editor.py` AI prompt with annotation support
+
+### Phase 2: Database Connectors (Postgres + BigQuery)
+- Created pluggable connector architecture: `api/services/connectors/base.py` (ABC), `__init__.py` (registry)
+- Created `postgres.py` connector (psycopg2-based sync to DuckDB)
+- Created `bigquery.py` connector (google-cloud-bigquery)
+- Extracted `snowflake.py` from duckdb_service.py into connector pattern
+- Rewrote `connections.py` router to use pluggable system
+- Rewrote `DatabaseConnector.tsx` with multi-DB tabs (Postgres, Snowflake, BigQuery)
+
+### Phase 3: Static HTML Export
+- Created `api/services/static_export.py` — self-contained HTML with Observable Plot from CDN
+- Added `GET /api/v2/dashboards/{id}/export/html` endpoint
+- Added "Export HTML" button to DashboardViewPage
+
+### Phase 4: Documentation & Packaging
+- Created `OnboardingWizard.tsx` for first-run experience
+- Created LICENSE (MIT), CONTRIBUTING.md, GitHub issue/PR templates
+- Created `.github/workflows/ci.yml` (TypeScript + ruff + pytest)
+- Added AI graceful degradation to AIChat.tsx (checks /ai-status endpoint)
+
+### Phase 5: Chart Types & Polish
+- Added HeatMap (Plot.cell), BoxPlot (Plot.boxY) to ObservableChartFactory
+- Created PieChart (d3.pie + d3.arc donut) and Treemap (d3.treemap + d3.hierarchy) as standalone components
+- Added all 4 types to ChartTypeSelector
+- Created `numberFormat.ts` with formatNumber(), tickFormatter(), detectFormat()
+
+### Phase 6: Multi-User & Auth
+- Created `api/services/metadata_db.py` — SQLite metadata store (users, dashboard_meta, dashboard_shares)
+- Created `api/auth_simple.py` — optional JWT auth system (AUTH_ENABLED env var)
+- Created `app/src/stores/authStore.ts` — Zustand auth store
+- Created `app/src/components/sharing/ShareModal.tsx` — visibility controls (private/team/public)
+- Created `app/src/pages/LoginPage.tsx` — login/register form
+- Added sharing API endpoints to dashboards_v2.py (GET/PUT /{id}/sharing)
+- Added Share button to DashboardViewPage header
+- Added /login route to App.tsx
+
+### Files Created
+- `app/src/components/editor/AnnotationEditor.tsx`
+- `app/src/components/sharing/ShareModal.tsx`
+- `app/src/components/onboarding/OnboardingWizard.tsx`
+- `app/src/pages/LoginPage.tsx`
+- `app/src/utils/numberFormat.ts`
+- `app/src/stores/authStore.ts`
+- `app/src/components/charts/PieChart.tsx` (inline in ObservableChartFactory)
+- `app/src/components/charts/TreemapChart.tsx` (inline in ObservableChartFactory)
+- `api/services/connectors/__init__.py`, `base.py`, `postgres.py`, `bigquery.py`, `snowflake.py`
+- `api/services/static_export.py`
+- `api/services/metadata_db.py`
+- `api/auth_simple.py`
+- `LICENSE`, `CONTRIBUTING.md`
+- `.github/ISSUE_TEMPLATE/bug_report.md`, `feature_request.md`
+- `.github/PULL_REQUEST_TEMPLATE.md`
+- `.github/workflows/ci.yml`
+
+### Files Modified
+- `app/src/types/chart.ts` — annotation types, 4 new chart types
+- `app/src/components/charts/ObservableChartFactory.tsx` — annotations, HeatMap, BoxPlot, PieChart, Treemap
+- `app/src/components/editor/Toolbox.tsx` — annotation section
+- `app/src/components/editor/ChartTypeSelector.tsx` — 4 new entries
+- `app/src/stores/editorStore.ts` — annotation state
+- `app/src/pages/EditorPage.tsx`, `DashboardGrid.tsx`, `ChartViewPage.tsx` — annotation passthrough
+- `app/src/pages/DashboardViewPage.tsx` — Share button, Export HTML, ShareModal
+- `app/src/pages/DashboardsHome.tsx` — OnboardingWizard
+- `app/src/components/editor/AIChat.tsx` — graceful degradation
+- `app/src/components/data/DatabaseConnector.tsx` — multi-DB tabs
+- `app/src/App.tsx` — /login route
+- `api/routers/dashboards_v2.py` — export + sharing endpoints
+- `api/routers/charts_v2.py` — ai-status endpoint
+- `api/routers/connections.py` — pluggable connector system
+- `engine/v2/chart_editor.py` — AI annotation prompt
+- `requirements.txt` — psycopg2-binary, google-cloud-bigquery
+
+### Remaining from Roadmap (Not Done)
+- Phase 4 items: v1 legacy cleanup, Docker compose updates, docs/ folder, README rewrite
+- Phase 7: Semantic Layer & Advanced AI (deferred to post-launch)
+
+### Next Steps
+- v1 legacy code cleanup (remove old routers/engine files)
+- Write documentation files in docs/ directory
+- Rewrite README.md with screenshots and comparison table
+- Update docker-compose.yml for zero-config startup
+- Visual QA of all new components
+
+---
+
 ## Session: 2026-02-14 (Part 6)
 
 ### Focus: Dark Mode QA, Chart Rendering Fixes, Clean Demo Dashboard

@@ -79,6 +79,7 @@ export function EditorPage() {
     showValues: store.config.showValues,
     xAxisTitle: store.config.xAxisTitle || undefined,
     yAxisTitle: store.config.yAxisTitle || undefined,
+    annotations: store.config.annotations,
   }
 
   // Apply palette colors

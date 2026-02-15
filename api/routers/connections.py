@@ -1,6 +1,6 @@
 """
 Connections router: database connection management and data sync.
-Supports Snowflake connections with offline fallback to cached parquet.
+Supports Snowflake, PostgreSQL, and BigQuery via pluggable connectors.
 """
 
 import os
@@ -15,12 +15,14 @@ from ..services.connection_service import (
     load_connection,
     list_connections,
     delete_connection,
-    get_snowflake_pat,
 )
+from ..services.connectors import get_connector, CONNECTOR_REGISTRY
 from ..services.duckdb_service import get_duckdb_service
 
 
 router = APIRouter(prefix="/connections", tags=["connections"])
+
+CACHE_DIR = Path(__file__).parent.parent.parent / "data" / "snowflake_saas"
 
 
 # ── Request / Response Schemas ───────────────────────────────────────────────
@@ -28,8 +30,7 @@ router = APIRouter(prefix="/connections", tags=["connections"])
 class CreateConnectionRequest(BaseModel):
     name: str
     db_type: str = "snowflake"
-    config: dict  # account, warehouse, database, schema
-
+    config: dict  # varies by db_type
 
 class ConnectionResponse(BaseModel):
     connection_id: str
@@ -38,69 +39,70 @@ class ConnectionResponse(BaseModel):
     config: dict
     created_at: str
 
-
 class TestConnectionRequest(BaseModel):
     username: str | None = None
     password: str | None = None
-
+    credentials: dict | None = None  # Generic credentials for any connector
 
 class TestConnectionResponse(BaseModel):
     success: bool
     message: str
     tables: list[str] = []
 
-
 class ListTablesRequest(BaseModel):
     username: str | None = None
     password: str | None = None
-
+    credentials: dict | None = None
 
 class ListTablesResponse(BaseModel):
     tables: list[str]
-
 
 class SyncRequest(BaseModel):
     tables: list[str]
     username: str | None = None
     password: str | None = None
-
+    credentials: dict | None = None
 
 class SyncedSource(BaseModel):
     source_id: str
     table_name: str
     row_count: int
 
-
 class SyncResponse(BaseModel):
     sources: list[SyncedSource]
+
+class ConnectorTypesResponse(BaseModel):
+    types: list[dict]
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
-def _resolve_username(username: str | None) -> str | None:
-    """Resolve username: explicit → .env fallback → None."""
-    return username or os.environ.get("SNOWFLAKE_USERNAME")
+def _build_credentials(conn_config: dict, db_type: str, request) -> dict:
+    """
+    Build a unified credentials dict from connection config + request params.
 
+    For Snowflake: merges connection config with username from .env fallback.
+    For Postgres/BigQuery: merges connection config with provided credentials.
+    """
+    creds = {**conn_config}
 
-def _snowflake_connect(config: dict, username: str):
-    """Create a Snowflake connection using PAT (Programmatic Access Token)."""
-    import snowflake.connector
+    # If the request provides a generic credentials dict, merge it
+    if hasattr(request, 'credentials') and request.credentials:
+        creds.update(request.credentials)
 
-    pat = get_snowflake_pat()
-    if not pat:
-        raise RuntimeError(
-            "Snowflake PAT not found. Set SNOWFLAKE_PAT in .env."
-        )
+    # Legacy Snowflake compat: merge username/password from request
+    if request.username:
+        creds["username"] = request.username
+    if hasattr(request, 'password') and request.password:
+        creds["password"] = request.password
 
-    return snowflake.connector.connect(
-        account=config["account"],
-        user=username,
-        authenticator="PROGRAMMATIC_ACCESS_TOKEN",
-        token=pat,
-        warehouse=config.get("warehouse", ""),
-        database=config.get("database", ""),
-        schema=config.get("schema", ""),
-    )
+    # Snowflake .env fallback for username
+    if db_type == "snowflake" and not creds.get("username"):
+        env_user = os.environ.get("SNOWFLAKE_USERNAME")
+        if env_user:
+            creds["username"] = env_user
+
+    return creds
 
 
 def _try_cached_parquet(db, tables: list[str]) -> list:
@@ -112,9 +114,29 @@ def _try_cached_parquet(db, tables: list[str]) -> list:
 
 # ── Endpoints ────────────────────────────────────────────────────────────────
 
+@router.get("/types", response_model=ConnectorTypesResponse)
+async def list_connector_types():
+    """List all supported database connector types and their required fields."""
+    types = []
+    for name, cls in CONNECTOR_REGISTRY.items():
+        instance = cls()
+        types.append({
+            "db_type": name,
+            "required_fields": instance.required_fields,
+        })
+    return ConnectorTypesResponse(types=types)
+
+
 @router.post("/", response_model=ConnectionResponse, status_code=201)
 async def create_connection(request: CreateConnectionRequest):
     """Save a new database connection (metadata only, no credentials)."""
+    if request.db_type not in CONNECTOR_REGISTRY:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unknown database type: {request.db_type}. "
+                   f"Available: {list(CONNECTOR_REGISTRY.keys())}",
+        )
+
     conn = save_connection(
         name=request.name,
         db_type=request.db_type,
@@ -169,42 +191,37 @@ async def remove_connection(connection_id: str):
 
 @router.post("/{connection_id}/test", response_model=TestConnectionResponse)
 async def test_connection(connection_id: str, request: TestConnectionRequest):
-    """Test a database connection using key-pair auth."""
+    """Test a database connection using the pluggable connector system."""
     conn = load_connection(connection_id)
     if not conn:
         raise HTTPException(status_code=404, detail="Connection not found")
 
-    username = _resolve_username(request.username)
-    if not username:
-        raise HTTPException(
-            status_code=400,
-            detail="No username provided and SNOWFLAKE_USERNAME not set in .env",
-        )
+    try:
+        connector = get_connector(conn.db_type)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    creds = _build_credentials(conn.config, conn.db_type, request)
 
     try:
-        sf_conn = _snowflake_connect(conn.config, username)
-        cursor = sf_conn.cursor()
-        cursor.execute("SHOW TABLES")
-        tables = [row[1] for row in cursor.fetchall()]
-        cursor.close()
-        sf_conn.close()
-
-        return TestConnectionResponse(
-            success=True,
-            message=f"Connected. Found {len(tables)} tables.",
-            tables=tables,
-        )
-    except ImportError:
+        result = connector.test_connection(creds)
+        if result.success:
+            # Also list tables on successful test
+            tables_result = connector.list_tables(creds)
+            return TestConnectionResponse(
+                success=True,
+                message=result.message,
+                tables=tables_result.tables if tables_result.success else [],
+            )
+        return TestConnectionResponse(success=False, message=result.message)
+    except ImportError as e:
         raise HTTPException(
             status_code=500,
-            detail="snowflake-connector-python not installed",
+            detail=f"Required library not installed for {conn.db_type}: {e}",
         )
     except Exception as e:
         traceback.print_exc()
-        return TestConnectionResponse(
-            success=False,
-            message=f"Connection failed: {e}",
-        )
+        return TestConnectionResponse(success=False, message=f"Connection failed: {e}")
 
 
 @router.post("/{connection_id}/tables", response_model=ListTablesResponse)
@@ -214,27 +231,25 @@ async def list_tables(connection_id: str, request: ListTablesRequest):
     if not conn:
         raise HTTPException(status_code=404, detail="Connection not found")
 
-    username = _resolve_username(request.username)
-    if not username:
-        raise HTTPException(
-            status_code=400,
-            detail="No username provided and SNOWFLAKE_USERNAME not set in .env",
-        )
+    try:
+        connector = get_connector(conn.db_type)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    creds = _build_credentials(conn.config, conn.db_type, request)
 
     try:
-        sf_conn = _snowflake_connect(conn.config, username)
-        cursor = sf_conn.cursor()
-        cursor.execute("SHOW TABLES")
-        tables = [row[1] for row in cursor.fetchall()]
-        cursor.close()
-        sf_conn.close()
-
-        return ListTablesResponse(tables=tables)
-    except ImportError:
+        result = connector.list_tables(creds)
+        if not result.success:
+            raise HTTPException(status_code=500, detail=result.message)
+        return ListTablesResponse(tables=result.tables)
+    except ImportError as e:
         raise HTTPException(
             status_code=500,
-            detail="snowflake-connector-python not installed",
+            detail=f"Required library not installed for {conn.db_type}: {e}",
         )
+    except HTTPException:
+        raise
     except Exception as e:
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Failed to list tables: {e}")
@@ -242,63 +257,73 @@ async def list_tables(connection_id: str, request: ListTablesRequest):
 
 @router.post("/{connection_id}/sync", response_model=SyncResponse)
 async def sync_tables(connection_id: str, request: SyncRequest):
-    """Sync tables from a database connection into DuckDB.
+    """
+    Sync tables from a database connection into DuckDB.
 
-    If credentials are provided → live Snowflake sync.
-    If no credentials but .env has them → use .env credentials.
-    If no credentials at all → fall back to cached parquet files.
+    For Snowflake: falls back to cached parquet if credentials unavailable.
+    For Postgres/BigQuery: requires valid credentials.
     """
     conn = load_connection(connection_id)
     if not conn:
         raise HTTPException(status_code=404, detail="Connection not found")
 
-    db = get_duckdb_service()
-    username = _resolve_username(request.username)
+    try:
+        connector = get_connector(conn.db_type)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
-    if username:
-        # Try live Snowflake sync, fall back to cached parquet on failure
-        try:
-            schemas = db.ingest_from_snowflake(
-                config=conn.config,
-                credentials={"username": username},
-                table_names=request.tables,
-            )
-        except ImportError:
-            # No snowflake-connector — try cached parquet
+    db = get_duckdb_service()
+    creds = _build_credentials(conn.config, conn.db_type, request)
+
+    # Determine cache dir (only for Snowflake for backward compat)
+    cache_dir = CACHE_DIR if conn.db_type == "snowflake" else None
+
+    try:
+        sync_results = connector.sync_to_duckdb(
+            tables=request.tables,
+            credentials=creds,
+            duckdb_service=db,
+            cache_dir=cache_dir,
+        )
+    except ImportError:
+        # Missing library — Snowflake can fall back to cached parquet
+        if conn.db_type == "snowflake":
             schemas = _try_cached_parquet(db, request.tables)
-            if not schemas:
-                raise HTTPException(
-                    status_code=500,
-                    detail="snowflake-connector-python not installed and no cached parquet available",
+            if schemas:
+                return SyncResponse(
+                    sources=[
+                        SyncedSource(source_id=s.source_id, table_name=s.filename, row_count=s.row_count)
+                        for s in schemas
+                    ]
                 )
-        except Exception as e:
-            # Live connection failed — try cached parquet as fallback
-            traceback.print_exc()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Required library not installed for {conn.db_type}",
+        )
+    except Exception as e:
+        traceback.print_exc()
+        # Snowflake fallback to cached parquet
+        if conn.db_type == "snowflake":
             schemas = _try_cached_parquet(db, request.tables)
-            if not schemas:
-                raise HTTPException(
-                    status_code=500,
-                    detail=f"Snowflake sync failed: {e}. No cached parquet fallback available.",
+            if schemas:
+                return SyncResponse(
+                    sources=[
+                        SyncedSource(source_id=s.source_id, table_name=s.filename, row_count=s.row_count)
+                        for s in schemas
+                    ]
                 )
-    else:
-        # Offline: load cached parquet
-        schemas = _try_cached_parquet(db, request.tables)
-        if not schemas:
-            raise HTTPException(
-                status_code=400,
-                detail=(
-                    f"No credentials available and no cached parquet found for: {request.tables}. "
-                    "Set SNOWFLAKE_USERNAME/PASSWORD in .env or provide credentials."
-                ),
-            )
+        raise HTTPException(
+            status_code=500,
+            detail=f"Sync failed: {e}",
+        )
 
     return SyncResponse(
         sources=[
             SyncedSource(
-                source_id=s.source_id,
-                table_name=s.filename,
-                row_count=s.row_count,
+                source_id=r["source_id"],
+                table_name=r["filename"],
+                row_count=r["row_count"],
             )
-            for s in schemas
+            for r in sync_results
         ]
     )

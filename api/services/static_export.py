@@ -1,0 +1,316 @@
+"""
+Static HTML export: generate a self-contained HTML file for a dashboard.
+
+The output includes:
+- Observable Plot from CDN
+- Chart data as inline JSON
+- Responsive grid matching dashboard layout
+- Dark/light theme support
+- No external dependencies except CDN scripts
+"""
+
+from __future__ import annotations
+
+import json
+from html import escape
+
+
+def export_dashboard_html(
+    title: str,
+    charts: list[dict],
+) -> str:
+    """
+    Build a self-contained HTML document that renders a dashboard.
+
+    Args:
+        title: Dashboard title
+        charts: List of chart dicts, each with:
+            - chart_id, title, subtitle, source, chart_type, width ("full"/"half")
+            - config: {x, y, series, horizontal, sort, stacked, showGrid, showLegend, palette, annotations, ...}
+            - data: list of row dicts
+
+    Returns:
+        Complete HTML string.
+    """
+
+    chart_cards_html = []
+    for i, chart in enumerate(charts):
+        ct = chart.get("chart_type", "BarChart")
+        w = chart.get("width", "half")
+        data_json = json.dumps(chart.get("data", []))
+        config_json = json.dumps(chart.get("config", {}))
+        chart_title = escape(chart.get("title", "") or "")
+        subtitle = escape(chart.get("subtitle", "") or "")
+        source = escape(chart.get("source", "") or "")
+
+        grid_class = "chart-full" if w == "full" else "chart-half"
+
+        card_html = f"""
+    <div class="chart-card {grid_class}">
+      {'<h3 class="chart-title">' + chart_title + '</h3>' if chart_title else ''}
+      {'<p class="chart-subtitle">' + subtitle + '</p>' if subtitle else ''}
+      <div id="chart-{i}" class="chart-container" data-chart-type="{ct}" data-index="{i}"></div>
+      {'<p class="chart-source">' + source + '</p>' if source else ''}
+    </div>"""
+        chart_cards_html.append(card_html)
+
+    charts_json = json.dumps([
+        {
+            "chartType": c.get("chart_type", "BarChart"),
+            "data": c.get("data", []),
+            "config": c.get("config", {}),
+        }
+        for c in charts
+    ])
+
+    html = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{escape(title)}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/@observablehq/plot@0.6/+esm" type="module"></script>
+  <style>
+    *, *::before, *::after {{ box-sizing: border-box; margin: 0; padding: 0; }}
+    body {{
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #f8f9fa;
+      color: #1a1a2e;
+      padding: 2rem;
+      max-width: 1200px;
+      margin: 0 auto;
+    }}
+    h1 {{
+      font-size: 1.5rem;
+      font-weight: 700;
+      margin-bottom: 1.5rem;
+      color: #1a1a2e;
+    }}
+    .dashboard-grid {{
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 1rem;
+    }}
+    .chart-card {{
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 1.25rem;
+      overflow: hidden;
+    }}
+    .chart-full {{ grid-column: 1 / -1; }}
+    .chart-half {{ grid-column: span 1; }}
+    .chart-title {{
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: #1a1a2e;
+      margin-bottom: 0.25rem;
+    }}
+    .chart-subtitle {{
+      font-size: 0.75rem;
+      color: #6b7280;
+      margin-bottom: 0.75rem;
+    }}
+    .chart-source {{
+      font-size: 0.625rem;
+      color: #9ca3af;
+      margin-top: 0.5rem;
+    }}
+    .chart-container {{
+      width: 100%;
+      min-height: 280px;
+    }}
+    .chart-container svg {{
+      width: 100%;
+      height: auto;
+    }}
+    .big-value {{
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem 0;
+    }}
+    .big-value .value {{
+      font-size: 2.5rem;
+      font-weight: 700;
+      color: #4e79a7;
+    }}
+    .footer {{
+      text-align: center;
+      margin-top: 2rem;
+      font-size: 0.625rem;
+      color: #9ca3af;
+    }}
+    @media (max-width: 768px) {{
+      body {{ padding: 1rem; }}
+      .dashboard-grid {{ grid-template-columns: 1fr; }}
+      .chart-half {{ grid-column: span 1; }}
+    }}
+    @media (prefers-color-scheme: dark) {{
+      body {{ background: #0f172a; color: #e2e8f0; }}
+      h1 {{ color: #e2e8f0; }}
+      .chart-card {{ background: #1e293b; border-color: #334155; }}
+      .chart-title {{ color: #e2e8f0; }}
+      .chart-subtitle {{ color: #94a3b8; }}
+      .chart-source {{ color: #64748b; }}
+    }}
+  </style>
+</head>
+<body>
+  <h1>{escape(title)}</h1>
+  <div class="dashboard-grid">
+    {"".join(chart_cards_html)}
+  </div>
+  <p class="footer">Generated by Story Analytics</p>
+
+  <script type="module">
+    import * as Plot from "https://cdn.jsdelivr.net/npm/@observablehq/plot@0.6/+esm";
+
+    const COLORS = ["#4e79a7","#f28e2b","#e15759","#76b7b2","#59a14f","#edc948","#b07aa1","#ff9da7","#9c755f","#bab0ac"];
+
+    const charts = {charts_json};
+
+    function maybeParseDates(data, field) {{
+      if (!data.length || !field) return data;
+      const sample = data[0][field];
+      if (typeof sample === "string" && /^\\d{{4}}-\\d{{2}}/.test(sample)) {{
+        return data.map(d => ({{ ...d, [field]: new Date(d[field]) }}));
+      }}
+      return data;
+    }}
+
+    function renderChart(container, chart) {{
+      const {{ chartType, data, config }} = chart;
+      const x = config.x, y = config.y, series = config.series;
+      const colors = config.color ? [config.color] : [...COLORS];
+      const width = container.clientWidth;
+      const height = 320;
+
+      if (chartType === "BigValue") {{
+        const row = data[0] || {{}};
+        const val = row[config.value || config.y] ?? "—";
+        const formatted = typeof val === "number"
+          ? (config.valueFormat === "currency" ? "$" + val.toLocaleString() : val.toLocaleString())
+          : String(val);
+        container.innerHTML = `<div class="big-value"><span class="value">${{formatted}}</span></div>`;
+        return;
+      }}
+
+      if (chartType === "DataTable") {{
+        if (!data.length) {{ container.textContent = "No data"; return; }}
+        const cols = Object.keys(data[0]);
+        const headerRow = cols.map(c => `<th style="padding:4px 8px;text-align:left;border-bottom:2px solid #e5e7eb;font-size:11px">${{c}}</th>`).join("");
+        const bodyRows = data.map(r =>
+          "<tr>" + cols.map(c => `<td style="padding:3px 8px;font-size:11px;border-bottom:1px solid #f3f4f6">${{r[c] ?? ""}}</td>`).join("") + "</tr>"
+        ).join("");
+        container.innerHTML = `<table style="width:100%;border-collapse:collapse"><thead><tr>${{headerRow}}</tr></thead><tbody>${{bodyRows}}</tbody></table>`;
+        return;
+      }}
+
+      const plotData = maybeParseDates(data, x);
+      const marks = [];
+
+      if (chartType === "BarChart") {{
+        if (config.horizontal) {{
+          marks.push(series
+            ? Plot.barX(plotData, {{ x: y, y: x, fill: series }})
+            : Plot.barX(plotData, {{ x: y, y: x, fill: colors[0] }}));
+        }} else {{
+          marks.push(series
+            ? Plot.barY(plotData, {{ x, y, fill: series, ...(config.stacked ? {{}} : {{ fx: x }}) }})
+            : Plot.barY(plotData, {{ x, y, fill: colors[0] }}));
+        }}
+      }} else if (chartType === "LineChart") {{
+        marks.push(series
+          ? Plot.lineY(plotData, {{ x, y, stroke: series, strokeWidth: 2 }})
+          : Plot.lineY(plotData, {{ x, y, stroke: colors[0], strokeWidth: 2 }}));
+      }} else if (chartType === "AreaChart") {{
+        marks.push(series
+          ? Plot.areaY(plotData, {{ x, y, fill: series, fillOpacity: 0.15 }})
+          : Plot.areaY(plotData, {{ x, y, fill: colors[0] + "26" }}));
+        marks.push(series
+          ? Plot.lineY(plotData, {{ x, y, stroke: series, strokeWidth: 2 }})
+          : Plot.lineY(plotData, {{ x, y, stroke: colors[0], strokeWidth: 2 }}));
+      }} else if (chartType === "ScatterPlot") {{
+        marks.push(series
+          ? Plot.dot(plotData, {{ x, y, fill: series, r: 4 }})
+          : Plot.dot(plotData, {{ x, y, fill: colors[0], r: 4 }}));
+      }} else if (chartType === "Histogram") {{
+        marks.push(Plot.rectY(plotData, {{ ...Plot.binX({{ y: "count" }}, {{ x }}), fill: colors[0] }}));
+      }}
+
+      // Annotations
+      const ann = config.annotations;
+      if (ann) {{
+        (ann.lines || []).forEach(line => {{
+          const color = line.color || "#e45756";
+          if (line.axis === "x") {{
+            marks.push(Plot.ruleX([line.value], {{ stroke: color, strokeDasharray: "6,4", strokeWidth: 1.5 }}));
+          }} else {{
+            marks.push(Plot.ruleY([line.value], {{ stroke: color, strokeDasharray: "6,4", strokeWidth: 1.5 }}));
+          }}
+          if (line.label) {{
+            marks.push(Plot.text([{{ [line.axis]: line.value, label: line.label }}], {{
+              [line.axis]: line.axis, text: "label", fontSize: 11, fill: color, fontWeight: 600,
+              ...(line.axis === "y" ? {{ dx: 4, textAnchor: "start", frameAnchor: "right" }} : {{ dy: -8, frameAnchor: "top" }})
+            }}));
+          }}
+        }});
+        (ann.ranges || []).forEach(range => {{
+          const color = range.color || "#e45756";
+          const opacity = range.opacity || 0.1;
+          if (range.axis === "x") {{
+            marks.push(Plot.rectX([{{ x1: range.start, x2: range.end }}], {{ x1: "x1", x2: "x2", fill: color, fillOpacity: opacity }}));
+          }} else {{
+            marks.push(Plot.rectY([{{ y1: range.start, y2: range.end }}], {{ y1: "y1", y2: "y2", fill: color, fillOpacity: opacity }}));
+          }}
+        }});
+        (ann.texts || []).forEach(t => {{
+          marks.push(Plot.text([{{ x: t.x, y: t.y, label: t.text }}], {{ x: "x", y: "y", text: "label", fontSize: t.fontSize || 12, fill: t.color || "#333" }}));
+        }});
+      }}
+
+      // Build ordinal domain if needed
+      const xOpts = {{}};
+      if (x && plotData.length > 0) {{
+        const sample = plotData[0][x];
+        if (typeof sample === "string" && !/^\\d{{4}}-\\d{{2}}/.test(String(sample))) {{
+          const seen = new Set();
+          const domain = [];
+          for (const row of plotData) {{
+            const v = row[x];
+            if (!seen.has(v)) {{ seen.add(v); domain.push(v); }}
+          }}
+          xOpts.domain = domain;
+        }}
+      }}
+
+      const svg = Plot.plot({{
+        width,
+        height,
+        marginLeft: config.horizontal ? 100 : 40,
+        marginRight: 20,
+        marginTop: 20,
+        marginBottom: 30,
+        x: {{ line: true, tickSize: 0, ...xOpts, ...(config.xAxisTitle ? {{ label: config.xAxisTitle }} : {{}}) }},
+        y: {{ line: true, tickSize: 0, grid: true, ...(config.yAxisTitle ? {{ label: config.yAxisTitle }} : {{}}) }},
+        color: {{ range: colors, ...(series ? {{ legend: true }} : {{}}) }},
+        marks,
+      }});
+
+      container.appendChild(svg);
+    }}
+
+    // Render all charts
+    charts.forEach((chart, i) => {{
+      const el = document.getElementById("chart-" + i);
+      if (el) renderChart(el, chart);
+    }});
+  </script>
+</body>
+</html>"""
+
+    return html

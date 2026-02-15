@@ -104,6 +104,7 @@ export function ChartViewPage() {
     showValues: (chart.config?.showValues as boolean) ?? false,
     xAxisTitle: (chart.config?.xAxisTitle as string) || undefined,
     yAxisTitle: (chart.config?.yAxisTitle as string) || undefined,
+    annotations: chart.config?.annotations as ChartConfig['annotations'],
   }
 
   // Apply palette colors

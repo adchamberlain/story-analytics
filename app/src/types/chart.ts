@@ -12,8 +12,50 @@ export type ChartType =
   | 'AreaChart'
   | 'ScatterPlot'
   | 'Histogram'
+  | 'HeatMap'
+  | 'BoxPlot'
+  | 'PieChart'
+  | 'Treemap'
   | 'DataTable'
   | 'BigValue'
+
+// =============================================================================
+// Annotation Types
+// =============================================================================
+
+export interface ReferenceLine {
+  id: string
+  axis: 'x' | 'y'
+  value: number | string
+  label?: string
+  color?: string
+  strokeDash?: number[]
+}
+
+export interface TextAnnotation {
+  id: string
+  x: number | string
+  y: number | string
+  text: string
+  fontSize?: number
+  color?: string
+}
+
+export interface HighlightRange {
+  id: string
+  axis: 'x' | 'y'
+  start: number | string
+  end: number | string
+  label?: string
+  color?: string
+  opacity?: number
+}
+
+export interface Annotations {
+  lines: ReferenceLine[]
+  texts: TextAnnotation[]
+  ranges: HighlightRange[]
+}
 
 export type FilterType =
   | 'Dropdown'
@@ -131,6 +173,9 @@ export interface ChartConfig {
   sparklineType?: 'line' | 'bar'
   /** Show trend indicator arrow */
   showTrend?: boolean
+
+  /** Annotations */
+  annotations?: Annotations
 
   /** Additional props */
   extraProps?: Record<string, unknown>

@@ -1,8 +1,10 @@
+import { useRef, useEffect } from 'react'
 import * as Plot from '@observablehq/plot'
+import * as d3 from 'd3'
 import { useObservablePlot } from '../../hooks/useObservablePlot'
 import { plotDefaults, CHART_COLORS } from '../../themes/datawrapper'
 import { useThemeStore } from '../../stores/themeStore'
-import type { ChartConfig, ChartType } from '../../types/chart'
+import type { ChartConfig, ChartType, Annotations } from '../../types/chart'
 
 interface ObservableChartFactoryProps {
   data: Record<string, unknown>[]
@@ -29,8 +31,9 @@ export function ObservableChartFactory({
   const { containerRef } = useObservablePlot(
     (width) => {
       const marks = buildMarks(chartType, data, config, colors)
+      const annotationMarks = buildAnnotationMarks(config.annotations)
       const plotOptions = buildPlotOptions(chartType, data, config, colors, width, height)
-      return Plot.plot({ ...plotOptions, marks })
+      return Plot.plot({ ...plotOptions, marks: [...marks, ...annotationMarks] })
     },
     [data, config, chartType, height, resolved]
   )
@@ -42,6 +45,14 @@ export function ObservableChartFactory({
 
   if (chartType === 'DataTable') {
     return <DataTableChart data={data} config={config} />
+  }
+
+  if (chartType === 'PieChart') {
+    return <PieChartComponent data={data} config={config} height={height} />
+  }
+
+  if (chartType === 'Treemap') {
+    return <TreemapComponent data={data} config={config} height={height} />
   }
 
   return <div ref={containerRef} style={{ width: '100%', height }} />
@@ -70,6 +81,10 @@ function buildMarks(
       return buildScatterMarks(data, x, y, series, config, colors)
     case 'Histogram':
       return buildHistogramMarks(data, x, config, colors)
+    case 'HeatMap':
+      return buildHeatMapMarks(data, x, y, series, colors)
+    case 'BoxPlot':
+      return buildBoxPlotMarks(data, x, y, colors)
     default:
       // Fallback: render as bar chart
       return buildBarMarks(data, x, y, series, config, colors)
@@ -241,6 +256,138 @@ function buildHistogramMarks(
   ]
 }
 
+function buildHeatMapMarks(
+  data: Record<string, unknown>[],
+  x: string | undefined,
+  y: string | undefined,
+  series: string | undefined,
+  _colors: readonly string[] | string[]
+): Plot.Markish[] {
+  if (!x || !y) return []
+  const fill = series ?? y
+  return [
+    Plot.cell(data, { x, y: series ? series : x, fill, tip: true }),
+  ]
+}
+
+function buildBoxPlotMarks(
+  data: Record<string, unknown>[],
+  x: string | undefined,
+  y: string | undefined,
+  colors: readonly string[] | string[]
+): Plot.Markish[] {
+  if (!x || !y) return []
+  return [
+    Plot.boxY(data, { x, y, fill: colors[0] }),
+  ]
+}
+
+// ── Annotation Mark Builders ────────────────────────────────────────────────
+
+function buildAnnotationMarks(annotations?: Annotations): Plot.Markish[] {
+  if (!annotations) return []
+
+  const marks: Plot.Markish[] = []
+
+  // Reference lines
+  for (const line of annotations.lines) {
+    const color = line.color ?? '#e45756'
+    const strokeDash = line.strokeDash ?? [6, 4]
+
+    if (line.axis === 'x') {
+      // Try to parse as date if it looks like an ISO date
+      const val = typeof line.value === 'string' && /^\d{4}-\d{2}/.test(line.value)
+        ? new Date(line.value)
+        : line.value
+      marks.push(
+        Plot.ruleX([val], { stroke: color, strokeDasharray: strokeDash.join(','), strokeWidth: 1.5 })
+      )
+      if (line.label) {
+        marks.push(
+          Plot.text([{ x: val, label: line.label }], {
+            x: 'x', text: 'label',
+            dy: -8, fontSize: 11, fill: color, fontWeight: 600,
+            frameAnchor: 'top',
+          })
+        )
+      }
+    } else {
+      marks.push(
+        Plot.ruleY([line.value], { stroke: color, strokeDasharray: strokeDash.join(','), strokeWidth: 1.5 })
+      )
+      if (line.label) {
+        marks.push(
+          Plot.text([{ y: line.value, label: line.label }], {
+            y: 'y', text: 'label',
+            dx: 4, fontSize: 11, fill: color, fontWeight: 600,
+            textAnchor: 'start', frameAnchor: 'right',
+          })
+        )
+      }
+    }
+  }
+
+  // Highlight ranges
+  for (const range of annotations.ranges) {
+    const color = range.color ?? '#e45756'
+    const opacity = range.opacity ?? 0.1
+
+    if (range.axis === 'x') {
+      marks.push(
+        Plot.rectX([{ x1: range.start, x2: range.end }], {
+          x1: 'x1', x2: 'x2',
+          fill: color, fillOpacity: opacity,
+        })
+      )
+      if (range.label) {
+        marks.push(
+          Plot.text([{ x: range.start, label: range.label }], {
+            x: 'x', text: 'label',
+            dy: -8, fontSize: 10, fill: color, fontWeight: 600,
+            frameAnchor: 'top', textAnchor: 'start',
+          })
+        )
+      }
+    } else {
+      marks.push(
+        Plot.rectY([{ y1: range.start, y2: range.end }], {
+          y1: 'y1', y2: 'y2',
+          fill: color, fillOpacity: opacity,
+        })
+      )
+      if (range.label) {
+        marks.push(
+          Plot.text([{ y: range.start, label: range.label }], {
+            y: 'y', text: 'label',
+            dx: 4, fontSize: 10, fill: color, fontWeight: 600,
+            textAnchor: 'start', frameAnchor: 'left',
+          })
+        )
+      }
+    }
+  }
+
+  // Text annotations
+  for (const ann of annotations.texts) {
+    const color = ann.color ?? '#333'
+    const fontSize = ann.fontSize ?? 12
+
+    // Parse x as date if it looks like ISO
+    const xVal = typeof ann.x === 'string' && /^\d{4}-\d{2}/.test(ann.x)
+      ? new Date(ann.x)
+      : ann.x
+
+    marks.push(
+      Plot.text([{ x: xVal, y: ann.y, label: ann.text }], {
+        x: 'x', y: 'y', text: 'label',
+        fontSize, fill: color, fontWeight: 500,
+      })
+    )
+  }
+
+  return marks
+}
+
 // ── Plot Options Builder ────────────────────────────────────────────────────
 
 function buildPlotOptions(
@@ -363,6 +510,133 @@ function BigValueChart({ data, config }: { data: Record<string, unknown>[]; conf
       )}
     </div>
   )
+}
+
+function PieChartComponent({ data, config, height }: { data: Record<string, unknown>[]; config: ChartConfig; height: number }) {
+  const containerRef = useRef<HTMLDivElement>(null)
+  const resolved = useThemeStore((s) => s.resolved)
+
+  useEffect(() => {
+    if (!containerRef.current || data.length === 0) return
+
+    const el = containerRef.current
+    el.innerHTML = ''
+
+    const labelField = config.x ?? Object.keys(data[0])[0]
+    const valueField = (config.value ?? config.y ?? Object.keys(data[0])[1]) as string
+    const width = el.clientWidth
+    const size = Math.min(width, height)
+    const radius = size / 2 - 20
+
+    const pieData = data.map((d) => ({
+      label: String(d[labelField] ?? ''),
+      value: Number(d[valueField] ?? 0),
+    })).filter((d) => d.value > 0)
+
+    const colors = config.color ? [config.color] : [...CHART_COLORS]
+    const colorScale = d3.scaleOrdinal(colors)
+
+    const pie = d3.pie<{ label: string; value: number }>().value((d) => d.value).sort(null)
+    const arc = d3.arc<d3.PieArcDatum<{ label: string; value: number }>>()
+      .innerRadius(radius * 0.4) // Donut
+      .outerRadius(radius)
+
+    const svg = d3.select(el).append('svg')
+      .attr('width', width)
+      .attr('height', size)
+      .attr('viewBox', `0 0 ${width} ${size}`)
+
+    const g = svg.append('g')
+      .attr('transform', `translate(${width / 2},${size / 2})`)
+
+    g.selectAll('path')
+      .data(pie(pieData))
+      .join('path')
+      .attr('d', arc as never)
+      .attr('fill', (_, i) => colorScale(String(i)))
+      .attr('stroke', resolved === 'dark' ? '#1e293b' : '#fff')
+      .attr('stroke-width', 2)
+
+    // Labels
+    const labelArc = d3.arc<d3.PieArcDatum<{ label: string; value: number }>>()
+      .innerRadius(radius * 0.75)
+      .outerRadius(radius * 0.75)
+
+    g.selectAll('text')
+      .data(pie(pieData))
+      .join('text')
+      .attr('transform', (d) => `translate(${labelArc.centroid(d)})`)
+      .attr('text-anchor', 'middle')
+      .attr('font-size', 11)
+      .attr('fill', resolved === 'dark' ? '#e2e8f0' : '#374151')
+      .text((d) => d.data.value > 0 ? d.data.label : '')
+
+    return () => { el.innerHTML = '' }
+  }, [data, config, height, resolved])
+
+  if (data.length === 0) return <p className="text-sm text-text-muted">No data</p>
+  return <div ref={containerRef} style={{ width: '100%', height }} />
+}
+
+function TreemapComponent({ data, config, height }: { data: Record<string, unknown>[]; config: ChartConfig; height: number }) {
+  const containerRef = useRef<HTMLDivElement>(null)
+  const resolved = useThemeStore((s) => s.resolved)
+
+  useEffect(() => {
+    if (!containerRef.current || data.length === 0) return
+
+    const el = containerRef.current
+    el.innerHTML = ''
+
+    const labelField = config.x ?? Object.keys(data[0])[0]
+    const valueField = (config.value ?? config.y ?? Object.keys(data[0])[1]) as string
+    const width = el.clientWidth
+
+    const treeData = data.map((d) => ({
+      name: String(d[labelField] ?? ''),
+      value: Math.abs(Number(d[valueField] ?? 0)),
+    })).filter((d) => d.value > 0)
+
+    interface TreeNode { name: string; value: number; children?: TreeNode[] }
+    const rootData: TreeNode = { name: 'root', value: 0, children: treeData }
+    const root = d3.hierarchy(rootData).sum((d) => d.value)
+
+    d3.treemap<TreeNode>().size([width, height]).padding(2)(root)
+
+    const colors = config.color ? [config.color] : [...CHART_COLORS]
+    const colorScale = d3.scaleOrdinal(colors)
+
+    const svg = d3.select(el).append('svg')
+      .attr('width', width)
+      .attr('height', height)
+
+    type TreeLeaf = d3.HierarchyRectangularNode<TreeNode>
+    const nodes = root.leaves() as TreeLeaf[]
+
+    svg.selectAll('rect')
+      .data(nodes)
+      .join('rect')
+      .attr('x', (d) => d.x0)
+      .attr('y', (d) => d.y0)
+      .attr('width', (d) => d.x1 - d.x0)
+      .attr('height', (d) => d.y1 - d.y0)
+      .attr('fill', (_, i) => colorScale(String(i)))
+      .attr('rx', 2)
+
+    svg.selectAll('text')
+      .data(nodes)
+      .join('text')
+      .attr('x', (d) => d.x0 + 4)
+      .attr('y', (d) => d.y0 + 14)
+      .attr('font-size', 11)
+      .attr('fill', resolved === 'dark' ? '#e2e8f0' : '#fff')
+      .text((d) => (d.x1 - d.x0) > 40 ? d.data.name : '')
+
+    return () => { el.innerHTML = '' }
+  }, [data, config, height, resolved])
+
+  if (data.length === 0) return <p className="text-sm text-text-muted">No data</p>
+  return <div ref={containerRef} style={{ width: '100%', height }} />
 }
 
 function DataTableChart({ data }: { data: Record<string, unknown>[]; config: ChartConfig }) {
