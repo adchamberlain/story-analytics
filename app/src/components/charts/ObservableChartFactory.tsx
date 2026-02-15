@@ -1,6 +1,7 @@
 import * as Plot from '@observablehq/plot'
 import { useObservablePlot } from '../../hooks/useObservablePlot'
 import { plotDefaults, CHART_COLORS } from '../../themes/datawrapper'
+import { useThemeStore } from '../../stores/themeStore'
 import type { ChartConfig, ChartType } from '../../types/chart'
 
 interface ObservableChartFactoryProps {
@@ -20,6 +21,7 @@ export function ObservableChartFactory({
   chartType,
   height = 320,
 }: ObservableChartFactoryProps) {
+  const resolved = useThemeStore((s) => s.resolved)
   const colors = config.color
     ? [config.color]
     : [...CHART_COLORS]
@@ -27,10 +29,10 @@ export function ObservableChartFactory({
   const { containerRef } = useObservablePlot(
     (width) => {
       const marks = buildMarks(chartType, data, config, colors)
-      const plotOptions = buildPlotOptions(chartType, config, colors, width, height)
+      const plotOptions = buildPlotOptions(chartType, data, config, colors, width, height)
       return Plot.plot({ ...plotOptions, marks })
     },
-    [data, config, chartType, height]
+    [data, config, chartType, height, resolved]
   )
 
   // Non-Plot chart types
@@ -243,6 +245,7 @@ function buildHistogramMarks(
 
 function buildPlotOptions(
   _chartType: ChartType,
+  data: Record<string, unknown>[],
   config: ChartConfig,
   colors: readonly string[] | string[],
   width: number,
@@ -250,9 +253,25 @@ function buildPlotOptions(
 ): Record<string, unknown> {
   const overrides: Record<string, unknown> = {}
 
+  // Preserve data ordering for ordinal (string) x-axis values.
+  // Observable Plot sorts ordinal domains alphabetically by default,
+  // which breaks chronological or custom SQL ORDER BY.
+  if (config.x && data.length > 0) {
+    const sample = data[0][config.x]
+    if (typeof sample === 'string' && !/^\d{4}-\d{2}/.test(sample)) {
+      const seen = new Set<string>()
+      const domain: string[] = []
+      for (const row of data) {
+        const v = row[config.x] as string
+        if (!seen.has(v)) { seen.add(v); domain.push(v) }
+      }
+      overrides.x = { ...getBaseAxis(), domain }
+    }
+  }
+
   // Axis labels
   if (config.xAxisTitle || config.yAxisTitle) {
-    if (config.xAxisTitle) overrides.x = { ...getBaseAxis(), label: config.xAxisTitle }
+    if (config.xAxisTitle) overrides.x = { ...(overrides.x as Record<string, unknown> ?? {}), ...getBaseAxis(), label: config.xAxisTitle }
     if (config.yAxisTitle) overrides.y = { ...getBaseAxis(), label: config.yAxisTitle, grid: true }
   }
 
@@ -273,8 +292,8 @@ function buildPlotOptions(
     overrides.grid = false
   }
 
-  // Color range
-  overrides.color = { range: [...colors] }
+  // Color range + legend when series is in use
+  overrides.color = { range: [...colors], ...(config.series ? { legend: true } : {}) }
 
   return plotDefaults({
     width,
@@ -338,7 +357,7 @@ function BigValueChart({ data, config }: { data: Record<string, unknown>[]; conf
         >
           {delta >= 0 ? '+' : ''}{delta.toLocaleString()}
           {config.comparisonLabel && (
-            <span className="text-gray-400 ml-1 font-normal">{config.comparisonLabel}</span>
+            <span className="text-text-muted ml-1 font-normal">{config.comparisonLabel}</span>
           )}
         </div>
       )}
@@ -347,7 +366,7 @@ function BigValueChart({ data, config }: { data: Record<string, unknown>[]; conf
 }
 
 function DataTableChart({ data }: { data: Record<string, unknown>[]; config: ChartConfig }) {
-  if (data.length === 0) return <p className="text-sm text-gray-400">No data</p>
+  if (data.length === 0) return <p className="text-sm text-text-muted">No data</p>
 
   const columns = Object.keys(data[0])
 
@@ -359,7 +378,7 @@ function DataTableChart({ data }: { data: Record<string, unknown>[]; config: Cha
             {columns.map((col) => (
               <th
                 key={col}
-                className="text-left px-3 py-2 border-b-2 border-gray-200 font-semibold text-text-primary text-xs"
+                className="text-left px-3 py-2 border-b-2 border-border-default font-semibold text-text-primary text-xs"
               >
                 {col}
               </th>
@@ -368,9 +387,9 @@ function DataTableChart({ data }: { data: Record<string, unknown>[]; config: Cha
         </thead>
         <tbody>
           {data.map((row, i) => (
-            <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+            <tr key={i} className={i % 2 === 0 ? 'bg-surface' : 'bg-surface-secondary'}>
               {columns.map((col) => (
-                <td key={col} className="px-3 py-1.5 border-b border-gray-100" style={{ fontSize: 12 }}>
+                <td key={col} className="px-3 py-1.5 border-b border-border-subtle" style={{ fontSize: 12 }}>
                   {String(row[col] ?? '')}
                 </td>
               ))}

@@ -8,6 +8,7 @@ import os
 import uuid
 import csv
 import tempfile
+from datetime import datetime, timezone
 from pathlib import Path
 from dataclasses import dataclass, field
 
@@ -16,6 +17,12 @@ import duckdb
 
 DATA_DIR = Path(__file__).parent.parent.parent / "data" / "uploads"
 CACHE_DIR = Path(__file__).parent.parent.parent / "data" / "snowflake_saas"
+
+
+@dataclass
+class SourceMeta:
+    path: Path
+    ingested_at: datetime
 
 
 @dataclass
@@ -50,7 +57,7 @@ class DuckDBService:
 
     def __init__(self) -> None:
         self._conn = duckdb.connect(":memory:")
-        self._sources: dict[str, Path] = {}
+        self._sources: dict[str, SourceMeta] = {}
         DATA_DIR.mkdir(parents=True, exist_ok=True)
 
     def ingest_csv(self, file_path: Path, filename: str) -> SourceSchema:
@@ -65,7 +72,7 @@ class DuckDBService:
             import shutil
             shutil.copy2(file_path, stored_path)
 
-        self._sources[source_id] = stored_path
+        self._sources[source_id] = SourceMeta(path=stored_path, ingested_at=datetime.now(timezone.utc))
         table_name = f"src_{source_id}"
 
         # Detect delimiter
@@ -91,7 +98,7 @@ class DuckDBService:
             SELECT * FROM read_parquet('{parquet_path}')
         """)
 
-        self._sources[source_id] = parquet_path
+        self._sources[source_id] = SourceMeta(path=parquet_path, ingested_at=datetime.now(timezone.utc))
         schema = self._inspect_table(table_name, source_id, table_name_hint)
         return schema
 
@@ -211,7 +218,7 @@ class DuckDBService:
             # Common patterns: FROM data, FROM "data", FROM table_name
             if source_id in self._sources:
                 # Get the stem of the original filename as a possible table reference
-                stem = self._sources[source_id].stem
+                stem = self._sources[source_id].path.stem
                 for ref in [stem, stem.lower(), stem.upper(), "data", "uploaded_data"]:
                     if ref in processed_sql:
                         processed_sql = processed_sql.replace(ref, table_name)
@@ -228,10 +235,16 @@ class DuckDBService:
 
         return QueryResult(columns=columns, rows=rows, row_count=len(rows))
 
+    def get_ingested_at(self, source_id: str) -> datetime | None:
+        """Return the UTC timestamp when a source was ingested, or None."""
+        meta = self._sources.get(source_id)
+        return meta.ingested_at if meta else None
+
     def get_schema(self, source_id: str) -> SourceSchema:
         """Get schema information for an uploaded source."""
         table_name = f"src_{source_id}"
-        filename = self._sources.get(source_id, Path("unknown")).name
+        meta = self._sources.get(source_id)
+        filename = meta.path.name if meta else "unknown"
         return self._inspect_table(table_name, source_id, filename)
 
     def _inspect_table(self, table_name: str, source_id: str, filename: str) -> SourceSchema:

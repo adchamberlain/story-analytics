@@ -23,11 +23,11 @@ function shortType(duckdbType: string): string {
 export function ColumnDropdown({ label, value, columns, columnTypes, allowNone = false, onChange }: ColumnDropdownProps) {
   return (
     <div>
-      <label className="block text-xs font-medium text-gray-500 mb-1">{label}</label>
+      <label className="block text-xs font-medium text-text-secondary mb-1">{label}</label>
       <select
         value={value ?? ''}
         onChange={(e) => onChange(e.target.value || null)}
-        className="w-full px-2 py-1.5 text-sm border border-gray-200 rounded-md bg-white focus:outline-none focus:border-blue-400"
+        className="w-full px-2 py-1.5 text-sm border border-border-default rounded-md bg-surface text-text-primary focus:outline-none focus:border-blue-400"
       >
         {allowNone && <option value="">None</option>}
         {!allowNone && !value && <option value="">Select...</option>}

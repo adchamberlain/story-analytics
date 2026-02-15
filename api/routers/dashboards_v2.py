@@ -5,7 +5,10 @@ A dashboard is an ordered collection of chart references rendered in a grid.
 
 from __future__ import annotations
 
+import difflib
+import re
 import traceback
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
@@ -65,6 +68,15 @@ class ChartWithData(BaseModel):
     data: list[dict]
     columns: list[str]
     error: str | None = None
+    # 11.2: Data freshness
+    data_ingested_at: str | None = None
+    freshness: str | None = None
+    # 11.3: Schema change detection
+    error_type: str | None = None
+    error_suggestion: str | None = None
+    # 11.4: Health status
+    health_status: str = "healthy"
+    health_issues: list[str] = []
 
 
 class DashboardWithDataResponse(BaseModel):
@@ -74,6 +86,132 @@ class DashboardWithDataResponse(BaseModel):
     charts: list[ChartWithData]
     created_at: str
     updated_at: str
+    has_stale_data: bool = False
+
+
+class ChartHealthResult(BaseModel):
+    chart_id: str
+    health_status: str
+    health_issues: list[str]
+
+
+class HealthCheckResponse(BaseModel):
+    dashboard_id: str
+    checked_at: str
+    charts: list[ChartHealthResult]
+    overall_status: str
+
+
+# ── Helpers ─────────────────────────────────────────────────────────────────
+
+def _compute_freshness(ingested_at: datetime | None) -> str | None:
+    """Compute freshness bucket from ingestion timestamp."""
+    if ingested_at is None:
+        return None
+    age_hours = (datetime.now(timezone.utc) - ingested_at).total_seconds() / 3600
+    if age_hours < 1:
+        return "fresh"
+    elif age_hours < 24:
+        return "aging"
+    else:
+        return "stale"
+
+
+_SCHEMA_CHANGE_PATTERNS = [
+    re.compile(r'does not have a column with name "([^"]+)"', re.IGNORECASE),
+    re.compile(r'Referenced column "([^"]+)" not found', re.IGNORECASE),
+    re.compile(r'column "([^"]+)" (?:not found|does not exist)', re.IGNORECASE),
+    re.compile(r'Binder Error:.*"([^"]+)".*not found', re.IGNORECASE),
+]
+
+_SOURCE_MISSING_PATTERNS = [
+    re.compile(r'Table .* does not exist', re.IGNORECASE),
+    re.compile(r'Catalog Error:.*Table.*not found', re.IGNORECASE),
+]
+
+
+def _classify_sql_error(
+    error_str: str,
+    source_id: str | None,
+) -> tuple[str, str, str | None]:
+    """Classify a DuckDB error into (error_message, error_type, error_suggestion).
+
+    Returns:
+        (error_message, error_type, error_suggestion) where error_type is one of
+        "schema_change", "source_missing", or "sql_error".
+    """
+    db = get_duckdb_service()
+
+    # Check schema change patterns
+    for pattern in _SCHEMA_CHANGE_PATTERNS:
+        match = pattern.search(error_str)
+        if match:
+            missing_col = match.group(1)
+            suggestion = None
+            if source_id:
+                try:
+                    schema = db.get_schema(source_id)
+                    current_cols = [c.name for c in schema.columns]
+                    close = difflib.get_close_matches(missing_col, current_cols, n=3, cutoff=0.4)
+                    if close:
+                        suggestion = f'Column "{missing_col}" no longer exists. Did you mean: {", ".join(close)}?'
+                    else:
+                        suggestion = (
+                            f'Column "{missing_col}" no longer exists. '
+                            f"Available columns: {', '.join(current_cols[:10])}"
+                        )
+                except Exception:
+                    suggestion = f'Column "{missing_col}" no longer exists.'
+            return (f"SQL execution failed: {error_str}", "schema_change", suggestion)
+
+    # Check source missing patterns
+    for pattern in _SOURCE_MISSING_PATTERNS:
+        if pattern.search(error_str):
+            return (
+                f"SQL execution failed: {error_str}",
+                "source_missing",
+                "The data source may need to be re-uploaded or reconnected.",
+            )
+
+    # Generic SQL error
+    return (f"SQL execution failed: {error_str}", "sql_error", None)
+
+
+def _compute_health_status(
+    error: str | None,
+    error_type: str | None,
+    freshness: str | None,
+    row_count: int,
+) -> tuple[str, list[str]]:
+    """Compute health status and issues list from chart state.
+
+    Returns:
+        (health_status, health_issues) where health_status is one of
+        "healthy", "warning", or "error".
+    """
+    issues: list[str] = []
+
+    if error:
+        if error_type in ("schema_change", "source_missing"):
+            issues.append(f"Error: {error_type.replace('_', ' ')}")
+        else:
+            issues.append("SQL execution error")
+        return ("error", issues)
+
+    if freshness == "stale":
+        issues.append("Data is more than 24 hours old")
+    if row_count == 0:
+        issues.append("Query returned 0 rows")
+
+    if issues:
+        return ("warning", issues)
+
+    return ("healthy", [])
+
+
+# ── Health check cache ──────────────────────────────────────────────────────
+
+_health_cache: dict[str, HealthCheckResponse] = {}
 
 
 # ── Endpoints ────────────────────────────────────────────────────────────────
@@ -123,6 +261,7 @@ async def get_dashboard(dashboard_id: str):
 
     db = get_duckdb_service()
     charts_with_data: list[ChartWithData] = []
+    any_stale = False
 
     for ref in dashboard.charts:
         chart_id = ref.get("chart_id", "")
@@ -139,12 +278,17 @@ async def get_dashboard(dashboard_id: str):
                 horizontal=False, sort=True, config=None,
                 data=[], columns=[],
                 error=f"Chart {chart_id} not found",
+                error_type="source_missing",
+                health_status="error",
+                health_issues=[f"Chart {chart_id} not found"],
             ))
             continue
 
         data: list[dict] = []
         columns: list[str] = []
         error: str | None = None
+        error_type: str | None = None
+        error_suggestion: str | None = None
 
         if chart.sql:
             try:
@@ -153,7 +297,22 @@ async def get_dashboard(dashboard_id: str):
                 columns = result.columns
             except Exception as e:
                 traceback.print_exc()
-                error = f"SQL execution failed: {e}"
+                error, error_type, error_suggestion = _classify_sql_error(
+                    str(e), chart.source_id
+                )
+
+        # Freshness
+        ingested_at = db.get_ingested_at(chart.source_id)
+        ingested_at_iso = ingested_at.isoformat() if ingested_at else None
+        freshness = _compute_freshness(ingested_at)
+        if freshness == "stale":
+            any_stale = True
+
+        # Health
+        row_count = len(data)
+        health_status, health_issues = _compute_health_status(
+            error, error_type, freshness, row_count
+        )
 
         charts_with_data.append(ChartWithData(
             chart_id=chart.id,
@@ -171,6 +330,12 @@ async def get_dashboard(dashboard_id: str):
             data=data,
             columns=columns,
             error=error,
+            data_ingested_at=ingested_at_iso,
+            freshness=freshness,
+            error_type=error_type,
+            error_suggestion=error_suggestion,
+            health_status=health_status,
+            health_issues=health_issues,
         ))
 
     return DashboardWithDataResponse(
@@ -180,7 +345,50 @@ async def get_dashboard(dashboard_id: str):
         charts=charts_with_data,
         created_at=dashboard.created_at,
         updated_at=dashboard.updated_at,
+        has_stale_data=any_stale,
     )
+
+
+@router.post("/{dashboard_id}/health-check", response_model=HealthCheckResponse)
+async def run_health_check(dashboard_id: str):
+    """Run data-level health checks for all charts in a dashboard."""
+    # Re-use get_dashboard to get full chart state
+    dashboard_data = await get_dashboard(dashboard_id)
+
+    chart_results: list[ChartHealthResult] = []
+    worst_status = "healthy"
+
+    for chart in dashboard_data.charts:
+        chart_results.append(ChartHealthResult(
+            chart_id=chart.chart_id,
+            health_status=chart.health_status,
+            health_issues=chart.health_issues,
+        ))
+        if chart.health_status == "error":
+            worst_status = "error"
+        elif chart.health_status == "warning" and worst_status != "error":
+            worst_status = "warning"
+
+    result = HealthCheckResponse(
+        dashboard_id=dashboard_id,
+        checked_at=datetime.now(timezone.utc).isoformat(),
+        charts=chart_results,
+        overall_status=worst_status,
+    )
+
+    _health_cache[dashboard_id] = result
+    return result
+
+
+@router.get("/{dashboard_id}/health", response_model=HealthCheckResponse)
+async def get_health(dashboard_id: str):
+    """Get cached health check results (without re-running checks)."""
+    if dashboard_id not in _health_cache:
+        raise HTTPException(
+            status_code=404,
+            detail="No health check results found. Run POST /health-check first.",
+        )
+    return _health_cache[dashboard_id]
 
 
 @router.put("/{dashboard_id}", response_model=DashboardResponse)

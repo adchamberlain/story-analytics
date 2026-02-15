@@ -24,7 +24,7 @@ export function ChartTypeSelector({ value, onChange }: ChartTypeSelectorProps) {
             flex flex-col items-center gap-1 px-2 py-2.5 rounded-lg text-xs transition-colors border
             ${value === type
               ? 'bg-blue-50 border-blue-300 text-blue-700'
-              : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+              : 'bg-surface border-border-default text-text-on-surface hover:bg-surface-secondary'
             }
           `}
         >

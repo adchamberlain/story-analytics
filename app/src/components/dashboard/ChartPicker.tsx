@@ -55,38 +55,38 @@ export function ChartPicker({ excludeIds, onAdd, onCreateNew, onClose }: ChartPi
   })
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay" onClick={onClose}>
       <div
-        className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[70vh] flex flex-col"
+        className="bg-surface rounded-xl shadow-xl w-full max-w-lg max-h-[70vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="px-5 py-4 border-b border-gray-200 flex items-center justify-between">
+        <div className="px-5 py-4 border-b border-border-default flex items-center justify-between">
           <h2 className="text-sm font-semibold text-text-primary">Add Chart</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-lg">&times;</button>
+          <button onClick={onClose} className="text-text-icon hover:text-text-icon-hover text-lg">&times;</button>
         </div>
 
         {/* Create New */}
         {onCreateNew && (
-          <div className="px-5 py-3 border-b border-gray-100">
+          <div className="px-5 py-3 border-b border-border-subtle">
             <button
               onClick={onCreateNew}
               className="w-full text-left px-4 py-3 rounded-lg border-2 border-dashed border-blue-300 hover:border-blue-400 hover:bg-blue-50 transition-colors"
             >
               <p className="text-sm font-medium text-blue-600">+ Create New Chart</p>
-              <p className="text-xs text-gray-500 mt-0.5">Pick a data source and build a chart</p>
+              <p className="text-xs text-text-secondary mt-0.5">Pick a data source and build a chart</p>
             </button>
           </div>
         )}
 
         {/* Search */}
-        <div className="px-5 py-3 border-b border-gray-100">
+        <div className="px-5 py-3 border-b border-border-subtle">
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search charts..."
-            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:border-blue-400"
+            className="w-full px-3 py-2 text-sm border border-border-strong rounded-lg bg-surface text-text-primary focus:outline-none focus:border-blue-400"
             autoFocus
           />
         </div>
@@ -105,7 +105,7 @@ export function ChartPicker({ excludeIds, onAdd, onCreateNew, onClose }: ChartPi
                 <button
                   key={chart.id}
                   onClick={() => onAdd(chart.id)}
-                  className="w-full text-left px-4 py-3 rounded-lg border border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-colors flex items-center justify-between"
+                  className="w-full text-left px-4 py-3 rounded-lg border border-border-default hover:border-blue-300 hover:bg-blue-50 transition-colors flex items-center justify-between"
                 >
                   <div>
                     <p className="text-sm font-medium text-text-primary">

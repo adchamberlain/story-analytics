@@ -50,7 +50,7 @@ export function DashboardsHome() {
 
   if (error) {
     return (
-      <div className="max-w-6xl mx-auto px-6 py-8">
+      <div className="max-w-6xl mx-auto px-6 py-10">
         <div className="bg-red-50 border border-red-200 rounded-lg px-6 py-4 text-center">
           <p className="text-sm text-red-700">{error}</p>
         </div>
@@ -59,23 +59,27 @@ export function DashboardsHome() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto px-6 py-8">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-lg font-semibold text-text-primary">Dashboards</h1>
+    <div className="max-w-6xl mx-auto px-6 py-10">
+      <div className="flex items-center justify-between mb-8">
+        <h1 className="text-2xl font-bold text-text-primary">Dashboards</h1>
       </div>
 
       {dashboards.length === 0 ? (
-        <div className="text-center py-20 border-2 border-dashed border-gray-200 rounded-xl">
-          <p className="text-sm text-text-secondary">No dashboards yet.</p>
+        <div className="text-center py-20 border-2 border-dashed border-border-default rounded-xl">
+          <svg className="mx-auto h-12 w-12 text-text-icon mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" />
+          </svg>
+          <h2 className="text-base font-semibold text-text-primary mb-1">No dashboards yet</h2>
+          <p className="text-sm text-text-secondary mb-5">Create your first dashboard to get started.</p>
           <Link
             to="/dashboard/new"
-            className="mt-3 inline-block text-sm text-blue-600 underline hover:text-blue-800"
+            className="inline-flex items-center px-4 py-2 text-sm rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors font-medium"
           >
-            Create your first dashboard
+            + New Dashboard
           </Link>
         </div>
       ) : (
-        <div className="grid gap-4 grid-cols-[repeat(auto-fill,minmax(300px,1fr))]">
+        <div className="grid gap-5 grid-cols-[repeat(auto-fill,minmax(300px,1fr))]">
           {dashboards.map((d) => (
             <DashboardCard key={d.id} dashboard={d} />
           ))}
@@ -91,22 +95,30 @@ function DashboardCard({ dashboard }: { dashboard: DashboardSummary }) {
     day: 'numeric',
     year: 'numeric',
   })
+  const isPinned = localStorage.getItem('pinnedDashboardId') === dashboard.id
 
   return (
     <Link
       to={`/dashboard/${dashboard.id}`}
-      className="bg-white rounded-lg border border-gray-200 p-5 flex flex-col hover:border-gray-300 transition-colors"
+      className="bg-surface-raised rounded-xl border border-border-default shadow-card hover:shadow-card-hover p-6 flex flex-col transition-shadow"
     >
-      <h3 className="text-sm font-semibold text-text-primary mb-1 line-clamp-2">
-        {dashboard.title || 'Untitled'}
-      </h3>
+      <div className="flex items-start justify-between gap-2">
+        <h3 className="text-base font-semibold text-text-primary mb-1 line-clamp-2">
+          {dashboard.title || 'Untitled'}
+        </h3>
+        {isPinned && (
+          <svg className="h-4 w-4 text-blue-500 shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 3.75V16.5L12 14.25 7.5 16.5V3.75m9 0H18A2.25 2.25 0 0120.25 6v12A2.25 2.25 0 0118 20.25H6A2.25 2.25 0 013.75 18V6A2.25 2.25 0 016 3.75h1.5m9 0h-9" />
+          </svg>
+        )}
+      </div>
       {dashboard.description && (
-        <p className="text-xs text-text-secondary mb-3 line-clamp-2">
+        <p className="text-sm text-text-secondary mb-3 line-clamp-2">
           {dashboard.description}
         </p>
       )}
       <div className="flex-1" />
-      <div className="flex items-center justify-between mt-4 pt-3 border-t border-gray-100">
+      <div className="flex items-center justify-between mt-4 pt-3 border-t border-border-subtle">
         <span className="text-xs text-text-muted">
           {dashboard.chart_count} chart{dashboard.chart_count !== 1 ? 's' : ''}
         </span>

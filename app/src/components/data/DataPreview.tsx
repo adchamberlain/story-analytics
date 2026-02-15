@@ -10,9 +10,9 @@ interface DataPreviewProps {
 
 export function DataPreview({ filename, rowCount, columns, preview, loadingPreview }: DataPreviewProps) {
   return (
-    <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+    <div className="bg-surface-raised rounded-lg border border-border-default overflow-hidden">
       {/* Header */}
-      <div className="px-6 py-4 border-b border-gray-100">
+      <div className="px-6 py-4 border-b border-border-subtle">
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-base font-semibold text-text-primary">
@@ -26,12 +26,12 @@ export function DataPreview({ filename, rowCount, columns, preview, loadingPrevi
       </div>
 
       {/* Column schema */}
-      <div className="px-6 py-3 border-b border-gray-100 bg-gray-50">
+      <div className="px-6 py-3 border-b border-border-subtle bg-surface-secondary">
         <div className="flex flex-wrap gap-2">
           {columns.map((col) => (
             <div key={col.name} className="flex items-center gap-1.5 text-xs">
               <span className="font-medium text-text-primary">{col.name}</span>
-              <span className="px-1.5 py-0.5 rounded bg-gray-200 text-gray-600 font-mono text-[10px]">
+              <span className="px-1.5 py-0.5 rounded bg-surface-inset text-text-on-surface font-mono text-[10px]">
                 {formatType(col.type)}
               </span>
               {col.null_count > 0 && (
@@ -46,12 +46,12 @@ export function DataPreview({ filename, rowCount, columns, preview, loadingPrevi
 
       {/* Data preview table */}
       {loadingPreview ? (
-        <div className="px-6 py-8 text-center text-sm text-gray-400">Loading preview...</div>
+        <div className="px-6 py-8 text-center text-sm text-text-muted">Loading preview...</div>
       ) : preview ? (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-gray-200">
+              <tr className="border-b border-border-default">
                 {preview.columns.map((col) => (
                   <th
                     key={col}
@@ -64,11 +64,11 @@ export function DataPreview({ filename, rowCount, columns, preview, loadingPrevi
             </thead>
             <tbody>
               {preview.rows.map((row, i) => (
-                <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                <tr key={i} className={i % 2 === 0 ? 'bg-surface' : 'bg-surface-secondary'}>
                   {preview.columns.map((col) => (
                     <td
                       key={col}
-                      className="px-4 py-1.5 border-b border-gray-50 whitespace-nowrap text-xs text-gray-800"
+                      className="px-4 py-1.5 border-b border-border-subtle whitespace-nowrap text-xs text-text-primary"
                     >
                       {formatCell(row[col])}
                     </td>

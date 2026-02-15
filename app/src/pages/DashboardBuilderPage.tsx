@@ -78,7 +78,7 @@ export function DashboardBuilderPage() {
 
   if (store.loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-surface-secondary flex items-center justify-center">
         <div className="text-center">
           <svg className="animate-spin h-8 w-8 mx-auto text-blue-500 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
@@ -91,19 +91,19 @@ export function DashboardBuilderPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-surface-secondary">
       {/* Header */}
-      <header className="bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between">
+      <header className="bg-surface border-b border-border-default px-6 py-3 flex items-center justify-between">
         <button
           onClick={() => navigate(-1)}
-          className="text-sm text-gray-500 hover:text-gray-700 transition-colors"
+          className="text-sm text-text-secondary hover:text-text-on-surface transition-colors"
         >
           &larr; Back
         </button>
         <div className="flex items-center gap-2">
           <button
             onClick={() => store.setPickerOpen(true)}
-            className="px-3 py-1.5 text-sm rounded border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors"
+            className="px-3 py-1.5 text-sm rounded border border-border-default text-text-on-surface hover:bg-surface-secondary transition-colors"
           >
             + Add Chart
           </button>
@@ -132,20 +132,20 @@ export function DashboardBuilderPage() {
             value={store.title}
             onChange={(e) => store.setTitle(e.target.value)}
             placeholder="Dashboard title"
-            className="w-full text-2xl font-semibold bg-transparent border-none focus:outline-none placeholder:text-gray-300 text-text-primary"
+            className="w-full text-2xl font-semibold bg-transparent border-none focus:outline-none placeholder:text-text-icon text-text-primary"
           />
           <input
             type="text"
             value={store.description}
             onChange={(e) => store.setDescription(e.target.value)}
             placeholder="Add a description..."
-            className="w-full text-sm bg-transparent border-none focus:outline-none placeholder:text-gray-300 text-text-secondary"
+            className="w-full text-sm bg-transparent border-none focus:outline-none placeholder:text-text-icon text-text-secondary"
           />
         </div>
 
         {/* Chart list */}
         {store.charts.length === 0 ? (
-          <div className="text-center py-20 border-2 border-dashed border-gray-200 rounded-xl">
+          <div className="text-center py-20 border-2 border-dashed border-border-default rounded-xl">
             <p className="text-sm text-text-muted">
               No charts yet. Click "Add Chart" to get started.
             </p>
@@ -212,10 +212,10 @@ function BuilderChartCard({
     ? CHART_TYPE_LABELS[meta.chart_type] ?? meta.chart_type
     : '...'
 
-  const btnClass = 'text-xs px-2 py-1 rounded border border-gray-200 text-gray-500 hover:bg-gray-50 transition-colors disabled:opacity-30'
+  const btnClass = 'text-xs px-2 py-1 rounded border border-border-default text-text-secondary hover:bg-surface-secondary transition-colors disabled:opacity-30'
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 px-5 py-4 flex items-center gap-4">
+    <div className="bg-surface-raised rounded-lg border border-border-default px-5 py-4 flex items-center gap-4">
       {/* Order controls */}
       <div className="flex flex-col gap-1">
         <button onClick={() => onMove('up')} disabled={index === 0} className={btnClass}>
@@ -243,7 +243,7 @@ function BuilderChartCard({
         className={`text-xs px-3 py-1.5 rounded border transition-colors ${
           ref_.width === 'full'
             ? 'border-blue-300 text-blue-600 bg-blue-50'
-            : 'border-gray-200 text-gray-500 hover:bg-gray-50'
+            : 'border-border-default text-text-secondary hover:bg-surface-secondary'
         }`}
       >
         {ref_.width === 'full' ? 'Full width' : 'Half width'}

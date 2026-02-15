@@ -3,7 +3,7 @@ import { TopNav } from './TopNav'
 
 export function AppShell() {
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-surface-secondary">
       <TopNav />
       <Outlet />
     </div>

@@ -519,6 +519,8 @@ AI (assistant role):
 
 ## Priority Order
 
+> **Status as of 2026-02-14:** Phases 1–11 are complete. The core product (database connections, human-driven chart creation, dashboard workflow, data refresh/maintenance) is fully functional. Phase 12 (team & sharing) is the next major milestone.
+
 | Phase | Scope | Status |
 |-------|-------|--------|
 | ~~Phase 1~~ | ~~Observable Plot rendering~~ | Done (v2 PoC) |
@@ -527,14 +529,14 @@ AI (assistant role):
 | ~~Phase 4~~ | ~~Chart editor (toolbox + AI chat)~~ | Done (v2 PoC) — toolbox carries forward |
 | ~~Phase 5~~ | ~~Publishing + sharing~~ | Done (v2 PoC) |
 | ~~Phase 6~~ | ~~Dashboard assembly~~ | Done (v2 PoC) |
-| **Phase 7** | Frontend architecture reset | **Next** — remove v1, dashboard-first nav, unify styling |
-| **Phase 8** | Database connections (Snowflake) | Primary data path |
-| **Phase 9** | Human-driven chart creation | Editor as creation interface, enhanced toolbox |
-| **Phase 10** | Dashboard-first workflow | Dashboards as home, pin default, creation in context |
-| **Phase 11** | Data refresh & maintenance | Living dashboards, schema detection, QA |
-| **Phase 12** | Team & sharing | Future — multi-user, shared dashboards |
+| ~~Phase 7~~ | ~~Frontend architecture reset~~ | Done — v1 removed, dashboard-first nav, Tailwind v4, visual refresh |
+| ~~Phase 8~~ | ~~Database connections (Snowflake)~~ | Done — Snowflake PAT auth, table browser, connection UI |
+| ~~Phase 9~~ | ~~Human-driven chart creation~~ | Done — editor as creation interface, toolbox, custom SQL mode |
+| ~~Phase 10~~ | ~~Dashboard-first workflow~~ | Done (partial) — dashboard view/builder exist; pin-to-default and dashboard-level data source not yet implemented |
+| ~~Phase 11~~ | ~~Data refresh & maintenance~~ | Done — manual refresh, freshness monitoring, schema change detection, health checks |
+| **Phase 12** | Team & sharing | **Next** — multi-user, shared dashboards |
 
-Phases 7 and 8 can be built in parallel (frontend reset + backend connections). Phase 9 depends on Phase 8 (need database schema for column mapping). Phase 10 depends on Phase 9 (need chart creation for dashboard building). Phase 11 is post-launch polish. Phase 12 is future.
+Phase 12 is the next major milestone. Pin-to-default dashboard and dashboard-level data source are minor follow-ups from Phase 10 that can be addressed as needed.
 
 ---
 

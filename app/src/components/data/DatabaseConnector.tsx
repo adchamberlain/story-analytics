@@ -250,9 +250,9 @@ export function DatabaseConnector({ onSynced }: DatabaseConnectorProps) {
     return (
       <button
         onClick={handleOpen}
-        className="w-full border-2 border-dashed border-gray-300 rounded-xl p-8 text-center cursor-pointer hover:border-blue-300 hover:bg-blue-50 transition-colors bg-white"
+        className="w-full border-2 border-dashed border-border-strong rounded-xl p-8 text-center cursor-pointer hover:border-blue-300 hover:bg-blue-50 transition-colors bg-surface"
       >
-        <svg className="h-10 w-10 mx-auto text-gray-300 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+        <svg className="h-10 w-10 mx-auto text-text-icon mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 0v3.75m-16.5-3.75v3.75m16.5 0v3.75C20.25 16.153 16.556 18 12 18s-8.25-1.847-8.25-4.125v-3.75m16.5 0c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125" />
         </svg>
         <p className="text-sm font-medium text-text-primary">Connect to Database</p>
@@ -264,10 +264,10 @@ export function DatabaseConnector({ onSynced }: DatabaseConnectorProps) {
   // ── Pick saved connection ─────────────────────────────────────────────────
   if (step === 'pick') {
     return (
-      <div className="rounded-lg border border-gray-200 bg-white overflow-hidden">
-        <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+      <div className="rounded-lg border border-border-default bg-surface overflow-hidden">
+        <div className="px-5 py-4 border-b border-border-subtle flex items-center justify-between">
           <h3 className="text-sm font-medium text-text-primary">Connect to Database</h3>
-          <button onClick={handleClose} className="text-xs text-gray-400 hover:text-gray-600">&times; Close</button>
+          <button onClick={handleClose} className="text-xs text-text-icon hover:text-text-icon-hover">&times; Close</button>
         </div>
 
         <div className="p-5 space-y-3">
@@ -280,7 +280,7 @@ export function DatabaseConnector({ onSynced }: DatabaseConnectorProps) {
                   key={conn.connection_id}
                   onClick={() => handleSelectSaved(conn)}
                   disabled={testing}
-                  className="w-full text-left px-4 py-3 rounded-lg border border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-colors flex items-center justify-between disabled:opacity-50"
+                  className="w-full text-left px-4 py-3 rounded-lg border border-border-default hover:border-blue-300 hover:bg-blue-50 transition-colors flex items-center justify-between disabled:opacity-50"
                 >
                   <div>
                     <p className="text-sm font-medium text-text-primary">{conn.name}</p>
@@ -296,7 +296,7 @@ export function DatabaseConnector({ onSynced }: DatabaseConnectorProps) {
 
               <button
                 onClick={handleNewConnection}
-                className="w-full px-4 py-3 rounded-lg border border-dashed border-gray-300 hover:border-blue-300 hover:bg-blue-50 transition-colors text-sm text-text-muted text-center"
+                className="w-full px-4 py-3 rounded-lg border border-dashed border-border-strong hover:border-blue-300 hover:bg-blue-50 transition-colors text-sm text-text-muted text-center"
               >
                 + New Connection
               </button>
@@ -312,10 +312,10 @@ export function DatabaseConnector({ onSynced }: DatabaseConnectorProps) {
   // ── New connection form ───────────────────────────────────────────────────
   if (step === 'form') {
     return (
-      <div className="rounded-lg border border-gray-200 bg-white overflow-hidden">
-        <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+      <div className="rounded-lg border border-border-default bg-surface overflow-hidden">
+        <div className="px-5 py-4 border-b border-border-subtle flex items-center justify-between">
           <h3 className="text-sm font-medium text-text-primary">New Snowflake Connection</h3>
-          <button onClick={handleClose} className="text-xs text-gray-400 hover:text-gray-600">&times; Close</button>
+          <button onClick={handleClose} className="text-xs text-text-icon hover:text-text-icon-hover">&times; Close</button>
         </div>
 
         <div className="p-5 space-y-4">
@@ -327,7 +327,7 @@ export function DatabaseConnector({ onSynced }: DatabaseConnectorProps) {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="My Analytics DB"
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-3 py-2 text-sm border border-border-default rounded-lg bg-surface text-text-primary focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
             <div>
@@ -337,7 +337,7 @@ export function DatabaseConnector({ onSynced }: DatabaseConnectorProps) {
                 value={account}
                 onChange={(e) => setAccount(e.target.value)}
                 placeholder="abc12345.us-east-1"
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-3 py-2 text-sm border border-border-default rounded-lg bg-surface text-text-primary focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
             <div>
@@ -347,7 +347,7 @@ export function DatabaseConnector({ onSynced }: DatabaseConnectorProps) {
                 value={warehouse}
                 onChange={(e) => setWarehouse(e.target.value)}
                 placeholder="COMPUTE_WH"
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-3 py-2 text-sm border border-border-default rounded-lg bg-surface text-text-primary focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
             <div>
@@ -357,7 +357,7 @@ export function DatabaseConnector({ onSynced }: DatabaseConnectorProps) {
                 value={database}
                 onChange={(e) => setDatabase(e.target.value)}
                 placeholder="ANALYTICS_POC"
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-3 py-2 text-sm border border-border-default rounded-lg bg-surface text-text-primary focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
             <div>
@@ -367,12 +367,12 @@ export function DatabaseConnector({ onSynced }: DatabaseConnectorProps) {
                 value={schema}
                 onChange={(e) => setSchema(e.target.value)}
                 placeholder="SAAS_DEMO"
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-3 py-2 text-sm border border-border-default rounded-lg bg-surface text-text-primary focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
           </div>
 
-          <div className="border-t border-gray-100 pt-4">
+          <div className="border-t border-border-subtle pt-4">
             <p className="text-xs text-text-muted mb-3">
               A browser window will open for Snowflake login (MFA supported). Username falls back to .env if blank.
             </p>
@@ -383,7 +383,7 @@ export function DatabaseConnector({ onSynced }: DatabaseConnectorProps) {
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 placeholder="From .env if blank"
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-3 py-2 text-sm border border-border-default rounded-lg bg-surface text-text-primary focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
           </div>
@@ -419,10 +419,10 @@ export function DatabaseConnector({ onSynced }: DatabaseConnectorProps) {
   // ── Table picker ──────────────────────────────────────────────────────────
   if (step === 'tables') {
     return (
-      <div className="rounded-lg border border-gray-200 bg-white overflow-hidden">
-        <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+      <div className="rounded-lg border border-border-default bg-surface overflow-hidden">
+        <div className="px-5 py-4 border-b border-border-subtle flex items-center justify-between">
           <h3 className="text-sm font-medium text-text-primary">Select Tables to Import</h3>
-          <button onClick={handleClose} className="text-xs text-gray-400 hover:text-gray-600">&times; Close</button>
+          <button onClick={handleClose} className="text-xs text-text-icon hover:text-text-icon-hover">&times; Close</button>
         </div>
 
         <div className="p-5 space-y-4">
@@ -447,17 +447,17 @@ export function DatabaseConnector({ onSynced }: DatabaseConnectorProps) {
           </div>
 
           {/* Table list */}
-          <div className="max-h-64 overflow-y-auto border border-gray-100 rounded-lg divide-y divide-gray-100">
+          <div className="max-h-64 overflow-y-auto border border-border-subtle rounded-lg divide-y divide-border-subtle">
             {tables.map((table) => (
               <label
                 key={table}
-                className="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 cursor-pointer"
+                className="flex items-center gap-3 px-4 py-2.5 hover:bg-surface-secondary cursor-pointer"
               >
                 <input
                   type="checkbox"
                   checked={selectedTables.has(table)}
                   onChange={() => handleToggleTable(table)}
-                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  className="rounded border-border-strong text-blue-600 focus:ring-blue-500"
                 />
                 <span className="text-sm text-text-primary">{table}</span>
               </label>
@@ -489,7 +489,7 @@ export function DatabaseConnector({ onSynced }: DatabaseConnectorProps) {
   // ── Syncing state ─────────────────────────────────────────────────────────
   if (step === 'syncing') {
     return (
-      <div className="rounded-lg border border-gray-200 bg-white p-8 text-center">
+      <div className="rounded-lg border border-border-default bg-surface p-8 text-center">
         <svg className="animate-spin h-8 w-8 mx-auto text-blue-500 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />

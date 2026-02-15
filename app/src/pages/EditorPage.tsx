@@ -98,7 +98,7 @@ export function EditorPage() {
 
   if (store.loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-surface-secondary flex items-center justify-center">
         <div className="text-center">
           <svg className="animate-spin h-8 w-8 mx-auto text-blue-500 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
@@ -112,7 +112,7 @@ export function EditorPage() {
 
   if (store.error && !store.data.length && !isNew) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-surface-secondary flex items-center justify-center">
         <div className="bg-red-50 border border-red-200 rounded-lg px-6 py-4 max-w-md">
           <p className="text-sm text-red-700 font-medium">Failed to load chart</p>
           <p className="text-sm text-red-600 mt-1">{store.error}</p>
@@ -124,17 +124,17 @@ export function EditorPage() {
   const showEmptyState = isNew && store.data.length === 0
 
   return (
-    <div className="h-screen flex flex-col bg-gray-50">
+    <div className="h-screen flex flex-col bg-surface-secondary">
       {/* Header */}
-      <header className="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between shrink-0">
+      <header className="bg-surface border-b border-border-default shadow-sm px-5 py-4 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
           <button
             onClick={handleBack}
-            className="text-sm text-gray-500 hover:text-gray-700 transition-colors"
+            className="text-sm text-text-secondary hover:text-text-on-surface transition-colors"
           >
             &larr; Back
           </button>
-          <span className="text-sm font-medium text-text-primary">
+          <span className="text-base font-semibold text-text-primary">
             {isNew && !store.chartId ? 'New Chart' : store.config.title || 'Untitled Chart'}
           </span>
           {isDirty && (
@@ -148,7 +148,7 @@ export function EditorPage() {
           <button
             onClick={store.undo}
             disabled={store.configHistory.length === 0}
-            className="px-2.5 py-1.5 text-xs rounded border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-30"
+            className="px-3 py-2 text-xs rounded-lg border border-border-default text-text-on-surface hover:bg-surface-secondary transition-colors disabled:opacity-30"
             title="Undo (Ctrl+Z)"
           >
             Undo
@@ -156,17 +156,17 @@ export function EditorPage() {
           <button
             onClick={store.redo}
             disabled={store.configFuture.length === 0}
-            className="px-2.5 py-1.5 text-xs rounded border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-30"
+            className="px-3 py-2 text-xs rounded-lg border border-border-default text-text-on-surface hover:bg-surface-secondary transition-colors disabled:opacity-30"
             title="Redo (Ctrl+Shift+Z)"
           >
             Redo
           </button>
-          <div className="w-px h-5 bg-gray-200 mx-1" />
+          <div className="w-px h-5 bg-border-default mx-1" />
           {store.chartId && (
             <button
               onClick={store.discard}
               disabled={!isDirty}
-              className="px-3 py-1.5 text-xs rounded border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-30"
+              className="px-3 py-2 text-xs rounded-lg border border-border-default text-text-on-surface hover:bg-surface-secondary transition-colors disabled:opacity-30"
             >
               Discard
             </button>
@@ -174,7 +174,7 @@ export function EditorPage() {
           <button
             onClick={handleSave}
             disabled={!canSave || store.saving}
-            className="px-4 py-1.5 text-xs rounded bg-blue-600 text-white hover:bg-blue-700 transition-colors font-medium disabled:opacity-50"
+            className="px-4 py-2 text-xs rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors font-medium disabled:opacity-50"
             title="Save (Ctrl+S)"
           >
             {store.saving ? 'Saving...' : 'Save'}
@@ -192,7 +192,7 @@ export function EditorPage() {
       {/* Three-pane layout */}
       <div className="flex flex-1 min-h-0 overflow-hidden">
         {/* Left: Toolbox */}
-        <aside className="w-[280px] border-r border-gray-200 bg-white overflow-y-auto shrink-0">
+        <aside className="w-[280px] border-r border-border-default bg-surface overflow-y-auto shrink-0">
           <Toolbox />
         </aside>
 
@@ -200,7 +200,7 @@ export function EditorPage() {
         <main className="flex-1 p-6 overflow-y-auto flex items-start justify-center">
           <div className="w-full max-w-3xl">
             {showEmptyState ? (
-              <div className="flex items-center justify-center h-80 border-2 border-dashed border-gray-200 rounded-xl">
+              <div className="flex items-center justify-center h-80 border-2 border-dashed border-border-default rounded-xl">
                 <div className="text-center">
                   <p className="text-sm text-text-muted">
                     {store.config.dataMode === 'sql'
@@ -227,7 +227,7 @@ export function EditorPage() {
         </main>
 
         {/* Right: AI Chat */}
-        <aside className="w-[320px] border-l border-gray-200 bg-white shrink-0">
+        <aside className="w-[320px] border-l border-border-default bg-surface shrink-0">
           <AIChat />
         </aside>
       </div>

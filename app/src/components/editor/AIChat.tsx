@@ -44,7 +44,7 @@ export function AIChat() {
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="px-4 py-3 border-b border-gray-200 shrink-0">
+      <div className="px-4 py-3 border-b border-border-default shrink-0">
         <h3 className="text-sm font-semibold text-text-primary">AI Assistant</h3>
         <p className="text-xs mt-0.5 text-text-muted">
           Describe changes in natural language
@@ -70,12 +70,12 @@ export function AIChat() {
               className={`inline-block px-3 py-2 rounded-lg max-w-[85%] ${
                 msg.role === 'user'
                   ? 'bg-blue-600 text-white'
-                  : 'bg-gray-100 text-gray-800'
+                  : 'bg-surface-inset text-text-primary'
               }`}
             >
               {msg.content}
             </div>
-            <div className="text-[10px] mt-0.5 text-gray-400">
+            <div className="text-[10px] mt-0.5 text-text-muted">
               {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
             </div>
           </div>
@@ -83,7 +83,7 @@ export function AIChat() {
 
         {chatLoading && (
           <div className="text-left">
-            <div className="inline-block px-3 py-2 rounded-lg bg-gray-100 text-gray-500 text-sm">
+            <div className="inline-block px-3 py-2 rounded-lg bg-surface-inset text-text-secondary text-sm">
               Thinking...
             </div>
           </div>
@@ -93,7 +93,7 @@ export function AIChat() {
       </div>
 
       {/* Input */}
-      <div className="p-3 border-t border-gray-200 shrink-0">
+      <div className="p-3 border-t border-border-default shrink-0">
         <div className="flex gap-2">
           <textarea
             ref={textareaRef}
@@ -102,7 +102,7 @@ export function AIChat() {
             onKeyDown={handleKeyDown}
             placeholder="Describe a change..."
             rows={1}
-            className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg resize-none focus:outline-none focus:border-blue-400"
+            className="flex-1 px-3 py-2 text-sm border border-border-default rounded-lg resize-none bg-surface text-text-primary focus:outline-none focus:border-blue-400"
             style={{ minHeight: 36, maxHeight: 120 }}
           />
           <button

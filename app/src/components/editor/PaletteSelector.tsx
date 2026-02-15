@@ -24,7 +24,7 @@ export function PaletteSelector({ value, onChange }: PaletteSelectorProps) {
             w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-xs transition-colors border
             ${value === key
               ? 'bg-blue-50 border-blue-300'
-              : 'bg-white border-gray-200 hover:bg-gray-50'
+              : 'bg-surface border-border-default hover:bg-surface-secondary'
             }
           `}
         >
@@ -37,7 +37,7 @@ export function PaletteSelector({ value, onChange }: PaletteSelectorProps) {
               />
             ))}
           </div>
-          <span className="text-gray-600">{PALETTE_LABELS[key]}</span>
+          <span className="text-text-on-surface">{PALETTE_LABELS[key]}</span>
         </button>
       ))}
     </div>
