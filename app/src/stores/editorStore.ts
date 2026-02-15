@@ -324,7 +324,6 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       if (result.success) {
         set({
           data: result.data ?? [],
-          columns: result.columns ?? [],
           sql: result.sql ?? null,
           error: null,
         })

@@ -1,6 +1,7 @@
 import { useEffect, useCallback } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { useEditorStore } from '../stores/editorStore'
+import { useDataStore } from '../stores/dataStore'
 import { ChartWrapper } from '../components/charts/ChartWrapper'
 import { ObservableChartFactory } from '../components/charts/ObservableChartFactory'
 import { Toolbox } from '../components/editor/Toolbox'
@@ -96,7 +97,8 @@ export function EditorPage() {
   const handleBack = useCallback(() => {
     if (isDirty && !window.confirm('You have unsaved changes. Discard them?')) return
     if (isNew || !store.chartId) {
-      navigate(-1)
+      useDataStore.getState().reset()
+      navigate('/library')
     } else {
       navigate(`/chart/${store.chartId}`)
     }
