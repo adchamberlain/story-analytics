@@ -7,7 +7,7 @@ import json
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from dataclasses import dataclass, field, asdict
+from dataclasses import dataclass, asdict
 
 
 DASHBOARDS_DIR = Path(__file__).parent.parent.parent / "data" / "dashboards"

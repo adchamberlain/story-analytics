@@ -5,7 +5,7 @@ All connectors implement the DatabaseConnector interface and sync data
 into DuckDB for uniform SQL querying.
 """
 
-from .base import DatabaseConnector, ColumnInfo, ConnectorResult
+from .base import DatabaseConnector, ColumnInfo as ColumnInfo, ConnectorResult as ConnectorResult
 from .snowflake import SnowflakeConnector
 from .postgres import PostgresConnector
 from .bigquery import BigQueryConnector

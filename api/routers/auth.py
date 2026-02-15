@@ -6,7 +6,6 @@ import os
 from datetime import timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, EmailStr
 from sqlalchemy.orm import Session
 
@@ -16,7 +15,7 @@ from ..dependencies import get_current_user
 from ..email import send_magic_link_email
 from ..models.magic_link import MagicLink
 from ..models.user import User
-from ..schemas.user import Token, UserPreferences, UserResponse
+from ..schemas.user import UserPreferences, UserResponse
 from ..security import create_access_token
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -72,7 +71,7 @@ async def request_magic_link(
     # Invalidate any existing magic links for this email
     db.query(MagicLink).filter(
         MagicLink.email == email,
-        MagicLink.used == False,
+        MagicLink.used.is_(False),
     ).update({"used": True})
 
     # Create new magic link
