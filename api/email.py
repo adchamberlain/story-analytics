@@ -3,7 +3,6 @@ Email service for sending magic links.
 """
 
 import os
-from typing import Optional
 
 import resend
 
@@ -41,7 +40,7 @@ def send_magic_link_email(
     is_localhost = "localhost" in magic_link_url
     if is_localhost:
         print(f"\n{'='*60}")
-        print(f"MAGIC LINK (use this for local dev - email link won't work)")
+        print("MAGIC LINK (use this for local dev - email link won't work)")
         print(f"{'='*60}")
         print(f"Email: {to_email}")
         print(f"Link:  {magic_link_url}")

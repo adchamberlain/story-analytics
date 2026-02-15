@@ -10,7 +10,6 @@ and all dashboards are effectively public.
 
 from __future__ import annotations
 
-import os
 import sqlite3
 import uuid
 from datetime import datetime, timezone

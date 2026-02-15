@@ -37,8 +37,6 @@ def export_dashboard_html(
     for i, chart in enumerate(charts):
         ct = chart.get("chart_type", "BarChart")
         w = chart.get("width", "half")
-        data_json = json.dumps(chart.get("data", []))
-        config_json = json.dumps(chart.get("config", {}))
         chart_title = escape(chart.get("title", "") or "")
         subtitle = escape(chart.get("subtitle", "") or "")
         source = escape(chart.get("source", "") or "")

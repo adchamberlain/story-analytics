@@ -8,17 +8,17 @@ from dotenv import load_dotenv
 # Load .env file before any other imports
 load_dotenv(Path(__file__).parent.parent / ".env")
 
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi import FastAPI  # noqa: E402
+from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
 
-from .config import get_settings
-from .database import create_tables
-from .routers import auth_router
-from .routers.data import router as data_router
-from .routers.charts_v2 import router as charts_v2_router
-from .routers.dashboards_v2 import router as dashboards_v2_router
-from .routers.connections import router as connections_router
-from .routers.settings import router as settings_router
+from .config import get_settings  # noqa: E402
+from .database import create_tables  # noqa: E402
+from .routers import auth_router  # noqa: E402
+from .routers.data import router as data_router  # noqa: E402
+from .routers.charts_v2 import router as charts_v2_router  # noqa: E402
+from .routers.dashboards_v2 import router as dashboards_v2_router  # noqa: E402
+from .routers.connections import router as connections_router  # noqa: E402
+from .routers.settings import router as settings_router  # noqa: E402
 
 settings = get_settings()
 

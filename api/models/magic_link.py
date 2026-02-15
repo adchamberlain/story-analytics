@@ -5,8 +5,7 @@ Magic link model for passwordless authentication.
 import secrets
 from datetime import datetime, timedelta
 
-from sqlalchemy import Column, DateTime, Integer, String, Boolean, ForeignKey
-from sqlalchemy.orm import relationship
+from sqlalchemy import Column, DateTime, Integer, String, Boolean
 
 from ..database import Base
 

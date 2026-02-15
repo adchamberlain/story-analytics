@@ -12,7 +12,7 @@ from __future__ import annotations
 import os
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
 from jose import JWTError, jwt
@@ -20,7 +20,7 @@ from passlib.context import CryptContext
 
 from .services.metadata_db import (
     create_user, get_user_by_email, get_user_by_id,
-    ensure_default_user, DEFAULT_USER_ID,
+    ensure_default_user,
 )
 
 

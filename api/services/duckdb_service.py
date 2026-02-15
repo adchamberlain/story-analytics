@@ -4,13 +4,12 @@ Manages in-memory DuckDB connections with uploaded data from CSV, parquet,
 or Snowflake sources.
 """
 
-import os
 import uuid
 import csv
 import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 import duckdb
 
