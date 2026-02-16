@@ -33,7 +33,7 @@ export function EditorPage() {
   const handleSave = useCallback(async () => {
     if (isNew || !store.chartId) {
       const newId = await store.saveNew()
-      if (newId) navigate(`/editor/${newId}`, { replace: true })
+      if (newId) navigate(`/chart/${newId}`, { replace: true })
     } else {
       await store.save()
     }
@@ -222,6 +222,7 @@ export function EditorPage() {
                 title={store.config.title || undefined}
                 subtitle={store.config.subtitle || undefined}
                 source={store.config.source || undefined}
+                sourceUrl={store.config.sourceUrl || undefined}
               >
                 <ObservableChartFactory
                   data={store.data}

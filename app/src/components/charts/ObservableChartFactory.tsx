@@ -31,9 +31,23 @@ export function ObservableChartFactory({
   const { containerRef } = useObservablePlot(
     (width) => {
       const marks = buildMarks(chartType, data, config, colors)
-      const annotationMarks = buildAnnotationMarks(config.annotations)
+      const bgColor = getComputedStyle(document.documentElement).getPropertyValue('--color-surface-raised').trim() || '#1e293b'
+      const annotationMarks = buildAnnotationMarks(config.annotations, bgColor)
       const plotOptions = buildPlotOptions(chartType, data, config, colors, width, height)
-      return Plot.plot({ ...plotOptions, marks: [...marks, ...annotationMarks] })
+      const plot = Plot.plot({ ...plotOptions, marks: [...marks, ...annotationMarks] })
+
+      // Observable Plot renders the legend as a <div> inside a <figure> wrapper.
+      // The color: { legend: false } API doesn't reliably suppress it,
+      // so we remove legend elements from the DOM when showLegend is off.
+      if (config.showLegend === false && plot.tagName === 'FIGURE') {
+        for (const child of Array.from(plot.children)) {
+          if (child.tagName !== 'svg' && child.tagName !== 'SVG') {
+            child.remove()
+          }
+        }
+      }
+
+      return plot
     },
     [data, config, chartType, height, resolved]
   )
@@ -284,7 +298,7 @@ function buildBoxPlotMarks(
 
 // ── Annotation Mark Builders ────────────────────────────────────────────────
 
-function buildAnnotationMarks(annotations?: Annotations): Plot.Markish[] {
+function buildAnnotationMarks(annotations?: Annotations, bgColor = '#1e293b'): Plot.Markish[] {
   if (!annotations) return []
 
   const marks: Plot.Markish[] = []
@@ -307,6 +321,7 @@ function buildAnnotationMarks(annotations?: Annotations): Plot.Markish[] {
           Plot.text([{ x: val, label: line.label }], {
             x: 'x', text: 'label',
             dy: -8, fontSize: 11, fill: color, fontWeight: 600,
+            stroke: bgColor, strokeWidth: 4,
             frameAnchor: 'top',
           })
         )
@@ -319,8 +334,9 @@ function buildAnnotationMarks(annotations?: Annotations): Plot.Markish[] {
         marks.push(
           Plot.text([{ y: line.value, label: line.label }], {
             y: 'y', text: 'label',
-            dx: 4, fontSize: 11, fill: color, fontWeight: 600,
-            textAnchor: 'start', frameAnchor: 'right',
+            dx: -4, fontSize: 11, fill: color, fontWeight: 600,
+            stroke: bgColor, strokeWidth: 4,
+            textAnchor: 'end', frameAnchor: 'right',
           })
         )
       }
@@ -434,13 +450,19 @@ function buildPlotOptions(
     overrides.marginLeft = 100
   }
 
-  // Grid toggle
+  // Grid toggle — controls both x (top-level) and y (axis-level) grid lines
   if (config.showGrid === false) {
     overrides.grid = false
+    const yOpts = (overrides.y as Record<string, unknown>) ?? { ...getBaseAxis() }
+    yOpts.grid = false
+    overrides.y = yOpts
   }
 
   // Color range + legend when series is in use
-  overrides.color = { range: [...colors], ...(config.series ? { legend: true } : {}) }
+  const wantLegend = config.showLegend !== false && !!config.series
+  overrides.color = wantLegend
+    ? { range: [...colors], legend: true }
+    : { range: [...colors], legend: false }
 
   return plotDefaults({
     width,

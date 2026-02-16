@@ -13,6 +13,7 @@ export interface EditorConfig {
   title: string
   subtitle: string
   source: string
+  sourceUrl: string
   x: string | null
   y: string | null
   series: string | null
@@ -42,6 +43,7 @@ const DEFAULT_CONFIG: EditorConfig = {
   title: '',
   subtitle: '',
   source: '',
+  sourceUrl: '',
   x: null,
   y: null,
   series: null,
@@ -142,7 +144,7 @@ interface EditorState {
 const MAX_HISTORY = 50
 
 /** Keys that trigger auto build-query in new chart mode */
-const DATA_KEYS: (keyof EditorConfig)[] = ['x', 'y', 'series', 'aggregation', 'timeGrain', 'chartType']
+const DATA_KEYS: (keyof EditorConfig)[] = ['x', 'y', 'series', 'aggregation', 'timeGrain']
 
 export const useEditorStore = create<EditorState>((set, get) => ({
   // Initial state
@@ -193,6 +195,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         title: chart.title ?? '',
         subtitle: chart.subtitle ?? '',
         source: chart.source ?? '',
+        sourceUrl: chart.config?.sourceUrl ?? '',
         x: chart.x ?? null,
         y: chart.y ?? null,
         series: chart.series ?? null,
@@ -372,6 +375,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
             yAxisTitle: config.yAxisTitle,
             aggregation: config.aggregation,
             timeGrain: config.timeGrain,
+            sourceUrl: config.sourceUrl || undefined,
             dataMode: config.dataMode,
             annotations: config.annotations,
             value: config.value,
@@ -443,16 +447,29 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       })
       get().fetchAvailableTables()
     } else {
-      // Switching back to Table: restore source columns, clear SQL state
+      // Switching back to Table: restore source columns, clear SQL-specific state.
+      // Preserve user's config (titles, axis labels, chart type, etc.)
       set({
         customSql: '',
         sqlError: null,
         sqlExecuting: false,
+        data: [],
+        sql: null,
         config: { ...config, dataMode: 'table', x: null, y: null, series: null },
       })
-      // Re-initialize from source to restore original columns
+      // Restore original source columns without resetting the full config
       if (sourceId) {
-        get().initNew(sourceId)
+        fetch(`/api/data/schema/${sourceId}`)
+          .then((res) => res.ok ? res.json() : Promise.reject(res.statusText))
+          .then((schema) => {
+            const columns = (schema.columns ?? []).map((c: { name: string }) => c.name)
+            const columnTypes: Record<string, string> = {}
+            for (const col of schema.columns ?? []) {
+              columnTypes[col.name] = col.type
+            }
+            set({ columns, columnTypes })
+          })
+          .catch(() => {})
       }
     }
   },
@@ -573,6 +590,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
             yAxisTitle: config.yAxisTitle,
             aggregation: config.aggregation,
             timeGrain: config.timeGrain,
+            sourceUrl: config.sourceUrl || undefined,
             dataMode: config.dataMode,
             annotations: config.annotations,
             value: config.value,

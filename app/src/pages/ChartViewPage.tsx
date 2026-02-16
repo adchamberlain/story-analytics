@@ -141,6 +141,7 @@ export function ChartViewPage() {
             title={chart.title ?? undefined}
             subtitle={chart.subtitle ?? undefined}
             source={chart.source ?? undefined}
+            sourceUrl={(chart.config?.sourceUrl as string) ?? undefined}
           >
             <ObservableChartFactory
               data={data}
