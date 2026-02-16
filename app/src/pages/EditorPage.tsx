@@ -229,6 +229,7 @@ export function EditorPage() {
                   config={chartConfig}
                   chartType={store.config.chartType}
                   height={420}
+                  editable
                 />
               </ChartWrapper>
             )}

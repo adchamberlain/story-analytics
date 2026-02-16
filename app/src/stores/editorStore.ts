@@ -120,6 +120,10 @@ interface EditorState {
   saving: boolean
   error: string | null
 
+  // Annotation placement (click-to-place)
+  placingAnnotationId: string | null
+  setPlacingAnnotation: (id: string | null) => void
+
   // Computed
   isDirty: () => boolean
 
@@ -167,6 +171,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   loading: false,
   saving: false,
   error: null,
+  placingAnnotationId: null,
+  setPlacingAnnotation: (id) => set({ placingAnnotationId: id }),
 
   isDirty: () => {
     const { config, savedConfig, data, chartId } = get()
@@ -764,6 +770,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       loading: false,
       saving: false,
       error: null,
+      placingAnnotationId: null,
     })
   },
 }))
