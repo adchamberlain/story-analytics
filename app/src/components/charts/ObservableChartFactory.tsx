@@ -6,11 +6,11 @@ import { plotDefaults, CHART_COLORS } from '../../themes/datawrapper'
 import { useThemeStore } from '../../stores/themeStore'
 import { useEditorStore } from '../../stores/editorStore'
 import { getXValues, getYForX, resolveOffset, smartOffset } from '../../utils/annotationDefaults'
-import type { ChartConfig, ChartType, Annotations, PointAnnotation } from '../../types/chart'
+import type { ChartConfig, ChartType, Annotations, PointAnnotation, HighlightRange } from '../../types/chart'
 
 /** Minimal type for the Observable Plot element with scale access. */
 interface PlotElement extends HTMLElement {
-  scale: (name: string) => { apply: (v: unknown) => number; domain?: unknown[]; invert?: (px: number) => unknown }
+  scale: (name: string) => { apply: (v: unknown) => number; domain?: unknown[]; range?: unknown[]; invert?: (px: number) => unknown }
 }
 
 interface ObservableChartFactoryProps {
@@ -73,32 +73,54 @@ export function ObservableChartFactory({
         }
       }
 
-      // Append point notes as raw SVG (outside Plot marks, for pixel-space control + drag)
+      // Append annotation SVG layers (outside Plot marks, for pixel-space control + drag)
       const plotEl = plot as unknown as PlotElement
-      if (config.annotations?.texts?.length) {
-        const svg = plot.querySelector('svg') ?? (plot.tagName === 'svg' ? plot : null)
-        if (svg) {
-          appendPointNotes({
-            svg: svg as SVGSVGElement,
-            plotEl,
-            annotations: config.annotations.texts,
-            bgColor,
-            textColor,
-            editable,
-            onDragEnd: (id, dx, dy) => {
-              const store = useEditorStore.getState()
-              const anns = store.config.annotations
-              store.updateConfig({
-                annotations: {
-                  ...anns,
-                  texts: anns.texts.map((t) =>
-                    t.id === id ? { ...t, dx, dy, position: undefined } : t
-                  ),
-                },
-              })
-            },
-          })
-        }
+      const svg = plot.querySelector('svg') ?? (plot.tagName === 'svg' ? plot : null)
+
+      // Highlight ranges first (renders behind point notes in z-order)
+      if (svg && config.annotations?.ranges?.length) {
+        appendHighlightRanges({
+          svg: svg as SVGSVGElement,
+          plotEl,
+          ranges: config.annotations.ranges,
+          data,
+          xColumn: config.x,
+          editable,
+          onRangeEdgeDrag: (id, patch) => {
+            const store = useEditorStore.getState()
+            const anns = store.config.annotations
+            store.updateConfig({
+              annotations: {
+                ...anns,
+                ranges: anns.ranges.map((r) => r.id === id ? { ...r, ...patch } : r),
+              },
+            })
+          },
+        })
+      }
+
+      // Point notes on top
+      if (svg && config.annotations?.texts?.length) {
+        appendPointNotes({
+          svg: svg as SVGSVGElement,
+          plotEl,
+          annotations: config.annotations.texts,
+          bgColor,
+          textColor,
+          editable,
+          onDragEnd: (id, dx, dy) => {
+            const store = useEditorStore.getState()
+            const anns = store.config.annotations
+            store.updateConfig({
+              annotations: {
+                ...anns,
+                texts: anns.texts.map((t) =>
+                  t.id === id ? { ...t, dx, dy, position: undefined } : t
+                ),
+              },
+            })
+          },
+        })
       }
 
       return plot
@@ -481,46 +503,7 @@ function buildAnnotationMarks(annotations?: Annotations, bgColor = '#1e293b', _t
     }
   }
 
-  // Highlight ranges
-  for (const range of annotations.ranges) {
-    const color = range.color ?? '#e45756'
-    const opacity = range.opacity ?? 0.1
-
-    if (range.axis === 'x') {
-      marks.push(
-        Plot.rectX([{ x1: range.start, x2: range.end }], {
-          x1: 'x1', x2: 'x2',
-          fill: color, fillOpacity: opacity,
-        })
-      )
-      if (range.label) {
-        marks.push(
-          Plot.text([{ x: range.start, label: range.label }], {
-            x: 'x', text: 'label',
-            dy: -8, fontSize: 10, fill: color, fontWeight: 600,
-            frameAnchor: 'top', textAnchor: 'start',
-          })
-        )
-      }
-    } else {
-      marks.push(
-        Plot.rectY([{ y1: range.start, y2: range.end }], {
-          y1: 'y1', y2: 'y2',
-          fill: color, fillOpacity: opacity,
-        })
-      )
-      if (range.label) {
-        marks.push(
-          Plot.text([{ y: range.start, label: range.label }], {
-            y: 'y', text: 'label',
-            dx: 4, fontSize: 10, fill: color, fontWeight: 600,
-            textAnchor: 'start', frameAnchor: 'left',
-          })
-        )
-      }
-    }
-  }
-
+  // Highlight ranges are rendered as raw SVG after Plot.plot() — see appendHighlightRanges()
   // Point notes are rendered as raw SVG after Plot.plot() — see appendPointNotes()
 
   return marks
@@ -623,6 +606,300 @@ function appendPointNotes({ svg, plotEl, annotations, bgColor, textColor, editab
         })
 
       text.call(drag)
+    }
+  }
+}
+
+// ── Draggable Highlight Ranges (raw SVG) ─────────────────────────────────────
+
+type ScaleObj = ReturnType<PlotElement['scale']>
+
+/** Invert a pixel position back to a data value, handling ordinal/band scales. */
+function invertScale(
+  scale: ScaleObj,
+  px: number,
+  dataValues?: unknown[],
+): unknown {
+  // Continuous scale (numeric, date) — use built-in invert
+  if (scale.invert) return scale.invert(px)
+  // Ordinal/band scale — snap to nearest value by pixel distance
+  if (dataValues) {
+    let closest = dataValues[0]
+    let minDist = Infinity
+    for (const v of dataValues) {
+      const d = Math.abs(scale.apply(v) - px)
+      if (d < minDist) { minDist = d; closest = v }
+    }
+    return closest
+  }
+  return px
+}
+
+interface AppendHighlightRangesOpts {
+  svg: SVGSVGElement
+  plotEl: PlotElement
+  ranges: HighlightRange[]
+  data: Record<string, unknown>[]
+  xColumn?: string
+  editable: boolean
+  onRangeEdgeDrag: (id: string, patch: Partial<HighlightRange>) => void
+}
+
+function appendHighlightRanges({ svg, plotEl, ranges, data, xColumn, editable, onRangeEdgeDrag }: AppendHighlightRangesOpts) {
+  let xScale: ScaleObj
+  let yScale: ScaleObj
+  try {
+    xScale = plotEl.scale('x')
+    yScale = plotEl.scale('y')
+  } catch {
+    return // scales unavailable
+  }
+
+  // Compute plot area bounds from scale ranges
+  const xRange = xScale.range as unknown as [number, number] | undefined
+  const yRange = yScale.range as unknown as [number, number] | undefined
+  if (!xRange || !yRange) return
+
+  const plotLeft = Math.min(xRange[0], xRange[1])
+  const plotRight = Math.max(xRange[0], xRange[1])
+  const plotTop = Math.min(yRange[0], yRange[1])
+  const plotBottom = Math.max(yRange[0], yRange[1])
+
+  // Collect x-axis data values for ordinal snapping
+  const xDataValues = xColumn
+    ? (() => {
+        const seen = new Set<unknown>()
+        const vals: unknown[] = []
+        for (const row of data) {
+          const v = row[xColumn]
+          const parsed = typeof v === 'string' && /^\d{4}-\d{2}/.test(v) ? new Date(v) : v
+          if (!seen.has(String(v))) { seen.add(String(v)); vals.push(parsed) }
+        }
+        return vals
+      })()
+    : undefined
+
+  const g = d3.select(svg).append('g').attr('class', 'highlight-ranges')
+
+  const HANDLE_WIDTH = 8 // hit area width in pixels
+
+  for (const range of ranges) {
+    const color = range.color ?? '#e45756'
+    const opacity = range.opacity ?? 0.1
+
+    if (range.axis === 'x') {
+      // ── X-axis range (vertical edges) ──────────────────────────────────
+      const startVal = typeof range.start === 'string' && /^\d{4}-\d{2}/.test(range.start)
+        ? new Date(range.start) : range.start
+      const endVal = typeof range.end === 'string' && /^\d{4}-\d{2}/.test(range.end)
+        ? new Date(range.end) : range.end
+
+      let startPx = xScale.apply(startVal)
+      let endPx = xScale.apply(endVal)
+      if (!isFinite(startPx) || !isFinite(endPx)) continue
+
+      // Ensure start < end in pixel space
+      if (startPx > endPx) { [startPx, endPx] = [endPx, startPx] }
+
+      const rangeG = g.append('g')
+
+      // Fill rect
+      const fillRect = rangeG.append('rect')
+        .attr('x', startPx)
+        .attr('y', plotTop)
+        .attr('width', endPx - startPx)
+        .attr('height', plotBottom - plotTop)
+        .attr('fill', color)
+        .attr('fill-opacity', opacity)
+
+      // Label
+      if (range.label) {
+        rangeG.append('text')
+          .attr('x', startPx + 4)
+          .attr('y', plotTop - 4)
+          .attr('font-size', 10)
+          .attr('font-weight', 600)
+          .attr('fill', color)
+          .attr('text-anchor', 'start')
+          .text(range.label)
+      }
+
+      if (editable) {
+        // Start edge handle
+        const startHandle = rangeG.append('rect')
+          .attr('x', startPx - HANDLE_WIDTH / 2)
+          .attr('y', plotTop)
+          .attr('width', HANDLE_WIDTH)
+          .attr('height', plotBottom - plotTop)
+          .attr('fill', 'transparent')
+          .style('cursor', 'ew-resize')
+
+        // End edge handle
+        const endHandle = rangeG.append('rect')
+          .attr('x', endPx - HANDLE_WIDTH / 2)
+          .attr('y', plotTop)
+          .attr('width', HANDLE_WIDTH)
+          .attr('height', plotBottom - plotTop)
+          .attr('fill', 'transparent')
+          .style('cursor', 'ew-resize')
+
+        // Drag: start edge
+        let currentStartPx = startPx
+        let currentEndPx = endPx
+
+        const startDrag = d3.drag<SVGRectElement, unknown>()
+          .on('drag', function (event) {
+            const newPx = Math.max(plotLeft, Math.min(plotRight, event.x))
+            currentStartPx = newPx
+            d3.select(this).attr('x', newPx - HANDLE_WIDTH / 2)
+            // Resize fill rect
+            const lo = Math.min(currentStartPx, currentEndPx)
+            const hi = Math.max(currentStartPx, currentEndPx)
+            fillRect.attr('x', lo).attr('width', hi - lo)
+          })
+          .on('end', function () {
+            // Swap if dragged past the other edge
+            const lo = Math.min(currentStartPx, currentEndPx)
+            const hi = Math.max(currentStartPx, currentEndPx)
+            const newStart = invertScale(xScale, lo, xDataValues)
+            const newEnd = invertScale(xScale, hi, xDataValues)
+            // Convert Date back to ISO string for storage
+            const toVal = (v: unknown) => v instanceof Date ? v.toISOString().slice(0, 10) : v
+            onRangeEdgeDrag(range.id, {
+              start: toVal(newStart) as number | string,
+              end: toVal(newEnd) as number | string,
+            })
+          })
+
+        // Drag: end edge
+        const endDrag = d3.drag<SVGRectElement, unknown>()
+          .on('drag', function (event) {
+            const newPx = Math.max(plotLeft, Math.min(plotRight, event.x))
+            currentEndPx = newPx
+            d3.select(this).attr('x', newPx - HANDLE_WIDTH / 2)
+            const lo = Math.min(currentStartPx, currentEndPx)
+            const hi = Math.max(currentStartPx, currentEndPx)
+            fillRect.attr('x', lo).attr('width', hi - lo)
+          })
+          .on('end', function () {
+            const lo = Math.min(currentStartPx, currentEndPx)
+            const hi = Math.max(currentStartPx, currentEndPx)
+            const newStart = invertScale(xScale, lo, xDataValues)
+            const newEnd = invertScale(xScale, hi, xDataValues)
+            const toVal = (v: unknown) => v instanceof Date ? v.toISOString().slice(0, 10) : v
+            onRangeEdgeDrag(range.id, {
+              start: toVal(newStart) as number | string,
+              end: toVal(newEnd) as number | string,
+            })
+          })
+
+        startHandle.call(startDrag)
+        endHandle.call(endDrag)
+      }
+    } else {
+      // ── Y-axis range (horizontal edges) ────────────────────────────────
+      let startPy = yScale.apply(range.start)
+      let endPy = yScale.apply(range.end)
+      if (!isFinite(startPy) || !isFinite(endPy)) continue
+
+      // In SVG, smaller y = higher on screen; ensure top < bottom
+      const topPy = Math.min(startPy, endPy)
+      const bottomPy = Math.max(startPy, endPy)
+
+      const rangeG = g.append('g')
+
+      // Fill rect
+      const fillRect = rangeG.append('rect')
+        .attr('x', plotLeft)
+        .attr('y', topPy)
+        .attr('width', plotRight - plotLeft)
+        .attr('height', bottomPy - topPy)
+        .attr('fill', color)
+        .attr('fill-opacity', opacity)
+
+      // Label
+      if (range.label) {
+        rangeG.append('text')
+          .attr('x', plotLeft + 4)
+          .attr('y', topPy - 4)
+          .attr('font-size', 10)
+          .attr('font-weight', 600)
+          .attr('fill', color)
+          .attr('text-anchor', 'start')
+          .text(range.label)
+      }
+
+      if (editable) {
+        // Top edge handle
+        const topHandle = rangeG.append('rect')
+          .attr('x', plotLeft)
+          .attr('y', topPy - HANDLE_WIDTH / 2)
+          .attr('width', plotRight - plotLeft)
+          .attr('height', HANDLE_WIDTH)
+          .attr('fill', 'transparent')
+          .style('cursor', 'ns-resize')
+
+        // Bottom edge handle
+        const bottomHandle = rangeG.append('rect')
+          .attr('x', plotLeft)
+          .attr('y', bottomPy - HANDLE_WIDTH / 2)
+          .attr('width', plotRight - plotLeft)
+          .attr('height', HANDLE_WIDTH)
+          .attr('fill', 'transparent')
+          .style('cursor', 'ns-resize')
+
+        let currentTopPy = topPy
+        let currentBottomPy = bottomPy
+
+        const topDrag = d3.drag<SVGRectElement, unknown>()
+          .on('drag', function (event) {
+            const newPy = Math.max(plotTop, Math.min(plotBottom, event.y))
+            currentTopPy = newPy
+            d3.select(this).attr('y', newPy - HANDLE_WIDTH / 2)
+            const lo = Math.min(currentTopPy, currentBottomPy)
+            const hi = Math.max(currentTopPy, currentBottomPy)
+            fillRect.attr('y', lo).attr('height', hi - lo)
+          })
+          .on('end', function () {
+            const lo = Math.min(currentTopPy, currentBottomPy)
+            const hi = Math.max(currentTopPy, currentBottomPy)
+            // Invert: lower pixel y → higher data value
+            const hiVal = invertScale(yScale, lo)
+            const loVal = invertScale(yScale, hi)
+            // Keep start <= end in data space
+            const numLo = Number(loVal)
+            const numHi = Number(hiVal)
+            onRangeEdgeDrag(range.id, {
+              start: (isNaN(numLo) ? loVal : numLo) as number | string,
+              end: (isNaN(numHi) ? hiVal : numHi) as number | string,
+            })
+          })
+
+        const bottomDrag = d3.drag<SVGRectElement, unknown>()
+          .on('drag', function (event) {
+            const newPy = Math.max(plotTop, Math.min(plotBottom, event.y))
+            currentBottomPy = newPy
+            d3.select(this).attr('y', newPy - HANDLE_WIDTH / 2)
+            const lo = Math.min(currentTopPy, currentBottomPy)
+            const hi = Math.max(currentTopPy, currentBottomPy)
+            fillRect.attr('y', lo).attr('height', hi - lo)
+          })
+          .on('end', function () {
+            const lo = Math.min(currentTopPy, currentBottomPy)
+            const hi = Math.max(currentTopPy, currentBottomPy)
+            const hiVal = invertScale(yScale, lo)
+            const loVal = invertScale(yScale, hi)
+            const numLo = Number(loVal)
+            const numHi = Number(hiVal)
+            onRangeEdgeDrag(range.id, {
+              start: (isNaN(numLo) ? loVal : numLo) as number | string,
+              end: (isNaN(numHi) ? hiVal : numHi) as number | string,
+            })
+          })
+
+        topHandle.call(topDrag)
+        bottomHandle.call(bottomDrag)
+      }
     }
   }
 }

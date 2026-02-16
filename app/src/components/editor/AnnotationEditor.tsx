@@ -491,6 +491,7 @@ function RangeEditor({
           <ColorPicker value={range.color ?? '#e45756'} onChange={(color) => onChange(range.id, { color })} />
         </div>
       </div>
+      <p className="text-[10px] text-text-muted mt-1">Drag edges on chart to resize</p>
     </AnnotationCard>
   )
 }
