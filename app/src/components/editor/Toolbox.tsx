@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useEditorStore } from '../../stores/editorStore'
 import { ChartTypeSelector } from './ChartTypeSelector'
 import { PaletteSelector } from './PaletteSelector'
@@ -28,6 +28,22 @@ export function Toolbox() {
   const availableTables = useEditorStore((s) => s.availableTables)
   const sourceId = useEditorStore((s) => s.sourceId)
   const data = useEditorStore((s) => s.data)
+
+  const [sqlSuccess, setSqlSuccess] = useState<string | null>(null)
+  const sqlSuccessTimer = useRef<ReturnType<typeof setTimeout>>()
+
+  const handleRunQuery = async () => {
+    setSqlSuccess(null)
+    clearTimeout(sqlSuccessTimer.current)
+    await executeCustomSql()
+    // Check store for results after execution
+    const { data: rows, sqlError: err } = useEditorStore.getState()
+    if (!err && rows.length >= 0) {
+      const msg = `${rows.length.toLocaleString()} row${rows.length !== 1 ? 's' : ''} returned`
+      setSqlSuccess(msg)
+      sqlSuccessTimer.current = setTimeout(() => setSqlSuccess(null), 4000)
+    }
+  }
 
   const isBar = config.chartType === 'BarChart'
   const isBigValue = config.chartType === 'BigValue'
@@ -62,7 +78,7 @@ export function Toolbox() {
               onKeyDown={(e) => {
                 if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
                   e.preventDefault()
-                  executeCustomSql()
+                  handleRunQuery()
                 }
               }}
               placeholder="SELECT * FROM src_..."
@@ -72,12 +88,19 @@ export function Toolbox() {
 
             {/* Run Button */}
             <button
-              onClick={executeCustomSql}
+              onClick={handleRunQuery}
               disabled={!customSql.trim() || sqlExecuting}
               className="w-full px-3 py-1.5 text-xs font-medium rounded-md bg-emerald-600 text-white hover:bg-emerald-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             >
               {sqlExecuting ? 'Running...' : 'Run Query'}
             </button>
+
+            {/* Success Flash */}
+            {sqlSuccess && !sqlError && (
+              <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-md px-2 py-1.5">
+                <p className="text-xs text-emerald-400">{sqlSuccess}</p>
+              </div>
+            )}
 
             {/* Error Display */}
             {sqlError && (

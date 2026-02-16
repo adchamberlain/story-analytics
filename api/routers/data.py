@@ -172,7 +172,7 @@ async def upload_csv(file: UploadFile = File(...)):
     except ValueError as e:
         # User-friendly message from ingest_csv retry logic
         raise HTTPException(status_code=422, detail=str(e))
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=422,
             detail=f"Could not parse \"{file.filename}\". Check that the file is a valid CSV with a header row.",
