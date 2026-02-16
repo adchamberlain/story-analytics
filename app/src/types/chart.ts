@@ -23,6 +23,8 @@ export type ChartType =
 // Annotation Types
 // =============================================================================
 
+export type AnnotationPosition = 'above' | 'below' | 'left' | 'right'
+
 export interface ReferenceLine {
   id: string
   axis: 'x' | 'y'
@@ -32,14 +34,22 @@ export interface ReferenceLine {
   strokeDash?: number[]
 }
 
-export interface TextAnnotation {
+/** Point Note — anchored to a data point with a label offset from the dot. */
+export interface PointAnnotation {
   id: string
   x: number | string
   y: number | string
   text: string
+  /** @deprecated Use dx/dy. Kept for backward compat with saved JSON. */
+  position?: AnnotationPosition
+  dx?: number   // pixel offset from anchor dot
+  dy?: number   // pixel offset from anchor dot
   fontSize?: number
   color?: string
 }
+
+/** @deprecated Use PointAnnotation instead */
+export type TextAnnotation = PointAnnotation
 
 export interface HighlightRange {
   id: string
@@ -53,7 +63,8 @@ export interface HighlightRange {
 
 export interface Annotations {
   lines: ReferenceLine[]
-  texts: TextAnnotation[]
+  /** Point notes (key kept as `texts` for backward compat with saved JSON) */
+  texts: PointAnnotation[]
   ranges: HighlightRange[]
 }
 

@@ -1,4 +1,5 @@
 import { useCallback, useRef } from 'react'
+import { Link } from 'react-router-dom'
 import { exportSVG, exportPNG, exportPDF } from '../../utils/chartExport'
 
 interface ChartWrapperProps {
@@ -6,15 +7,17 @@ interface ChartWrapperProps {
   subtitle?: string
   source?: string
   sourceUrl?: string
+  chartUrl?: string
   children: React.ReactNode
   className?: string
+  compact?: boolean
 }
 
 /**
  * Publication-ready chart wrapper with title, subtitle, source note, and export buttons.
  * Replaces the PoC ChartCard — no library badge, adds export functionality.
  */
-export function ChartWrapper({ title, subtitle, source, sourceUrl, children, className = '' }: ChartWrapperProps) {
+export function ChartWrapper({ title, subtitle, source, sourceUrl, chartUrl, children, className = '', compact = false }: ChartWrapperProps) {
   const chartAreaRef = useRef<HTMLDivElement>(null)
 
   const handleExportSVG = useCallback(() => {
@@ -33,13 +36,19 @@ export function ChartWrapper({ title, subtitle, source, sourceUrl, children, cla
   }, [title, source])
 
   return (
-    <div className={`bg-surface-raised rounded-2xl border border-border-default shadow-card p-7 flex flex-col ${className}`}>
+    <div className={`bg-surface-raised rounded-2xl border border-border-default shadow-card flex flex-col ${compact ? 'group overflow-hidden p-5' : 'p-7'} ${className}`}>
       {/* Header */}
       {(title || subtitle) && (
         <div className="mb-1">
           {title && (
             <h3 className="text-[18px] font-semibold text-text-primary">
-              {title}
+              {chartUrl ? (
+                <Link to={chartUrl} className="hover:underline">
+                  {title}
+                </Link>
+              ) : (
+                title
+              )}
             </h3>
           )}
           {subtitle && (
@@ -51,12 +60,12 @@ export function ChartWrapper({ title, subtitle, source, sourceUrl, children, cla
       )}
 
       {/* Chart area */}
-      <div ref={chartAreaRef} className="flex-1 min-h-0 mt-3">
+      <div ref={chartAreaRef} className={`flex-1 min-h-0 overflow-hidden ${compact ? 'mt-2' : 'mt-3'}`}>
         {children}
       </div>
 
       {/* Footer: source + export */}
-      <div className="flex items-center justify-between mt-3">
+      <div className={`flex items-center justify-between ${compact ? 'mt-2' : 'mt-3'}`}>
         {source ? (
           <p className="text-xs text-text-muted">
             Source:{' '}
@@ -74,7 +83,7 @@ export function ChartWrapper({ title, subtitle, source, sourceUrl, children, cla
             )}
           </p>
         ) : <div />}
-        <div className="flex gap-2">
+        <div className={`flex gap-2 ${compact ? 'opacity-0 group-hover:opacity-100 transition-opacity' : ''}`}>
           <button
             onClick={handleExportSVG}
             className="text-[12px] px-2.5 py-1 rounded-lg border border-border-default text-text-secondary hover:bg-surface-secondary transition-colors"

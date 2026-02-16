@@ -115,6 +115,15 @@ export function DashboardGrid({ charts, dashboardId, editable = false, onLayoutC
     )
   }
 
+  // Build a height map from the computed layout so each cell knows its grid height
+  const heightMap = useMemo(() => {
+    const map: Record<string, number> = {}
+    for (const item of layout) {
+      map[item.i] = item.h
+    }
+    return map
+  }, [layout])
+
   return (
     <div ref={containerRef as React.RefObject<HTMLDivElement>}>
       {mounted && (
@@ -143,8 +152,8 @@ export function DashboardGrid({ charts, dashboardId, editable = false, onLayoutC
           }}
         >
           {charts.map((chart) => (
-            <div key={chart.chart_id}>
-              <DashboardChartCell chart={chart} dashboardId={dashboardId} editable={editable} />
+            <div key={chart.chart_id} className="overflow-hidden">
+              <DashboardChartCell chart={chart} dashboardId={dashboardId} editable={editable} gridH={heightMap[chart.chart_id] ?? 5} />
             </div>
           ))}
         </GridLayout>
@@ -175,10 +184,12 @@ function DashboardChartCell({
   chart,
   dashboardId,
   editable,
+  gridH,
 }: {
   chart: ChartWithData
   dashboardId?: string
   editable: boolean
+  gridH: number
 }) {
   if (chart.error) {
     if (chart.error_type === 'schema_change') {
@@ -241,8 +252,13 @@ function DashboardChartCell({
     chartConfig.color = paletteColors[paletteColors.length - 1] as string
   }
 
+  // Compute available chart height from grid row height (60px) and gap (24px)
+  // Overhead: p-5 padding (40px), header (~35px), chart gap (8px), footer gap + source (~24px), potential legend (~15px)
+  const cellHeight = gridH * 60 + (gridH - 1) * 24
+  const chartHeight = Math.max(cellHeight - 122, 120)
+
   return (
-    <div className="relative h-full">
+    <div className="group relative h-full">
       {editable && (
         <div className="drag-handle absolute top-0 left-0 right-0 h-8 cursor-grab active:cursor-grabbing z-10 flex items-center justify-center">
           <svg className="h-4 w-4 text-text-muted opacity-0 group-hover:opacity-100 transition-opacity" fill="currentColor" viewBox="0 0 24 24">
@@ -258,13 +274,15 @@ function DashboardChartCell({
         subtitle={chart.subtitle ?? undefined}
         source={chart.source ?? undefined}
         sourceUrl={(chart.config?.sourceUrl as string) ?? undefined}
+        chartUrl={`/chart/${chart.chart_id}`}
         className="h-full"
+        compact
       >
         <ObservableChartFactory
           data={chart.data}
           config={chartConfig}
           chartType={chartType}
-          height={undefined}
+          height={chartHeight}
         />
       </ChartWrapper>
     </div>

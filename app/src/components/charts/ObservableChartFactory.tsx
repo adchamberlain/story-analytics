@@ -1,16 +1,25 @@
-import { useRef, useEffect } from 'react'
+import { useRef, useEffect, useCallback } from 'react'
 import * as Plot from '@observablehq/plot'
 import * as d3 from 'd3'
 import { useObservablePlot } from '../../hooks/useObservablePlot'
 import { plotDefaults, CHART_COLORS } from '../../themes/datawrapper'
 import { useThemeStore } from '../../stores/themeStore'
-import type { ChartConfig, ChartType, Annotations } from '../../types/chart'
+import { useEditorStore } from '../../stores/editorStore'
+import { getXValues, getYForX, resolveOffset, smartOffset } from '../../utils/annotationDefaults'
+import type { ChartConfig, ChartType, Annotations, PointAnnotation } from '../../types/chart'
+
+/** Minimal type for the Observable Plot element with scale access. */
+interface PlotElement extends HTMLElement {
+  scale: (name: string) => { apply: (v: unknown) => number; domain?: unknown[]; invert?: (px: number) => unknown }
+}
 
 interface ObservableChartFactoryProps {
   data: Record<string, unknown>[]
   config: ChartConfig
   chartType: ChartType
   height?: number
+  /** When true, point note labels are draggable (editor only). */
+  editable?: boolean
 }
 
 /**
@@ -22,8 +31,10 @@ export function ObservableChartFactory({
   config,
   chartType,
   height = 320,
+  editable = false,
 }: ObservableChartFactoryProps) {
   const resolved = useThemeStore((s) => s.resolved)
+  const placingId = useEditorStore((s) => s.placingAnnotationId)
   const colors = config.color
     ? [config.color]
     : [...CHART_COLORS]
@@ -38,13 +49,20 @@ export function ObservableChartFactory({
       }))
     : []
 
+  // Ref to the Observable Plot element — used for scale inversion on click-to-place
+  const plotRef = useRef<PlotElement | null>(null)
+
   const { containerRef } = useObservablePlot(
     (width) => {
       const marks = buildMarks(chartType, data, config, colors)
       const bgColor = getComputedStyle(document.documentElement).getPropertyValue('--color-surface-raised').trim() || '#1e293b'
-      const annotationMarks = buildAnnotationMarks(config.annotations, bgColor)
+      const textColor = getComputedStyle(document.documentElement).getPropertyValue('--color-text-primary').trim() || '#e2e8f0'
+      const annotationMarks = buildAnnotationMarks(config.annotations, bgColor, textColor)
       const plotOptions = buildPlotOptions(chartType, data, config, colors, width, height)
       const plot = Plot.plot({ ...plotOptions, marks: [...marks, ...annotationMarks] })
+
+      // Store plot ref for scale inversion in click handler
+      plotRef.current = plot as unknown as PlotElement
 
       // Strip any built-in legend that Observable Plot may have generated
       if (plot.tagName === 'FIGURE') {
@@ -55,10 +73,99 @@ export function ObservableChartFactory({
         }
       }
 
+      // Append point notes as raw SVG (outside Plot marks, for pixel-space control + drag)
+      const plotEl = plot as unknown as PlotElement
+      if (config.annotations?.texts?.length) {
+        const svg = plot.querySelector('svg') ?? (plot.tagName === 'svg' ? plot : null)
+        if (svg) {
+          appendPointNotes({
+            svg: svg as SVGSVGElement,
+            plotEl,
+            annotations: config.annotations.texts,
+            bgColor,
+            textColor,
+            editable,
+            onDragEnd: (id, dx, dy) => {
+              const store = useEditorStore.getState()
+              const anns = store.config.annotations
+              store.updateConfig({
+                annotations: {
+                  ...anns,
+                  texts: anns.texts.map((t) =>
+                    t.id === id ? { ...t, dx, dy, position: undefined } : t
+                  ),
+                },
+              })
+            },
+          })
+        }
+      }
+
       return plot
     },
-    [data, config, chartType, height, resolved]
+    [data, config, chartType, height, resolved, editable]
   )
+
+  // ── Click-to-place handler ─────────────────────────────────────────────────
+  const handleChartClick = useCallback((e: React.MouseEvent) => {
+    const store = useEditorStore.getState()
+    const activeId = store.placingAnnotationId
+    if (!activeId || !plotRef.current) return
+
+    const xCol = config.x
+    if (!xCol || data.length === 0) return
+
+    // Get click position relative to the SVG element
+    const svg = plotRef.current.querySelector('svg') ?? plotRef.current
+    const rect = svg.getBoundingClientRect()
+    const px = e.clientX - rect.left
+
+    // Use plot x-scale to find the nearest data x-value
+    const xScale = plotRef.current.scale('x')
+    const xValues = getXValues(data, xCol)
+
+    let closestX: unknown = xValues[0]
+    let minDist = Infinity
+    for (const v of xValues) {
+      // Parse dates for scale application (same logic as maybeParseDates)
+      const scaled = typeof v === 'string' && /^\d{4}-\d{2}/.test(v) ? new Date(v) : v
+      const xPx = xScale.apply(scaled)
+      const dist = Math.abs(px - xPx)
+      if (dist < minDist) {
+        minDist = dist
+        closestX = v
+      }
+    }
+
+    // Look up y from data
+    const yCol = config.y as string | undefined
+    const yVal = yCol ? getYForX(data, xCol, yCol, closestX) ?? 0 : 0
+
+    // Compute smart dx/dy offset that won't clip off-screen
+    const ctx = {
+      data,
+      xColumn: xCol,
+      yColumn: yCol,
+      columnTypes: useEditorStore.getState().columnTypes,
+    }
+    const offset = smartOffset(ctx, closestX, yVal)
+
+    // Update the annotation with the selected point
+    const annotations = store.config.annotations
+    store.updateConfig({
+      annotations: {
+        ...annotations,
+        texts: annotations.texts.map((t) =>
+          t.id === activeId
+            ? { ...t, x: closestX as number | string, y: yVal, ...offset, position: undefined }
+            : t
+        ),
+      },
+    })
+
+    // Exit placement mode
+    store.setPlacingAnnotation(null)
+  }, [data, config])
 
   // Non-Plot chart types
   if (chartType === 'BigValue') {
@@ -89,7 +196,16 @@ export function ObservableChartFactory({
           ))}
         </div>
       )}
-      <div ref={containerRef} style={{ width: '100%', height }} />
+      {placingId && (
+        <div style={{ padding: '4px 8px', fontSize: 11, color: 'var(--color-blue-500)', textAlign: 'center' }}>
+          Click on the chart to place the point note
+        </div>
+      )}
+      <div
+        ref={containerRef}
+        onClick={placingId ? handleChartClick : undefined}
+        style={{ width: '100%', height, cursor: placingId ? 'crosshair' : undefined }}
+      />
     </div>
   )
 }
@@ -320,7 +436,7 @@ function buildBoxPlotMarks(
 
 // ── Annotation Mark Builders ────────────────────────────────────────────────
 
-function buildAnnotationMarks(annotations?: Annotations, bgColor = '#1e293b'): Plot.Markish[] {
+function buildAnnotationMarks(annotations?: Annotations, bgColor = '#1e293b', _textColor = '#e2e8f0'): Plot.Markish[] {
   if (!annotations) return []
 
   const marks: Plot.Markish[] = []
@@ -405,25 +521,110 @@ function buildAnnotationMarks(annotations?: Annotations, bgColor = '#1e293b'): P
     }
   }
 
-  // Text annotations
-  for (const ann of annotations.texts) {
-    const color = ann.color ?? '#333'
-    const fontSize = ann.fontSize ?? 12
+  // Point notes are rendered as raw SVG after Plot.plot() — see appendPointNotes()
 
-    // Parse x as date if it looks like ISO
+  return marks
+}
+
+// ── Draggable Point Notes (raw SVG) ─────────────────────────────────────────
+
+interface AppendPointNotesOpts {
+  svg: SVGSVGElement
+  plotEl: PlotElement
+  annotations: PointAnnotation[]
+  bgColor: string
+  textColor: string
+  editable: boolean
+  onDragEnd: (id: string, dx: number, dy: number) => void
+}
+
+function appendPointNotes({ svg, plotEl, annotations, bgColor, textColor, editable, onDragEnd }: AppendPointNotesOpts) {
+  let xScale: ReturnType<PlotElement['scale']>
+  let yScale: ReturnType<PlotElement['scale']>
+  try {
+    xScale = plotEl.scale('x')
+    yScale = plotEl.scale('y')
+  } catch {
+    return // scales unavailable (e.g. pie chart)
+  }
+
+  const g = d3.select(svg).append('g').attr('class', 'point-notes')
+
+  for (const ann of annotations) {
+    const color = ann.color ?? textColor
+    const fontSize = ann.fontSize ?? 12
+    const { dx, dy } = resolveOffset(ann)
+
+    // Convert data coords → pixel coords
     const xVal = typeof ann.x === 'string' && /^\d{4}-\d{2}/.test(ann.x)
       ? new Date(ann.x)
       : ann.x
+    const cx = xScale.apply(xVal)
+    const cy = yScale.apply(ann.y)
+    if (!isFinite(cx) || !isFinite(cy)) continue
 
-    marks.push(
-      Plot.text([{ x: xVal, y: ann.y, label: ann.text }], {
-        x: 'x', y: 'y', text: 'label',
-        fontSize, fill: color, fontWeight: 500,
-      })
-    )
+    const noteG = g.append('g')
+
+    // Anchor dot
+    noteG.append('circle')
+      .attr('cx', cx)
+      .attr('cy', cy)
+      .attr('r', 3.5)
+      .attr('fill', color)
+      .attr('stroke', bgColor)
+      .attr('stroke-width', 1.5)
+
+    // Connector line (hidden when distance < 8px)
+    const dist = Math.sqrt(dx * dx + dy * dy)
+    const line = noteG.append('line')
+      .attr('x1', cx)
+      .attr('y1', cy)
+      .attr('x2', cx + dx)
+      .attr('y2', cy + dy)
+      .attr('stroke', color)
+      .attr('stroke-width', 0.75)
+      .attr('stroke-opacity', dist < 8 ? 0 : 0.5)
+
+    // Label text
+    const text = noteG.append('text')
+      .attr('x', cx + dx)
+      .attr('y', cy + dy)
+      .attr('text-anchor', 'middle')
+      .attr('dominant-baseline', 'central')
+      .attr('font-size', fontSize)
+      .attr('font-weight', 600)
+      .attr('fill', color)
+      .attr('paint-order', 'stroke')
+      .attr('stroke', bgColor)
+      .attr('stroke-width', 4)
+      .text(ann.text)
+
+    // Drag behavior (editor only)
+    if (editable) {
+      text.style('cursor', 'grab')
+
+      const drag = d3.drag<SVGTextElement, unknown>()
+        .on('start', function () {
+          d3.select(this).style('cursor', 'grabbing')
+        })
+        .on('drag', function (event) {
+          const dragDx = event.x - cx
+          const dragDy = event.y - cy
+          d3.select(this).attr('x', event.x).attr('y', event.y)
+          line.attr('x2', event.x).attr('y2', event.y)
+          const d = Math.sqrt(dragDx * dragDx + dragDy * dragDy)
+          line.attr('stroke-opacity', d < 8 ? 0 : 0.5)
+        })
+        .on('end', function (event) {
+          d3.select(this).style('cursor', 'grab')
+          const finalDx = Math.round(event.x - cx)
+          const finalDy = Math.round(event.y - cy)
+          onDragEnd(ann.id, finalDx, finalDy)
+        })
+
+      text.call(drag)
+    }
   }
-
-  return marks
 }
 
 // ── Plot Options Builder ────────────────────────────────────────────────────
