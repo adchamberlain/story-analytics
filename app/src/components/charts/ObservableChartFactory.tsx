@@ -531,6 +531,11 @@ function appendPointNotes({ svg, plotEl, annotations, bgColor, textColor, editab
     return // scales unavailable (e.g. pie chart)
   }
 
+  // Plot area bounds for edge-clipping detection
+  const xRange = xScale.range as unknown as [number, number] | undefined
+  const plotLeft = xRange ? Math.min(xRange[0], xRange[1]) : 0
+  const plotRight = xRange ? Math.max(xRange[0], xRange[1]) : svg.clientWidth
+
   const g = d3.select(svg).append('g').attr('class', 'point-notes')
 
   for (const ann of annotations) {
@@ -545,6 +550,14 @@ function appendPointNotes({ svg, plotEl, annotations, bgColor, textColor, editab
     const cx = xScale.apply(xVal)
     const cy = yScale.apply(ann.y)
     if (!isFinite(cx) || !isFinite(cy)) continue
+
+    // Choose text-anchor based on proximity to plot edges
+    const labelX = cx + dx
+    const rightMargin = plotRight - labelX
+    const leftMargin = labelX - plotLeft
+    let anchor = 'middle'
+    if (rightMargin < 40) anchor = 'end'
+    else if (leftMargin < 40) anchor = 'start'
 
     const noteG = g.append('g')
 
@@ -572,7 +585,7 @@ function appendPointNotes({ svg, plotEl, annotations, bgColor, textColor, editab
     const text = noteG.append('text')
       .attr('x', cx + dx)
       .attr('y', cy + dy)
-      .attr('text-anchor', 'middle')
+      .attr('text-anchor', anchor)
       .attr('dominant-baseline', 'central')
       .attr('font-size', fontSize)
       .attr('font-weight', 600)
