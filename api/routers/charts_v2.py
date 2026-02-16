@@ -164,6 +164,14 @@ class EditResponse(BaseModel):
 # ── Endpoints ────────────────────────────────────────────────────────────────
 
 VALID_AGGREGATIONS = {"none", "sum", "avg", "median", "count", "min", "max"}
+
+
+def _format_sql(sql: str) -> str:
+    """Add line breaks before major SQL keywords for readability."""
+    import re
+    for kw in ["FROM", "WHERE", "GROUP BY", "HAVING", "ORDER BY", "LIMIT"]:
+        sql = re.sub(rf"\s+({kw}\b)", rf"\n{kw}", sql, flags=re.IGNORECASE)
+    return sql.strip()
 VALID_TIME_GRAINS = {"none", "day", "week", "month", "quarter", "year"}
 
 
@@ -253,13 +261,13 @@ async def build_query(request: BuildQueryRequest):
         result = db.execute_query(sql, request.source_id)
         return BuildQueryResponse(
             success=True,
-            sql=sql,
+            sql=_format_sql(sql),
             data=result.rows,
             columns=result.columns,
         )
     except Exception as e:
         traceback.print_exc()
-        return BuildQueryResponse(success=False, sql=sql, error=f"SQL execution failed: {e}")
+        return BuildQueryResponse(success=False, sql=_format_sql(sql), error=f"SQL execution failed: {e}")
 
 
 @router.post("/propose", response_model=ProposeResponse)

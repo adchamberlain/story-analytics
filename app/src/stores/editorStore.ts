@@ -448,16 +448,16 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       get().fetchAvailableTables()
     } else {
       // Switching back to Table: restore source columns, clear SQL-specific state.
-      // Preserve user's config (titles, axis labels, chart type, etc.)
+      // Preserve entire user config including x/y/series — validate after schema loads.
       set({
         customSql: '',
         sqlError: null,
         sqlExecuting: false,
         data: [],
         sql: null,
-        config: { ...config, dataMode: 'table', x: null, y: null, series: null },
+        config: { ...config, dataMode: 'table' },
       })
-      // Restore original source columns without resetting the full config
+      // Restore original source columns, then validate x/y/series and rebuild query
       if (sourceId) {
         fetch(`/api/data/schema/${sourceId}`)
           .then((res) => res.ok ? res.json() : Promise.reject(res.statusText))
@@ -467,7 +467,21 @@ export const useEditorStore = create<EditorState>((set, get) => ({
             for (const col of schema.columns ?? []) {
               columnTypes[col.name] = col.type
             }
-            set({ columns, columnTypes })
+            const colSet = new Set(columns)
+            const cur = get().config
+            // Clear any column mappings that don't exist in the source
+            const patch: Partial<EditorConfig> = {}
+            if (cur.x && !colSet.has(cur.x)) patch.x = null
+            if (cur.y && !colSet.has(cur.y)) patch.y = null
+            if (cur.series && !colSet.has(cur.series)) patch.series = null
+
+            set({
+              columns,
+              columnTypes,
+              ...(Object.keys(patch).length > 0 ? { config: { ...cur, ...patch } } : {}),
+            })
+            // Rebuild query with restored/validated columns
+            get().buildQuery()
           })
           .catch(() => {})
       }
