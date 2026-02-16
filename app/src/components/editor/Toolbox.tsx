@@ -292,11 +292,13 @@ export function Toolbox() {
             checked={config.showGrid}
             onChange={(showGrid) => updateConfig({ showGrid })}
           />
-          <Toggle
-            label="Legend"
-            checked={config.showLegend}
-            onChange={(showLegend) => updateConfig({ showLegend })}
-          />
+          {config.series && (
+            <Toggle
+              label="Legend"
+              checked={config.showLegend}
+              onChange={(showLegend) => updateConfig({ showLegend })}
+            />
+          )}
         </div>
       </Section>
 

@@ -28,6 +28,16 @@ export function ObservableChartFactory({
     ? [config.color]
     : [...CHART_COLORS]
 
+  // Build custom legend data — unique series values mapped to palette colors.
+  // We never rely on Observable Plot's built-in legend (unreliable for stroke marks).
+  const showLegend = config.showLegend !== false && !!config.series
+  const legendItems = showLegend
+    ? getUniqueSeries(data, config.series!).map((label, i) => ({
+        label,
+        color: colors[i % colors.length],
+      }))
+    : []
+
   const { containerRef } = useObservablePlot(
     (width) => {
       const marks = buildMarks(chartType, data, config, colors)
@@ -36,12 +46,10 @@ export function ObservableChartFactory({
       const plotOptions = buildPlotOptions(chartType, data, config, colors, width, height)
       const plot = Plot.plot({ ...plotOptions, marks: [...marks, ...annotationMarks] })
 
-      // Observable Plot renders the legend as a <div> inside a <figure> wrapper.
-      // The color: { legend: false } API doesn't reliably suppress it,
-      // so we remove legend elements from the DOM when showLegend is off.
-      if (config.showLegend === false && plot.tagName === 'FIGURE') {
+      // Strip any built-in legend that Observable Plot may have generated
+      if (plot.tagName === 'FIGURE') {
         for (const child of Array.from(plot.children)) {
-          if (child.tagName !== 'svg' && child.tagName !== 'SVG') {
+          if (child.tagName !== 'svg' && child.tagName !== 'SVG' && child.tagName !== 'STYLE') {
             child.remove()
           }
         }
@@ -69,7 +77,21 @@ export function ObservableChartFactory({
     return <TreemapComponent data={data} config={config} height={height} />
   }
 
-  return <div ref={containerRef} style={{ width: '100%', height }} />
+  return (
+    <div style={{ width: '100%' }}>
+      {legendItems.length > 0 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', padding: '0 0 6px', fontSize: 12 }}>
+          {legendItems.map((item) => (
+            <span key={item.label} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+              <span style={{ width: 12, height: 12, borderRadius: 2, backgroundColor: item.color, flexShrink: 0 }} />
+              <span style={{ color: 'var(--color-text-secondary)' }}>{item.label}</span>
+            </span>
+          ))}
+        </div>
+      )}
+      <div ref={containerRef} style={{ width: '100%', height }} />
+    </div>
+  )
 }
 
 // ── Mark Builders ───────────────────────────────────────────────────────────
@@ -458,11 +480,8 @@ function buildPlotOptions(
     overrides.y = yOpts
   }
 
-  // Color range + legend when series is in use
-  const wantLegend = config.showLegend !== false && !!config.series
-  overrides.color = wantLegend
-    ? { range: [...colors], legend: true }
-    : { range: [...colors], legend: false }
+  // Color range — legend is always suppressed here; we render a custom React legend instead
+  overrides.color = { range: [...colors], legend: false }
 
   return plotDefaults({
     width,
@@ -473,6 +492,18 @@ function buildPlotOptions(
 
 function getBaseAxis() {
   return { line: true, tickSize: 0, labelOffset: 8 }
+}
+
+// ── Legend Helper ───────────────────────────────────────────────────────────
+
+function getUniqueSeries(data: Record<string, unknown>[], field: string): string[] {
+  const seen = new Set<string>()
+  const result: string[] = []
+  for (const row of data) {
+    const v = String(row[field] ?? '')
+    if (!seen.has(v)) { seen.add(v); result.push(v) }
+  }
+  return result
 }
 
 // ── Date Parsing Helper ─────────────────────────────────────────────────────
