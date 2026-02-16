@@ -37,6 +37,7 @@ interface DataState {
 
   /** Actions */
   uploadCSV: (file: File) => Promise<void>
+  pasteData: (text: string) => Promise<void>
   loadPreview: (sourceId: string) => Promise<void>
   reset: () => void
 }
@@ -65,6 +66,31 @@ export const useDataStore = create<DataState>((set, get) => ({
       if (!res.ok) {
         const body = await res.json().catch(() => ({ detail: res.statusText }))
         throw new Error(body.detail ?? `Upload failed: ${res.status}`)
+      }
+
+      const source: UploadedSource = await res.json()
+      set({ source, uploading: false })
+
+      // Auto-load preview
+      get().loadPreview(source.source_id)
+    } catch (e) {
+      set({ uploading: false, error: e instanceof Error ? e.message : String(e) })
+    }
+  },
+
+  pasteData: async (text: string) => {
+    set({ uploading: true, error: null, source: null, preview: null })
+
+    try {
+      const res = await fetch(`${API_BASE}/paste`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ data: text }),
+      })
+
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({ detail: res.statusText }))
+        throw new Error(body.detail ?? `Paste failed: ${res.status}`)
       }
 
       const source: UploadedSource = await res.json()

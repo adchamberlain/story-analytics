@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { FileDropzone } from '../components/data/FileDropzone'
+import { PasteDataInput } from '../components/data/PasteDataInput'
 import { DatabaseConnector } from '../components/data/DatabaseConnector'
 import { DataPreview } from '../components/data/DataPreview'
 import { useDataStore } from '../stores/dataStore'
@@ -18,6 +19,7 @@ export function SourcePickerPage() {
   const [loading, setLoading] = useState(true)
   const [refreshKey, setRefreshKey] = useState(0)
   const [showRecent, setShowRecent] = useState(false)
+  const [inputMode, setInputMode] = useState<'upload' | 'paste'>('upload')
 
   const dataStore = useDataStore()
 
@@ -42,6 +44,13 @@ export function SourcePickerPage() {
   const handleFileSelected = useCallback(
     async (file: File) => {
       await dataStore.uploadCSV(file)
+    },
+    [dataStore]
+  )
+
+  const handlePasteSubmit = useCallback(
+    async (text: string) => {
+      await dataStore.pasteData(text)
     },
     [dataStore]
   )
@@ -117,7 +126,7 @@ export function SourcePickerPage() {
                 className="text-[15px] font-medium text-text-secondary hover:text-text-primary rounded-lg border border-border-default hover:border-border-hover transition-colors"
                 style={{ padding: '10px 24px' }}
               >
-                Upload different file
+                Choose different data
               </button>
             </div>
           </>
@@ -128,16 +137,48 @@ export function SourcePickerPage() {
               Choose a data source
             </h1>
             <p className="text-[15px] text-text-muted leading-relaxed" style={{ marginBottom: '40px' }}>
-              Upload a CSV file or connect to a database.
+              Upload a CSV file, paste data, or connect to a database.
             </p>
 
             {/* Two primary options */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '40px' }}>
-              {/* Upload CSV */}
-              <FileDropzone
-                onFileSelected={handleFileSelected}
-                uploading={dataStore.uploading}
-              />
+              {/* Upload / Paste toggle */}
+              <div className="flex" style={{ gap: '4px', marginBottom: '4px' }}>
+                <button
+                  onClick={() => setInputMode('upload')}
+                  className={`text-[14px] font-medium rounded-lg transition-colors ${
+                    inputMode === 'upload'
+                      ? 'text-text-primary bg-surface-raised'
+                      : 'text-text-muted hover:text-text-secondary'
+                  }`}
+                  style={{ padding: '6px 14px' }}
+                >
+                  Upload CSV
+                </button>
+                <button
+                  onClick={() => setInputMode('paste')}
+                  className={`text-[14px] font-medium rounded-lg transition-colors ${
+                    inputMode === 'paste'
+                      ? 'text-text-primary bg-surface-raised'
+                      : 'text-text-muted hover:text-text-secondary'
+                  }`}
+                  style={{ padding: '6px 14px' }}
+                >
+                  Paste data
+                </button>
+              </div>
+
+              {inputMode === 'upload' ? (
+                <FileDropzone
+                  onFileSelected={handleFileSelected}
+                  uploading={dataStore.uploading}
+                />
+              ) : (
+                <PasteDataInput
+                  onSubmit={handlePasteSubmit}
+                  uploading={dataStore.uploading}
+                />
+              )}
 
               {dataStore.error && (
                 <p className="text-[14px]" style={{ color: '#ef4444', marginTop: '-8px' }}>{dataStore.error}</p>

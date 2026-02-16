@@ -79,6 +79,10 @@ class TableInfo(BaseModel):
     column_count: int
 
 
+class PasteRequest(BaseModel):
+    data: str
+
+
 # ── Endpoints ────────────────────────────────────────────────────────────────
 
 @router.get("/sources", response_model=list[SourceSummary])
@@ -176,6 +180,57 @@ async def upload_csv(file: UploadFile = File(...)):
         raise HTTPException(
             status_code=422,
             detail=f"Could not parse \"{file.filename}\". Check that the file is a valid CSV with a header row.",
+        )
+    finally:
+        tmp_path.unlink(missing_ok=True)
+
+    return UploadResponse(
+        source_id=schema.source_id,
+        filename=schema.filename,
+        row_count=schema.row_count,
+        columns=[
+            ColumnInfoResponse(
+                name=c.name,
+                type=c.type,
+                nullable=c.nullable,
+                sample_values=c.sample_values,
+                null_count=c.null_count,
+                distinct_count=c.distinct_count,
+                min_value=c.min_value,
+                max_value=c.max_value,
+            )
+            for c in schema.columns
+        ],
+    )
+
+
+@router.post("/paste", response_model=UploadResponse)
+async def paste_data(request: PasteRequest):
+    """Ingest pasted tabular data (CSV/TSV), load into DuckDB, return schema info."""
+    text = request.data.strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="No data provided")
+
+    if len(text) > 50_000:
+        raise HTTPException(
+            status_code=400,
+            detail="Pasted data is too large. Please upload a CSV file for datasets over ~10,000 rows.",
+        )
+
+    # Write pasted text to a temp file and ingest through the standard CSV path
+    with tempfile.NamedTemporaryFile(delete=False, suffix='.csv', mode='w', encoding='utf-8') as tmp:
+        tmp.write(text)
+        tmp_path = Path(tmp.name)
+
+    try:
+        service = get_duckdb_service()
+        schema = service.ingest_csv(tmp_path, "pasted_data.csv")
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    except Exception:
+        raise HTTPException(
+            status_code=422,
+            detail="Could not parse pasted data. Check that it contains a header row and is tab- or comma-separated.",
         )
     finally:
         tmp_path.unlink(missing_ok=True)
