@@ -555,13 +555,13 @@ const SWATCH_COLORS = [
 
 function ColorPicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   return (
-    <div className="flex items-center gap-1">
+    <div className="flex flex-wrap items-center gap-1">
       {SWATCH_COLORS.map((c) => (
         <button
           key={c}
           onClick={() => onChange(c)}
           title={c}
-          className="w-4.5 h-4.5 rounded-full border-2 cursor-pointer transition-transform hover:scale-110 shrink-0"
+          className="w-4 h-4 rounded-full border-2 cursor-pointer transition-transform hover:scale-110"
           style={{
             backgroundColor: c,
             borderColor: c === value ? 'var(--color-text-primary)' : 'transparent',
