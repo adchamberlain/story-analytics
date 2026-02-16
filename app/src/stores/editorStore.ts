@@ -15,7 +15,7 @@ export interface EditorConfig {
   source: string
   sourceUrl: string
   x: string | null
-  y: string | null
+  y: string | string[] | null
   series: string | null
   horizontal: boolean
   sort: boolean
@@ -323,7 +323,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           source_id: sourceId,
           x: config.x,
           y: config.y,
-          series: config.series,
+          // Multi-Y uses UNPIVOT for implicit series; don't send explicit series
+          series: Array.isArray(config.y) && config.y.length > 1 ? null : config.series,
           aggregation: config.aggregation,
           time_grain: config.timeGrain,
         }),
@@ -478,7 +479,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
             // Clear any column mappings that don't exist in the source
             const patch: Partial<EditorConfig> = {}
             if (cur.x && !colSet.has(cur.x)) patch.x = null
-            if (cur.y && !colSet.has(cur.y)) patch.y = null
+            if (Array.isArray(cur.y)) {
+              const valid = cur.y.filter((c) => colSet.has(c))
+              patch.y = valid.length > 0 ? valid : null
+            } else if (cur.y && !colSet.has(cur.y)) {
+              patch.y = null
+            }
             if (cur.series && !colSet.has(cur.series)) patch.series = null
 
             set({

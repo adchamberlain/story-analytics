@@ -81,7 +81,7 @@ class SaveRequest(BaseModel):
     title: str
     sql: str
     x: str | None = None
-    y: str | None = None
+    y: str | list[str] | None = None
     series: str | None = None
     horizontal: bool = False
     sort: bool = True
@@ -102,7 +102,7 @@ class SavedChartResponse(BaseModel):
     source: str | None = None
     sql: str
     x: str | None = None
-    y: str | None = None
+    y: str | list[str] | None = None
     series: str | None = None
     horizontal: bool = False
     sort: bool = True
@@ -125,7 +125,7 @@ class UpdateChartRequest(BaseModel):
     subtitle: str | None = None
     source: str | None = None
     x: str | None = None
-    y: str | None = None
+    y: str | list[str] | None = None
     series: str | None = None
     horizontal: bool | None = None
     sort: bool | None = None
@@ -135,7 +135,7 @@ class UpdateChartRequest(BaseModel):
 class BuildQueryRequest(BaseModel):
     source_id: str
     x: str
-    y: str | None = None
+    y: str | list[str] | None = None
     series: str | None = None
     aggregation: str = "none"  # "none", "sum", "avg", "count", "min", "max"
     time_grain: str = "none"  # "none", "day", "week", "month", "quarter", "year"
@@ -202,59 +202,117 @@ async def build_query(request: BuildQueryRequest):
 
     valid_cols = {c.name for c in schema.columns}
 
-    for col_name, col_label in [(request.x, "x"), (request.y, "y"), (request.series, "series")]:
+    # Normalize y: single-element list → scalar string
+    y = request.y
+    if isinstance(y, list):
+        if len(y) == 1:
+            y = y[0]
+        elif len(y) == 0:
+            y = None
+
+    # Validate columns
+    for col_name, col_label in [(request.x, "x"), (request.series, "series")]:
         if col_name and col_name not in valid_cols:
             return BuildQueryResponse(
                 success=False,
                 error=f"Column {q(col_name)} not found in source. Available: {sorted(valid_cols)}",
             )
 
+    # Validate y column(s)
+    if isinstance(y, list):
+        for yc in y:
+            if yc not in valid_cols:
+                return BuildQueryResponse(
+                    success=False,
+                    error=f"Column {q(yc)} not found in source. Available: {sorted(valid_cols)}",
+                )
+    elif y and y not in valid_cols:
+        return BuildQueryResponse(
+            success=False,
+            error=f"Column {q(y)} not found in source. Available: {sorted(valid_cols)}",
+        )
+
     table_name = f"src_{request.source_id}"
 
-    # X column expression — apply DATE_TRUNC when a time grain is set
-    use_grain = request.time_grain != "none" and request.aggregation != "none"
-    if use_grain:
-        x_expr = f"DATE_TRUNC('{request.time_grain}', {q(request.x)})"
-        x_select = f"{x_expr} AS {q(request.x)}"
-    else:
-        x_expr = q(request.x)
-        x_select = q(request.x)
+    # ── Multi-Y UNPIVOT branch ──────────────────────────────────────────────
+    if isinstance(y, list) and len(y) > 1:
+        y_cols_quoted = ", ".join(q(c) for c in y)
+        subquery = f"SELECT {q(request.x)}, {y_cols_quoted} FROM {table_name}"
+        unpivot = (
+            f"({subquery})"
+            f' UNPIVOT (metric_value FOR metric_name IN ({y_cols_quoted}))'
+        )
 
-    # Build SQL
-    if request.aggregation == "none":
-        # Raw select
-        select_cols = [x_select]
-        if request.y:
-            select_cols.append(q(request.y))
-        if request.series:
-            select_cols.append(q(request.series))
-        sql = f"SELECT {', '.join(select_cols)} FROM {table_name} ORDER BY {x_expr} LIMIT 5000"
-    elif request.aggregation == "count" and not request.y:
-        # COUNT(*) with no y column
-        select_cols = [x_select, 'COUNT(*) AS "count"']
-        group_cols = [x_expr]
-        if request.series:
-            select_cols.append(q(request.series))
-            group_cols.append(q(request.series))
-        sql = (
-            f"SELECT {', '.join(select_cols)} FROM {table_name} "
-            f"GROUP BY {', '.join(group_cols)} ORDER BY {x_expr}"
-        )
+        use_grain = request.time_grain != "none" and request.aggregation != "none"
+        if use_grain:
+            x_expr = f"DATE_TRUNC('{request.time_grain}', {q(request.x)})"
+            x_alias = q(request.x)
+        else:
+            x_expr = q(request.x)
+            x_alias = None
+
+        if request.aggregation == "none":
+            x_sel = f"{x_expr} AS {x_alias}" if x_alias else x_expr
+            sql = (
+                f"SELECT {x_sel}, metric_name, metric_value"
+                f"\nFROM {unpivot}"
+                f"\nORDER BY {x_expr} LIMIT 5000"
+            )
+        else:
+            agg = request.aggregation.upper()
+            x_sel = f"{x_expr} AS {x_alias}" if x_alias else x_expr
+            sql = (
+                f"SELECT {x_sel}, metric_name, {agg}(metric_value) AS metric_value"
+                f"\nFROM {unpivot}"
+                f"\nGROUP BY {x_expr}, metric_name"
+                f"\nORDER BY {x_expr}"
+            )
     else:
-        # Aggregated query
-        agg = request.aggregation.upper()
-        y_col = request.y or "*"
-        y_quoted = q(y_col) if request.y else "*"
-        y_alias = request.y or "count"
-        select_cols = [x_select, f'{agg}({y_quoted}) AS {q(y_alias)}']
-        group_cols = [x_expr]
-        if request.series:
-            select_cols.append(q(request.series))
-            group_cols.append(q(request.series))
-        sql = (
-            f"SELECT {', '.join(select_cols)} FROM {table_name} "
-            f"GROUP BY {', '.join(group_cols)} ORDER BY {x_expr}"
-        )
+        # ── Single-Y branch (existing logic) ────────────────────────────────
+        # X column expression — apply DATE_TRUNC when a time grain is set
+        use_grain = request.time_grain != "none" and request.aggregation != "none"
+        if use_grain:
+            x_expr = f"DATE_TRUNC('{request.time_grain}', {q(request.x)})"
+            x_select = f"{x_expr} AS {q(request.x)}"
+        else:
+            x_expr = q(request.x)
+            x_select = q(request.x)
+
+        # Build SQL
+        if request.aggregation == "none":
+            # Raw select
+            select_cols = [x_select]
+            if y:
+                select_cols.append(q(y))
+            if request.series:
+                select_cols.append(q(request.series))
+            sql = f"SELECT {', '.join(select_cols)} FROM {table_name} ORDER BY {x_expr} LIMIT 5000"
+        elif request.aggregation == "count" and not y:
+            # COUNT(*) with no y column
+            select_cols = [x_select, 'COUNT(*) AS "count"']
+            group_cols = [x_expr]
+            if request.series:
+                select_cols.append(q(request.series))
+                group_cols.append(q(request.series))
+            sql = (
+                f"SELECT {', '.join(select_cols)} FROM {table_name} "
+                f"GROUP BY {', '.join(group_cols)} ORDER BY {x_expr}"
+            )
+        else:
+            # Aggregated query
+            agg = request.aggregation.upper()
+            y_col = y or "*"
+            y_quoted = q(y_col) if y else "*"
+            y_alias = y or "count"
+            select_cols = [x_select, f'{agg}({y_quoted}) AS {q(y_alias)}']
+            group_cols = [x_expr]
+            if request.series:
+                select_cols.append(q(request.series))
+                group_cols.append(q(request.series))
+            sql = (
+                f"SELECT {', '.join(select_cols)} FROM {table_name} "
+                f"GROUP BY {', '.join(group_cols)} ORDER BY {x_expr}"
+            )
 
     # Execute
     try:

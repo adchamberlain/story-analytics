@@ -24,7 +24,7 @@ class SavedChart:
     source: str | None
     sql: str
     x: str | None
-    y: str | None
+    y: str | list[str] | None
     series: str | None
     horizontal: bool
     sort: bool
@@ -42,7 +42,7 @@ def save_chart(
     title: str,
     sql: str,
     x: str | None = None,
-    y: str | None = None,
+    y: str | list[str] | None = None,
     series: str | None = None,
     horizontal: bool = False,
     sort: bool = True,
