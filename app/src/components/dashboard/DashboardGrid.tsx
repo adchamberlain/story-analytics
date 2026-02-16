@@ -257,6 +257,7 @@ function DashboardChartCell({
         title={chart.title ?? undefined}
         subtitle={chart.subtitle ?? undefined}
         source={chart.source ?? undefined}
+        sourceUrl={(chart.config?.sourceUrl as string) ?? undefined}
         className="h-full"
       >
         <ObservableChartFactory

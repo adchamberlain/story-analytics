@@ -5,6 +5,7 @@ interface ChartWrapperProps {
   title?: string
   subtitle?: string
   source?: string
+  sourceUrl?: string
   children: React.ReactNode
   className?: string
 }
@@ -13,7 +14,7 @@ interface ChartWrapperProps {
  * Publication-ready chart wrapper with title, subtitle, source note, and export buttons.
  * Replaces the PoC ChartCard — no library badge, adds export functionality.
  */
-export function ChartWrapper({ title, subtitle, source, children, className = '' }: ChartWrapperProps) {
+export function ChartWrapper({ title, subtitle, source, sourceUrl, children, className = '' }: ChartWrapperProps) {
   const chartAreaRef = useRef<HTMLDivElement>(null)
 
   const handleExportSVG = useCallback(() => {
@@ -58,7 +59,19 @@ export function ChartWrapper({ title, subtitle, source, children, className = ''
       <div className="flex items-center justify-between mt-3">
         {source ? (
           <p className="text-xs text-text-muted">
-            Source: {source}
+            Source:{' '}
+            {sourceUrl ? (
+              <a
+                href={sourceUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline hover:text-text-secondary transition-colors"
+              >
+                {source}
+              </a>
+            ) : (
+              source
+            )}
           </p>
         ) : <div />}
         <div className="flex gap-2">

@@ -1,5 +1,4 @@
 import { useState, useRef, useEffect } from 'react'
-import { Link } from 'react-router-dom'
 import { useEditorStore } from '../../stores/editorStore'
 
 const PROVIDER_LABELS: Record<string, string> = {
@@ -103,7 +102,7 @@ export function AIChat() {
         <h3 className="text-sm font-semibold text-text-primary">AI Assistant</h3>
         <p className="text-xs mt-0.5 text-text-muted">
           {providerLabel ? (
-            <>Using <Link to="/settings" className="underline hover:text-text-secondary transition-colors">{providerLabel}</Link></>
+            <>Using <a href="/settings" target="_blank" rel="noopener noreferrer" className="underline hover:text-text-secondary transition-colors">{providerLabel}</a></>
           ) : (
             'Describe changes in natural language'
           )}

@@ -221,6 +221,14 @@ export function Toolbox() {
             value={config.source}
             onChange={(source) => updateConfig({ source })}
           />
+          {config.source && (
+            <TextInput
+              label="Source URL"
+              value={config.sourceUrl}
+              onChange={(sourceUrl) => updateConfig({ sourceUrl })}
+              placeholder="https://..."
+            />
+          )}
         </div>
       </Section>
 
@@ -352,7 +360,7 @@ function CollapsibleSection({ title, count, children }: { title: string; count?:
   )
 }
 
-function TextInput({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+function TextInput({ label, value, onChange, placeholder }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string }) {
   return (
     <div>
       <label className="block text-xs font-medium text-text-secondary mb-1">{label}</label>
@@ -360,7 +368,8 @@ function TextInput({ label, value, onChange }: { label: string; value: string; o
         type="text"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full px-2 py-1.5 text-sm border border-border-default rounded-md bg-surface text-text-primary focus:outline-none focus:border-blue-400"
+        placeholder={placeholder}
+        className="w-full px-2 py-1.5 text-sm border border-border-default rounded-md bg-surface text-text-primary placeholder:text-text-muted focus:outline-none focus:border-blue-400"
       />
     </div>
   )
