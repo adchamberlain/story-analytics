@@ -67,7 +67,6 @@ export function ShareModal({ dashboardId, onClose }: ShareModalProps) {
 
   const visibilityOptions: { value: Visibility; label: string; description: string }[] = [
     { value: 'private', label: 'Private', description: 'Only you can view this dashboard' },
-    { value: 'team', label: 'Team', description: 'All authenticated users can view' },
     { value: 'public', label: 'Public', description: 'Anyone with the link can view' },
   ]
 
@@ -111,7 +110,7 @@ export function ShareModal({ dashboardId, onClose }: ShareModalProps) {
                       key={opt.value}
                       className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
                         visibility === opt.value
-                          ? 'border-blue-300 bg-blue-50 dark:border-blue-700 dark:bg-blue-950'
+                          ? 'border-blue-500/40 bg-blue-500/10'
                           : 'border-border-default hover:bg-surface-secondary'
                       }`}
                     >

@@ -43,13 +43,6 @@ interface DashboardData {
   has_stale_data: boolean
 }
 
-interface HealthCheckResult {
-  dashboard_id: string
-  checked_at: string
-  charts: { chart_id: string; health_status: string; health_issues: string[] }[]
-  overall_status: string
-}
-
 /**
  * Public dashboard view. Fetches dashboard with chart data from v2 API
  * and renders all charts in a responsive grid.
@@ -65,10 +58,6 @@ export function DashboardViewPage() {
   const [, setTick] = useState(0)
   const gridRef = useRef<HTMLDivElement>(null)
   const refreshErrorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-
-  // Health check state
-  const [healthChecking, setHealthChecking] = useState(false)
-  const [healthResult, setHealthResult] = useState<HealthCheckResult | null>(null)
 
   // Pin state
   const [isPinned, setIsPinned] = useState(() => localStorage.getItem('pinnedDashboardId') === dashboardId)
@@ -145,26 +134,6 @@ export function DashboardViewPage() {
     }
   }
 
-  const handleHealthCheck = async () => {
-    if (!dashboardId || healthChecking) return
-    setHealthChecking(true)
-    setHealthResult(null)
-    try {
-      const res = await fetch(`/api/v2/dashboards/${dashboardId}/health-check`, {
-        method: 'POST',
-      })
-      if (!res.ok) {
-        throw new Error('Health check failed')
-      }
-      const data: HealthCheckResult = await res.json()
-      setHealthResult(data)
-    } catch {
-      setHealthResult(null)
-    } finally {
-      setHealthChecking(false)
-    }
-  }
-
   if (loading) {
     return (
       <div className="min-h-screen bg-surface-secondary flex items-center justify-center">
@@ -194,10 +163,6 @@ export function DashboardViewPage() {
     )
   }
 
-  const issueCount = healthResult
-    ? healthResult.charts.filter((c) => c.health_status !== 'healthy').length
-    : 0
-
   return (
     <div className="min-h-screen bg-surface-secondary">
       {/* Header */}
@@ -209,23 +174,6 @@ export function DashboardViewPage() {
           Dashboards
         </Link>
         <div className="flex items-center gap-2">
-          <button
-            onClick={handleHealthCheck}
-            disabled={healthChecking}
-            className="text-[14px] px-4 py-2 rounded-xl border border-border-default text-text-on-surface hover:bg-surface-secondary transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
-          >
-            {healthChecking ? (
-              <svg className="animate-spin h-3.5 w-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-              </svg>
-            ) : (
-              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            )}
-            Health Check
-          </button>
           <button
             onClick={() => setShowShareModal(true)}
             className="text-[14px] px-4 py-2 rounded-xl border border-border-default text-text-on-surface hover:bg-surface-secondary transition-colors flex items-center gap-1.5"
@@ -316,41 +264,6 @@ export function DashboardViewPage() {
               className="text-[14px] text-amber-700 underline hover:text-amber-900 ml-4"
             >
               Refresh now
-            </button>
-          </div>
-        )}
-
-        {/* Health check result banner */}
-        {healthResult && (
-          <div
-            className={`mb-4 flex items-center justify-between rounded-xl px-4 py-2.5 border ${
-              healthResult.overall_status === 'healthy'
-                ? 'bg-green-50 border-green-200'
-                : healthResult.overall_status === 'warning'
-                  ? 'bg-amber-50 border-amber-200'
-                  : 'bg-red-50 border-red-200'
-            }`}
-          >
-            <p
-              className={`text-[14px] ${
-                healthResult.overall_status === 'healthy'
-                  ? 'text-green-700'
-                  : healthResult.overall_status === 'warning'
-                    ? 'text-amber-700'
-                    : 'text-red-700'
-              }`}
-            >
-              {healthResult.overall_status === 'healthy'
-                ? 'All charts healthy'
-                : `${issueCount} chart${issueCount !== 1 ? 's' : ''} with issues`}
-            </p>
-            <button
-              onClick={() => setHealthResult(null)}
-              className="text-text-icon hover:text-text-icon-hover ml-4"
-            >
-              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-              </svg>
             </button>
           </div>
         )}
