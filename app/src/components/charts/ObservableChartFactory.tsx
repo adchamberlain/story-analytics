@@ -945,10 +945,25 @@ function buildPlotOptions(
     }
   }
 
-  // Axis labels
-  if (config.xAxisTitle || config.yAxisTitle) {
-    if (config.xAxisTitle) overrides.x = { ...(overrides.x as Record<string, unknown> ?? {}), ...getBaseAxis(), label: config.xAxisTitle }
-    if (config.yAxisTitle) overrides.y = { ...getBaseAxis(), label: config.yAxisTitle, grid: true }
+  // Axis labels — suppress Observable Plot's default column-name labels
+  // (they overlap tick marks). Only show when user explicitly sets a title.
+  overrides.x = {
+    ...(overrides.x as Record<string, unknown> ?? {}),
+    ...getBaseAxis(),
+    label: config.xAxisTitle || null,
+    // Center the label below the tick marks instead of inline at the right edge
+    ...(config.xAxisTitle ? { labelAnchor: 'center', labelOffset: 36, labelArrow: false } : {}),
+  }
+  overrides.y = {
+    ...(overrides.y as Record<string, unknown> ?? {}),
+    ...getBaseAxis(),
+    label: config.yAxisTitle || null,
+    grid: true,
+    ...(config.yAxisTitle ? { labelAnchor: 'center', labelOffset: 46, labelArrow: false } : {}),
+  }
+  // Extra left margin so rotated y-axis label doesn't overlap tick numbers
+  if (config.yAxisTitle) {
+    overrides.marginLeft = Math.max((overrides.marginLeft as number) ?? 40, 60)
   }
 
   // Y-axis bounds
