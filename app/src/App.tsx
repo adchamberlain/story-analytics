@@ -3,6 +3,7 @@ import { AppShell } from './components/layout/AppShell'
 import { DashboardsHome } from './pages/DashboardsHome'
 import { LibraryPage } from './pages/LibraryPage'
 import { SettingsPage } from './pages/SettingsPage'
+import { SourcesPage } from './pages/SourcesPage'
 import { DashboardBuilderPage } from './pages/DashboardBuilderPage'
 import { DashboardViewPage } from './pages/DashboardViewPage'
 import { EditorPage } from './pages/EditorPage'
@@ -20,6 +21,7 @@ function App() {
         <Route path="/dashboards" element={<DashboardsHome />} />
         <Route path="/library" element={<LibraryPage />} />
         <Route path="/settings" element={<SettingsPage />} />
+        <Route path="/sources" element={<SourcesPage />} />
         <Route path="/dashboard/new" element={<DashboardBuilderPage />} />
         <Route path="/dashboard/:dashboardId/edit" element={<DashboardBuilderPage />} />
       </Route>

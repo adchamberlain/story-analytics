@@ -248,6 +248,11 @@ export function SettingsPage() {
           <p className="text-[14px] text-text-muted leading-relaxed mt-1.5">
             Publication-ready dashboards from any data source.
           </p>
+          <p className="text-[14px] text-text-muted leading-relaxed mt-1.5">
+            Open source under the{' '}
+            <a href="https://opensource.org/licenses/MIT" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300 underline underline-offset-2">MIT License</a>.{' '}
+            <a href="https://storyanalytics.ai/" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300 underline underline-offset-2">storyanalytics.ai</a>
+          </p>
         </section>
 
 

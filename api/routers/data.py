@@ -2,6 +2,7 @@
 Data router: CSV upload, schema inspection, and query execution.
 """
 
+import shutil
 import tempfile
 from pathlib import Path
 
@@ -121,6 +122,32 @@ async def list_tables():
         except Exception:
             continue
     return results
+
+
+@router.delete("/sources/{source_id}")
+async def delete_source(source_id: str):
+    """Delete a CSV data source: drop DuckDB table, remove from memory, delete files."""
+    service = get_duckdb_service()
+
+    if source_id not in service._sources:
+        raise HTTPException(status_code=404, detail="Source not found")
+
+    # Drop the DuckDB table
+    table_name = f"src_{source_id}"
+    try:
+        service._conn.execute(f"DROP TABLE IF EXISTS {table_name}")
+    except Exception:
+        pass
+
+    # Remove from in-memory registry
+    del service._sources[source_id]
+
+    # Delete upload directory from disk
+    upload_dir = Path(__file__).parent.parent.parent / "data" / "uploads" / source_id
+    if upload_dir.exists():
+        shutil.rmtree(upload_dir)
+
+    return {"deleted": True}
 
 
 @router.post("/query-raw", response_model=RawQueryResponse)

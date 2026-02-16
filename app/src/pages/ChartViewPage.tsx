@@ -15,7 +15,7 @@ interface ChartData {
     subtitle: string | null
     source: string | null
     x: string | null
-    y: string | null
+    y: string | string[] | null
     series: string | null
     horizontal: boolean
     sort: boolean
@@ -91,11 +91,12 @@ export function ChartViewPage() {
   const { chart, data } = chartData
   const chartType = (chart.chart_type ?? 'BarChart') as ChartType
 
-  // Map API response → ChartConfig (same pattern as EditorPage)
+  // Map API response → ChartConfig (apply same multi-Y logic as EditorPage)
+  const isMultiY = Array.isArray(chart.y) && chart.y.length > 1
   const chartConfig: ChartConfig = {
     x: chart.x ?? undefined,
-    y: chart.y ?? undefined,
-    series: chart.series ?? undefined,
+    y: isMultiY ? 'metric_value' : (Array.isArray(chart.y) ? chart.y[0] : chart.y) ?? undefined,
+    series: isMultiY ? 'metric_name' : chart.series ?? undefined,
     horizontal: chart.horizontal,
     sort: chart.sort,
     stacked: (chart.config?.stacked as boolean) ?? false,
