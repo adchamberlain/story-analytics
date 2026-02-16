@@ -542,16 +542,32 @@ function AddButton({ label, onClick }: { label: string; onClick: () => void }) {
   )
 }
 
+const SWATCH_COLORS = [
+  '#e45756', // red (default annotation color)
+  '#2166ac', // steel blue
+  '#e08214', // orange
+  '#4dac26', // green
+  '#b2abd2', // lavender
+  '#d6604d', // muted red
+  '#888888', // gray
+  '#333333', // dark
+]
+
 function ColorPicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   return (
-    <div className="flex items-center gap-1.5">
-      <input
-        type="color"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="w-6 h-6 rounded border border-border-default cursor-pointer"
-      />
-      <span className="text-[10px] font-mono text-text-muted">{value}</span>
+    <div className="flex items-center gap-1">
+      {SWATCH_COLORS.map((c) => (
+        <button
+          key={c}
+          onClick={() => onChange(c)}
+          title={c}
+          className="w-4.5 h-4.5 rounded-full border-2 cursor-pointer transition-transform hover:scale-110 shrink-0"
+          style={{
+            backgroundColor: c,
+            borderColor: c === value ? 'var(--color-text-primary)' : 'transparent',
+          }}
+        />
+      ))}
     </div>
   )
 }
