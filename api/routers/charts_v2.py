@@ -170,7 +170,7 @@ def _format_sql(sql: str) -> str:
     """Add line breaks before major SQL keywords for readability."""
     import re
     for kw in ["FROM", "WHERE", "GROUP BY", "HAVING", "ORDER BY", "LIMIT"]:
-        sql = re.sub(rf"\s+({kw}\b)", rf"\n{kw}", sql, flags=re.IGNORECASE)
+        sql = re.sub(rf"\s+({kw}\b)", f"\n{kw}", sql, flags=re.IGNORECASE)
     return sql.strip()
 VALID_TIME_GRAINS = {"none", "day", "week", "month", "quarter", "year"}
 
