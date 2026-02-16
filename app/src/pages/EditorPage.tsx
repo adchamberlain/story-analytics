@@ -68,10 +68,12 @@ export function EditorPage() {
     : isDirty                  // Existing chart: enabled when dirty
 
   // Map EditorConfig → ChartConfig for the renderer
+  // Multi-Y: backend UNPIVOT produces metric_name/metric_value columns
+  const isMultiY = Array.isArray(store.config.y) && store.config.y.length > 1
   const chartConfig: ChartConfig = {
     x: store.config.x ?? undefined,
-    y: store.config.y ?? undefined,
-    series: store.config.series ?? undefined,
+    y: isMultiY ? 'metric_value' : (Array.isArray(store.config.y) ? store.config.y[0] : store.config.y) ?? undefined,
+    series: isMultiY ? 'metric_name' : store.config.series ?? undefined,
     horizontal: store.config.horizontal,
     sort: store.config.sort,
     stacked: store.config.stacked,

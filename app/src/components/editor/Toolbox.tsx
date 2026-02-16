@@ -3,6 +3,7 @@ import { useEditorStore } from '../../stores/editorStore'
 import { ChartTypeSelector } from './ChartTypeSelector'
 import { PaletteSelector } from './PaletteSelector'
 import { ColumnDropdown } from './ColumnDropdown'
+import { MultiColumnSelect } from './MultiColumnSelect'
 import { AnnotationEditor } from './AnnotationEditor'
 import type { ChartType } from '../../types/chart'
 import type { PaletteKey } from '../../themes/datawrapper'
@@ -50,6 +51,8 @@ export function Toolbox() {
   const hasSeriesOption = ['BarChart', 'LineChart', 'AreaChart', 'ScatterPlot'].includes(config.chartType)
   const isSqlMode = config.dataMode === 'sql'
   const sqlHasResults = isSqlMode && data.length > 0
+  const isMultiY = Array.isArray(config.y) && config.y.length > 1
+  const hasY = Array.isArray(config.y) ? config.y.length > 0 : !!config.y
 
   return (
     <div className="p-4 space-y-5">
@@ -132,7 +135,7 @@ export function Toolbox() {
                     {config.chartType !== 'Histogram' && (
                       <ColumnDropdown
                         label="Y Axis"
-                        value={config.y}
+                        value={Array.isArray(config.y) ? config.y[0] ?? null : config.y}
                         columns={columns}
                         columnTypes={columnTypes}
                         onChange={(y) => updateConfig({ y })}
@@ -166,16 +169,24 @@ export function Toolbox() {
                   columnTypes={columnTypes}
                   onChange={(x) => updateConfig({ x })}
                 />
-                {config.chartType !== 'Histogram' && (
-                  <ColumnDropdown
+                {config.chartType !== 'Histogram' && hasSeriesOption ? (
+                  <MultiColumnSelect
                     label="Y Axis"
                     value={config.y}
                     columns={columns}
                     columnTypes={columnTypes}
                     onChange={(y) => updateConfig({ y })}
                   />
-                )}
-                {hasSeriesOption && (
+                ) : config.chartType !== 'Histogram' ? (
+                  <ColumnDropdown
+                    label="Y Axis"
+                    value={Array.isArray(config.y) ? config.y[0] ?? null : config.y}
+                    columns={columns}
+                    columnTypes={columnTypes}
+                    onChange={(y) => updateConfig({ y })}
+                  />
+                ) : null}
+                {hasSeriesOption && !isMultiY && (
                   <ColumnDropdown
                     label="Series (color)"
                     value={config.series}
@@ -185,7 +196,7 @@ export function Toolbox() {
                     onChange={(series) => updateConfig({ series })}
                   />
                 )}
-                {config.chartType !== 'Histogram' && config.y && (
+                {config.chartType !== 'Histogram' && hasY && (
                   <div>
                     <label className="block text-xs font-medium text-text-secondary mb-1">Aggregation</label>
                     <select
@@ -292,7 +303,7 @@ export function Toolbox() {
             checked={config.showGrid}
             onChange={(showGrid) => updateConfig({ showGrid })}
           />
-          {config.series && (
+          {(config.series || isMultiY) && (
             <Toggle
               label="Legend"
               checked={config.showLegend}
