@@ -535,7 +535,7 @@ function appendPointNotes({ svg, plotEl, annotations, bgColor, textColor, editab
 
   for (const ann of annotations) {
     const color = ann.color ?? textColor
-    const fontSize = ann.fontSize ?? 12
+    const fontSize = ann.fontSize ?? 11
     const { dx, dy } = resolveOffset(ann)
 
     // Convert data coords → pixel coords
@@ -712,12 +712,12 @@ function appendHighlightRanges({ svg, plotEl, ranges, data, xColumn, editable, o
         .attr('fill', color)
         .attr('fill-opacity', opacity)
 
-      // Label
+      // Label (inside plot area so it doesn't clip)
       if (range.label) {
         rangeG.append('text')
           .attr('x', startPx + 4)
-          .attr('y', plotTop - 4)
-          .attr('font-size', 10)
+          .attr('y', plotTop + 12)
+          .attr('font-size', 11)
           .attr('font-weight', 600)
           .attr('fill', color)
           .attr('text-anchor', 'start')
@@ -822,7 +822,7 @@ function appendHighlightRanges({ svg, plotEl, ranges, data, xColumn, editable, o
         rangeG.append('text')
           .attr('x', plotLeft + 4)
           .attr('y', topPy - 4)
-          .attr('font-size', 10)
+          .attr('font-size', 11)
           .attr('font-weight', 600)
           .attr('fill', color)
           .attr('text-anchor', 'start')
