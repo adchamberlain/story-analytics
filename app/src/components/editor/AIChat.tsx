@@ -47,7 +47,7 @@ export function AIChat() {
     el.style.height = `${Math.min(el.scrollHeight, 120)}px`
   }
 
-  const [aiStatus, setAiStatus] = useState<{ available: boolean; provider: string } | null>(null)
+  const [aiStatus, setAiStatus] = useState<{ available: boolean; provider: string; available_providers: string[] } | null>(null)
   const [aiAvailable, setAiAvailable] = useState<boolean | null>(null)
 
   // Check if AI is available and which provider
@@ -72,6 +72,20 @@ export function AIChat() {
   const providerLabel = aiStatus?.provider
     ? PROVIDER_LABELS[aiStatus.provider] ?? aiStatus.provider
     : null
+
+  const handleProviderChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const newProvider = e.target.value
+    try {
+      await fetch('/api/settings/', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ai_provider: newProvider }),
+      })
+      setAiStatus((prev) => prev ? { ...prev, provider: newProvider } : prev)
+    } catch {
+      // Silently fail — provider stays unchanged in UI
+    }
+  }
 
   if (aiAvailable === false) {
     return (
@@ -101,7 +115,22 @@ export function AIChat() {
       <div className="px-4 py-3 border-b border-border-default shrink-0">
         <h3 className="text-sm font-semibold text-text-primary">AI Assistant</h3>
         <p className="text-xs mt-0.5 text-text-muted">
-          {providerLabel ? (
+          {aiStatus && aiStatus.available_providers.length > 1 ? (
+            <>
+              Using{' '}
+              <select
+                value={aiStatus.provider}
+                onChange={handleProviderChange}
+                className="text-xs bg-transparent border border-border-default rounded px-1 py-0.5 text-text-secondary cursor-pointer focus:outline-none focus:border-blue-400"
+              >
+                {aiStatus.available_providers.map((p) => (
+                  <option key={p} value={p}>
+                    {PROVIDER_LABELS[p] ?? p}
+                  </option>
+                ))}
+              </select>
+            </>
+          ) : providerLabel ? (
             <>Using <a href="/settings" target="_blank" rel="noopener noreferrer" className="underline hover:text-text-secondary transition-colors">{providerLabel}</a></>
           ) : (
             'Describe changes in natural language'

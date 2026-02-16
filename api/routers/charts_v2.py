@@ -38,12 +38,21 @@ async def ai_status():
         elif settings.google_api_key:
             provider = "google"
 
+    # Build list of all providers with a configured API key
+    available_providers = []
+    if settings.anthropic_api_key:
+        available_providers.append("anthropic")
+    if settings.openai_api_key:
+        available_providers.append("openai")
+    if settings.google_api_key:
+        available_providers.append("google")
+
     if not provider:
         raise HTTPException(
             status_code=503,
             detail="No AI API key configured. Add ANTHROPIC_API_KEY, OPENAI_API_KEY, or GOOGLE_API_KEY in Settings.",
         )
-    return {"available": True, "provider": provider}
+    return {"available": True, "provider": provider, "available_providers": available_providers}
 
 
 # ── Request / Response Schemas ───────────────────────────────────────────────
