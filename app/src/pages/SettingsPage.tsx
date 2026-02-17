@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useChartThemeStore } from '../stores/chartThemeStore'
+import { CHART_THEMES } from '../themes/chartThemes'
 
 const PROVIDERS = [
   { id: 'anthropic', label: 'Anthropic', sublabel: 'Claude', keyField: 'anthropic_api_key' as const },
@@ -193,6 +195,9 @@ export function SettingsPage() {
           </div>
         </section>
 
+        {/* ── Chart Theme ──────────────────────────────────────────── */}
+        <ChartThemeSelector />
+
         {/* ── Data Sources ─────────────────────────────────────────── */}
         <section className="bg-surface-raised rounded-2xl shadow-card border border-border-default p-7">
           <div className="flex items-center justify-between mb-5">
@@ -257,5 +262,89 @@ export function SettingsPage() {
 
       </div>
     </div>
+  )
+}
+
+// ── Chart Theme Selector ────────────────────────────────────────────────────
+
+function ChartThemeSelector() {
+  const { themeId, setChartTheme } = useChartThemeStore()
+  const themes = Object.values(CHART_THEMES)
+
+  return (
+    <section className="bg-surface-raised rounded-2xl shadow-card border border-border-default p-7">
+      <h2 className="text-[17px] font-semibold text-text-primary mb-1.5">Chart Theme</h2>
+      <p className="text-[14px] text-text-muted mb-5">Choose a visual style for all charts.</p>
+
+      <div className="grid grid-cols-2 gap-4">
+        {themes.map((t) => {
+          const active = t.id === themeId
+          return (
+            <button
+              key={t.id}
+              onClick={() => setChartTheme(t.id)}
+              className={`relative flex flex-col rounded-xl border-2 transition-all cursor-pointer overflow-hidden ${
+                active
+                  ? 'border-blue-500 shadow-md'
+                  : 'border-border-default hover:border-border-strong'
+              }`}
+            >
+              {/* Accent bar preview */}
+              {t.accent ? (
+                <div style={{ height: t.accent.barHeight + 1, background: t.accent.color }} />
+              ) : (
+                <div style={{ height: 4, background: 'transparent' }} />
+              )}
+
+              <div className="px-4 py-3.5">
+                {/* Palette swatches */}
+                <div className="flex gap-1 mb-3">
+                  {t.palette.colors.slice(0, 6).map((color, i) => (
+                    <div
+                      key={i}
+                      className="w-5 h-5 rounded-sm"
+                      style={{ backgroundColor: color }}
+                    />
+                  ))}
+                </div>
+
+                {/* Fake text preview lines */}
+                <div className="flex flex-col gap-1.5 mb-3">
+                  <div
+                    className="h-2.5 rounded-full"
+                    style={{
+                      width: '70%',
+                      backgroundColor: t.font.title.color || 'var(--color-text-primary)',
+                      opacity: 0.6,
+                    }}
+                  />
+                  <div
+                    className="h-2 rounded-full"
+                    style={{
+                      width: '50%',
+                      backgroundColor: t.font.subtitle.color || 'var(--color-text-secondary)',
+                      opacity: 0.4,
+                    }}
+                  />
+                </div>
+
+                {/* Theme name + description */}
+                <p className="text-[14px] font-semibold text-text-primary text-left">{t.name}</p>
+                <p className="text-[12px] text-text-muted text-left mt-0.5">{t.description}</p>
+              </div>
+
+              {/* Active check */}
+              {active && (
+                <div className="absolute top-2 right-2 w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center">
+                  <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+              )}
+            </button>
+          )
+        })}
+      </div>
+    </section>
   )
 }

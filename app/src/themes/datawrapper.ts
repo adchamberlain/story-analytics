@@ -3,6 +3,8 @@
  * Consolidated from the PoC observableTheme.ts.
  */
 
+import type { ChartTheme } from './chartThemes'
+
 // -- Color Palettes ----------------------------------------------------------
 
 /** Default multi-series palette (steel blue primary) */
@@ -52,27 +54,47 @@ function themeColors() {
   }
 }
 
+/**
+ * Resolve a color value: if the chart theme provides a non-empty string, use it;
+ * otherwise fall back to the CSS variable value.
+ */
+function resolveColor(themeValue: string, cssVarValue: string): string {
+  return themeValue || cssVarValue
+}
+
 // -- Observable Plot Defaults ------------------------------------------------
 
 /** Standard plot options to spread into Plot.plot() */
-export function plotDefaults(overrides: Record<string, unknown> = {}) {
-  const colors = themeColors()
+export function plotDefaults(overrides: Record<string, unknown> = {}, chartTheme?: ChartTheme) {
+  const cssColors = themeColors()
+
+  const fontFamily = chartTheme?.font.family || FONT.family
+  const fontSize = chartTheme?.font.axis.size ?? FONT.axis.size
+  const background = resolveColor(chartTheme?.plot.background ?? '', cssColors.background)
+  const textColor = resolveColor(chartTheme?.font.axis.color ?? '', cssColors.textSecondary)
+  const gridColor = resolveColor(chartTheme?.plot.grid.color ?? '', cssColors.grid)
+
+  const gridY = chartTheme?.plot.grid.y ?? true
+  const xLine = chartTheme?.plot.axes.xLine ?? true
+  const yLine = chartTheme?.plot.axes.yLine ?? true
+
+  const palette = chartTheme?.palette.colors ?? [...CHART_COLORS]
 
   return {
     style: {
-      fontFamily: FONT.family,
-      fontSize: `${FONT.axis.size}px`,
-      background: colors.background,
-      color: colors.textSecondary,
+      fontFamily,
+      fontSize: `${fontSize}px`,
+      background,
+      color: textColor,
     },
-    marginTop: 8,
-    marginRight: 16,
-    marginBottom: 48,
-    marginLeft: 56,
-    grid: true,
-    x: { line: true, tickSize: 0, labelOffset: 8 },
-    y: { line: true, tickSize: 0, labelOffset: 8, grid: true },
-    color: { range: [...CHART_COLORS] },
+    marginTop: chartTheme?.plot.marginTop ?? 8,
+    marginRight: chartTheme?.plot.marginRight ?? 16,
+    marginBottom: chartTheme?.plot.marginBottom ?? 48,
+    marginLeft: chartTheme?.plot.marginLeft ?? 56,
+    grid: false, // top-level grid (x-axis) — controlled per-theme
+    x: { line: xLine, tickSize: 0, labelOffset: 8 },
+    y: { line: yLine, tickSize: 0, labelOffset: 8, grid: gridY, ...(gridColor ? { gridColor } : {}) },
+    color: { range: [...palette] },
     ...overrides,
   }
 }
