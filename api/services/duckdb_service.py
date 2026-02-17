@@ -87,7 +87,7 @@ class DuckDBService:
                 """)
                 self._sources[source_id] = SourceMeta(
                     path=csv_file,
-                    ingested_at=datetime.now(timezone.utc),
+                    ingested_at=datetime.fromtimestamp(csv_file.stat().st_mtime, tz=timezone.utc),
                 )
                 count += 1
             except (duckdb.Error, UnicodeDecodeError, ValueError) as e:
@@ -344,6 +344,13 @@ class DuckDBService:
             return f"'{escaped}'"
 
         return _re.sub(r'\$\{inputs\.(\w+)\}', _replacer, sql)
+
+    def find_source_by_filename(self, filename: str) -> str | None:
+        """Return the source_id of an existing source with this filename, or None."""
+        for sid, meta in self._sources.items():
+            if meta.path.name == filename:
+                return sid
+        return None
 
     def get_ingested_at(self, source_id: str) -> datetime | None:
         """Return the UTC timestamp when a source was ingested, or None."""

@@ -61,7 +61,7 @@ export function SourcesPage() {
       <div className="flex items-center justify-between mb-8">
         <h1 className="text-[28px] font-bold text-text-primary tracking-tight">Data Sources</h1>
         <button
-          onClick={() => navigate('/editor/new/source')}
+          onClick={() => navigate('/editor/new/source?returnTo=/sources')}
           className="px-5 py-2.5 text-[14px] font-semibold rounded-xl bg-blue-600 text-white hover:bg-blue-500 transition-colors"
         >
           Add Data Source
@@ -88,7 +88,7 @@ export function SourcesPage() {
           <p className="text-[16px] font-medium text-text-secondary mb-1.5">No data sources yet</p>
           <p className="text-[14px] text-text-muted mb-6">Upload a CSV or connect a database to get started.</p>
           <button
-            onClick={() => navigate('/editor/new/source')}
+            onClick={() => navigate('/editor/new/source?returnTo=/sources')}
             className="px-5 py-2.5 text-[14px] font-semibold rounded-xl bg-blue-600 text-white hover:bg-blue-500 transition-colors"
           >
             Add Data Source

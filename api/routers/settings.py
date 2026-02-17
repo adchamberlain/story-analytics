@@ -71,27 +71,30 @@ async def update_settings(request: UpdateSettingsRequest):
 
 @router.get("/sources", response_model=list[DataSourceInfo])
 async def list_data_sources():
-    """List all data sources: uploaded CSVs + database connections."""
-    sources: list[DataSourceInfo] = []
+    """List all data sources: database connections first, then CSVs (most recent first)."""
+    connections: list[DataSourceInfo] = []
+    csvs: list[tuple[float, DataSourceInfo]] = []
 
     # Uploaded CSVs from DuckDB service
     db = get_duckdb_service()
     for source_id in list(db._sources.keys()):
         try:
             schema = db.get_schema(source_id)
-            sources.append(DataSourceInfo(
+            ingested_at = db.get_ingested_at(source_id)
+            ts = ingested_at.timestamp() if ingested_at else 0.0
+            csvs.append((ts, DataSourceInfo(
                 source_id=source_id,
                 name=schema.filename,
                 type="csv",
                 row_count=schema.row_count,
                 column_count=len(schema.columns),
-            ))
+            )))
         except Exception:
             continue
 
     # Database connections
     for conn in list_connections():
-        sources.append(DataSourceInfo(
+        connections.append(DataSourceInfo(
             source_id=conn.connection_id,
             name=conn.name,
             type=conn.db_type,
@@ -99,4 +102,7 @@ async def list_data_sources():
             column_count=0,
         ))
 
-    return sources
+    # Sort CSVs by ingested_at descending (most recent first)
+    csvs.sort(key=lambda x: x[0], reverse=True)
+
+    return connections + [info for _, info in csvs]

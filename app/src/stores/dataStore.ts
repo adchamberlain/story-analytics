@@ -24,6 +24,11 @@ export interface PreviewData {
   row_count: number
 }
 
+export interface DuplicateConflict {
+  filename: string
+  file: File
+}
+
 interface DataState {
   /** Current uploaded source metadata */
   source: UploadedSource | null
@@ -34,9 +39,13 @@ interface DataState {
   loadingPreview: boolean
   /** Error message */
   error: string | null
+  /** Pending duplicate conflict awaiting user confirmation */
+  duplicateConflict: DuplicateConflict | null
 
   /** Actions */
-  uploadCSV: (file: File) => Promise<void>
+  uploadCSV: (file: File, replace?: boolean) => Promise<void>
+  confirmReplace: () => Promise<void>
+  cancelReplace: () => void
   pasteData: (text: string) => Promise<void>
   loadPreview: (sourceId: string) => Promise<void>
   reset: () => void
@@ -50,18 +59,30 @@ export const useDataStore = create<DataState>((set, get) => ({
   uploading: false,
   loadingPreview: false,
   error: null,
+  duplicateConflict: null,
 
-  uploadCSV: async (file: File) => {
-    set({ uploading: true, error: null, source: null, preview: null })
+  uploadCSV: async (file: File, replace = false) => {
+    set({ uploading: true, error: null, source: null, preview: null, duplicateConflict: null })
 
     try {
       const formData = new FormData()
       formData.append('file', file)
+      if (replace) formData.append('replace', 'true')
 
       const res = await fetch(`${API_BASE}/upload`, {
         method: 'POST',
         body: formData,
       })
+
+      if (res.status === 409) {
+        const body = await res.json()
+        const detail = body.detail
+        if (detail?.code === 'DUPLICATE_FILENAME') {
+          // Store the conflict — UI will show a confirmation modal
+          set({ uploading: false, duplicateConflict: { filename: detail.filename, file } })
+          return
+        }
+      }
 
       if (!res.ok) {
         const body = await res.json().catch(() => ({ detail: res.statusText }))
@@ -76,6 +97,17 @@ export const useDataStore = create<DataState>((set, get) => ({
     } catch (e) {
       set({ uploading: false, error: e instanceof Error ? e.message : String(e) })
     }
+  },
+
+  confirmReplace: async () => {
+    const conflict = get().duplicateConflict
+    if (!conflict) return
+    set({ duplicateConflict: null })
+    await get().uploadCSV(conflict.file, true)
+  },
+
+  cancelReplace: () => {
+    set({ duplicateConflict: null })
   },
 
   pasteData: async (text: string) => {
@@ -118,6 +150,6 @@ export const useDataStore = create<DataState>((set, get) => ({
   },
 
   reset: () => {
-    set({ source: null, preview: null, uploading: false, loadingPreview: false, error: null })
+    set({ source: null, preview: null, uploading: false, loadingPreview: false, error: null, duplicateConflict: null })
   },
 }))

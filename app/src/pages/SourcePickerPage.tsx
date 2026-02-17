@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { FileDropzone } from '../components/data/FileDropzone'
 import { PasteDataInput } from '../components/data/PasteDataInput'
 import { DatabaseConnector } from '../components/data/DatabaseConnector'
@@ -15,6 +15,8 @@ interface SourceSummary {
 
 export function SourcePickerPage() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const returnTo = searchParams.get('returnTo')
   const [sources, setSources] = useState<SourceSummary[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshKey, setRefreshKey] = useState(0)
@@ -22,6 +24,14 @@ export function SourcePickerPage() {
   const [inputMode, setInputMode] = useState<'upload' | 'paste'>('upload')
 
   const dataStore = useDataStore()
+
+  // When returnTo is set (e.g. from Manage Sources), redirect after upload completes
+  useEffect(() => {
+    if (returnTo && dataStore.source && !dataStore.uploading) {
+      dataStore.reset()
+      navigate(returnTo)
+    }
+  }, [returnTo, dataStore.source, dataStore.uploading, navigate, dataStore])
 
   useEffect(() => {
     setLoading(true)
@@ -242,6 +252,32 @@ export function SourcePickerPage() {
           </>
         )}
       </main>
+
+      {/* Duplicate file confirmation modal */}
+      {dataStore.duplicateConflict && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-surface-raised rounded-2xl shadow-xl border border-border-default p-6 max-w-md mx-4">
+            <h3 className="text-[16px] font-semibold text-text-primary mb-2">File already exists</h3>
+            <p className="text-[14px] text-text-muted leading-relaxed mb-5">
+              <span className="font-medium text-text-secondary">"{dataStore.duplicateConflict.filename}"</span> has already been uploaded. Replace it with the new version?
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => dataStore.cancelReplace()}
+                className="px-4 py-2 text-[14px] font-medium rounded-lg border border-border-default text-text-secondary hover:bg-surface-input transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => dataStore.confirmReplace()}
+                className="px-4 py-2 text-[14px] font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-500 transition-colors"
+              >
+                Replace
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

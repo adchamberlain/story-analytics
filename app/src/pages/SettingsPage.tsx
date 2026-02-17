@@ -243,15 +243,14 @@ export function SettingsPage() {
         <section className="bg-surface-raised rounded-2xl shadow-card border border-border-default p-7">
           <h2 className="text-[17px] font-semibold text-text-primary mb-3">About</h2>
           <p className="text-[15px] text-text-secondary leading-relaxed">
-            Story Analytics v2.0
+            <a href="https://storyanalytics.ai/" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300 underline underline-offset-2">Story Analytics</a> v2.0
           </p>
           <p className="text-[14px] text-text-muted leading-relaxed mt-1.5">
-            Publication-ready dashboards from any data source.
-          </p>
-          <p className="text-[14px] text-text-muted leading-relaxed mt-1.5">
-            Open source under the{' '}
+            Publication-ready dashboards from any data source. {' '}
             <a href="https://opensource.org/licenses/MIT" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300 underline underline-offset-2">MIT License</a>.{' '}
-            <a href="https://storyanalytics.ai/" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300 underline underline-offset-2">storyanalytics.ai</a>
+          </p>
+          <p className="text-[14px] text-text-muted leading-relaxed mt-1.5">
+            Created by <a href="https://andrewchamberlain.com" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300 underline underline-offset-2">Andrew Chamberlain, Ph.D.</a>
           </p>
         </section>
 

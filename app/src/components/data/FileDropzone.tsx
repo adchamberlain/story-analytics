@@ -5,9 +5,17 @@ interface FileDropzoneProps {
   uploading: boolean
 }
 
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
 export function FileDropzone({ onFileSelected, uploading }: FileDropzoneProps) {
   const [dragOver, setDragOver] = useState(false)
   const [hint, setHint] = useState<string | null>(null)
+  const [fileName, setFileName] = useState<string | null>(null)
+  const [fileSize, setFileSize] = useState<number | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
   const handleDrop = useCallback(
@@ -30,6 +38,8 @@ export function FileDropzone({ onFileSelected, uploading }: FileDropzoneProps) {
         setHint(`Uploading "${csvFiles[0].name}" — only one file at a time is supported.`)
       }
 
+      setFileName(csvFiles[0].name)
+      setFileSize(csvFiles[0].size)
       onFileSelected(csvFiles[0])
     },
     [onFileSelected]
@@ -39,7 +49,11 @@ export function FileDropzone({ onFileSelected, uploading }: FileDropzoneProps) {
     (e: React.ChangeEvent<HTMLInputElement>) => {
       setHint(null)
       const file = e.target.files?.[0]
-      if (file) onFileSelected(file)
+      if (file) {
+        setFileName(file.name)
+        setFileSize(file.size)
+        onFileSelected(file)
+      }
     },
     [onFileSelected]
   )
@@ -83,7 +97,9 @@ export function FileDropzone({ onFileSelected, uploading }: FileDropzoneProps) {
       </div>
 
       <p className="text-[15px] font-medium text-text-primary">
-        {uploading ? 'Uploading...' : 'Drop a CSV file here, or click to browse'}
+        {uploading
+          ? `Uploading ${fileName ?? 'file'}${fileSize != null ? ` (${formatFileSize(fileSize)})` : ''}...`
+          : 'Drop a CSV file here, or click to browse'}
       </p>
       <p className="text-[13px] text-text-muted" style={{ marginTop: '6px' }}>
         CSV files only
