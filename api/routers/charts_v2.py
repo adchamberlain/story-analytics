@@ -20,6 +20,32 @@ from engine.v2.chart_editor import edit_chart
 
 router = APIRouter(prefix="/v2/charts", tags=["charts-v2"])
 
+# Map Settings UI provider names → engine provider names
+_SETTINGS_TO_ENGINE_PROVIDER = {
+    "anthropic": "claude",
+    "openai": "openai",
+    "google": "gemini",
+}
+
+
+def _get_engine_provider() -> str | None:
+    """Read the user's selected AI provider from settings and map to engine name."""
+    from ..services.settings_storage import load_settings
+
+    settings = load_settings()
+    provider = settings.ai_provider
+
+    # Auto-detect from first available key if not explicitly set
+    if not provider:
+        if settings.anthropic_api_key:
+            provider = "anthropic"
+        elif settings.openai_api_key:
+            provider = "openai"
+        elif settings.google_api_key:
+            provider = "google"
+
+    return _SETTINGS_TO_ENGINE_PROVIDER.get(provider)
+
 
 @router.get("/ai-status")
 async def ai_status():
@@ -378,6 +404,7 @@ async def propose(request: ProposeRequest):
         profile=profile,
         table_name=table_name,
         user_hint=request.user_hint,
+        provider_name=_get_engine_provider(),
     )
 
     if not proposal.success:
@@ -585,6 +612,7 @@ async def edit(request: EditRequest):
             current_config=request.current_config,
             user_message=request.message,
             columns=request.columns,
+            provider_name=_get_engine_provider(),
         )
     except Exception as e:
         traceback.print_exc()

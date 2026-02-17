@@ -404,6 +404,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         saving: false,
         chartId: saved.id,
         savedConfig: { ...config },
+        configHistory: [],
+        configFuture: [],
       })
       return saved.id as string
     } catch (e) {
@@ -633,8 +635,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         throw new Error(body.detail ?? `Save failed: ${res.status}`)
       }
 
-      // Snapshot saved state
-      set({ saving: false, savedConfig: { ...config } })
+      // Snapshot saved state and clear undo/redo history
+      set({ saving: false, savedConfig: { ...config }, configHistory: [], configFuture: [] })
     } catch (e) {
       set({ saving: false, error: e instanceof Error ? e.message : String(e) })
     }

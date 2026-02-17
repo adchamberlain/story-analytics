@@ -33,7 +33,7 @@ export function EditorPage() {
   const handleSave = useCallback(async () => {
     if (isNew || !store.chartId) {
       const newId = await store.saveNew()
-      if (newId) navigate(`/chart/${newId}`, { replace: true })
+      if (newId) navigate(`/editor/${newId}`, { replace: true })
     } else {
       await store.save()
     }
