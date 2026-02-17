@@ -17,12 +17,12 @@ export const CHART_COLORS = [
 /** Single-series default */
 export const PRIMARY_COLOR = '#2166ac'
 
-/** Sequential palettes for intensity encoding */
+/** Monochrome palettes — reordered for max spread so any prefix is distinct */
 export const PALETTES = {
   default: [...CHART_COLORS],
-  blues: ['#c6dbef', '#9ecae1', '#6baed6', '#3182bd', '#08519c'],
-  reds: ['#fcbba1', '#fc9272', '#fb6a4a', '#de2d26', '#a50f15'],
-  greens: ['#c7e9c0', '#a1d99b', '#74c476', '#31a354', '#006d2c'],
+  blues: ['#08519c', '#c6dbef', '#6baed6', '#3182bd', '#9ecae1'],
+  reds: ['#a50f15', '#fcbba1', '#fb6a4a', '#de2d26', '#fc9272'],
+  greens: ['#006d2c', '#c7e9c0', '#74c476', '#31a354', '#a1d99b'],
 } as const
 
 export type PaletteKey = keyof typeof PALETTES

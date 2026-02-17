@@ -68,6 +68,13 @@ ANNOTATION EXAMPLES:
 - "Add a note at (Jan, 500) saying 'Launch'" → add to annotations.texts: {"id": "ann-3", "x": "Jan", "y": 500, "text": "Launch"}
 
 When adding annotations, generate unique IDs like "ann-{timestamp}". Preserve existing annotations unless the user explicitly asks to remove them.
+- "Annotate the peak" → find max y-value from data context, add to annotations.texts with the actual x,y coordinates
+
+DATA AWARENESS:
+You may receive a DATA CONTEXT section with column statistics and sample rows from the chart's query result. Use this to:
+- Suggest data-aware titles and subtitles that reference actual values, trends, and date ranges
+- Place annotations at real data points (e.g., "annotate the peak" → find the max y-value and its x-coordinate from the data, create an annotation there)
+- When asked for a title, reference meaningful data (e.g., "Unemployment surged to 14.7% in April 2020")
 
 OUTPUT FORMAT:
 Return a single JSON object (no markdown code fences):
@@ -77,11 +84,48 @@ Return a single JSON object (no markdown code fences):
 }"""
 
 
+def _format_data_context(data_summary: dict) -> str:
+    """Format a data summary dict into concise text for the LLM prompt."""
+    lines = [
+        f"DATA CONTEXT (chart query result):",
+        f"Rows: {data_summary.get('row_count', 0)}",
+        "Columns:",
+    ]
+
+    for col_name, col_info in data_summary.get("columns", {}).items():
+        col_type = col_info.get("type", "unknown")
+        distinct = col_info.get("distinct_count", "?")
+        parts = [f"  - {col_name} ({col_type}): {distinct} distinct"]
+
+        col_min = col_info.get("min")
+        col_max = col_info.get("max")
+        if col_min is not None and col_max is not None:
+            parts.append(f"range {col_min} \u2192 {col_max}")
+
+        mean = col_info.get("mean")
+        if mean is not None:
+            parts.append(f"mean={mean}")
+
+        lines.append(", ".join(parts))
+
+    sample_rows = data_summary.get("sample_rows", [])
+    if sample_rows:
+        lines.append("Sample rows:")
+        for row in sample_rows[:5]:
+            row_parts = [f"{k}={v}" for k, v in row.items()]
+            lines.append(f"  {', '.join(row_parts)}")
+        if len(sample_rows) > 5:
+            lines.append(f"  ... ({len(sample_rows)} rows total)")
+
+    return "\n".join(lines)
+
+
 def edit_chart(
     current_config: dict,
     user_message: str,
     columns: list[str],
     provider_name: str | None = None,
+    data_summary: dict | None = None,
 ) -> EditResult:
     """
     Edit a chart config based on a natural language request.
@@ -91,17 +135,24 @@ def edit_chart(
         user_message: User's edit request
         columns: Available column names from the data
         provider_name: LLM provider to use
+        data_summary: Optional data summary with column stats and sample rows
 
     Returns:
         EditResult with updated config and explanation
     """
     llm = get_provider(provider_name)
 
-    user_content = (
-        f"Current config:\n{json.dumps(current_config, indent=2)}\n\n"
-        f"Available columns: {json.dumps(columns)}\n\n"
-        f"User request: {user_message}"
-    )
+    parts = [
+        f"Current config:\n{json.dumps(current_config, indent=2)}\n",
+        f"Available columns: {json.dumps(columns)}\n",
+    ]
+
+    if data_summary:
+        parts.append(_format_data_context(data_summary) + "\n")
+
+    parts.append(f"User request: {user_message}")
+
+    user_content = "\n".join(parts)
 
     messages = [Message(role="user", content=user_content)]
 

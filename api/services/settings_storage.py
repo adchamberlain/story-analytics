@@ -41,9 +41,10 @@ def load_settings() -> AppSettings:
 
         # Sync keys into os.environ so downstream LLM providers (which read
         # env vars) work after a server restart without needing a re-save.
+        # Always overwrite: settings.json is the source of truth once it exists.
         for provider, env_var in _PROVIDER_KEY_MAP.items():
             key_value = getattr(settings, f"{provider}_api_key", "")
-            if key_value and not os.environ.get(env_var):
+            if key_value:
                 os.environ[env_var] = key_value
 
         return settings

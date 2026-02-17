@@ -117,7 +117,7 @@ export function ChartViewPage() {
   const palette = (chart.config?.palette as PaletteKey) ?? 'default'
   const paletteColors = PALETTES[palette] ?? PALETTES.default
   if (palette !== 'default') {
-    chartConfig.color = paletteColors[paletteColors.length - 1] as string
+    chartConfig.colorRange = paletteColors
   }
 
   return (

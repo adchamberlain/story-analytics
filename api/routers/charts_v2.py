@@ -189,6 +189,7 @@ class EditRequest(BaseModel):
     message: str
     current_config: dict
     columns: list[str]
+    data_summary: dict | None = None
 
 
 class EditResponse(BaseModel):
@@ -613,6 +614,7 @@ async def edit(request: EditRequest):
             user_message=request.message,
             columns=request.columns,
             provider_name=_get_engine_provider(),
+            data_summary=request.data_summary,
         )
     except Exception as e:
         traceback.print_exc()
