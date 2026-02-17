@@ -99,6 +99,11 @@ export function ObservableChartFactory({
         })
       }
 
+      // Y-axis label (rendered manually to avoid overlap with tick values)
+      if (svg && config.yAxisTitle) {
+        appendYAxisLabel(svg as SVGSVGElement, plotEl, config.yAxisTitle)
+      }
+
       // Point notes on top
       if (svg && config.annotations?.texts?.length) {
         appendPointNotes({
@@ -507,6 +512,32 @@ function buildAnnotationMarks(annotations?: Annotations, bgColor = '#1e293b', _t
   // Point notes are rendered as raw SVG after Plot.plot() — see appendPointNotes()
 
   return marks
+}
+
+// ── Y-Axis Label (raw SVG) ──────────────────────────────────────────────────
+
+/** Append a rotated y-axis label to the left of the tick values, inside the extra margin. */
+function appendYAxisLabel(svg: SVGSVGElement, plotEl: PlotElement, title: string) {
+  let yScale: ReturnType<PlotElement['scale']>
+  try {
+    yScale = plotEl.scale('y')
+  } catch {
+    return
+  }
+
+  const yRange = yScale.range as unknown as [number, number] | undefined
+  if (!yRange) return
+
+  const midY = (yRange[0] + yRange[1]) / 2
+  const textColor = getComputedStyle(document.documentElement).getPropertyValue('--color-text-secondary').trim() || '#666'
+
+  d3.select(svg).append('text')
+    .attr('transform', `translate(14, ${midY}) rotate(-90)`)
+    .attr('text-anchor', 'middle')
+    .attr('dominant-baseline', 'central')
+    .attr('font-size', 12)
+    .attr('fill', textColor)
+    .text(title)
 }
 
 // ── Draggable Point Notes (raw SVG) ─────────────────────────────────────────
@@ -954,16 +985,18 @@ function buildPlotOptions(
     // Center the label below the tick marks instead of inline at the right edge
     ...(config.xAxisTitle ? { labelAnchor: 'center', labelOffset: 36, labelArrow: false } : {}),
   }
+  // Never let Observable Plot render the y-axis label — we render it manually
+  // after plot creation (see appendYAxisLabel) to avoid overlap with tick values.
   overrides.y = {
     ...(overrides.y as Record<string, unknown> ?? {}),
     ...getBaseAxis(),
-    label: config.yAxisTitle || null,
+    label: null,
     grid: true,
-    ...(config.yAxisTitle ? { labelAnchor: 'center', labelOffset: 46, labelArrow: false } : {}),
   }
-  // Extra left margin so rotated y-axis label doesn't overlap tick numbers
+  // Add extra left margin for the manually-rendered rotated y-axis label
   if (config.yAxisTitle) {
-    overrides.marginLeft = Math.max((overrides.marginLeft as number) ?? 40, 60)
+    overrides.marginLeft = (overrides.marginLeft as number | undefined) ?? 56
+    overrides.marginLeft = (overrides.marginLeft as number) + 24
   }
 
   // Y-axis bounds
@@ -999,6 +1032,8 @@ function buildPlotOptions(
 function getBaseAxis() {
   return { line: true, tickSize: 0, labelOffset: 8 }
 }
+
+
 
 // ── Legend Helper ───────────────────────────────────────────────────────────
 

@@ -37,7 +37,16 @@ def load_settings() -> AppSettings:
     """Load settings from data/settings.json, bootstrapping from env vars if needed."""
     if SETTINGS_PATH.exists():
         data = json.loads(SETTINGS_PATH.read_text())
-        return AppSettings(**{k: v for k, v in data.items() if k in AppSettings.__dataclass_fields__})
+        settings = AppSettings(**{k: v for k, v in data.items() if k in AppSettings.__dataclass_fields__})
+
+        # Sync keys into os.environ so downstream LLM providers (which read
+        # env vars) work after a server restart without needing a re-save.
+        for provider, env_var in _PROVIDER_KEY_MAP.items():
+            key_value = getattr(settings, f"{provider}_api_key", "")
+            if key_value and not os.environ.get(env_var):
+                os.environ[env_var] = key_value
+
+        return settings
 
     # Bootstrap from environment variables
     anthropic_key = os.environ.get("ANTHROPIC_API_KEY", "")
