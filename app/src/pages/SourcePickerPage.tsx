@@ -17,6 +17,7 @@ export function SourcePickerPage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const returnTo = searchParams.get('returnTo')
+  const returnToDashboard = searchParams.get('returnToDashboard')
   const [sources, setSources] = useState<SourceSummary[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshKey, setRefreshKey] = useState(0)
@@ -46,9 +47,11 @@ export function SourcePickerPage() {
 
   const handleSelectSource = useCallback(
     (sourceId: string) => {
-      navigate(`/editor/new?sourceId=${sourceId}`)
+      const params = new URLSearchParams({ sourceId })
+      if (returnToDashboard) params.set('returnToDashboard', returnToDashboard)
+      navigate(`/editor/new?${params}`)
     },
-    [navigate]
+    [navigate, returnToDashboard]
   )
 
   const handleFileSelected = useCallback(
@@ -119,7 +122,11 @@ export function SourcePickerPage() {
 
             <div style={{ display: 'flex', gap: '12px', marginTop: '24px' }}>
               <button
-                onClick={() => navigate(`/editor/new?sourceId=${dataStore.source!.source_id}`)}
+                onClick={() => {
+                  const params = new URLSearchParams({ sourceId: dataStore.source!.source_id })
+                  if (returnToDashboard) params.set('returnToDashboard', returnToDashboard)
+                  navigate(`/editor/new?${params}`)
+                }}
                 className="text-[15px] font-medium rounded-lg transition-colors"
                 style={{
                   padding: '10px 24px',

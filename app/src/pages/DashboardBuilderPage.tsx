@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useMemo } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import {
   GridLayout,
   useContainerWidth,
@@ -8,28 +8,26 @@ import {
 } from 'react-grid-layout'
 import { useDashboardBuilderStore } from '../stores/dashboardBuilderStore'
 import { ChartPicker } from '../components/dashboard/ChartPicker'
-import type { DashboardChartRef } from '../stores/dashboardBuilderStore'
+import { ChartWrapper } from '../components/charts/ChartWrapper'
+import { ObservableChartFactory } from '../components/charts/ObservableChartFactory'
+import { PALETTES } from '../themes/datawrapper'
+import type { ChartConfig, ChartType } from '../types/chart'
+import type { PaletteKey } from '../themes/datawrapper'
 
-const CHART_TYPE_LABELS: Record<string, string> = {
-  BarChart: 'Bar',
-  LineChart: 'Line',
-  AreaChart: 'Area',
-  ScatterPlot: 'Scatter',
-  Histogram: 'Histogram',
-  BigValue: 'KPI',
-  DataTable: 'Table',
-  HeatMap: 'Heatmap',
-  BoxPlot: 'Box Plot',
-  PieChart: 'Pie',
-  Treemap: 'Treemap',
-}
-
-/** Minimal chart metadata fetched for the builder cards. */
-interface ChartMeta {
-  id: string
+/** Full chart data fetched for rendering previews in the builder. */
+interface ChartFullData {
   chart_type: string
-  title: string
+  title: string | null
   subtitle: string | null
+  source: string | null
+  x: string | null
+  y: string | string[] | null
+  series: string | null
+  horizontal: boolean
+  sort: boolean
+  config: Record<string, unknown> | null
+  data: Record<string, unknown>[]
+  columns: string[]
 }
 
 /**
@@ -39,10 +37,11 @@ interface ChartMeta {
 export function DashboardBuilderPage() {
   const { dashboardId } = useParams<{ dashboardId: string }>()
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const store = useDashboardBuilderStore()
 
-  // Chart metadata cache (fetched once for display in builder cards)
-  const [chartMeta, setChartMeta] = useState<Record<string, ChartMeta>>({})
+  // Full chart data cache for rendering previews
+  const [chartData, setChartData] = useState<Record<string, ChartFullData>>({})
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
 
@@ -55,21 +54,50 @@ export function DashboardBuilderPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dashboardId])
 
-  // Fetch chart metadata for all referenced charts
+  // Auto-add chart when returning from chart creation flow
+  useEffect(() => {
+    const addChartId = searchParams.get('addChart')
+    if (addChartId) {
+      store.addChart(addChartId)
+      searchParams.delete('addChart')
+      setSearchParams(searchParams, { replace: true })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams])
+
+  // Fetch full chart data for all referenced charts
   useEffect(() => {
     if (store.charts.length === 0) return
 
-    const missing = store.charts.filter((c) => !chartMeta[c.chart_id])
+    const missing = store.charts.filter((c) => !chartData[c.chart_id])
     if (missing.length === 0) return
 
-    fetch('/api/v2/charts/')
-      .then((res) => res.json())
-      .then((charts: ChartMeta[]) => {
-        const map: Record<string, ChartMeta> = { ...chartMeta }
-        for (const c of charts) map[c.id] = c
-        setChartMeta(map)
-      })
-      .catch(() => {})
+    for (const ref of missing) {
+      fetch(`/api/v2/charts/${ref.chart_id}`)
+        .then((res) => res.ok ? res.json() : null)
+        .then((result) => {
+          if (!result) return
+          const chart = result.chart
+          setChartData((prev) => ({
+            ...prev,
+            [ref.chart_id]: {
+              chart_type: chart.chart_type,
+              title: chart.title,
+              subtitle: chart.subtitle,
+              source: chart.source,
+              x: chart.x,
+              y: chart.y,
+              series: chart.series,
+              horizontal: chart.horizontal ?? false,
+              sort: chart.sort ?? true,
+              config: chart.config,
+              data: result.data ?? [],
+              columns: result.columns ?? [],
+            },
+          }))
+        })
+        .catch(() => {})
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [store.charts.length])
 
@@ -85,8 +113,11 @@ export function DashboardBuilderPage() {
 
   const handleCreateNew = useCallback(() => {
     store.setPickerOpen(false)
-    navigate('/editor/new/source')
-  }, [store, navigate])
+    const url = dashboardId
+      ? `/editor/new/source?returnToDashboard=${dashboardId}`
+      : '/editor/new/source'
+    navigate(url)
+  }, [store, navigate, dashboardId])
 
   const handleDelete = useCallback(async () => {
     if (!dashboardId) return
@@ -141,7 +172,7 @@ export function DashboardBuilderPage() {
     }
 
     return items
-  }, [store.charts, chartMeta])
+  }, [store.charts])
 
   const { width, containerRef, mounted } = useContainerWidth()
 
@@ -274,8 +305,8 @@ export function DashboardBuilderPage() {
                 {store.charts.map((ref) => (
                   <div key={ref.chart_id}>
                     <BuilderGridCard
-                      ref_={ref}
-                      meta={chartMeta[ref.chart_id]}
+                      chartFullData={chartData[ref.chart_id]}
+                      gridH={gridLayout.find((l) => l.i === ref.chart_id)?.h ?? 5}
                       onRemove={() => store.removeChart(ref.chart_id)}
                     />
                   </div>
@@ -330,57 +361,88 @@ export function DashboardBuilderPage() {
 // ── Builder Grid Card ───────────────────────────────────────────────────────
 
 function BuilderGridCard({
-  ref_,
-  meta,
+  chartFullData,
+  gridH,
   onRemove,
 }: {
-  ref_: DashboardChartRef
-  meta?: ChartMeta
+  chartFullData?: ChartFullData
+  gridH: number
   onRemove: () => void
 }) {
-  const typeLabel = meta
-    ? CHART_TYPE_LABELS[meta.chart_type] ?? meta.chart_type
-    : '...'
+  // Still loading chart data
+  if (!chartFullData) {
+    return (
+      <div className="group bg-surface-raised rounded-2xl border border-border-default shadow-card h-full flex items-center justify-center cursor-grab active:cursor-grabbing">
+        <div className="text-center">
+          <svg className="animate-spin h-5 w-5 mx-auto text-text-muted mb-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+          </svg>
+          <p className="text-xs text-text-muted">Loading chart...</p>
+        </div>
+      </div>
+    )
+  }
+
+  const chartType = (chartFullData.chart_type ?? 'BarChart') as ChartType
+
+  const chartConfig: ChartConfig = {
+    x: chartFullData.x ?? undefined,
+    y: chartFullData.y ?? undefined,
+    series: chartFullData.series ?? undefined,
+    horizontal: chartFullData.horizontal,
+    sort: chartFullData.sort,
+    stacked: (chartFullData.config?.stacked as boolean) ?? false,
+    showGrid: (chartFullData.config?.showGrid as boolean) ?? true,
+    showLegend: (chartFullData.config?.showLegend as boolean) ?? true,
+    showValues: (chartFullData.config?.showValues as boolean) ?? false,
+    xAxisTitle: (chartFullData.config?.xAxisTitle as string) || undefined,
+    yAxisTitle: (chartFullData.config?.yAxisTitle as string) || undefined,
+    annotations: chartFullData.config?.annotations as ChartConfig['annotations'],
+    value: (chartFullData.config?.value as string) ?? undefined,
+    comparisonValue: (chartFullData.config?.comparisonValue as string) ?? undefined,
+    comparisonLabel: (chartFullData.config?.comparisonLabel as string) || undefined,
+    valueFormat: (chartFullData.config?.valueFormat as ChartConfig['valueFormat']) || undefined,
+    positiveIsGood: (chartFullData.config?.positiveIsGood as boolean) ?? true,
+  }
+
+  const palette = (chartFullData.config?.palette as PaletteKey) ?? 'default'
+  const paletteColors = PALETTES[palette] ?? PALETTES.default
+  if (palette !== 'default') {
+    chartConfig.colorRange = paletteColors
+  }
+
+  // Compute chart height from grid row height (60px) and gap (24px)
+  const cellHeight = gridH * 60 + (gridH - 1) * 24
+  const chartHeight = Math.max(cellHeight - 122, 120)
 
   return (
-    <div className="group bg-surface-raised rounded-2xl border border-border-default shadow-card h-full flex flex-col cursor-grab active:cursor-grabbing">
-      {/* Drag handle area */}
-      <div className="flex items-center justify-between px-5 pt-4 pb-2">
-        <div className="flex items-center gap-2 min-w-0 flex-1">
-          {/* Drag grip icon */}
-          <svg className="h-4 w-4 text-text-muted opacity-0 group-hover:opacity-100 transition-opacity shrink-0" fill="currentColor" viewBox="0 0 24 24">
-            <circle cx="9" cy="7" r="1.5" /><circle cx="15" cy="7" r="1.5" />
-            <circle cx="9" cy="12" r="1.5" /><circle cx="15" cy="12" r="1.5" />
-            <circle cx="9" cy="17" r="1.5" /><circle cx="15" cy="17" r="1.5" />
-          </svg>
-          <span className="text-[11px] font-medium uppercase tracking-wider text-text-muted">
-            {typeLabel}
-          </span>
-        </div>
-        <button
-          onClick={(e) => {
-            e.stopPropagation()
-            onRemove()
-          }}
-          className="text-[12px] text-red-400 hover:text-red-300 transition-colors opacity-0 group-hover:opacity-100 px-2 py-1 rounded-lg"
-        >
-          Remove
-        </button>
-      </div>
-
-      {/* Chart title */}
-      <div className="flex-1 flex items-start px-5 pb-4">
-        <div className="min-w-0">
-          <p className="text-[15px] font-semibold truncate text-text-primary">
-            {meta?.title ?? `Chart ${ref_.chart_id.slice(0, 8)}...`}
-          </p>
-          {meta?.subtitle && (
-            <p className="text-[13px] text-text-muted mt-0.5 truncate">
-              {meta.subtitle}
-            </p>
-          )}
-        </div>
-      </div>
+    <div className="group relative h-full">
+      {/* Remove button overlay */}
+      <button
+        onClick={(e) => {
+          e.stopPropagation()
+          onRemove()
+        }}
+        className="absolute top-2 right-2 z-10 text-[12px] text-red-400 hover:text-red-300 bg-surface-raised/80 backdrop-blur-sm transition-all opacity-0 group-hover:opacity-100 px-2 py-1 rounded-lg border border-red-500/20"
+      >
+        Remove
+      </button>
+      <ChartWrapper
+        title={chartFullData.title ?? undefined}
+        subtitle={chartFullData.subtitle ?? undefined}
+        source={chartFullData.source ?? undefined}
+        sourceUrl={(chartFullData.config?.sourceUrl as string) ?? undefined}
+        className="h-full cursor-grab active:cursor-grabbing"
+        compact
+      >
+        <ObservableChartFactory
+          data={chartFullData.data}
+          config={chartConfig}
+          chartType={chartType}
+          height={chartHeight}
+        />
+      </ChartWrapper>
     </div>
   )
 }

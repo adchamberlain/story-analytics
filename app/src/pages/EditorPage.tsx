@@ -30,14 +30,22 @@ export function EditorPage() {
   }, [chartId, sourceId])
 
   // Dual save paths
+  const returnToDashboard = searchParams.get('returnToDashboard')
+
   const handleSave = useCallback(async () => {
     if (isNew || !store.chartId) {
       const newId = await store.saveNew()
-      if (newId) navigate(`/chart/${newId}`)
+      if (newId) {
+        if (returnToDashboard) {
+          navigate(`/dashboard/${returnToDashboard}/edit?addChart=${newId}`)
+        } else {
+          navigate(`/chart/${newId}`)
+        }
+      }
     } else {
       await store.save()
     }
-  }, [isNew, store, navigate])
+  }, [isNew, store, navigate, returnToDashboard])
 
   // Keyboard shortcuts
   useEffect(() => {
