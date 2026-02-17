@@ -33,7 +33,7 @@ export function EditorPage() {
   const handleSave = useCallback(async () => {
     if (isNew || !store.chartId) {
       const newId = await store.saveNew()
-      if (newId) navigate(`/editor/${newId}`, { replace: true })
+      if (newId) navigate(`/chart/${newId}`)
     } else {
       await store.save()
     }
@@ -93,7 +93,7 @@ export function EditorPage() {
   // Apply palette colors
   const paletteColors = PALETTES[store.config.palette] ?? PALETTES.default
   if (store.config.palette !== 'default') {
-    chartConfig.color = paletteColors[paletteColors.length - 1] as string
+    chartConfig.colorRange = paletteColors
   }
 
   const handleBack = useCallback(() => {

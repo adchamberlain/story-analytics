@@ -137,6 +137,7 @@ export interface ChartConfig {
 
   /** Styling */
   color?: string
+  colorRange?: readonly string[]
   fillColor?: string
   backgroundColor?: string
   gridColor?: string

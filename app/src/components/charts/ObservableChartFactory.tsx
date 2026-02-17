@@ -35,9 +35,11 @@ export function ObservableChartFactory({
 }: ObservableChartFactoryProps) {
   const resolved = useThemeStore((s) => s.resolved)
   const placingId = useEditorStore((s) => s.placingAnnotationId)
-  const colors = config.color
-    ? [config.color]
-    : [...CHART_COLORS]
+  const colors = config.colorRange
+    ? [...config.colorRange]
+    : config.color
+      ? [config.color]
+      : [...CHART_COLORS]
 
   // Build custom legend data — unique series values mapped to palette colors.
   // We never rely on Observable Plot's built-in legend (unreliable for stroke marks).
@@ -1127,7 +1129,7 @@ function PieChartComponent({ data, config, height }: { data: Record<string, unkn
       value: Number(d[valueField] ?? 0),
     })).filter((d) => d.value > 0)
 
-    const colors = config.color ? [config.color] : [...CHART_COLORS]
+    const colors = config.colorRange ? [...config.colorRange] : config.color ? [config.color] : [...CHART_COLORS]
     const colorScale = d3.scaleOrdinal(colors)
 
     const pie = d3.pie<{ label: string; value: number }>().value((d) => d.value).sort(null)
@@ -1197,7 +1199,7 @@ function TreemapComponent({ data, config, height }: { data: Record<string, unkno
 
     d3.treemap<TreeNode>().size([width, height]).padding(2)(root)
 
-    const colors = config.color ? [config.color] : [...CHART_COLORS]
+    const colors = config.colorRange ? [...config.colorRange] : config.color ? [config.color] : [...CHART_COLORS]
     const colorScale = d3.scaleOrdinal(colors)
 
     const svg = d3.select(el).append('svg')

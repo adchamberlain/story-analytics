@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import type { ChartType, Annotations } from '../types/chart'
 import type { PaletteKey } from '../themes/datawrapper'
+import { buildDataSummary } from '../utils/dataSummary'
 
 // ── Editor Config ──────────────────────────────────────────────────────────
 
@@ -654,8 +655,17 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
 
   sendChatMessage: async (message: string) => {
-    const { chartId, config, columns, chatMessages } = get()
-    if (!chartId) return
+    const { chartId, config, columns, data, columnTypes, chatMessages } = get()
+    if (!chartId) {
+      const errorMsg: ChatMessage = {
+        id: `msg-${Date.now()}`,
+        role: 'assistant',
+        content: 'Please save your chart first before using the AI Assistant.',
+        timestamp: Date.now(),
+      }
+      set({ chatMessages: [...chatMessages, errorMsg] })
+      return
+    }
 
     const userMsg: ChatMessage = {
       id: `msg-${Date.now()}`,
@@ -671,6 +681,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     })
 
     try {
+      const dataSummary = data.length > 0 ? buildDataSummary(data, columns, columnTypes) : null
+
       const res = await fetch('/api/v2/charts/edit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -697,6 +709,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
             annotations: config.annotations,
           },
           columns,
+          data_summary: dataSummary,
         }),
       })
 
