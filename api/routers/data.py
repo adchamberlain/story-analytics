@@ -228,8 +228,11 @@ async def upload_csv(file: UploadFile = File(...), replace: str = Form("")):
         tmp.write(content)
         tmp_path = Path(tmp.name)
 
+    # Reuse the old source_id when replacing so existing charts keep working
+    reuse_id = existing_id if (existing_id and replace == "true") else None
+
     try:
-        schema = service.ingest_csv(tmp_path, file.filename)
+        schema = service.ingest_csv(tmp_path, file.filename, source_id=reuse_id)
     except ValueError as e:
         # User-friendly message from ingest_csv retry logic
         raise HTTPException(status_code=422, detail=str(e))

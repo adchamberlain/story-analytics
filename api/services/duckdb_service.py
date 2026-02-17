@@ -96,13 +96,15 @@ class DuckDBService:
         if count:
             print(f"[DuckDB] Reloaded {count} CSV source(s) from disk")
 
-    def ingest_csv(self, file_path: Path, filename: str) -> SourceSchema:
+    def ingest_csv(self, file_path: Path, filename: str, *, source_id: str | None = None) -> SourceSchema:
         """Load a CSV file into DuckDB and return schema information.
 
         If the initial parse fails (e.g. extra header/metadata lines), retries
         by skipping 1–5 leading rows before giving up.
+
+        Pass an existing ``source_id`` to reuse it (e.g. when replacing a file).
         """
-        source_id = uuid.uuid4().hex[:12]
+        source_id = source_id or uuid.uuid4().hex[:12]
 
         # Store file for persistence
         dest = DATA_DIR / source_id
