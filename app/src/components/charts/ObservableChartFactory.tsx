@@ -2,8 +2,9 @@ import { useRef, useEffect, useCallback } from 'react'
 import * as Plot from '@observablehq/plot'
 import * as d3 from 'd3'
 import { useObservablePlot } from '../../hooks/useObservablePlot'
-import { plotDefaults, CHART_COLORS } from '../../themes/datawrapper'
+import { plotDefaults } from '../../themes/datawrapper'
 import { useThemeStore } from '../../stores/themeStore'
+import { useChartThemeStore } from '../../stores/chartThemeStore'
 import { useEditorStore } from '../../stores/editorStore'
 import { getXValues, getYForX, resolveOffset, smartOffset } from '../../utils/annotationDefaults'
 import type { ChartConfig, ChartType, Annotations, PointAnnotation, HighlightRange } from '../../types/chart'
@@ -34,12 +35,13 @@ export function ObservableChartFactory({
   editable = false,
 }: ObservableChartFactoryProps) {
   const resolved = useThemeStore((s) => s.resolved)
+  const chartTheme = useChartThemeStore((s) => s.theme)
   const placingId = useEditorStore((s) => s.placingAnnotationId)
   const colors = config.colorRange
     ? [...config.colorRange]
     : config.color
       ? [config.color]
-      : [...CHART_COLORS]
+      : [...chartTheme.palette.colors]
 
   // Build custom legend data — unique series values mapped to palette colors.
   // We never rely on Observable Plot's built-in legend (unreliable for stroke marks).
@@ -60,7 +62,7 @@ export function ObservableChartFactory({
       const bgColor = getComputedStyle(document.documentElement).getPropertyValue('--color-surface-raised').trim() || '#1e293b'
       const textColor = getComputedStyle(document.documentElement).getPropertyValue('--color-text-primary').trim() || '#e2e8f0'
       const annotationMarks = buildAnnotationMarks(config.annotations, bgColor, textColor)
-      const plotOptions = buildPlotOptions(chartType, data, config, colors, width, height)
+      const plotOptions = buildPlotOptions(chartType, data, config, colors, width, height, chartTheme)
       const plot = Plot.plot({ ...plotOptions, marks: [...marks, ...annotationMarks] })
 
       // Store plot ref for scale inversion in click handler
@@ -132,7 +134,7 @@ export function ObservableChartFactory({
 
       return plot
     },
-    [data, config, chartType, height, resolved, editable]
+    [data, config, chartType, height, resolved, editable, chartTheme]
   )
 
   // ── Click-to-place handler ─────────────────────────────────────────────────
@@ -959,6 +961,7 @@ function buildPlotOptions(
   colors: readonly string[] | string[],
   width: number,
   height: number,
+  chartTheme?: import('../../themes/chartThemes').ChartTheme,
 ): Record<string, unknown> {
   const overrides: Record<string, unknown> = {}
 
@@ -1028,7 +1031,7 @@ function buildPlotOptions(
     width,
     height,
     ...overrides,
-  })
+  }, chartTheme)
 }
 
 function getBaseAxis() {
@@ -1111,6 +1114,7 @@ function BigValueChart({ data, config }: { data: Record<string, unknown>[]; conf
 function PieChartComponent({ data, config, height }: { data: Record<string, unknown>[]; config: ChartConfig; height: number }) {
   const containerRef = useRef<HTMLDivElement>(null)
   const resolved = useThemeStore((s) => s.resolved)
+  const themePalette = useChartThemeStore((s) => s.theme.palette.colors)
 
   useEffect(() => {
     if (!containerRef.current || data.length === 0) return
@@ -1129,7 +1133,7 @@ function PieChartComponent({ data, config, height }: { data: Record<string, unkn
       value: Number(d[valueField] ?? 0),
     })).filter((d) => d.value > 0)
 
-    const colors = config.colorRange ? [...config.colorRange] : config.color ? [config.color] : [...CHART_COLORS]
+    const colors = config.colorRange ? [...config.colorRange] : config.color ? [config.color] : [...themePalette]
     const colorScale = d3.scaleOrdinal(colors)
 
     const pie = d3.pie<{ label: string; value: number }>().value((d) => d.value).sort(null)
@@ -1168,7 +1172,7 @@ function PieChartComponent({ data, config, height }: { data: Record<string, unkn
       .text((d) => d.data.value > 0 ? d.data.label : '')
 
     return () => { el.innerHTML = '' }
-  }, [data, config, height, resolved])
+  }, [data, config, height, resolved, themePalette])
 
   if (data.length === 0) return <p className="text-sm text-text-muted">No data</p>
   return <div ref={containerRef} style={{ width: '100%', height }} />
@@ -1177,6 +1181,7 @@ function PieChartComponent({ data, config, height }: { data: Record<string, unkn
 function TreemapComponent({ data, config, height }: { data: Record<string, unknown>[]; config: ChartConfig; height: number }) {
   const containerRef = useRef<HTMLDivElement>(null)
   const resolved = useThemeStore((s) => s.resolved)
+  const themePalette = useChartThemeStore((s) => s.theme.palette.colors)
 
   useEffect(() => {
     if (!containerRef.current || data.length === 0) return
@@ -1199,7 +1204,7 @@ function TreemapComponent({ data, config, height }: { data: Record<string, unkno
 
     d3.treemap<TreeNode>().size([width, height]).padding(2)(root)
 
-    const colors = config.colorRange ? [...config.colorRange] : config.color ? [config.color] : [...CHART_COLORS]
+    const colors = config.colorRange ? [...config.colorRange] : config.color ? [config.color] : [...themePalette]
     const colorScale = d3.scaleOrdinal(colors)
 
     const svg = d3.select(el).append('svg')
@@ -1229,7 +1234,7 @@ function TreemapComponent({ data, config, height }: { data: Record<string, unkno
       .text((d) => (d.x1 - d.x0) > 40 ? d.data.name : '')
 
     return () => { el.innerHTML = '' }
-  }, [data, config, height, resolved])
+  }, [data, config, height, resolved, themePalette])
 
   if (data.length === 0) return <p className="text-sm text-text-muted">No data</p>
   return <div ref={containerRef} style={{ width: '100%', height }} />
