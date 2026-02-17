@@ -87,7 +87,7 @@ Return a single JSON object (no markdown code fences):
 def _format_data_context(data_summary: dict) -> str:
     """Format a data summary dict into concise text for the LLM prompt."""
     lines = [
-        f"DATA CONTEXT (chart query result):",
+        "DATA CONTEXT (chart query result):",
         f"Rows: {data_summary.get('row_count', 0)}",
         "Columns:",
     ]
