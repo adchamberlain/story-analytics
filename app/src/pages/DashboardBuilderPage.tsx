@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useMemo } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   GridLayout,
@@ -43,6 +43,8 @@ export function DashboardBuilderPage() {
 
   // Chart metadata cache (fetched once for display in builder cards)
   const [chartMeta, setChartMeta] = useState<Record<string, ChartMeta>>({})
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [deleting, setDeleting] = useState(false)
 
   // Load existing dashboard if editing
   useEffect(() => {
@@ -85,6 +87,19 @@ export function DashboardBuilderPage() {
     store.setPickerOpen(false)
     navigate('/editor/new/source')
   }, [store, navigate])
+
+  const handleDelete = useCallback(async () => {
+    if (!dashboardId) return
+    setDeleting(true)
+    try {
+      const res = await fetch(`/api/v2/dashboards/${dashboardId}`, { method: 'DELETE' })
+      if (!res.ok) throw new Error('Delete failed')
+      navigate('/dashboards')
+    } catch {
+      setDeleting(false)
+      setConfirmDelete(false)
+    }
+  }, [dashboardId, navigate])
 
   // Generate strict 2-column layout from store charts
   const gridLayout = useMemo((): Layout => {
@@ -170,6 +185,14 @@ export function DashboardBuilderPage() {
           Back
         </button>
         <div className="flex items-center gap-3">
+          {dashboardId && (
+            <button
+              onClick={() => setConfirmDelete(true)}
+              className="text-[14px] px-4 py-2.5 rounded-xl border border-red-500/30 text-red-400 hover:bg-red-500/10 transition-colors font-medium"
+            >
+              Delete
+            </button>
+          )}
           <button
             onClick={() => store.setPickerOpen(true)}
             className="text-[14px] px-5 py-2.5 rounded-xl border border-border-default text-text-on-surface hover:bg-surface-secondary transition-colors font-medium"
@@ -271,6 +294,34 @@ export function DashboardBuilderPage() {
           onCreateNew={handleCreateNew}
           onClose={() => store.setPickerOpen(false)}
         />
+      )}
+
+      {/* Delete confirmation modal */}
+      {confirmDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-surface-raised rounded-2xl shadow-xl border border-border-default p-6 max-w-md mx-4">
+            <h3 className="text-[16px] font-semibold text-text-primary mb-2">Delete dashboard</h3>
+            <p className="text-[14px] text-text-muted leading-relaxed mb-5">
+              Are you sure you want to delete <span className="font-medium text-text-secondary">"{store.title || 'Untitled'}"</span>? This cannot be undone.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setConfirmDelete(false)}
+                disabled={deleting}
+                className="px-4 py-2 text-[14px] font-medium rounded-lg border border-border-default text-text-secondary hover:bg-surface-input transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDelete}
+                disabled={deleting}
+                className="px-4 py-2 text-[14px] font-medium rounded-lg bg-red-600 text-white hover:bg-red-500 transition-colors disabled:opacity-50"
+              >
+                {deleting ? 'Deleting...' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

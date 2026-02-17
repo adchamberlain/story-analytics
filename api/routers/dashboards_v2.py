@@ -355,10 +355,11 @@ async def get_dashboard(dashboard_id: str, filters: str | None = None):
                     str(e), chart.source_id
                 )
 
-        # Freshness
+        # Freshness — CSV uploads are static data, never stale
         ingested_at = db.get_ingested_at(chart.source_id)
         ingested_at_iso = ingested_at.isoformat() if ingested_at else None
-        freshness = _compute_freshness(ingested_at)
+        is_csv = db.is_csv_source(chart.source_id)
+        freshness = "fresh" if is_csv else _compute_freshness(ingested_at)
         if freshness == "stale":
             any_stale = True
 

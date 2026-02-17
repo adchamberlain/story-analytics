@@ -354,6 +354,10 @@ class DuckDBService:
                 return sid
         return None
 
+    def is_csv_source(self, source_id: str) -> bool:
+        """Return True if the source is an uploaded CSV (static data)."""
+        return source_id in self._sources
+
     def get_ingested_at(self, source_id: str) -> datetime | None:
         """Return the UTC timestamp when a source was ingested, or None."""
         meta = self._sources.get(source_id)
