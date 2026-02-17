@@ -51,6 +51,9 @@ export function Toolbox() {
   const hasSeriesOption = ['BarChart', 'LineChart', 'AreaChart', 'ScatterPlot'].includes(config.chartType)
   const isSqlMode = config.dataMode === 'sql'
   const sqlHasResults = isSqlMode && data.length > 0
+  // Derive actual result columns from data keys — the store's `columns` may still
+  // hold source-table columns when buildQuery produced an UNPIVOT result.
+  const sqlResultColumns = sqlHasResults ? Object.keys(data[0]) : columns
   const isMultiY = Array.isArray(config.y) && config.y.length > 1
   const hasY = Array.isArray(config.y) ? config.y.length > 0 : !!config.y
 
@@ -114,7 +117,7 @@ export function Toolbox() {
 
             {/* Results Preview */}
             {sqlHasResults && (
-              <SqlResultsTable data={data} columns={columns} />
+              <SqlResultsTable data={data} columns={sqlResultColumns} />
             )}
 
             {/* Column Mapping (after successful execution) */}
@@ -122,13 +125,13 @@ export function Toolbox() {
               <div className="space-y-2 pt-2 border-t border-border-default">
                 <p className="text-[10px] font-medium text-text-icon uppercase tracking-wider">Map result columns</p>
                 {isBigValue ? (
-                  <BigValueColumnMapping columns={columns} columnTypes={columnTypes} config={config} updateConfig={updateConfig} />
+                  <BigValueColumnMapping columns={sqlResultColumns} columnTypes={columnTypes} config={config} updateConfig={updateConfig} />
                 ) : (
                   <>
                     <ColumnDropdown
                       label="X Axis"
                       value={config.x}
-                      columns={columns}
+                      columns={sqlResultColumns}
                       columnTypes={columnTypes}
                       onChange={(x) => updateConfig({ x })}
                     />
@@ -136,7 +139,7 @@ export function Toolbox() {
                       <ColumnDropdown
                         label="Y Axis"
                         value={Array.isArray(config.y) ? config.y[0] ?? null : config.y}
-                        columns={columns}
+                        columns={sqlResultColumns}
                         columnTypes={columnTypes}
                         onChange={(y) => updateConfig({ y })}
                       />
@@ -145,7 +148,7 @@ export function Toolbox() {
                       <ColumnDropdown
                         label="Series (color)"
                         value={config.series}
-                        columns={columns}
+                        columns={sqlResultColumns}
                         columnTypes={columnTypes}
                         allowNone
                         onChange={(series) => updateConfig({ series })}

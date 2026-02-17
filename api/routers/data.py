@@ -6,7 +6,7 @@ import shutil
 import tempfile
 from pathlib import Path
 
-from fastapi import APIRouter, UploadFile, File, HTTPException
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException
 from pydantic import BaseModel
 
 from ..services.duckdb_service import get_duckdb_service
@@ -183,13 +183,44 @@ async def query_raw(request: RawQueryRequest):
 
 
 @router.post("/upload", response_model=UploadResponse)
-async def upload_csv(file: UploadFile = File(...)):
-    """Upload a CSV file, load into DuckDB, return schema info."""
+async def upload_csv(file: UploadFile = File(...), replace: str = Form("")):
+    """Upload a CSV file, load into DuckDB, return schema info.
+
+    If a source with the same filename already exists and ``replace`` is not
+    set, returns 409 with the existing source_id so the frontend can prompt
+    the user before overwriting.
+    """
     if not file.filename:
         raise HTTPException(status_code=400, detail="No filename provided")
 
     if not file.filename.lower().endswith('.csv'):
         raise HTTPException(status_code=400, detail="Only CSV files are supported")
+
+    service = get_duckdb_service()
+
+    # Check for existing source with the same filename
+    existing_id = service.find_source_by_filename(file.filename)
+    if existing_id and replace != "true":
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "DUPLICATE_FILENAME",
+                "existing_source_id": existing_id,
+                "filename": file.filename,
+            },
+        )
+
+    # If replacing, delete the old source first
+    if existing_id and replace == "true":
+        table_name = f"src_{existing_id}"
+        try:
+            service._conn.execute(f"DROP TABLE IF EXISTS {table_name}")
+        except Exception:
+            pass
+        service._sources.pop(existing_id, None)
+        upload_dir = Path(__file__).parent.parent.parent / "data" / "uploads" / existing_id
+        if upload_dir.exists():
+            shutil.rmtree(upload_dir)
 
     # Write uploaded file to temp location, then ingest
     with tempfile.NamedTemporaryFile(delete=False, suffix='.csv') as tmp:
@@ -198,7 +229,6 @@ async def upload_csv(file: UploadFile = File(...)):
         tmp_path = Path(tmp.name)
 
     try:
-        service = get_duckdb_service()
         schema = service.ingest_csv(tmp_path, file.filename)
     except ValueError as e:
         # User-friendly message from ingest_csv retry logic
