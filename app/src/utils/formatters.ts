@@ -225,6 +225,7 @@ function getCurrencySymbol(currency: string): string {
 export function formatTimeAgo(date: Date): string {
   const seconds = Math.floor((Date.now() - date.getTime()) / 1000)
 
+  if (seconds < 0) return 'Just now'  // Future dates (clock skew)
   if (seconds < 10) return 'Just now'
   if (seconds < 60) return `${seconds} seconds ago`
 
