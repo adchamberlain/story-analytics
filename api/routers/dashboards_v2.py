@@ -451,15 +451,15 @@ async def get_health(dashboard_id: str):
 @router.put("/{dashboard_id}", response_model=DashboardResponse)
 async def update(dashboard_id: str, request: UpdateDashboardRequest):
     """Update a dashboard."""
+    raw = request.model_dump(exclude_unset=True)
     fields: dict = {}
-    if request.title is not None:
-        fields["title"] = request.title
-    if request.description is not None:
-        fields["description"] = request.description
-    if request.charts is not None:
-        fields["charts"] = [c.model_dump() for c in request.charts]
-    if request.filters is not None:
-        fields["filters"] = [f.model_dump(exclude_none=True) for f in request.filters]
+    for key, value in raw.items():
+        if key == "charts" and value is not None:
+            fields["charts"] = [c.model_dump() for c in request.charts]  # type: ignore[union-attr]
+        elif key == "filters" and value is not None:
+            fields["filters"] = [f.model_dump(exclude_none=True) for f in request.filters]  # type: ignore[union-attr]
+        else:
+            fields[key] = value
 
     if not fields:
         raise HTTPException(status_code=400, detail="No fields to update")

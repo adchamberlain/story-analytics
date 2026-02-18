@@ -106,7 +106,7 @@ export function DashboardBuilderPage() {
         .catch(() => {})
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [store.charts.length])
+  }, [store.charts.map((c) => c.chart_id).join(',')])
 
   const handleSave = useCallback(async () => {
     const id = await store.save()

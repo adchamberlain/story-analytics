@@ -1126,7 +1126,7 @@ function BigValueChart({ data, config }: { data: Record<string, unknown>[]; conf
   if (data.length === 0) return null
 
   const row = data[0]
-  const valueField = config.value ?? config.y
+  const valueField = config.value ?? (Array.isArray(config.y) ? config.y[0] : config.y)
   const value = valueField ? row[valueField as string] : null
   const compValue = config.comparisonValue ? row[config.comparisonValue] : null
 

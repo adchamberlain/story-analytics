@@ -120,6 +120,14 @@ export function DashboardViewPage() {
     }
   }, [])
 
+  // Stale pin cleanup: if this dashboard 404'd and it's pinned, clear the pin
+  useEffect(() => {
+    if (!loading && error && dashboardId && localStorage.getItem('pinnedDashboardId') === dashboardId) {
+      localStorage.removeItem('pinnedDashboardId')
+      setIsPinned(false)
+    }
+  }, [loading, error, dashboardId])
+
   const handleRefresh = () => {
     if (!refreshing) fetchDashboard(true)
   }
@@ -149,10 +157,6 @@ export function DashboardViewPage() {
   }
 
   if (error || !dashboard) {
-    // Stale pin cleanup: if this dashboard 404'd and it's pinned, clear the pin
-    if (dashboardId && localStorage.getItem('pinnedDashboardId') === dashboardId) {
-      localStorage.removeItem('pinnedDashboardId')
-    }
     return (
       <div className="min-h-screen bg-surface-secondary flex items-center justify-center">
         <div className="bg-red-50 border border-red-200 rounded-lg px-6 py-4 max-w-md text-center">

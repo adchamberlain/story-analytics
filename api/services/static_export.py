@@ -47,7 +47,7 @@ def export_dashboard_html(
     <div class="chart-card {grid_class}">
       {'<h3 class="chart-title">' + chart_title + '</h3>' if chart_title else ''}
       {'<p class="chart-subtitle">' + subtitle + '</p>' if subtitle else ''}
-      <div id="chart-{i}" class="chart-container" data-chart-type="{ct}" data-index="{i}"></div>
+      <div id="chart-{i}" class="chart-container" data-chart-type="{escape(ct)}" data-index="{i}"></div>
       {'<p class="chart-source">' + source + '</p>' if source else ''}
     </div>"""
         chart_cards_html.append(card_html)
@@ -59,7 +59,7 @@ def export_dashboard_html(
             "config": c.get("config", {}),
         }
         for c in charts
-    ])
+    ]).replace("</", "<\\/")  # Prevent </script> injection in inline JSON
 
     html = f"""<!DOCTYPE html>
 <html lang="en">
@@ -169,6 +169,8 @@ def export_dashboard_html(
 
     const COLORS = ["#4e79a7","#f28e2b","#e15759","#76b7b2","#59a14f","#edc948","#b07aa1","#ff9da7","#9c755f","#bab0ac"];
 
+    function esc(s) {{ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }}
+
     const charts = {charts_json};
 
     function maybeParseDates(data, field) {{
@@ -193,16 +195,16 @@ def export_dashboard_html(
         const formatted = typeof val === "number"
           ? (config.valueFormat === "currency" ? "$" + val.toLocaleString() : val.toLocaleString())
           : String(val);
-        container.innerHTML = `<div class="big-value"><span class="value">${{formatted}}</span></div>`;
+        container.innerHTML = `<div class="big-value"><span class="value">${{esc(formatted)}}</span></div>`;
         return;
       }}
 
       if (chartType === "DataTable") {{
         if (!data.length) {{ container.textContent = "No data"; return; }}
         const cols = Object.keys(data[0]);
-        const headerRow = cols.map(c => `<th style="padding:4px 8px;text-align:left;border-bottom:2px solid #e5e7eb;font-size:11px">${{c}}</th>`).join("");
+        const headerRow = cols.map(c => `<th style="padding:4px 8px;text-align:left;border-bottom:2px solid #e5e7eb;font-size:11px">${{esc(c)}}</th>`).join("");
         const bodyRows = data.map(r =>
-          "<tr>" + cols.map(c => `<td style="padding:3px 8px;font-size:11px;border-bottom:1px solid #f3f4f6">${{r[c] ?? ""}}</td>`).join("") + "</tr>"
+          "<tr>" + cols.map(c => `<td style="padding:3px 8px;font-size:11px;border-bottom:1px solid #f3f4f6">${{esc(r[c] ?? "")}}</td>`).join("") + "</tr>"
         ).join("");
         container.innerHTML = `<table style="width:100%;border-collapse:collapse"><thead><tr>${{headerRow}}</tr></thead><tbody>${{bodyRows}}</tbody></table>`;
         return;

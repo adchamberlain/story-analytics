@@ -118,8 +118,7 @@ def update_chart(chart_id: str, **fields) -> SavedChart | None:
     now = datetime.now(timezone.utc).isoformat()
 
     for key, value in fields.items():
-        if value is not None:
-            data[key] = value
+        data[key] = value
 
     data["updated_at"] = now
     path.write_text(json.dumps(data, indent=2))

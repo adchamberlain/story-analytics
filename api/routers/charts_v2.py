@@ -576,7 +576,7 @@ async def get_chart(chart_id: str):
 @router.put("/{chart_id}", response_model=SavedChartResponse)
 async def update(chart_id: str, request: UpdateChartRequest):
     """Update a saved chart's configuration."""
-    fields = {k: v for k, v in request.model_dump().items() if v is not None}
+    fields = request.model_dump(exclude_unset=True)
     if not fields:
         raise HTTPException(status_code=400, detail="No fields to update")
 
