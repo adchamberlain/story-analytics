@@ -334,12 +334,18 @@ async def build_query(request: BuildQueryRequest):
                 f"SELECT {', '.join(select_cols)} FROM {table_name} "
                 f"GROUP BY {', '.join(group_cols)} ORDER BY {x_expr}"
             )
+        elif not y:
+            # Non-count aggregation requires a y column (SUM(*), AVG(*) etc. are invalid SQL)
+            return BuildQueryResponse(
+                success=False,
+                error=f"{request.aggregation.upper()}() requires a Y column. Select a numeric column or use COUNT.",
+            )
         else:
             # Aggregated query
             agg = request.aggregation.upper()
-            y_col = y or "*"
-            y_quoted = q(y_col) if y else "*"
-            y_alias = y or "count"
+            y_col = y
+            y_quoted = q(y_col)
+            y_alias = y
             select_cols = [x_select, f'{agg}({y_quoted}) AS {q(y_alias)}']
             group_cols = [x_expr]
             if request.series:

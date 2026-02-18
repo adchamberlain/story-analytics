@@ -169,7 +169,7 @@ def export_dashboard_html(
 
     const COLORS = ["#4e79a7","#f28e2b","#e15759","#76b7b2","#59a14f","#edc948","#b07aa1","#ff9da7","#9c755f","#bab0ac"];
 
-    function esc(s) {{ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/`/g,"&#96;").replace(/\$/g,"&#36;"); }}
+    function esc(s) {{ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/`/g,"&#96;").replace(/\\$/g,"&#36;"); }}
 
     const charts = {charts_json};
 
@@ -307,7 +307,16 @@ def export_dashboard_html(
     // Render all charts
     charts.forEach((chart, i) => {{
       const el = document.getElementById("chart-" + i);
-      if (el) renderChart(el, chart);
+      if (el) {{
+        try {{
+          renderChart(el, chart);
+        }} catch (err) {{
+          el.textContent = "Chart render error";
+          el.style.color = "#e15759";
+          el.style.fontSize = "13px";
+          el.style.padding = "2rem";
+        }}
+      }}
     }});
   </script>
 </body>

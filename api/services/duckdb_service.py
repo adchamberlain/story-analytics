@@ -314,7 +314,13 @@ class DuckDBService:
                 stem = self._sources[source_id].path.stem
                 for ref in [stem, stem.lower(), stem.upper(), "data", "uploaded_data"]:
                     if ref in processed_sql:
-                        processed_sql = processed_sql.replace(ref, table_name)
+                        # Use word-boundary regex to avoid corrupting substrings
+                        # e.g. "wholesale_sales" should not be mangled when table stem is "sales"
+                        processed_sql = re.sub(
+                            r'\b' + re.escape(ref) + r'\b',
+                            table_name,
+                            processed_sql,
+                        )
                         break
                 else:
                     # No recognizable table reference found; if it's a simple query, wrap it
