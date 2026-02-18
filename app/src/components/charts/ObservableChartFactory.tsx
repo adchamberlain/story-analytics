@@ -365,10 +365,17 @@ function buildBarMarks(
     }
 
     if (series) {
-      marks.push(
-        Plot.barX(data, { x: y, y: x, fill: series, ...sortOpt }),
-        Plot.tip(data, Plot.pointerY({ x: y, y: x, fill: series })),
-      )
+      if (config.stacked) {
+        marks.push(
+          Plot.barX(data, Plot.stackX({ y: x, x: y, fill: series, ...sortOpt })),
+          Plot.tip(data, Plot.pointerY({ x: y, y: x, fill: series })),
+        )
+      } else {
+        marks.push(
+          Plot.barX(data, { x: y, y: x, fill: series, fy: x, ...sortOpt }),
+          Plot.tip(data, Plot.pointerY({ x: y, y: x, fill: series })),
+        )
+      }
     } else {
       marks.push(
         Plot.barX(data, { x: y, y: x, fill: colors[0], ...sortOpt }),
@@ -1047,10 +1054,22 @@ function buildPlotOptions(
     overrides.marginLeft = (overrides.marginLeft as number) + 24
   }
 
-  // Y-axis bounds
+  // Y-axis bounds — only set domain when at least one bound is provided.
+  // Compute the missing bound from the data to avoid [value, undefined] which
+  // Observable Plot cannot handle.
   if (config.yAxisMin !== undefined || config.yAxisMax !== undefined) {
     const yOpts = (overrides.y as Record<string, unknown>) ?? { ...getBaseAxis(), grid: true }
-    yOpts.domain = [config.yAxisMin ?? undefined, config.yAxisMax ?? undefined]
+    const yCol = config.y as string | undefined
+    let dataMin = 0
+    let dataMax = 0
+    if (yCol && data.length > 0) {
+      const nums = data.map((d) => Number(d[yCol])).filter((v) => isFinite(v))
+      if (nums.length > 0) {
+        dataMin = Math.min(...nums)
+        dataMax = Math.max(...nums)
+      }
+    }
+    yOpts.domain = [config.yAxisMin ?? dataMin, config.yAxisMax ?? dataMax]
     overrides.y = yOpts
   }
 
