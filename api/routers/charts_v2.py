@@ -342,7 +342,7 @@ async def build_query(request: BuildQueryRequest):
                 group_cols.append(q(request.series))
             sql = (
                 f"SELECT {', '.join(select_cols)} FROM {table_name} "
-                f"GROUP BY {', '.join(group_cols)} ORDER BY {x_expr}"
+                f"GROUP BY {', '.join(group_cols)} ORDER BY {x_expr} LIMIT 10000"
             )
         elif not y:
             # Non-count aggregation requires a y column (SUM(*), AVG(*) etc. are invalid SQL)
@@ -363,7 +363,7 @@ async def build_query(request: BuildQueryRequest):
                 group_cols.append(q(request.series))
             sql = (
                 f"SELECT {', '.join(select_cols)} FROM {table_name} "
-                f"GROUP BY {', '.join(group_cols)} ORDER BY {x_expr}"
+                f"GROUP BY {', '.join(group_cols)} ORDER BY {x_expr} LIMIT 10000"
             )
 
     # Execute

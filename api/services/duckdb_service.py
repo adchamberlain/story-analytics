@@ -370,9 +370,9 @@ class DuckDBService:
                 # Get the stem of the original filename as a possible table reference
                 stem = meta.path.stem
                 for ref in [stem, stem.lower(), stem.upper(), "data", "uploaded_data"]:
-                    if ref in processed_sql:
-                        # Use word-boundary regex to avoid corrupting substrings
-                        # e.g. "wholesale_sales" should not be mangled when table stem is "sales"
+                    # Use word-boundary regex for both the check and the substitution
+                    # to avoid false-positive substring matches (e.g. "sales" in "wholesale_sales")
+                    if re.search(r'\b' + re.escape(ref) + r'\b', processed_sql):
                         processed_sql = re.sub(
                             r'\b' + re.escape(ref) + r'\b',
                             table_name,

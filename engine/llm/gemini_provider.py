@@ -155,18 +155,25 @@ class GeminiProvider(LLMProvider):
         if not messages:
             raise ValueError("generate() requires at least one message")
 
-        gemini_history = []
+        gemini_history: list[types.Content] = []
         for msg in messages[:-1]:  # All except the last message
             if msg.role == "system":
                 # System messages are handled via system_instruction
                 continue
             role = "model" if msg.role == "assistant" else "user"
-            gemini_history.append(
-                types.Content(
-                    role=role,
-                    parts=[types.Part.from_text(text=msg.content)],
-                )
+            entry = types.Content(
+                role=role,
+                parts=[types.Part.from_text(text=msg.content)],
             )
+            # Gemini requires strictly alternating user/model roles.
+            # Merge consecutive same-role messages (can happen when system messages are filtered).
+            if gemini_history and gemini_history[-1].role == role:
+                gemini_history[-1] = types.Content(
+                    role=role,
+                    parts=(gemini_history[-1].parts or []) + (entry.parts or []),
+                )
+            else:
+                gemini_history.append(entry)
 
         # Get the last message to send
         last_message = messages[-1].content if messages else ""
@@ -271,8 +278,11 @@ class GeminiProvider(LLMProvider):
             mime_type=image_media_type,
         )
 
-        # Create content with image and text
-        contents = [image_part, prompt]
+        # Create content with image and text — both parts must be inside a single Content
+        contents = types.Content(
+            role="user",
+            parts=[image_part, types.Part.from_text(text=prompt)],
+        )
 
         # Handle rate limits with retry logic
         last_exception = None

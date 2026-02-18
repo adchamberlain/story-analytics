@@ -130,6 +130,15 @@ def propose_chart(
     return _parse_proposal(response.content)
 
 
+def _coerce_bool(val: object, default: bool) -> bool:
+    """Coerce an LLM-provided value to bool, handling string 'false'/'true'."""
+    if isinstance(val, bool):
+        return val
+    if isinstance(val, str):
+        return val.strip().lower() not in ("false", "0", "no", "null", "")
+    return bool(val) if val is not None else default
+
+
 def _parse_proposal(response: str) -> ProposedChart:
     """Parse the LLM response into a ProposedChart."""
     # Try to extract JSON from the response
@@ -181,8 +190,8 @@ def _parse_proposal(response: str) -> ProposedChart:
         x=_nullable(data.get("x")),
         y=_nullable(data.get("y")),
         series=_nullable(data.get("series")),
-        horizontal=data.get("horizontal", False),
-        sort=data.get("sort", True),
+        horizontal=_coerce_bool(data.get("horizontal"), False),
+        sort=_coerce_bool(data.get("sort"), True),
         reasoning=data.get("reasoning"),
         sql=data.get("sql"),
     )

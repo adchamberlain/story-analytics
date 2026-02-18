@@ -589,6 +589,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       configHistory: configHistory.slice(0, -1),
       configFuture: [{ ...config }, ...configFuture],
     })
+    // Refresh data to match restored config
+    if (previous.dataMode !== 'sql') get().buildQuery()
   },
 
   redo: () => {
@@ -601,6 +603,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       configHistory: [...configHistory, { ...config }],
       configFuture: configFuture.slice(1),
     })
+    // Refresh data to match restored config
+    if (next.dataMode !== 'sql') get().buildQuery()
   },
 
   save: async () => {
@@ -666,11 +670,18 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set({
       config: { ...savedConfig },
       sql: savedSql,
+      customSql: savedConfig.dataMode === 'sql' ? (savedSql ?? '') : '',
+      sqlError: null,
       configHistory: [],
       configFuture: [],
     })
     // Re-run query with restored config to refresh data
-    get().buildQuery()
+    if (savedConfig.dataMode === 'sql' && savedSql) {
+      // For SQL mode, re-execute the saved SQL directly
+      get().executeCustomSql()
+    } else {
+      get().buildQuery()
+    }
   },
 
   sendChatMessage: async (message: string) => {
