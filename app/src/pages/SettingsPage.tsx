@@ -42,7 +42,10 @@ export function SettingsPage() {
   // Load settings on mount
   useEffect(() => {
     fetch('/api/settings/')
-      .then((res) => res.json())
+      .then((res) => {
+        if (!res.ok) throw new Error(`Settings fetch failed: ${res.status}`)
+        return res.json()
+      })
       .then((data: Settings) => {
         setSettings(data)
         setSelectedProvider(data.ai_provider)
@@ -58,7 +61,10 @@ export function SettingsPage() {
   // Load data sources on mount
   useEffect(() => {
     fetch('/api/settings/sources')
-      .then((res) => res.json())
+      .then((res) => {
+        if (!res.ok) throw new Error(`Sources fetch failed: ${res.status}`)
+        return res.json()
+      })
       .then((data: DataSource[]) => {
         setSources(data)
         setSourcesLoading(false)
