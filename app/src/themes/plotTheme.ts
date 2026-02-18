@@ -1,23 +1,26 @@
 /**
- * Datawrapper-inspired theme for Observable Plot charts.
- * Consolidated from the PoC observableTheme.ts.
+ * Story Analytics default chart theme for Observable Plot.
+ * Provides color palettes, typography, and plot configuration.
  */
 
 import type { ChartTheme } from './chartThemes'
 
 // -- Color Palettes ----------------------------------------------------------
 
-/** Default multi-series palette (steel blue primary) */
+/** Default multi-series palette (teal primary) */
 export const CHART_COLORS = [
-  '#2166ac', // steel blue (primary)
-  '#d6604d', // muted red
-  '#4dac26', // green
-  '#b2abd2', // lavender
-  '#e08214', // orange
+  '#18a1cd', // teal blue (primary)
+  '#c0392b', // brick red
+  '#3d918d', // deep teal-green
+  '#e6a817', // amber
+  '#8e6bb0', // purple
+  '#d4774a', // warm orange
+  '#6aa84f', // green
+  '#cccccc', // neutral gray
 ] as const
 
 /** Single-series default */
-export const PRIMARY_COLOR = '#2166ac'
+export const PRIMARY_COLOR = '#18a1cd'
 
 /** Monochrome palettes — reordered for max spread so any prefix is distinct */
 export const PALETTES = {
@@ -32,10 +35,10 @@ export type PaletteKey = keyof typeof PALETTES
 // -- Typography & Spacing ----------------------------------------------------
 
 export const FONT = {
-  family: 'Inter, system-ui, sans-serif',
-  title: { size: 18, weight: 600 },
+  family: 'Roboto, sans-serif',
+  title: { size: 22, weight: 700 },
   subtitle: { size: 14, weight: 400 },
-  source: { size: 11, weight: 400 },
+  source: { size: 12, weight: 400 },
   axis: { size: 12, weight: 400 },
 } as const
 
@@ -46,7 +49,7 @@ function themeColors() {
   const s = getComputedStyle(document.documentElement)
   return {
     background: s.getPropertyValue('--color-surface').trim() || '#ffffff',
-    grid: s.getPropertyValue('--color-grid').trim() || '#e5e5e5',
+    grid: s.getPropertyValue('--color-grid').trim() || '#d9d9d9',
     axis: s.getPropertyValue('--color-axis').trim() || '#333333',
     textPrimary: s.getPropertyValue('--color-text-primary').trim() || '#1a1a1a',
     textSecondary: s.getPropertyValue('--color-text-secondary').trim() || '#666666',
@@ -75,8 +78,8 @@ export function plotDefaults(overrides: Record<string, unknown> = {}, chartTheme
   const gridColor = resolveColor(chartTheme?.plot.grid.color ?? '', cssColors.grid)
 
   const gridY = chartTheme?.plot.grid.y ?? true
-  const xLine = chartTheme?.plot.axes.xLine ?? true
-  const yLine = chartTheme?.plot.axes.yLine ?? true
+  const xLine = chartTheme?.plot.axes.xLine ?? false
+  const yLine = chartTheme?.plot.axes.yLine ?? false
 
   const palette = chartTheme?.palette.colors ?? [...CHART_COLORS]
 
@@ -86,12 +89,13 @@ export function plotDefaults(overrides: Record<string, unknown> = {}, chartTheme
       fontSize: `${fontSize}px`,
       background,
       color: textColor,
+      fontVariantNumeric: chartTheme?.font.tabularNums !== false ? 'tabular-nums' : 'normal',
     },
     marginTop: chartTheme?.plot.marginTop ?? 8,
-    marginRight: chartTheme?.plot.marginRight ?? 16,
-    marginBottom: chartTheme?.plot.marginBottom ?? 48,
-    marginLeft: chartTheme?.plot.marginLeft ?? 56,
-    grid: false, // top-level grid (x-axis) — controlled per-theme
+    marginRight: chartTheme?.plot.marginRight ?? 24,
+    marginBottom: chartTheme?.plot.marginBottom ?? 36,
+    marginLeft: chartTheme?.plot.marginLeft ?? 48,
+    grid: false, // top-level grid (x-axis) — controlled per chart type
     x: { line: xLine, tickSize: 0, labelOffset: 8 },
     y: { line: yLine, tickSize: 0, labelOffset: 8, grid: gridY, ...(gridColor ? { gridColor } : {}) },
     color: { range: [...palette] },

@@ -73,10 +73,10 @@ export function ChartWrapper({ title, subtitle, source, sourceUrl, chartUrl, chi
       )}
 
       {/* Content with padding */}
-      <div className={compact ? 'p-5 flex flex-col flex-1 min-h-0' : 'p-7 flex flex-col flex-1 min-h-0'}>
+      <div className="p-5 flex flex-col flex-1 min-h-0">
         {/* Header */}
         {(title || subtitle) && (
-          <div className="mb-1">
+          <div className="mb-1.5">
             {title && (
               <h3
                 style={{
@@ -116,7 +116,7 @@ export function ChartWrapper({ title, subtitle, source, sourceUrl, chartUrl, chi
         </div>
 
         {/* Footer: source + export */}
-        <div className={`flex items-center justify-between ${compact ? 'mt-2' : 'mt-3'}`}>
+        <div className={`flex items-center justify-between ${compact ? 'mt-3' : 'mt-4'}`}>
           {source ? (
             <p
               style={{
@@ -132,6 +132,7 @@ export function ChartWrapper({ title, subtitle, source, sourceUrl, chartUrl, chi
                   target="_blank"
                   rel="noopener noreferrer"
                   className="underline hover:opacity-80 transition-opacity"
+                  style={{ color: '#1d81a2' }}
                 >
                   {source}
                 </a>

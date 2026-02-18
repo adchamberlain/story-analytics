@@ -2,7 +2,7 @@
 
 ## Positioning
 
-**Datawrapper-quality charts, open-source, from any data source, powered by AI.**
+**Publication-ready charts, open-source, from any data source, powered by AI.**
 
 The only open-source tool that combines publication-ready visual quality with AI-powered chart creation. Upload a CSV or connect a database, and get a polished, shareable chart in seconds.
 
@@ -33,7 +33,7 @@ No open-source tool produces publication-ready visualizations with AI-driven cre
 Researchers, data analysts, economists, and BI professionals who:
 
 - Have clean data (CSV files or SQL queries) ready to visualize
-- Want Datawrapper-quality output without paying for Datawrapper
+- Want publication-ready output without paying for a SaaS tool
 - Want both a fast manual workflow and an AI-assisted one
 - May need to run everything locally (privacy, air-gapped environments)
 

@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import type { ChartType, Annotations } from '../types/chart'
-import type { PaletteKey } from '../themes/datawrapper'
+import type { PaletteKey } from '../themes/plotTheme'
 import { buildDataSummary } from '../utils/dataSummary'
 
 // ── Editor Config ──────────────────────────────────────────────────────────

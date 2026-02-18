@@ -1,5 +1,5 @@
 # Brand Configuration
-# Story Analytics - Datawrapper-minimal design system
+# Story Analytics - Publication-ready design system
 # Design: Clean, publication-ready charts with modern typography
 
 brand:
@@ -33,12 +33,12 @@ typography:
   body_font: "Inter"
   base_size: 1
 
-# Chart-specific - Datawrapper minimal aesthetic
+# Chart-specific - Publication-ready minimal aesthetic
 charts:
   # Use palette from evidence.config.yaml
   palette: []
 
-  # Minimal gridlines - Datawrapper style
+  # Minimal gridlines - clean publication style
   show_gridlines: true
   gridline_color: "#f1f5f9"  # Very subtle - Slate-100
 

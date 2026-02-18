@@ -1,5 +1,5 @@
-import { PALETTES } from '../../themes/datawrapper'
-import type { PaletteKey } from '../../themes/datawrapper'
+import { PALETTES } from '../../themes/plotTheme'
+import type { PaletteKey } from '../../themes/plotTheme'
 import { useChartThemeStore } from '../../stores/chartThemeStore'
 
 interface PaletteSelectorProps {
