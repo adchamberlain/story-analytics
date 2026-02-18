@@ -161,7 +161,9 @@ async def query_raw(request: RawQueryRequest):
 
     # Reject non-SELECT statements to prevent DML/DDL (DROP, INSERT, DELETE, etc.)
     import re as _re
-    first_keyword = _re.match(r'\s*(\w+)', sql)
+    # Strip leading SQL comments (block and line) before checking the first keyword
+    sql_stripped_comments = _re.sub(r'^\s*(/\*.*?\*/\s*|--[^\n]*\n\s*)*', '', sql, flags=_re.DOTALL)
+    first_keyword = _re.match(r'\s*(\w+)', sql_stripped_comments)
     if not first_keyword or first_keyword.group(1).upper() not in ("SELECT", "WITH", "EXPLAIN"):
         return RawQueryResponse(
             success=False,

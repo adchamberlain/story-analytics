@@ -495,11 +495,11 @@ function buildHeatMapMarks(
   _colors: readonly string[] | string[]
 ): Plot.Markish[] {
   if (!x || !y) return []
-  // HeatMap: x and y are the two categorical axes, fill encodes the value.
-  // When series is provided, use it as the fill (color) dimension.
-  // When no series, y doubles as the fill (numeric heat value).
+  // HeatMap: x is one categorical axis, fill encodes the numeric heat value (always y).
+  // When series is provided, it becomes the y-axis (second categorical dimension).
+  // When no series, y doubles as both the y-axis and the fill.
   const yAxis = series ?? y
-  const fill = series ? y : y
+  const fill = y
   return [
     Plot.cell(data, { x, y: yAxis, fill, tip: true }),
   ]

@@ -179,6 +179,20 @@ def _parse_edit_response(response: str) -> EditResult:
     if json_match:
         json_str = json_match.group(1).strip()
 
+    # If no fences, extract the first complete JSON object (LLMs often append explanation text)
+    if not json_match:
+        open_idx = json_str.find("{")
+        if open_idx >= 0:
+            depth = 0
+            for i, ch in enumerate(json_str[open_idx:], start=open_idx):
+                if ch == "{":
+                    depth += 1
+                elif ch == "}":
+                    depth -= 1
+                    if depth == 0:
+                        json_str = json_str[open_idx : i + 1]
+                        break
+
     try:
         data = json.loads(json_str)
     except json.JSONDecodeError as e:

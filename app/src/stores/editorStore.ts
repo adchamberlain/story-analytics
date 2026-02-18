@@ -781,6 +781,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
 
   reset: () => {
+    clearTimeout(_buildQueryTimer)
     set({
       chartId: null,
       sourceId: null,

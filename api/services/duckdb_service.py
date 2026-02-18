@@ -365,6 +365,9 @@ class DuckDBService:
             if name not in params:
                 return match.group(0)  # Leave unmatched placeholders as-is
             val = params[name]
+            # Bool check must come before int (bool is a subclass of int in Python)
+            if isinstance(val, bool):
+                return "true" if val else "false"
             if isinstance(val, (int, float)):
                 return str(val)
             # String: escape single quotes by doubling
