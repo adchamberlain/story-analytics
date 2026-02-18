@@ -47,8 +47,10 @@ export function DashboardBuilderPage() {
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
 
-  // Load existing dashboard if editing
+  // Load existing dashboard if editing — clear stale chart cache on navigation
   useEffect(() => {
+    setChartData({})
+    setChartErrors({})
     if (dashboardId) {
       store.load(dashboardId)
     }

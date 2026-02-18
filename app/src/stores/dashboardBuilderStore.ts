@@ -155,7 +155,7 @@ export const useDashboardBuilderStore = create<DashboardBuilderState>((set, get)
         dashboardId: dashboard.id,
         title: dashboard.title,
         description: dashboard.description ?? '',
-        charts: dashboard.charts.map((c: { chart_id: string; width?: string; layout?: GridLayout }) => ({
+        charts: (dashboard.charts ?? []).map((c: { chart_id: string; width?: string; layout?: GridLayout }) => ({
           chart_id: c.chart_id,
           width: (c.width === 'full' ? 'full' : 'half') as 'full' | 'half',
           ...(c.layout ? { layout: c.layout } : {}),

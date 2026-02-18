@@ -237,8 +237,14 @@ async def upload_csv(file: UploadFile = File(...), replace: str = Form("")):
             shutil.rmtree(upload_dir)
 
     # Write uploaded file to temp location, then ingest
+    MAX_UPLOAD_BYTES = 100 * 1024 * 1024  # 100 MB
     with tempfile.NamedTemporaryFile(delete=False, suffix='.csv') as tmp:
         content = await file.read()
+        if len(content) > MAX_UPLOAD_BYTES:
+            raise HTTPException(
+                status_code=413,
+                detail="File too large. Maximum upload size is 100 MB.",
+            )
         tmp.write(content)
         tmp_path = Path(tmp.name)
 
