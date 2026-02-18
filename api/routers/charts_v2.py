@@ -411,10 +411,14 @@ async def propose(request: ProposeRequest):
     if not proposal.success:
         return ProposeResponse(success=False, error=proposal.error)
 
-    # Stage 2: Execute the proposed SQL
+    # Stage 2: Execute the proposed SQL (validate it's read-only first)
     data = []
     columns = []
     if proposal.sql:
+        import re as _re
+        first_kw = _re.match(r'\s*(\w+)', proposal.sql)
+        if not first_kw or first_kw.group(1).upper() not in ("SELECT", "WITH"):
+            return ProposeResponse(success=False, error="AI generated non-SELECT SQL")
         try:
             result = db.execute_query(proposal.sql, request.source_id)
             data = result.rows
@@ -459,9 +463,22 @@ async def propose(request: ProposeRequest):
     )
 
 
+def _validate_readonly_sql(sql: str) -> str | None:
+    """Return an error message if SQL is not a read-only SELECT/WITH statement."""
+    import re
+    first_kw = re.match(r'\s*(\w+)', sql)
+    if not first_kw or first_kw.group(1).upper() not in ("SELECT", "WITH"):
+        return "Only SELECT queries can be saved"
+    return None
+
+
 @router.post("/save", response_model=SavedChartResponse)
 async def save(request: SaveRequest):
     """Save a chart configuration."""
+    if request.sql:
+        err = _validate_readonly_sql(request.sql)
+        if err:
+            raise HTTPException(status_code=400, detail=err)
     chart = save_chart(
         source_id=request.source_id,
         chart_type=request.chart_type,

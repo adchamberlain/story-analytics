@@ -1065,8 +1065,9 @@ function buildPlotOptions(
     if (yCol && data.length > 0) {
       const nums = data.map((d) => Number(d[yCol])).filter((v) => isFinite(v))
       if (nums.length > 0) {
-        dataMin = Math.min(...nums)
-        dataMax = Math.max(...nums)
+        // Avoid Math.min/max spread — stack overflow on 65K+ rows
+        dataMin = nums.reduce((a, b) => (a < b ? a : b), nums[0])
+        dataMax = nums.reduce((a, b) => (a > b ? a : b), nums[0])
       }
     }
     yOpts.domain = [config.yAxisMin ?? dataMin, config.yAxisMax ?? dataMax]

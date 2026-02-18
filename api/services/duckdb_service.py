@@ -4,6 +4,7 @@ Manages in-memory DuckDB connections with uploaded data from CSV, parquet,
 or Snowflake sources.
 """
 
+import re
 import uuid
 import csv
 import tempfile
@@ -13,6 +14,9 @@ from pathlib import Path
 from dataclasses import dataclass
 
 import duckdb
+
+# source_id values are 12-char hex strings from uuid4().hex[:12]
+_SAFE_SOURCE_ID_RE = re.compile(r"^[a-f0-9]{1,32}$")
 
 
 DATA_DIR = Path(__file__).parent.parent.parent / "data" / "uploads"
@@ -280,6 +284,8 @@ class DuckDBService:
 
     def get_preview(self, source_id: str, limit: int = 10) -> QueryResult:
         """Get first N rows of an uploaded source."""
+        if not _SAFE_SOURCE_ID_RE.match(source_id):
+            raise ValueError(f"Invalid source_id: {source_id}")
         table_name = f"src_{source_id}"
         return self.execute_query(f"SELECT * FROM {table_name} LIMIT {limit}", source_id)
 
@@ -291,6 +297,8 @@ class DuckDBService:
             source_id: The source to query against.
             params: Optional dict of filter param values to substitute for ${inputs.name}.
         """
+        if not _SAFE_SOURCE_ID_RE.match(source_id):
+            raise ValueError(f"Invalid source_id: {source_id}")
         table_name = f"src_{source_id}"
 
         # Replace generic table references with the actual table name

@@ -151,6 +151,9 @@ const MAX_HISTORY = 50
 /** Keys that trigger auto build-query in new chart mode */
 const DATA_KEYS: (keyof EditorConfig)[] = ['x', 'y', 'series', 'aggregation', 'timeGrain']
 
+/** Debounce timer for auto buildQuery calls from updateConfig */
+let _buildQueryTimer: ReturnType<typeof setTimeout>
+
 export const useEditorStore = create<EditorState>((set, get) => ({
   // Initial state
   chartId: null,
@@ -438,8 +441,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     if (!chartId && currentConfig.dataMode !== 'sql') {
       const changedKeys = Object.keys(partial) as (keyof EditorConfig)[]
       if (changedKeys.some((k) => DATA_KEYS.includes(k))) {
-        // Use setTimeout to let the state update settle before reading it
-        setTimeout(() => get().buildQuery(), 0)
+        // Debounce: cancel previous pending buildQuery before scheduling a new one
+        clearTimeout(_buildQueryTimer)
+        _buildQueryTimer = setTimeout(() => get().buildQuery(), 0)
       }
     }
   },
