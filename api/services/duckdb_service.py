@@ -134,35 +134,54 @@ class DuckDBService:
 
         # Try parsing, retrying with skip=N if the file has extra lines at the top
         first_error = None
-        for skip in [0, 1, 2, 3, 4, 5]:
+        success = False
+        try:
+            for skip in [0, 1, 2, 3, 4, 5]:
+                try:
+                    skip_clause = f", skip={skip}" if skip > 0 else ""
+                    with self._lock:
+                        self._conn.execute(f"""
+                            CREATE OR REPLACE TABLE {table_name} AS
+                            SELECT * FROM read_csv_auto(
+                                '{_sql_string(str(stored_path))}', delim='{delimiter}', header=true{skip_clause}
+                            )
+                        """)
+                        # Verify we got at least 1 column and 1 row
+                        row_count = self._conn.execute(
+                            f"SELECT COUNT(*) FROM {table_name}"
+                        ).fetchone()[0]
+                        col_count = len(self._conn.execute(
+                            f"DESCRIBE {table_name}"
+                        ).fetchall())
+                    if col_count >= 1 and row_count >= 1:
+                        if skip > 0:
+                            print(f"[DuckDB] Parsed {filename} after skipping {skip} leading line(s)")
+                        success = True
+                        break
+                except (duckdb.Error, UnicodeDecodeError) as e:
+                    if first_error is None:
+                        first_error = e
+                    continue
+        except BaseException:
+            # Unexpected error (OSError, MemoryError, etc.) — clean up files and table
+            import shutil
+            shutil.rmtree(dest, ignore_errors=True)
             try:
-                skip_clause = f", skip={skip}" if skip > 0 else ""
                 with self._lock:
-                    self._conn.execute(f"""
-                        CREATE OR REPLACE TABLE {table_name} AS
-                        SELECT * FROM read_csv_auto(
-                            '{_sql_string(str(stored_path))}', delim='{delimiter}', header=true{skip_clause}
-                        )
-                    """)
-                    # Verify we got at least 1 column and 1 row
-                    row_count = self._conn.execute(
-                        f"SELECT COUNT(*) FROM {table_name}"
-                    ).fetchone()[0]
-                    col_count = len(self._conn.execute(
-                        f"DESCRIBE {table_name}"
-                    ).fetchall())
-                if col_count >= 1 and row_count >= 1:
-                    if skip > 0:
-                        print(f"[DuckDB] Parsed {filename} after skipping {skip} leading line(s)")
-                    break
-            except (duckdb.Error, UnicodeDecodeError) as e:
-                if first_error is None:
-                    first_error = e
-                continue
-        else:
+                    self._conn.execute(f"DROP TABLE IF EXISTS {table_name}")
+            except Exception:
+                pass
+            raise
+
+        if not success:
             # All attempts failed — clean up and raise a user-friendly message
             import shutil
             shutil.rmtree(dest, ignore_errors=True)
+            try:
+                with self._lock:
+                    self._conn.execute(f"DROP TABLE IF EXISTS {table_name}")
+            except Exception:
+                pass
             raise ValueError(
                 f"Could not parse \"{filename}\". "
                 "Check that the file is a valid CSV with a header row."
@@ -484,10 +503,14 @@ class DuckDBService:
         """
         with open(path, 'r', newline='') as f:
             sample = f.read(8192)
+        _SAFE_DELIMITERS = {',', '\t', '|', ';', ' ', ':'}
         try:
             dialect = csv.Sniffer().sniff(sample)
             delim = dialect.delimiter
         except csv.Error:
+            delim = ','
+        # Only allow known-safe delimiters to prevent SQL injection via crafted CSVs
+        if delim not in _SAFE_DELIMITERS:
             delim = ','
         # Escape single quotes to prevent SQL injection when interpolated
         return delim.replace("'", "''")

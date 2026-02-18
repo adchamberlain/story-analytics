@@ -26,14 +26,16 @@ export function SourcePickerPage() {
 
   const dataStore = useDataStore()
 
-  // When returnTo is set (e.g. from Manage Sources), redirect after upload completes
+  // When returnTo is set (e.g. from Manage Sources), redirect after upload completes.
+  // Validate returnTo is a same-origin relative path to prevent open redirect.
+  const safeReturnTo = returnTo && returnTo.startsWith('/') && !returnTo.startsWith('//') ? returnTo : null
   useEffect(() => {
-    if (returnTo && dataStore.source && !dataStore.uploading) {
+    if (safeReturnTo && dataStore.source && !dataStore.uploading) {
       dataStore.reset()
-      navigate(returnTo)
+      navigate(safeReturnTo)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [returnTo, dataStore.source, dataStore.uploading, navigate])
+  }, [safeReturnTo, dataStore.source, dataStore.uploading, navigate])
 
   useEffect(() => {
     setLoading(true)

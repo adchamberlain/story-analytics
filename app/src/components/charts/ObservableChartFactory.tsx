@@ -110,7 +110,7 @@ export function ObservableChartFactory({
             store.updateConfig({
               annotations: {
                 ...anns,
-                ranges: anns.ranges.map((r) => r.id === id ? { ...r, ...patch } : r),
+                ranges: (anns?.ranges ?? []).map((r) => r.id === id ? { ...r, ...patch } : r),
               },
             })
           },
@@ -138,7 +138,7 @@ export function ObservableChartFactory({
             store.updateConfig({
               annotations: {
                 ...anns,
-                texts: anns.texts.map((t) =>
+                texts: (anns?.texts ?? []).map((t) =>
                   t.id === id ? { ...t, dx, dy, position: undefined } : t
                 ),
               },
@@ -1031,7 +1031,11 @@ function buildPlotOptions(
         const v = row[config.x] as string
         if (!seen.has(v)) { seen.add(v); domain.push(v) }
       }
-      overrides.x = { ...getBaseAxis(), domain }
+      if (config.horizontal) {
+        overrides.y = { ...getBaseAxis(), domain }
+      } else {
+        overrides.x = { ...getBaseAxis(), domain }
+      }
     }
   }
 
@@ -1100,8 +1104,13 @@ function buildPlotOptions(
     overrides.y = yOpts
   }
 
-  // Color range — legend is always suppressed here; we render a custom React legend instead
-  overrides.color = { range: [...colors], legend: false }
+  // Color range — legend is always suppressed here; we render a custom React legend instead.
+  // Set explicit domain (alphabetically sorted series values) to match the custom React legend's ordering.
+  const colorOpts: Record<string, unknown> = { range: [...colors], legend: false }
+  if (config.series) {
+    colorOpts.domain = getUniqueSeries(data, config.series)
+  }
+  overrides.color = colorOpts
 
   return plotDefaults({
     width,
@@ -1207,7 +1216,7 @@ function PieChartComponent({ data, config, height, autoHeight }: { data: Record<
     if (!valueField) return // Single-column data — no numeric column to chart
     const width = el.clientWidth
     const effectiveHeight = autoHeight ? el.clientHeight : height
-    if (effectiveHeight <= 0) return // waiting for layout
+    if (width <= 0 || effectiveHeight <= 0) return // waiting for layout
     const size = Math.min(width, effectiveHeight)
 
     // Reserve space for external labels
@@ -1362,7 +1371,7 @@ function TreemapComponent({ data, config, height, autoHeight }: { data: Record<s
     if (!valueField) return // Single-column data — no numeric column to chart
     const width = el.clientWidth
     const effectiveHeight = autoHeight ? el.clientHeight : height
-    if (effectiveHeight <= 0) return // waiting for layout
+    if (width <= 0 || effectiveHeight <= 0) return // waiting for layout
 
     const treeData = data.map((d) => ({
       name: String(d[labelField] ?? ''),
