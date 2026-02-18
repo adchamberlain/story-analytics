@@ -12,7 +12,7 @@ interface ChartWithData {
   subtitle: string | null
   source: string | null
   x: string | null
-  y: string | null
+  y: string | string[] | null
   series: string | null
   horizontal: boolean
   sort: boolean

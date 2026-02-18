@@ -391,10 +391,11 @@ function BuilderGridCard({
 
   const chartType = (chartFullData.chart_type ?? 'BarChart') as ChartType
 
+  const isMultiY = Array.isArray(chartFullData.y) && chartFullData.y.length > 1
   const chartConfig: ChartConfig = {
     x: chartFullData.x ?? undefined,
-    y: chartFullData.y ?? undefined,
-    series: chartFullData.series ?? undefined,
+    y: isMultiY ? 'metric_value' : (Array.isArray(chartFullData.y) ? chartFullData.y[0] : chartFullData.y) ?? undefined,
+    series: isMultiY ? 'metric_name' : chartFullData.series ?? undefined,
     horizontal: chartFullData.horizontal,
     sort: chartFullData.sort,
     stacked: (chartFullData.config?.stacked as boolean) ?? false,

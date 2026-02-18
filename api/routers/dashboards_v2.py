@@ -91,7 +91,7 @@ class ChartWithData(BaseModel):
     subtitle: str | None
     source: str | None
     x: str | None
-    y: str | None
+    y: str | list[str] | None
     series: str | None
     horizontal: bool
     sort: bool
