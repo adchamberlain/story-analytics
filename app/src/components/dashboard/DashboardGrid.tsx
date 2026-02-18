@@ -8,9 +8,9 @@ import {
 } from 'react-grid-layout'
 import { ChartWrapper } from '../charts/ChartWrapper'
 import { ObservableChartFactory } from '../charts/ObservableChartFactory'
-import { PALETTES } from '../../themes/datawrapper'
+import { PALETTES } from '../../themes/plotTheme'
 import type { ChartConfig, ChartType } from '../../types/chart'
-import type { PaletteKey } from '../../themes/datawrapper'
+import type { PaletteKey } from '../../themes/plotTheme'
 import type { GridLayout as GridLayoutPos } from '../../stores/dashboardBuilderStore'
 
 // ── Types ───────────────────────────────────────────────────────────────────

@@ -2,12 +2,13 @@ import { useRef, useEffect, useCallback } from 'react'
 import * as Plot from '@observablehq/plot'
 import * as d3 from 'd3'
 import { useObservablePlot } from '../../hooks/useObservablePlot'
-import { plotDefaults } from '../../themes/datawrapper'
+import { plotDefaults } from '../../themes/plotTheme'
 import { useThemeStore } from '../../stores/themeStore'
 import { useChartThemeStore } from '../../stores/chartThemeStore'
 import { useEditorStore } from '../../stores/editorStore'
 import { getXValues, getYForX, resolveOffset, smartOffset } from '../../utils/annotationDefaults'
 import type { ChartConfig, ChartType, Annotations, PointAnnotation, HighlightRange } from '../../types/chart'
+import type { ChartTheme } from '../../themes/chartThemes'
 
 /** Minimal type for the Observable Plot element with scale access. */
 interface PlotElement extends HTMLElement {
@@ -58,7 +59,7 @@ export function ObservableChartFactory({
 
   const { containerRef } = useObservablePlot(
     (width) => {
-      const marks = buildMarks(chartType, data, config, colors)
+      const marks = buildMarks(chartType, data, config, colors, chartTheme)
       const bgColor = getComputedStyle(document.documentElement).getPropertyValue('--color-surface-raised').trim() || '#1e293b'
       const textColor = getComputedStyle(document.documentElement).getPropertyValue('--color-text-primary').trim() || '#e2e8f0'
       const annotationMarks = buildAnnotationMarks(config.annotations, bgColor, textColor)
@@ -80,6 +81,13 @@ export function ObservableChartFactory({
       // Append annotation SVG layers (outside Plot marks, for pixel-space control + drag)
       const plotEl = plot as unknown as PlotElement
       const svg = plot.querySelector('svg') ?? (plot.tagName === 'svg' ? plot : null)
+
+      // Apply crispEdges to gridlines for sharp pixel-aligned rendering
+      if (svg) {
+        svg.querySelectorAll('line').forEach((el) => {
+          el.setAttribute('shape-rendering', 'crispEdges')
+        })
+      }
 
       // Highlight ranges first (renders behind point notes in z-order)
       if (svg && config.annotations?.ranges?.length) {
@@ -219,10 +227,10 @@ export function ObservableChartFactory({
   return (
     <div style={{ width: '100%' }}>
       {legendItems.length > 0 && (
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', padding: '0 0 6px', fontSize: 12 }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '14px', padding: '0 0 6px', fontSize: 12 }}>
           {legendItems.map((item) => (
-            <span key={item.label} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-              <span style={{ width: 12, height: 12, borderRadius: 2, backgroundColor: item.color, flexShrink: 0 }} />
+            <span key={item.label} style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+              <span style={{ width: 10, height: 10, borderRadius: 1, backgroundColor: item.color, flexShrink: 0 }} />
               <span style={{ color: 'var(--color-text-secondary)' }}>{item.label}</span>
             </span>
           ))}
@@ -248,7 +256,8 @@ function buildMarks(
   chartType: ChartType,
   data: Record<string, unknown>[],
   config: ChartConfig,
-  colors: readonly string[] | string[]
+  colors: readonly string[] | string[],
+  chartTheme?: ChartTheme,
 ): Plot.Markish[] {
   const x = config.x
   const y = config.y as string | undefined
@@ -258,7 +267,7 @@ function buildMarks(
     case 'LineChart':
       return buildLineMarks(data, x, y, series, config, colors)
     case 'BarChart':
-      return buildBarMarks(data, x, y, series, config, colors)
+      return buildBarMarks(data, x, y, series, config, colors, chartTheme)
     case 'AreaChart':
       return buildAreaMarks(data, x, y, series, config, colors)
     case 'ScatterPlot':
@@ -293,7 +302,7 @@ function buildLineMarks(
       Plot.lineY(lineData, {
         x, y,
         stroke: series,
-        strokeWidth: config.lineWidth ?? 2,
+        strokeWidth: config.lineWidth ?? 2.5,
       }),
       Plot.tip(lineData, Plot.pointerX({ x, y, stroke: series })),
     )
@@ -302,7 +311,7 @@ function buildLineMarks(
       Plot.lineY(lineData, {
         x, y,
         stroke: colors[0],
-        strokeWidth: config.lineWidth ?? 2,
+        strokeWidth: config.lineWidth ?? 2.5,
       }),
       Plot.tip(lineData, Plot.pointerX({ x, y })),
     )
@@ -317,7 +326,8 @@ function buildBarMarks(
   y: string | undefined,
   series: string | undefined,
   config: ChartConfig,
-  colors: readonly string[] | string[]
+  colors: readonly string[] | string[],
+  chartTheme?: ChartTheme,
 ): Plot.Markish[] {
   if (!x || !y) return []
 
@@ -328,6 +338,17 @@ function buildBarMarks(
     const sortOpt = config.sort !== false
       ? { sort: { y: 'x' as const, reverse: true } }
       : {}
+
+    // Gray bar track behind each bar (non-series only)
+    if (!series && chartTheme?.plot.barTrack !== false) {
+      const trackColor = chartTheme?.plot.barTrackColor ?? '#e5e5e5'
+      const maxVal = d3.max(data, (d) => Number(d[y] ?? 0)) ?? 0
+      if (maxVal > 0) {
+        marks.push(
+          Plot.barX(data, { x: () => maxVal, y: x, fill: trackColor, ...sortOpt }),
+        )
+      }
+    }
 
     if (series) {
       marks.push(
@@ -362,6 +383,11 @@ function buildBarMarks(
         Plot.tip(data, Plot.pointerX({ x, y })),
       )
     }
+
+    // Thick baseline at y=0 for vertical bars
+    const baselineColor = chartTheme?.plot.baseline.color ?? '#333333'
+    const baselineWidth = chartTheme?.plot.baseline.width ?? 2
+    marks.push(Plot.ruleY([0], { stroke: baselineColor, strokeWidth: baselineWidth }))
   }
 
   return marks
@@ -384,13 +410,13 @@ function buildAreaMarks(
   if (series) {
     marks.push(
       Plot.areaY(areaData, { x, y, fill: series, fillOpacity: 0.15 }),
-      Plot.lineY(areaData, { x, y, stroke: series, strokeWidth: config.lineWidth ?? 2 }),
+      Plot.lineY(areaData, { x, y, stroke: series, strokeWidth: config.lineWidth ?? 2.5 }),
       Plot.tip(areaData, Plot.pointerX({ x, y, stroke: series })),
     )
   } else {
     marks.push(
       Plot.areaY(areaData, { x, y, fill: fillColor }),
-      Plot.lineY(areaData, { x, y, stroke: colors[0], strokeWidth: config.lineWidth ?? 2 }),
+      Plot.lineY(areaData, { x, y, stroke: colors[0], strokeWidth: config.lineWidth ?? 2.5 }),
       Plot.tip(areaData, Plot.pointerX({ x, y })),
     )
   }
@@ -408,17 +434,17 @@ function buildScatterMarks(
 ): Plot.Markish[] {
   if (!x || !y) return []
 
-  const r = config.markerSize ?? 4
+  const r = config.markerSize ?? 5
   const marks: Plot.Markish[] = []
 
   if (series) {
     marks.push(
-      Plot.dot(data, { x, y, fill: series, r }),
+      Plot.dot(data, { x, y, fill: series, r, fillOpacity: 0.85 }),
       Plot.tip(data, Plot.pointer({ x, y, fill: series })),
     )
   } else {
     marks.push(
-      Plot.dot(data, { x, y, fill: colors[0], r }),
+      Plot.dot(data, { x, y, fill: colors[0], r, fillOpacity: 0.85 }),
       Plot.tip(data, Plot.pointer({ x, y })),
     )
   }
@@ -958,7 +984,7 @@ function appendHighlightRanges({ svg, plotEl, ranges, data, xColumn, editable, o
 // ── Plot Options Builder ────────────────────────────────────────────────────
 
 function buildPlotOptions(
-  _chartType: ChartType,
+  chartType: ChartType,
   data: Record<string, unknown>[],
   config: ChartConfig,
   colors: readonly string[] | string[],
@@ -1019,6 +1045,15 @@ function buildPlotOptions(
     overrides.marginLeft = 100
   }
 
+  // Chart-type-specific grid rules (overridden by explicit showGrid toggle)
+  if (chartType === 'ScatterPlot') {
+    overrides.grid = true // add x-axis gridlines for scatter
+  } else if (config.horizontal) {
+    // Horizontal bars: no gridlines
+    const yOpts = overrides.y as Record<string, unknown>
+    if (yOpts) yOpts.grid = false
+  }
+
   // Grid toggle — controls both x (top-level) and y (axis-level) grid lines
   if (config.showGrid === false) {
     overrides.grid = false
@@ -1038,7 +1073,7 @@ function buildPlotOptions(
 }
 
 function getBaseAxis() {
-  return { line: true, tickSize: 0, labelOffset: 8 }
+  return { line: false, tickSize: 0, labelOffset: 8 }
 }
 
 
@@ -1118,7 +1153,7 @@ function BigValueChart({ data, config }: { data: Record<string, unknown>[]; conf
 function PieChartComponent({ data, config, height }: { data: Record<string, unknown>[]; config: ChartConfig; height: number }) {
   const containerRef = useRef<HTMLDivElement>(null)
   const resolved = useThemeStore((s) => s.resolved)
-  const themePalette = useChartThemeStore((s) => s.theme.palette.colors)
+  const chartTheme = useChartThemeStore((s) => s.theme)
 
   useEffect(() => {
     if (!containerRef.current || data.length === 0) return
@@ -1130,19 +1165,26 @@ function PieChartComponent({ data, config, height }: { data: Record<string, unkn
     const valueField = (config.value ?? config.y ?? Object.keys(data[0])[1]) as string
     const width = el.clientWidth
     const size = Math.min(width, height)
-    const radius = size / 2 - 20
+
+    // Reserve space for external labels
+    const isExternal = chartTheme.pie.labelStyle === 'external'
+    const labelSpace = isExternal ? 80 : 20
+    const radius = (size - labelSpace * 2) / 2
 
     const pieData = data.map((d) => ({
       label: String(d[labelField] ?? ''),
       value: Number(d[valueField] ?? 0),
     })).filter((d) => d.value > 0)
 
-    const colors = config.colorRange ? [...config.colorRange] : config.color ? [config.color] : [...themePalette]
+    const total = d3.sum(pieData, (d) => d.value)
+
+    const colors = config.colorRange ? [...config.colorRange] : config.color ? [config.color] : [...chartTheme.palette.colors]
     const colorScale = d3.scaleOrdinal(colors)
 
     const pie = d3.pie<{ label: string; value: number }>().value((d) => d.value).sort(null)
+    const innerR = radius * (chartTheme.pie.innerRadius ?? 0)
     const arc = d3.arc<d3.PieArcDatum<{ label: string; value: number }>>()
-      .innerRadius(radius * 0.4) // Donut
+      .innerRadius(innerR)
       .outerRadius(radius)
 
     const svg = d3.select(el).append('svg')
@@ -1153,30 +1195,103 @@ function PieChartComponent({ data, config, height }: { data: Record<string, unkn
     const g = svg.append('g')
       .attr('transform', `translate(${width / 2},${size / 2})`)
 
+    const sliceStroke = chartTheme.pie.sliceStroke || (resolved === 'dark' ? '#1e293b' : '#ffffff')
+    const sliceStrokeWidth = chartTheme.pie.sliceStrokeWidth ?? 1
+
+    const arcs = pie(pieData)
+
     g.selectAll('path')
-      .data(pie(pieData))
+      .data(arcs)
       .join('path')
       .attr('d', arc as never)
       .attr('fill', (_, i) => colorScale(String(i)))
-      .attr('stroke', resolved === 'dark' ? '#1e293b' : '#fff')
-      .attr('stroke-width', 2)
+      .attr('stroke', sliceStroke)
+      .attr('stroke-width', sliceStrokeWidth)
 
-    // Labels
-    const labelArc = d3.arc<d3.PieArcDatum<{ label: string; value: number }>>()
-      .innerRadius(radius * 0.75)
-      .outerRadius(radius * 0.75)
+    const textColor = resolved === 'dark' ? '#e2e8f0' : '#374151'
 
-    g.selectAll('text')
-      .data(pie(pieData))
-      .join('text')
-      .attr('transform', (d) => `translate(${labelArc.centroid(d)})`)
-      .attr('text-anchor', 'middle')
-      .attr('font-size', 11)
-      .attr('fill', resolved === 'dark' ? '#e2e8f0' : '#374151')
-      .text((d) => d.data.value > 0 ? d.data.label : '')
+    if (isExternal) {
+      // External labels with connector polylines and dots
+      const connectorStart = d3.arc<d3.PieArcDatum<{ label: string; value: number }>>()
+        .innerRadius(radius * 1.02)
+        .outerRadius(radius * 1.02)
+
+      const connectorMid = d3.arc<d3.PieArcDatum<{ label: string; value: number }>>()
+        .innerRadius(radius * 1.12)
+        .outerRadius(radius * 1.12)
+
+      const connectorColor = chartTheme.pie.connectorColor ?? '#999999'
+      const dotRadius = chartTheme.pie.connectorDotRadius ?? 3
+
+      // Connector polylines
+      g.selectAll('polyline')
+        .data(arcs)
+        .join('polyline')
+        .attr('points', (d) => {
+          const posA = connectorStart.centroid(d)
+          const posB = connectorMid.centroid(d)
+          const midAngle = (d.startAngle + d.endAngle) / 2
+          const posC: [number, number] = [
+            (radius * 1.22) * (midAngle < Math.PI ? 1 : -1),
+            posB[1],
+          ]
+          return [posA, posB, posC].map((p) => p.join(',')).join(' ')
+        })
+        .attr('fill', 'none')
+        .attr('stroke', connectorColor)
+        .attr('stroke-width', 1)
+
+      // Connector dots at slice edge
+      g.selectAll('circle.connector-dot')
+        .data(arcs)
+        .join('circle')
+        .attr('class', 'connector-dot')
+        .attr('cx', (d) => connectorStart.centroid(d)[0])
+        .attr('cy', (d) => connectorStart.centroid(d)[1])
+        .attr('r', dotRadius)
+        .attr('fill', connectorColor)
+
+      // Label text
+      g.selectAll('text')
+        .data(arcs)
+        .join('text')
+        .attr('transform', (d) => {
+          const pos = connectorMid.centroid(d)
+          const midAngle = (d.startAngle + d.endAngle) / 2
+          return `translate(${(radius * 1.25) * (midAngle < Math.PI ? 1 : -1)},${pos[1]})`
+        })
+        .attr('text-anchor', (d) => {
+          const midAngle = (d.startAngle + d.endAngle) / 2
+          return midAngle < Math.PI ? 'start' : 'end'
+        })
+        .attr('dominant-baseline', 'central')
+        .attr('font-size', 12)
+        .attr('font-family', chartTheme.font.family)
+        .attr('fill', textColor)
+        .text((d) => {
+          const pct = ((d.data.value / total) * 100).toFixed(0)
+          return `${d.data.label} (${pct}%)`
+        })
+    } else {
+      // Internal labels (donut themes)
+      const labelArc = d3.arc<d3.PieArcDatum<{ label: string; value: number }>>()
+        .innerRadius(radius * 0.75)
+        .outerRadius(radius * 0.75)
+
+      g.selectAll('text')
+        .data(arcs)
+        .join('text')
+        .attr('transform', (d) => `translate(${labelArc.centroid(d)})`)
+        .attr('text-anchor', 'middle')
+        .attr('dominant-baseline', 'central')
+        .attr('font-size', 11)
+        .attr('font-family', chartTheme.font.family)
+        .attr('fill', textColor)
+        .text((d) => d.data.value > 0 ? d.data.label : '')
+    }
 
     return () => { el.innerHTML = '' }
-  }, [data, config, height, resolved, themePalette])
+  }, [data, config, height, resolved, chartTheme])
 
   if (data.length === 0) return <p className="text-sm text-text-muted">No data</p>
   return <div ref={containerRef} style={{ width: '100%', height }} />
@@ -1253,11 +1368,12 @@ function DataTableChart({ data }: { data: Record<string, unknown>[]; config: Cha
     <div className="overflow-auto max-h-80">
       <table className="w-full text-sm border-collapse">
         <thead>
-          <tr>
+          <tr className="border-t border-border-default">
             {columns.map((col) => (
               <th
                 key={col}
-                className="text-left px-3 py-2 border-b-2 border-border-default font-semibold text-text-primary text-xs"
+                className="text-left px-3 py-2 border-b-2 border-border-default font-semibold text-text-primary"
+                style={{ fontSize: 13 }}
               >
                 {col}
               </th>

@@ -6,7 +6,7 @@ import { ChartWrapper } from '../components/charts/ChartWrapper'
 import { ObservableChartFactory } from '../components/charts/ObservableChartFactory'
 import { Toolbox } from '../components/editor/Toolbox'
 import { AIChat } from '../components/editor/AIChat'
-import { PALETTES } from '../themes/datawrapper'
+import { PALETTES } from '../themes/plotTheme'
 import type { ChartConfig } from '../types/chart'
 
 export function EditorPage() {

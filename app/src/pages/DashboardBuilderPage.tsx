@@ -10,9 +10,9 @@ import { useDashboardBuilderStore } from '../stores/dashboardBuilderStore'
 import { ChartPicker } from '../components/dashboard/ChartPicker'
 import { ChartWrapper } from '../components/charts/ChartWrapper'
 import { ObservableChartFactory } from '../components/charts/ObservableChartFactory'
-import { PALETTES } from '../themes/datawrapper'
+import { PALETTES } from '../themes/plotTheme'
 import type { ChartConfig, ChartType } from '../types/chart'
-import type { PaletteKey } from '../themes/datawrapper'
+import type { PaletteKey } from '../themes/plotTheme'
 
 /** Full chart data fetched for rendering previews in the builder. */
 interface ChartFullData {

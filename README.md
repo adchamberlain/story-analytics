@@ -6,7 +6,7 @@ Publication-ready dashboards from any data source.
 
 ## What is Story Analytics?
 
-Story Analytics is an open-source dashboarding tool that produces Datawrapper-quality charts from any SQL database or CSV file. You build charts with a visual editor and built-in SQL workbench, arrange them on drag-and-drop dashboards, and export to SVG, PNG, or PDF.
+Story Analytics is an open-source dashboarding tool that produces publication-ready charts from any SQL database or CSV file. You build charts with a visual editor and built-in SQL workbench, arrange them on drag-and-drop dashboards, and export to SVG, PNG, or PDF.
 
 An AI assistant (Claude, GPT, or Gemini) is available to help write SQL, add calculated fields, and refine chart styling — but you're always in control.
 
@@ -22,7 +22,7 @@ An AI assistant (Claude, GPT, or Gemini) is available to help write SQL, add cal
 - **Export** — SVG, PNG, and PDF for individual charts and full dashboards
 - **Annotations** — Reference lines, text labels, and highlighted ranges
 - **KPI cards** — Single-number displays with comparison values, trend indicators, and color-coded deltas
-- **Color palettes** — Curated publication-ready palettes with Datawrapper-quality defaults
+- **Color palettes** — Curated publication-ready palettes with professionally designed defaults
 - **Dark mode** — Full light/dark theme support
 - **Local-first** — All data stays on your machine, stored as JSON files
 

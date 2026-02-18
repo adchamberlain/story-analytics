@@ -6,7 +6,7 @@ import { ColumnDropdown } from './ColumnDropdown'
 import { MultiColumnSelect } from './MultiColumnSelect'
 import { AnnotationEditor } from './AnnotationEditor'
 import type { ChartType } from '../../types/chart'
-import type { PaletteKey } from '../../themes/datawrapper'
+import type { PaletteKey } from '../../themes/plotTheme'
 import type { AggregationType, TimeGrain, DataMode, EditorConfig, TableInfoItem } from '../../stores/editorStore'
 
 function isDateColumn(type: string | undefined): boolean {
