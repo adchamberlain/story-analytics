@@ -26,10 +26,14 @@ export function SharePanel({ chartId, title, source, chartRef }: SharePanelProps
   }, [])
 
   const copyToClipboard = useCallback(async (text: string, setter: (v: boolean) => void) => {
-    await navigator.clipboard.writeText(text)
-    setter(true)
-    clearTimeout(copyTimer.current)
-    copyTimer.current = setTimeout(() => setter(false), 2000)
+    try {
+      await navigator.clipboard.writeText(text)
+      setter(true)
+      clearTimeout(copyTimer.current)
+      copyTimer.current = setTimeout(() => setter(false), 2000)
+    } catch {
+      // Clipboard API can fail in insecure contexts or iframes — ignore silently
+    }
   }, [])
 
   const getSvg = useCallback((): SVGSVGElement | null => {

@@ -7,7 +7,11 @@ from __future__ import annotations
 import tempfile
 from pathlib import Path
 
+import re as _re
+
 from .base import DatabaseConnector, ColumnInfo, ConnectorResult
+
+_SAFE_SCHEMA_RE = _re.compile(r'^[a-zA-Z_][a-zA-Z0-9_$]*$')
 
 
 class PostgresConnector(DatabaseConnector):
@@ -27,13 +31,19 @@ class PostgresConnector(DatabaseConnector):
 
     def _connect(self, credentials: dict):
         import psycopg2
+        schema = credentials.get("schema", "")
+        options = None
+        if schema:
+            if not _SAFE_SCHEMA_RE.match(schema):
+                raise ValueError(f"Invalid schema name: {schema!r}")
+            options = f"-c search_path={schema}"
         return psycopg2.connect(
             host=credentials["host"],
             port=int(credentials.get("port", 5432)),
             dbname=credentials["database"],
             user=credentials["username"],
             password=credentials["password"],
-            options=f"-c search_path={self._quote_identifier(credentials.get('schema', 'public'))}" if credentials.get("schema") else None,
+            options=options,
         )
 
     def test_connection(self, credentials: dict) -> ConnectorResult:
@@ -130,16 +140,17 @@ class PostgresConnector(DatabaseConnector):
                 pq.write_table(arrow_table, str(pq_path))
 
                 # Ingest into DuckDB
-                source_schema = duckdb_service.ingest_parquet(pq_path, table.lower())
-                results.append({
-                    "source_id": source_schema.source_id,
-                    "filename": source_schema.filename,
-                    "row_count": source_schema.row_count,
-                    "column_count": len(source_schema.columns),
-                })
-
-                if not cache_dir:
-                    pq_path.unlink(missing_ok=True)
+                try:
+                    source_schema = duckdb_service.ingest_parquet(pq_path, table.lower())
+                    results.append({
+                        "source_id": source_schema.source_id,
+                        "filename": source_schema.filename,
+                        "row_count": source_schema.row_count,
+                        "column_count": len(source_schema.columns),
+                    })
+                finally:
+                    if not cache_dir:
+                        pq_path.unlink(missing_ok=True)
 
             cursor.close()
         finally:

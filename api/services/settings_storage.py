@@ -11,7 +11,7 @@ import json
 import os
 from datetime import datetime, timezone
 from pathlib import Path
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass, asdict, fields as dc_fields
 
 
 SETTINGS_PATH = Path(__file__).parent.parent.parent / "data" / "settings.json"
@@ -37,7 +37,8 @@ def load_settings() -> AppSettings:
     """Load settings from data/settings.json, bootstrapping from env vars if needed."""
     if SETTINGS_PATH.exists():
         data = json.loads(SETTINGS_PATH.read_text())
-        settings = AppSettings(**{k: v for k, v in data.items() if k in AppSettings.__dataclass_fields__})
+        known = {f.name for f in dc_fields(AppSettings)}
+        settings = AppSettings(**{k: v for k, v in data.items() if k in known})
 
         # Sync keys into os.environ so downstream LLM providers (which read
         # env vars) work after a server restart without needing a re-save.
@@ -82,9 +83,11 @@ def save_settings(**fields: str) -> AppSettings:
 
     current.updated_at = datetime.now(timezone.utc).isoformat()
 
-    # Persist to disk
+    # Persist to disk atomically
     SETTINGS_PATH.parent.mkdir(parents=True, exist_ok=True)
-    SETTINGS_PATH.write_text(json.dumps(asdict(current), indent=2))
+    tmp_path = SETTINGS_PATH.with_suffix(".json.tmp")
+    tmp_path.write_text(json.dumps(asdict(current), indent=2))
+    os.replace(str(tmp_path), str(SETTINGS_PATH))
 
     # Push keys into os.environ so downstream code works immediately.
     # Clear env var when key is removed so providers stop using the old key.

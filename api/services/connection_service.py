@@ -12,7 +12,7 @@ import re
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass, asdict, fields as dc_fields
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +60,9 @@ def save_connection(
     )
 
     path = CONNECTIONS_DIR / f"{connection_id}.json"
-    path.write_text(json.dumps(asdict(conn), indent=2))
+    tmp_path = path.with_suffix(".json.tmp")
+    tmp_path.write_text(json.dumps(asdict(conn), indent=2))
+    os.replace(str(tmp_path), str(path))
     return conn
 
 
@@ -73,7 +75,8 @@ def load_connection(connection_id: str) -> ConnectionInfo | None:
         return None
 
     data = json.loads(path.read_text())
-    return ConnectionInfo(**data)
+    known = {f.name for f in dc_fields(ConnectionInfo)}
+    return ConnectionInfo(**{k: v for k, v in data.items() if k in known})
 
 
 def list_connections() -> list[ConnectionInfo]:
@@ -82,10 +85,11 @@ def list_connections() -> list[ConnectionInfo]:
         return []
 
     connections = []
+    known = {f.name for f in dc_fields(ConnectionInfo)}
     for path in sorted(CONNECTIONS_DIR.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True):
         try:
             data = json.loads(path.read_text())
-            connections.append(ConnectionInfo(**data))
+            connections.append(ConnectionInfo(**{k: v for k, v in data.items() if k in known}))
         except Exception:
             logger.warning("Skipping corrupted connection file: %s", path.name)
             continue

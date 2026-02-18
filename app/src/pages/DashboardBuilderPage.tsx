@@ -81,6 +81,7 @@ export function DashboardBuilderPage() {
   }, [searchParams, store.dashboardId])
 
   // Fetch full chart data for all referenced charts
+  const chartIdKey = store.charts.map((c) => c.chart_id).join(',')
   useEffect(() => {
     if (store.charts.length === 0) return
 
@@ -96,6 +97,7 @@ export function DashboardBuilderPage() {
           return res.json()
         })
         .then((result) => {
+          if (abortController.signal.aborted) return
           const chart = result.chart
           setChartData((prev) => ({
             ...prev,
@@ -123,7 +125,7 @@ export function DashboardBuilderPage() {
 
     return () => abortController.abort()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [store.charts.map((c) => c.chart_id).join(',')])
+  }, [chartIdKey])
 
   const handleSave = useCallback(async () => {
     const id = await store.save()

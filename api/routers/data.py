@@ -2,6 +2,7 @@
 Data router: CSV upload, schema inspection, and query execution.
 """
 
+import re
 import shutil
 import tempfile
 from pathlib import Path
@@ -9,7 +10,7 @@ from pathlib import Path
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException
 from pydantic import BaseModel
 
-from ..services.duckdb_service import get_duckdb_service
+from ..services.duckdb_service import get_duckdb_service, _SAFE_SOURCE_ID_RE
 
 
 router = APIRouter(prefix="/data", tags=["data"])
@@ -127,20 +128,24 @@ async def list_tables():
 @router.delete("/sources/{source_id}")
 async def delete_source(source_id: str):
     """Delete a CSV data source: drop DuckDB table, remove from memory, delete files."""
+    if not _SAFE_SOURCE_ID_RE.match(source_id):
+        raise HTTPException(status_code=400, detail="Invalid source_id")
+
     service = get_duckdb_service()
 
     if source_id not in service._sources:
         raise HTTPException(status_code=404, detail="Source not found")
 
-    # Drop the DuckDB table
+    # Drop the DuckDB table and remove from in-memory registry atomically
     table_name = f"src_{source_id}"
     try:
-        service._conn.execute(f"DROP TABLE IF EXISTS {table_name}")
+        with service._lock:
+            service._conn.execute(f"DROP TABLE IF EXISTS {table_name}")
     except Exception:
         pass
 
-    # Remove from in-memory registry
-    del service._sources[source_id]
+    # Remove inside lock to avoid race with concurrent iterators
+    service._sources.pop(source_id, None)
 
     # Delete upload directory from disk
     upload_dir = Path(__file__).parent.parent.parent / "data" / "uploads" / source_id
@@ -162,7 +167,7 @@ async def query_raw(request: RawQueryRequest):
     # Reject non-SELECT statements to prevent DML/DDL (DROP, INSERT, DELETE, etc.)
     import re as _re
     # Strip leading SQL comments (block and line) before checking the first keyword
-    sql_stripped_comments = _re.sub(r'^\s*(/\*.*?\*/\s*|--[^\n]*\n\s*)*', '', sql, flags=_re.DOTALL)
+    sql_stripped_comments = _re.sub(r'^\s*(/\*.*?\*/\s*|--[^\n]*(?:\n|$)\s*)*', '', sql, flags=_re.DOTALL)
     first_keyword = _re.match(r'\s*(\w+)', sql_stripped_comments)
     if not first_keyword or first_keyword.group(1).upper() not in ("SELECT", "WITH", "EXPLAIN"):
         return RawQueryResponse(
@@ -170,22 +175,24 @@ async def query_raw(request: RawQueryRequest):
             error="Only SELECT, WITH, and EXPLAIN statements are allowed.",
         )
 
+    # Reject multi-statement SQL: strip all semicolons to prevent piggy-backed DML
+    sql = sql.replace(";", "")
+
     # Safety: append LIMIT 10000 if user SQL has no top-level LIMIT clause.
-    # Use regex to match LIMIT as a standalone keyword (not inside comments/strings).
-    sql_no_trailing = sql.rstrip(";")
-    if not _re.search(r'\bLIMIT\s+\d', sql_no_trailing, _re.IGNORECASE):
-        sql = sql_no_trailing + " LIMIT 10000"
+    if not _re.search(r'\bLIMIT\s+\d', sql, _re.IGNORECASE):
+        sql = sql + " LIMIT 10000"
 
     try:
-        result = service._conn.execute(sql)
-        if result.description:
-            col_names = [desc[0] for desc in result.description]
-            col_types = [str(desc[1]) for desc in result.description]
-            rows_raw = result.fetchall()
-            rows = [dict(zip(col_names, row)) for row in rows_raw]
-        else:
-            # Non-SELECT statements (INSERT, UPDATE, DELETE) have no description
-            col_names, col_types, rows = [], [], []
+        with service._lock:
+            result = service._conn.execute(sql)
+            if result.description:
+                col_names = [desc[0] for desc in result.description]
+                col_types = [str(desc[1]) for desc in result.description]
+                rows_raw = result.fetchall()
+                rows = [dict(zip(col_names, row)) for row in rows_raw]
+            else:
+                # Non-SELECT statements (INSERT, UPDATE, DELETE) have no description
+                col_names, col_types, rows = [], [], []
 
         return RawQueryResponse(
             success=True,
@@ -230,7 +237,8 @@ async def upload_csv(file: UploadFile = File(...), replace: str = Form("")):
     if existing_id and replace == "true":
         table_name = f"src_{existing_id}"
         try:
-            service._conn.execute(f"DROP TABLE IF EXISTS {table_name}")
+            with service._lock:
+                service._conn.execute(f"DROP TABLE IF EXISTS {table_name}")
         except Exception:
             pass
         service._sources.pop(existing_id, None)
@@ -241,14 +249,15 @@ async def upload_csv(file: UploadFile = File(...), replace: str = Form("")):
     # Write uploaded file to temp location, then ingest
     MAX_UPLOAD_BYTES = 100 * 1024 * 1024  # 100 MB
     with tempfile.NamedTemporaryFile(delete=False, suffix='.csv') as tmp:
+        tmp_path = Path(tmp.name)
         content = await file.read()
         if len(content) > MAX_UPLOAD_BYTES:
+            tmp_path.unlink(missing_ok=True)
             raise HTTPException(
                 status_code=413,
                 detail="File too large. Maximum upload size is 100 MB.",
             )
         tmp.write(content)
-        tmp_path = Path(tmp.name)
 
     # Reuse the old source_id when replacing so existing charts keep working
     reuse_id = existing_id if (existing_id and replace == "true") else None

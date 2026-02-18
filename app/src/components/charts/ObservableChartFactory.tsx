@@ -1194,10 +1194,12 @@ function PieChartComponent({ data, config, height, autoHeight }: { data: Record<
   const chartTheme = useChartThemeStore((s) => s.theme)
 
   useEffect(() => {
-    if (!containerRef.current || data.length === 0) return
-
     const el = containerRef.current
+    if (!el) return
+
     el.innerHTML = ''
+
+    if (data.length === 0) return
 
     const keys = Object.keys(data[0])
     const labelField = config.x ?? keys[0]
@@ -1347,10 +1349,12 @@ function TreemapComponent({ data, config, height, autoHeight }: { data: Record<s
   const themePalette = useChartThemeStore((s) => s.theme.palette.colors)
 
   useEffect(() => {
-    if (!containerRef.current || data.length === 0) return
-
     const el = containerRef.current
+    if (!el) return
+
     el.innerHTML = ''
+
+    if (data.length === 0) return
 
     const keys = Object.keys(data[0])
     const labelField = config.x ?? keys[0]

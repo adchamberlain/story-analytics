@@ -127,15 +127,17 @@ export function DatabaseConnector({ onSynced }: DatabaseConnectorProps) {
 
   const handleSelectSaved = async (conn: SavedConnection) => {
     setActiveConnectionId(conn.connection_id)
+    setDbType(conn.db_type as DbType)
     setError(null)
     setTesting(true)
     setTestMessage(null)
 
     try {
+      // Send empty credentials — server merges with saved config and env vars
       const res = await fetch(`/api/connections/${conn.connection_id}/test`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ credentials: buildCredentials(), username: username || null }),
+        body: JSON.stringify({ credentials: {}, username: null }),
       })
       const data = await res.json()
 

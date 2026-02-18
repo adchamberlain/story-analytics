@@ -15,6 +15,8 @@ export function useObservablePlot(
 ) {
   const containerRef = useRef<HTMLDivElement>(null)
   const observerRef = useRef<ResizeObserver | null>(null)
+  const renderFnRef = useRef(renderFn)
+  renderFnRef.current = renderFn
   const [size, setSize] = useState({ width: 0, height: 0 })
 
   // Track container size via ResizeObserver.
@@ -55,7 +57,7 @@ export function useObservablePlot(
     const el = containerRef.current
     if (!el || size.width === 0) return
 
-    const plot = renderFn(size.width, size.height)
+    const plot = renderFnRef.current(size.width, size.height)
     if (!plot) return // render deferred (e.g. waiting for height measurement)
     el.replaceChildren(plot)
 

@@ -5,11 +5,12 @@ Local-first, Git-friendly persistence.
 
 import json
 import logging
+import os
 import re
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass, asdict, fields as dc_fields
 
 logger = logging.getLogger(__name__)
 
@@ -87,8 +88,21 @@ def save_chart(
     )
 
     path = CHARTS_DIR / f"{chart_id}.json"
-    path.write_text(json.dumps(asdict(chart), indent=2))
+    _atomic_write(path, json.dumps(asdict(chart), indent=2))
     return chart
+
+
+def _atomic_write(path: Path, content: str) -> None:
+    """Write content to a file atomically via temp file + rename."""
+    tmp_path = path.with_suffix(".json.tmp")
+    tmp_path.write_text(content)
+    os.replace(str(tmp_path), str(path))
+
+
+def _safe_load_chart(data: dict) -> SavedChart:
+    """Load a SavedChart from dict, ignoring unknown keys from newer versions."""
+    known = {f.name for f in dc_fields(SavedChart)}
+    return SavedChart(**{k: v for k, v in data.items() if k in known})
 
 
 def _validate_id(chart_id: str) -> bool:
@@ -105,7 +119,7 @@ def load_chart(chart_id: str) -> SavedChart | None:
         return None
 
     data = json.loads(path.read_text())
-    return SavedChart(**data)
+    return _safe_load_chart(data)
 
 
 def list_charts() -> list[SavedChart]:
@@ -117,7 +131,7 @@ def list_charts() -> list[SavedChart]:
     for path in sorted(CHARTS_DIR.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True):
         try:
             data = json.loads(path.read_text())
-            charts.append(SavedChart(**data))
+            charts.append(_safe_load_chart(data))
         except Exception:
             logger.warning("Skipping corrupted chart file: %s", path.name)
             continue
@@ -144,8 +158,8 @@ def update_chart(chart_id: str, **fields) -> SavedChart | None:
             data[key] = value
 
     data["updated_at"] = now
-    path.write_text(json.dumps(data, indent=2))
-    return SavedChart(**data)
+    _atomic_write(path, json.dumps(data, indent=2))
+    return _safe_load_chart(data)
 
 
 def delete_chart(chart_id: str) -> bool:

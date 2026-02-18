@@ -75,10 +75,14 @@ export function ShareModal({ dashboardId, onClose }: ShareModalProps) {
   const shareUrl = `${window.location.origin}/dashboard/${dashboardId}`
 
   const handleCopyLink = async () => {
-    await navigator.clipboard.writeText(shareUrl)
-    setCopiedLink(true)
-    clearTimeout(copyTimer.current)
-    copyTimer.current = setTimeout(() => setCopiedLink(false), 2000)
+    try {
+      await navigator.clipboard.writeText(shareUrl)
+      setCopiedLink(true)
+      clearTimeout(copyTimer.current)
+      copyTimer.current = setTimeout(() => setCopiedLink(false), 2000)
+    } catch {
+      // Clipboard API can fail in insecure contexts or iframes — ignore silently
+    }
   }
 
   const visibilityOptions: { value: Visibility; label: string; description: string }[] = [

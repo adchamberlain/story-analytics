@@ -152,10 +152,21 @@ export function LibraryPage() {
   }
 
   const selectAll = () => {
-    if (selectedIds.size === charts.length) {
-      setSelectedIds(new Set())
+    const allVisibleSelected = charts.length > 0 && charts.every((c) => selectedIds.has(c.id))
+    if (allVisibleSelected) {
+      // Remove only the currently visible IDs (preserve selections from other filters)
+      setSelectedIds((prev) => {
+        const next = new Set(prev)
+        for (const c of charts) next.delete(c.id)
+        return next
+      })
     } else {
-      setSelectedIds(new Set(charts.map((c) => c.id)))
+      // Add all visible IDs to the selection
+      setSelectedIds((prev) => {
+        const next = new Set(prev)
+        for (const c of charts) next.add(c.id)
+        return next
+      })
     }
   }
 
@@ -220,7 +231,7 @@ export function LibraryPage() {
             onClick={selectAll}
             className="text-[14px] font-medium text-blue-500 hover:text-blue-400 transition-colors"
           >
-            {selectedIds.size === charts.length ? 'Deselect all' : 'Select all'}
+            {charts.length > 0 && charts.every((c) => selectedIds.has(c.id)) ? 'Deselect all' : 'Select all'}
           </button>
           <span className="text-[14px] text-text-secondary">
             {selectedIds.size} chart{selectedIds.size !== 1 ? 's' : ''} selected

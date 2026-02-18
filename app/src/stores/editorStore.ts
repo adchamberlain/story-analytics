@@ -444,7 +444,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       if (changedKeys.some((k) => DATA_KEYS.includes(k))) {
         // Debounce: cancel previous pending buildQuery before scheduling a new one
         clearTimeout(_buildQueryTimer)
-        _buildQueryTimer = setTimeout(() => get().buildQuery(), 0)
+        _buildQueryTimer = setTimeout(() => get().buildQuery(), 150)
       }
     }
   },

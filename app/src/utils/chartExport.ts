@@ -26,11 +26,15 @@ export function exportSVG(svgElement: SVGSVGElement, filename: string): void {
 
 /** Render an SVG element to a PNG at 2x resolution and download */
 export function exportPNG(svgElement: SVGSVGElement, filename: string, scale = 2): void {
-  svgToCanvas(svgElement, scale).then((canvas) => {
-    canvas.toBlob((blob) => {
-      if (blob) downloadBlob(blob, `${sanitizeFilename(filename)}.png`)
-    }, 'image/png')
-  })
+  svgToCanvas(svgElement, scale)
+    .then((canvas) => {
+      canvas.toBlob((blob) => {
+        if (blob) downloadBlob(blob, `${sanitizeFilename(filename)}.png`)
+      }, 'image/png')
+    })
+    .catch((err) => {
+      console.error('PNG export failed:', err)
+    })
 }
 
 /** Render an SVG element to a PDF and download */

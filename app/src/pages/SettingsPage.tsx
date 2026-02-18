@@ -92,11 +92,11 @@ export function SettingsPage() {
   }
 
   const handleSave = async () => {
-    setSaving(true)
-    setSaveStatus('idle')
-
     const provider = PROVIDERS.find((p) => p.id === selectedProvider)
     if (!provider) return
+
+    setSaving(true)
+    setSaveStatus('idle')
 
     const body: Record<string, string> = { ai_provider: selectedProvider }
     // Only send key if it's not a masked value (i.e., user typed a new one)
