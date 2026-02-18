@@ -355,7 +355,7 @@ function buildBarMarks(
 
     // Gray bar track behind each bar (non-series only)
     if (!series && chartTheme?.plot.barTrack !== false) {
-      const trackColor = chartTheme?.plot.barTrackColor ?? '#e5e5e5'
+      const trackColor = chartTheme?.plot.barTrackColor || getComputedStyle(document.documentElement).getPropertyValue('--color-grid').trim() || '#e5e5e5'
       const maxVal = d3.max(data, (d) => Number(d[y] ?? 0)) ?? 0
       if (maxVal > 0) {
         marks.push(
@@ -406,7 +406,7 @@ function buildBarMarks(
     }
 
     // Thick baseline at y=0 for vertical bars
-    const baselineColor = chartTheme?.plot.baseline.color ?? '#333333'
+    const baselineColor = chartTheme?.plot.baseline.color || getComputedStyle(document.documentElement).getPropertyValue('--color-axis').trim() || '#333333'
     const baselineWidth = chartTheme?.plot.baseline.width ?? 2
     marks.push(Plot.ruleY([0], { stroke: baselineColor, strokeWidth: baselineWidth }))
   }
@@ -1259,7 +1259,7 @@ function PieChartComponent({ data, config, height, autoHeight }: { data: Record<
         .innerRadius(radius * 1.12)
         .outerRadius(radius * 1.12)
 
-      const connectorColor = chartTheme.pie.connectorColor ?? '#999999'
+      const connectorColor = chartTheme.pie.connectorColor || getComputedStyle(document.documentElement).getPropertyValue('--color-text-muted').trim() || '#999999'
       const dotRadius = chartTheme.pie.connectorDotRadius ?? 3
 
       // Connector polylines
