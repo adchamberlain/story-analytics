@@ -135,7 +135,10 @@ export function DashboardBuilderPage() {
   const handleAddChart = useCallback((chartId: string) => {
     store.addChart(chartId)
     store.setPickerOpen(false)
-  }, [store])
+    store.save().then((id) => {
+      if (id && !dashboardId) navigate(`/dashboard/${id}/edit`)
+    })
+  }, [store, dashboardId, navigate])
 
   const handleCreateNew = useCallback(() => {
     store.setPickerOpen(false)

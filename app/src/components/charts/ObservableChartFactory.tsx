@@ -1056,7 +1056,13 @@ function buildPlotOptions(
     label: null,
     grid: true,
   }
+  // Horizontal bars need wider left margin for categorical labels
+  if (config.horizontal) {
+    overrides.marginLeft = 100
+  }
+
   // Add extra left margin for the manually-rendered rotated y-axis label
+  // (must run after horizontal-bar default so the +24 is additive, not overwritten)
   if (config.yAxisTitle) {
     overrides.marginLeft = (overrides.marginLeft as number | undefined) ?? 56
     overrides.marginLeft = (overrides.marginLeft as number) + 24
@@ -1080,11 +1086,6 @@ function buildPlotOptions(
     }
     yOpts.domain = [config.yAxisMin ?? dataMin, config.yAxisMax ?? dataMax]
     overrides.y = yOpts
-  }
-
-  // Horizontal bars need wider left margin for labels
-  if (config.horizontal) {
-    overrides.marginLeft = 100
   }
 
   // Chart-type-specific grid rules (overridden by explicit showGrid toggle)
