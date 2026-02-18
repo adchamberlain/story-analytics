@@ -2,7 +2,6 @@
 API configuration settings.
 """
 
-import os
 from functools import lru_cache
 
 from pydantic_settings import BaseSettings
@@ -15,7 +14,7 @@ class Settings(BaseSettings):
     database_url: str = "sqlite:///data/story_analytics.db"
 
     # JWT Authentication
-    secret_key: str = os.environ.get("SECRET_KEY", "dev-secret-key-change-in-production")
+    secret_key: str = "dev-secret-key-change-in-production"
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 60 * 24 * 7  # 1 week
 

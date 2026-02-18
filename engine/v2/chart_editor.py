@@ -202,6 +202,12 @@ def _parse_edit_response(response: str) -> EditResult:
             error=f"Failed to parse LLM response as JSON: {e}\nResponse: {response[:500]}",
         )
 
+    if not isinstance(data, dict):
+        return EditResult(
+            success=False,
+            error=f"LLM response is not a JSON object (got {type(data).__name__})",
+        )
+
     config = data.get("config")
     if not config or not isinstance(config, dict):
         return EditResult(

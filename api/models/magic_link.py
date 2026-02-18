@@ -39,4 +39,8 @@ class MagicLink(Base):
     @property
     def is_valid(self) -> bool:
         """Check if token is still valid."""
-        return not self.used and datetime.now(timezone.utc) < self.expires_at
+        exp = self.expires_at
+        # SQLite may strip timezone info; normalize to UTC for safe comparison
+        if exp is not None and exp.tzinfo is None:
+            exp = exp.replace(tzinfo=timezone.utc)
+        return not self.used and exp is not None and datetime.now(timezone.utc) < exp
