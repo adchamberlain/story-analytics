@@ -17,7 +17,8 @@ export function DashboardsHome() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    fetch('/api/v2/dashboards/')
+    const abortController = new AbortController()
+    fetch('/api/v2/dashboards/', { signal: abortController.signal })
       .then(async (res) => {
         if (!res.ok) {
           const body = await res.json().catch(() => ({ detail: res.statusText }))
@@ -30,9 +31,11 @@ export function DashboardsHome() {
         setLoading(false)
       })
       .catch((e) => {
+        if (e.name === 'AbortError') return
         setError(e instanceof Error ? e.message : String(e))
         setLoading(false)
       })
+    return () => abortController.abort()
   }, [])
 
   if (loading) {
