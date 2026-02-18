@@ -82,12 +82,14 @@ export function AIChat() {
   const handleProviderChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newProvider = e.target.value
     try {
-      await fetch('/api/settings/', {
+      const res = await fetch('/api/settings/', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ai_provider: newProvider }),
       })
-      setAiStatus((prev) => prev ? { ...prev, provider: newProvider } : prev)
+      if (res.ok) {
+        setAiStatus((prev) => prev ? { ...prev, provider: newProvider } : prev)
+      }
     } catch {
       // Silently fail — provider stays unchanged in UI
     }

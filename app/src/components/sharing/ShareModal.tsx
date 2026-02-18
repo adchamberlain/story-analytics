@@ -143,6 +143,7 @@ export function ShareModal({ dashboardId, onClose }: ShareModalProps) {
                         value={opt.value}
                         checked={visibility === opt.value}
                         onChange={() => handleVisibilityChange(opt.value)}
+                        disabled={saving}
                         className="mt-0.5"
                       />
                       <div>

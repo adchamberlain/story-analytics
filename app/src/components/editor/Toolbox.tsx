@@ -44,7 +44,7 @@ export function Toolbox() {
     await executeCustomSql()
     // Check store for results after execution
     const { data: rows, sqlError: err } = useEditorStore.getState()
-    if (!err && rows.length >= 0) {
+    if (!err) {
       const msg = `${rows.length.toLocaleString()} row${rows.length !== 1 ? 's' : ''} returned`
       setSqlSuccess(msg)
       sqlSuccessTimer.current = setTimeout(() => setSqlSuccess(null), 4000)

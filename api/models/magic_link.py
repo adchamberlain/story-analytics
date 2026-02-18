@@ -3,7 +3,7 @@ Magic link model for passwordless authentication.
 """
 
 import secrets
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import Column, DateTime, Integer, String, Boolean
 
@@ -23,7 +23,7 @@ class MagicLink(Base):
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String, nullable=False, index=True)
     token = Column(String, unique=True, nullable=False, index=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     expires_at = Column(DateTime, nullable=False)
     used = Column(Boolean, default=False)
 
@@ -33,10 +33,10 @@ class MagicLink(Base):
         return cls(
             email=email.lower(),
             token=generate_token(),
-            expires_at=datetime.utcnow() + timedelta(minutes=expires_minutes),
+            expires_at=datetime.now(timezone.utc) + timedelta(minutes=expires_minutes),
         )
 
     @property
     def is_valid(self) -> bool:
         """Check if token is still valid."""
-        return not self.used and datetime.utcnow() < self.expires_at
+        return not self.used and datetime.now(timezone.utc) < self.expires_at
