@@ -513,12 +513,12 @@ async def export_html(dashboard_id: str):
             "source": chart.source,
             "width": chart.width,
             "config": {
+                **(chart.config or {}),
                 "x": chart.x,
                 "y": chart.y,
                 "series": chart.series,
                 "horizontal": chart.horizontal,
                 "sort": chart.sort,
-                **(chart.config or {}),
             },
             "data": chart.data,
         })

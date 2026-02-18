@@ -24,7 +24,7 @@ class MagicLink(Base):
     email = Column(String, nullable=False, index=True)
     token = Column(String, unique=True, nullable=False, index=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
-    expires_at = Column(DateTime, nullable=False)
+    expires_at = Column(DateTime(timezone=True), nullable=False)
     used = Column(Boolean, default=False)
 
     @classmethod

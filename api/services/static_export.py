@@ -187,7 +187,7 @@ def export_dashboard_html(
       const x = config.x, y = config.y, series = config.series;
       const isMultiY = Array.isArray(y) && y.length > 1;
       const colors = config.color ? [config.color] : [...COLORS];
-      const width = container.clientWidth;
+      const width = container.clientWidth || 640;
       const height = 320;
 
       if (chartType === "BigValue") {{
@@ -225,7 +225,7 @@ def export_dashboard_html(
             : Plot.barX(plotData, {{ x: yField, y: x, fill: colors[0] }}));
         }} else {{
           marks.push(implicitSeries
-            ? Plot.barY(plotData, {{ x, y: yField, fill: implicitSeries, ...(config.stacked ? {{}} : {{ fx: x }}) }})
+            ? Plot.barY(plotData, {{ x, y: yField, fill: implicitSeries, ...(config.stacked || isMultiY ? {{}} : {{ fx: x }}) }})
             : Plot.barY(plotData, {{ x, y: yField, fill: colors[0] }}));
         }}
       }} else if (chartType === "LineChart") {{
@@ -302,7 +302,7 @@ def export_dashboard_html(
         marginBottom: 30,
         x: {{ line: true, tickSize: 0, ...xOpts, ...(config.xAxisTitle ? {{ label: config.xAxisTitle }} : {{}}) }},
         y: {{ line: true, tickSize: 0, grid: true, ...(config.yAxisTitle ? {{ label: config.yAxisTitle }} : {{}}) }},
-        color: {{ range: colors, ...(series ? {{ legend: true }} : {{}}) }},
+        color: {{ range: colors, ...(implicitSeries ? {{ legend: true }} : {{}}) }},
         marks,
       }});
 
