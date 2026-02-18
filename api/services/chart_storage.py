@@ -136,8 +136,12 @@ def update_chart(chart_id: str, **fields) -> SavedChart | None:
     data = json.loads(path.read_text())
     now = datetime.now(timezone.utc).isoformat()
 
+    # Only allow updating presentation fields — protect id, source_id, sql, timestamps
+    _UPDATABLE = {"chart_type", "title", "subtitle", "source", "x", "y", "series",
+                  "horizontal", "sort", "reasoning", "config", "connection_id", "source_table"}
     for key, value in fields.items():
-        data[key] = value
+        if key in _UPDATABLE:
+            data[key] = value
 
     data["updated_at"] = now
     path.write_text(json.dumps(data, indent=2))

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useChartThemeStore } from '../stores/chartThemeStore'
 import { CHART_THEMES } from '../themes/chartThemes'
@@ -34,6 +34,11 @@ export function SettingsPage() {
   const [showKey, setShowKey] = useState(false)
   const [saving, setSaving] = useState(false)
   const [saveStatus, setSaveStatus] = useState<'idle' | 'success' | 'error'>('idle')
+  const saveTimer = useRef<ReturnType<typeof setTimeout>>()
+
+  useEffect(() => {
+    return () => clearTimeout(saveTimer.current)
+  }, [])
 
   // Data sources state
   const [sources, setSources] = useState<DataSource[]>([])
@@ -110,7 +115,8 @@ export function SettingsPage() {
       setSettings(data)
       setApiKey(data[provider.keyField])
       setSaveStatus('success')
-      setTimeout(() => setSaveStatus('idle'), 2000)
+      clearTimeout(saveTimer.current)
+      saveTimer.current = setTimeout(() => setSaveStatus('idle'), 2000)
     } catch {
       setSaveStatus('error')
     } finally {

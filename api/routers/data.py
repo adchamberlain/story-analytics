@@ -159,9 +159,17 @@ async def query_raw(request: RawQueryRequest):
     if not sql:
         return RawQueryResponse(success=False, error="SQL query is empty")
 
+    # Reject non-SELECT statements to prevent DML/DDL (DROP, INSERT, DELETE, etc.)
+    import re as _re
+    first_keyword = _re.match(r'\s*(\w+)', sql)
+    if not first_keyword or first_keyword.group(1).upper() not in ("SELECT", "WITH", "EXPLAIN"):
+        return RawQueryResponse(
+            success=False,
+            error="Only SELECT, WITH, and EXPLAIN statements are allowed.",
+        )
+
     # Safety: append LIMIT 10000 if user SQL has no top-level LIMIT clause.
     # Use regex to match LIMIT as a standalone keyword (not inside comments/strings).
-    import re as _re
     sql_no_trailing = sql.rstrip(";")
     if not _re.search(r'\bLIMIT\s+\d', sql_no_trailing, _re.IGNORECASE):
         sql = sql_no_trailing + " LIMIT 10000"

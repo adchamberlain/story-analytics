@@ -107,10 +107,13 @@ class DuckDBService:
         """
         source_id = source_id or uuid.uuid4().hex[:12]
 
-        # Store file for persistence
+        # Store file for persistence — sanitize filename to prevent path traversal
+        safe_filename = Path(filename).name
+        if not safe_filename:
+            safe_filename = "upload.csv"
         dest = DATA_DIR / source_id
         dest.mkdir(parents=True, exist_ok=True)
-        stored_path = dest / filename
+        stored_path = dest / safe_filename
         if file_path != stored_path:
             import shutil
             shutil.copy2(file_path, stored_path)
