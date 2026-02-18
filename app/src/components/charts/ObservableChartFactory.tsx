@@ -116,6 +116,7 @@ export function ObservableChartFactory({
           annotations: config.annotations.texts,
           bgColor,
           textColor,
+          fontFamily: chartTheme.font.family || 'Inter, system-ui, sans-serif',
           editable,
           onDragEnd: (id, dx, dy) => {
             const store = useEditorStore.getState()
@@ -552,11 +553,12 @@ interface AppendPointNotesOpts {
   annotations: PointAnnotation[]
   bgColor: string
   textColor: string
+  fontFamily: string
   editable: boolean
   onDragEnd: (id: string, dx: number, dy: number) => void
 }
 
-function appendPointNotes({ svg, plotEl, annotations, bgColor, textColor, editable, onDragEnd }: AppendPointNotesOpts) {
+function appendPointNotes({ svg, plotEl, annotations, bgColor, textColor, fontFamily, editable, onDragEnd }: AppendPointNotesOpts) {
   let xScale: ReturnType<PlotElement['scale']>
   let yScale: ReturnType<PlotElement['scale']>
   try {
@@ -622,6 +624,7 @@ function appendPointNotes({ svg, plotEl, annotations, bgColor, textColor, editab
       .attr('y', cy + dy)
       .attr('text-anchor', anchor)
       .attr('dominant-baseline', 'central')
+      .attr('font-family', fontFamily)
       .attr('font-size', fontSize)
       .attr('font-weight', 600)
       .attr('fill', color)
