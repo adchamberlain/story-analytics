@@ -86,11 +86,14 @@ def save_settings(**fields: str) -> AppSettings:
     SETTINGS_PATH.parent.mkdir(parents=True, exist_ok=True)
     SETTINGS_PATH.write_text(json.dumps(asdict(current), indent=2))
 
-    # Push keys into os.environ so downstream code works immediately
+    # Push keys into os.environ so downstream code works immediately.
+    # Clear env var when key is removed so providers stop using the old key.
     for provider, env_var in _PROVIDER_KEY_MAP.items():
         key_value = getattr(current, f"{provider}_api_key", "")
         if key_value:
             os.environ[env_var] = key_value
+        else:
+            os.environ.pop(env_var, None)
 
     return current
 

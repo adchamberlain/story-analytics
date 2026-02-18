@@ -61,7 +61,10 @@ export function DatabaseConnector({ onSynced }: DatabaseConnectorProps) {
       setLoadingConnections(true)
       setError(null)
       fetch('/api/connections/')
-        .then((res) => res.json())
+        .then((res) => {
+          if (!res.ok) throw new Error(`Connections fetch failed: ${res.status}`)
+          return res.json()
+        })
         .then((data: SavedConnection[]) => {
           setSavedConnections(data)
           setLoadingConnections(false)

@@ -91,7 +91,7 @@ async def list_sources():
     """List all data sources currently loaded in DuckDB."""
     service = get_duckdb_service()
     results = []
-    for source_id in service._sources:
+    for source_id in list(service._sources):
         try:
             schema = service.get_schema(source_id)
             results.append(SourceSummary(
@@ -109,7 +109,7 @@ async def list_tables():
     """List all loaded DuckDB tables with their internal names (for raw SQL queries)."""
     service = get_duckdb_service()
     results = []
-    for source_id in service._sources:
+    for source_id in list(service._sources):
         try:
             schema = service.get_schema(source_id)
             results.append(TableInfo(
