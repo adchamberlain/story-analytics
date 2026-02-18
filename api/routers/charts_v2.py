@@ -273,7 +273,13 @@ async def build_query(request: BuildQueryRequest):
     # ── Multi-Y UNPIVOT branch ──────────────────────────────────────────────
     if isinstance(y, list) and len(y) > 1:
         y_cols_quoted = ", ".join(q(c) for c in y)
-        subquery = f"SELECT {q(request.x)}, {y_cols_quoted} FROM {table_name}"
+        # Include series column in subquery so it survives UNPIVOT
+        series_col = q(request.series) if request.series else None
+        sub_cols = [q(request.x)]
+        if series_col:
+            sub_cols.append(series_col)
+        sub_cols.append(y_cols_quoted)
+        subquery = f"SELECT {', '.join(sub_cols)} FROM {table_name}"
         unpivot = (
             f"({subquery})"
             f' UNPIVOT (metric_value FOR metric_name IN ({y_cols_quoted}))'
@@ -287,10 +293,14 @@ async def build_query(request: BuildQueryRequest):
             x_expr = q(request.x)
             x_alias = None
 
+        # Build SELECT / GROUP BY with optional series column
+        series_sel = f", {series_col}" if series_col else ""
+        series_group = f", {series_col}" if series_col else ""
+
         if request.aggregation == "none":
             x_sel = f"{x_expr} AS {x_alias}" if x_alias else x_expr
             sql = (
-                f"SELECT {x_sel}, metric_name, metric_value"
+                f"SELECT {x_sel}{series_sel}, metric_name, metric_value"
                 f"\nFROM {unpivot}"
                 f"\nORDER BY {x_expr} LIMIT 5000"
             )
@@ -298,9 +308,9 @@ async def build_query(request: BuildQueryRequest):
             agg = request.aggregation.upper()
             x_sel = f"{x_expr} AS {x_alias}" if x_alias else x_expr
             sql = (
-                f"SELECT {x_sel}, metric_name, {agg}(metric_value) AS metric_value"
+                f"SELECT {x_sel}{series_sel}, metric_name, {agg}(metric_value) AS metric_value"
                 f"\nFROM {unpivot}"
-                f"\nGROUP BY {x_expr}, metric_name"
+                f"\nGROUP BY {x_expr}{series_group}, metric_name"
                 f"\nORDER BY {x_expr} LIMIT 10000"
             )
     else:

@@ -77,8 +77,10 @@ class OpenAIProvider(LLMProvider):
         if system_prompt:
             openai_messages.append({"role": "system", "content": system_prompt})
 
-        # Add conversation messages
+        # Add conversation messages (skip system messages if system_prompt already provided)
         for msg in messages:
+            if system_prompt and msg.role == "system":
+                continue
             if msg.role in ("user", "assistant", "system"):
                 openai_messages.append({"role": msg.role, "content": msg.content})
 

@@ -53,6 +53,9 @@ interface DataState {
 
 const API_BASE = '/api/data'
 
+/** Monotonically increasing counter to guard against stale preview responses. */
+let previewRequestId = 0
+
 export const useDataStore = create<DataState>((set, get) => ({
   source: null,
   preview: null,
@@ -100,8 +103,8 @@ export const useDataStore = create<DataState>((set, get) => ({
   },
 
   confirmReplace: async () => {
-    const conflict = get().duplicateConflict
-    if (!conflict) return
+    const { duplicateConflict: conflict, uploading } = get()
+    if (!conflict || uploading) return
     // Keep conflict state until upload succeeds (uploadCSV clears it via set())
     const file = conflict.file
     await get().uploadCSV(file, true)
@@ -137,6 +140,7 @@ export const useDataStore = create<DataState>((set, get) => ({
   },
 
   loadPreview: async (sourceId: string) => {
+    const requestId = ++previewRequestId
     set({ loadingPreview: true })
 
     try {
@@ -144,9 +148,14 @@ export const useDataStore = create<DataState>((set, get) => ({
       if (!res.ok) throw new Error(`Preview failed: ${res.status}`)
 
       const preview: PreviewData = await res.json()
-      set({ preview, loadingPreview: false })
+      // Only apply if this is still the latest request (stale-guard)
+      if (requestId === previewRequestId) {
+        set({ preview, loadingPreview: false })
+      }
     } catch (e) {
-      set({ loadingPreview: false, error: e instanceof Error ? e.message : String(e) })
+      if (requestId === previewRequestId) {
+        set({ loadingPreview: false, error: e instanceof Error ? e.message : String(e) })
+      }
     }
   },
 
