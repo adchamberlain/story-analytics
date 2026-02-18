@@ -9,10 +9,12 @@
   },
   "scripts": {
     "dev": "echo 'Use ./dev.sh to start development servers'",
-    "sources": "python -m engine.sources"
+    "sources": "python -m engine.sources",
+    "test": "python -m pytest engine/tests/ -x --tb=short && cd app && npx vitest run --config vitest.config.ts",
+    "prepare": "husky"
   },
-  "dependencies": {},
   "devDependencies": {
-    "dotenv-cli": "^11.0.0"
+    "dotenv-cli": "^11.0.0",
+    "husky": "^9.1.7"
   }
 }

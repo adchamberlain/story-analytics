@@ -28,6 +28,12 @@ qa_screenshots/
 test_data/
 output/
 
+# Regression test suite (local-only, not shipped with open-source repo)
+engine/tests/
+app/src/__tests__/
+app/vitest.config.ts
+.husky/
+
 # Build output
 app/dist/
 

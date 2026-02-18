@@ -458,6 +458,8 @@ async def update(dashboard_id: str, request: UpdateDashboardRequest):
         fields["description"] = request.description
     if request.charts is not None:
         fields["charts"] = [c.model_dump() for c in request.charts]
+    if request.filters is not None:
+        fields["filters"] = [f.model_dump(exclude_none=True) for f in request.filters]
 
     if not fields:
         raise HTTPException(status_code=400, detail="No fields to update")
@@ -471,6 +473,7 @@ async def update(dashboard_id: str, request: UpdateDashboardRequest):
         title=dashboard.title,
         description=dashboard.description,
         charts=dashboard.charts,
+        filters=dashboard.filters or [],
         created_at=dashboard.created_at,
         updated_at=dashboard.updated_at,
     )

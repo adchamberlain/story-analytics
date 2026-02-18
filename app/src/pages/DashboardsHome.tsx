@@ -6,7 +6,7 @@ interface DashboardSummary {
   id: string
   title: string
   description: string | null
-  chart_count: number
+  charts: { chart_id: string }[]
   created_at: string
   updated_at: string
 }
@@ -128,7 +128,7 @@ function DashboardCard({ dashboard }: { dashboard: DashboardSummary }) {
       <div className="flex-1" />
       <div className="flex items-center justify-between" style={{ marginTop: '24px', paddingTop: '20px', borderTop: '1px solid var(--color-border-subtle)' }}>
         <span className="text-[13px] text-text-muted">
-          {dashboard.chart_count} chart{dashboard.chart_count !== 1 ? 's' : ''}
+          {dashboard.charts.length} chart{dashboard.charts.length !== 1 ? 's' : ''}
         </span>
         <span className="text-[13px] text-text-muted">{date}</span>
       </div>
