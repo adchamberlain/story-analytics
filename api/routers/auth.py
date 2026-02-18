@@ -163,15 +163,19 @@ async def get_me(current_user: User = Depends(get_current_user)):
     return current_user
 
 
+class UpdateProfileRequest(BaseModel):
+    name: str | None = None
+
+
 @router.put("/me", response_model=UserResponse)
 async def update_profile(
-    name: str | None = None,
+    body: UpdateProfileRequest,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """Update user profile."""
-    if name:
-        current_user.name = name
+    if body.name is not None:
+        current_user.name = body.name
 
     db.commit()
     db.refresh(current_user)

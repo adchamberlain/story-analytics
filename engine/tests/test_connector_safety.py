@@ -1770,36 +1770,38 @@ class TestToolboxRowLengthCondition:
 class TestExecuteQueryReadOnly:
     """Regression: execute_query must reject DML/DDL (DROP, INSERT, DELETE, etc.)."""
 
+    _SID = "abcdef012345"  # Valid 12-char hex source_id
+
     def test_reject_drop_table(self):
         svc = DuckDBService()
         with pytest.raises(ValueError, match="Only SELECT"):
-            svc.execute_query("DROP TABLE src_abc", "abc")
+            svc.execute_query("DROP TABLE src_abc", self._SID)
 
     def test_reject_delete(self):
         svc = DuckDBService()
         with pytest.raises(ValueError, match="Only SELECT"):
-            svc.execute_query("DELETE FROM src_abc", "abc")
+            svc.execute_query("DELETE FROM src_abc", self._SID)
 
     def test_reject_insert(self):
         svc = DuckDBService()
         with pytest.raises(ValueError, match="Only SELECT"):
-            svc.execute_query("INSERT INTO src_abc VALUES (1)", "abc")
+            svc.execute_query("INSERT INTO src_abc VALUES (1)", self._SID)
 
     def test_reject_comment_bypass(self):
         svc = DuckDBService()
         with pytest.raises(ValueError, match="Only SELECT"):
-            svc.execute_query("-- comment\nDROP TABLE src_abc", "abc")
+            svc.execute_query("-- comment\nDROP TABLE src_abc", self._SID)
 
     def test_reject_block_comment_bypass(self):
         svc = DuckDBService()
         with pytest.raises(ValueError, match="Only SELECT"):
-            svc.execute_query("/* comment */ DROP TABLE src_abc", "abc")
+            svc.execute_query("/* comment */ DROP TABLE src_abc", self._SID)
 
     def test_allow_select(self):
         """SELECT should not raise ValueError (may fail for other reasons)."""
         svc = DuckDBService()
         try:
-            svc.execute_query("SELECT 1", "abc")
+            svc.execute_query("SELECT 1", self._SID)
         except ValueError as e:
             if "Only SELECT" in str(e):
                 pytest.fail("SELECT should be allowed")
@@ -1808,7 +1810,7 @@ class TestExecuteQueryReadOnly:
         """WITH (CTE) should not raise ValueError."""
         svc = DuckDBService()
         try:
-            svc.execute_query("WITH t AS (SELECT 1) SELECT * FROM t", "abc")
+            svc.execute_query("WITH t AS (SELECT 1) SELECT * FROM t", self._SID)
         except ValueError as e:
             if "Only SELECT" in str(e):
                 pytest.fail("WITH should be allowed")

@@ -2,6 +2,25 @@
 
 ## 2026-02-18
 
+### Session: Bug hunt round 27 — 9 fixes across auth, chart factory, dashboard, schema, DuckDB (555 tests)
+
+6 parallel scanning agents across schema analyzer, chart factory, dashboard pages, API middleware, DuckDB service, and conversation engine. Triaged ~15 candidates, kept 9 confirmed real bugs.
+
+**Fixes applied:**
+1. **`update_profile` ignores JSON body** — `name: str | None = None` without Pydantic model makes FastAPI treat it as query param. Frontend sends JSON body which is silently ignored. Profile name updates are a no-op. Wrapped in `UpdateProfileRequest` model (auth.py:166-179)
+2. **Click-to-place crash when annotations undefined** — `annotations.texts.map(...)` crashes with `TypeError` when `config.annotations` is undefined (optional field). Added `?? { lines: [], texts: [], ranges: [] }` fallback (ObservableChartFactory.tsx:200)
+3. **`?addChart` flow fails for new dashboards** — `store.dashboardId` stays null for new dashboards (no load), so the addChart effect never fires. Chart silently dropped. Fixed guard to skip the check for new dashboards (DashboardBuilderPage.tsx:73)
+4. **`yAxisMin/yAxisMax` overwrites ordinal y-domain on horizontal bars** — numeric bounds were unconditionally applied to `overrides.y`, overwriting the ordinal category domain. For horizontal bars, the numeric axis is x. Added orientation check (ObservableChartFactory.tsx:1074-1089)
+5. **`isPinned` stale on dashboard navigation** — `useState` initializer runs only at mount; component reuse across navigations leaves pin state from first dashboard. Added `useEffect` sync on `dashboardId` (DashboardViewPage.tsx:63)
+6. **Contradictory DATA PATTERN hints** — independent `if` blocks emitted both "Time series detected" and "Category + metric detected" for mixed-column datasets. Changed to `elif` chain with priority ordering (schema_analyzer.py:114-119)
+7. **`created_at` column timezone mismatch** — sibling of Round 26's `expires_at` fix: `DateTime` (naive) column with `datetime.now(timezone.utc)` (aware) default. Breaks on PostgreSQL (magic_link.py:26)
+8. **Source ID regex allows 1-char IDs** — `{1,32}` accepts any length; all generated IDs are 12 chars. Changed to `{12}` (duckdb_service.py:19)
+9. **Global `re.sub` corrupts SQL aliases** — word-boundary replacement of filename stem overwrites ALL occurrences including column names and aliases (e.g., `SUM(sales) AS sales FROM sales` → all three replaced). Limited to FROM/JOIN context only (duckdb_service.py:372-381)
+
+Tests: 454 Python + 101 frontend = **555 total** (4 new test files, 2 tests updated)
+
+---
+
 ### Session: Bug hunt round 26 — 7 fixes across auth, export, editor, data store (541 tests)
 
 6 parallel scanning agents across settings/auth, editor page/toolbox, dashboard builder, data upload/preview, static export, and connection service. Triaged ~15 candidates, kept 7 confirmed real bugs.

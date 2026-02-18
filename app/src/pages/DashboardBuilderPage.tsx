@@ -70,7 +70,10 @@ export function DashboardBuilderPage() {
   }, [dashboardId])
   useEffect(() => {
     const addChartId = searchParams.get('addChart')
-    if (!addChartId || !store.dashboardId || addChartHandled.current) return
+    if (!addChartId || addChartHandled.current) return
+    // For existing dashboards, wait for store.load() to complete (sets store.dashboardId).
+    // For new dashboards (no dashboardId in URL), no load occurs — proceed immediately.
+    if (dashboardId && !store.dashboardId) return
 
     addChartHandled.current = true
     store.addChart(addChartId)
@@ -78,7 +81,7 @@ export function DashboardBuilderPage() {
       if (id) navigate(`/dashboard/${id}/edit`)
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams, store.dashboardId])
+  }, [searchParams, store.dashboardId, dashboardId])
 
   // Fetch full chart data for all referenced charts
   const chartIdKey = store.charts.map((c) => c.chart_id).join(',')

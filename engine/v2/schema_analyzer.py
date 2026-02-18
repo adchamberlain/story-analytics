@@ -113,9 +113,9 @@ def build_schema_context(profile: DataProfile, table_name: str) -> str:
     lines.append("DATA PATTERN:")
     if date_cols and numeric_cols:
         lines.append("  Time series data detected (date + numeric columns → line or area chart)")
-    if categorical_cols and numeric_cols:
+    elif categorical_cols and numeric_cols:
         lines.append("  Category + metric data detected (→ bar chart)")
-    if len(numeric_cols) >= 2 and not date_cols:
+    elif len(numeric_cols) >= 2:
         lines.append("  Multiple numeric columns without dates (→ scatter plot)")
 
     return "\n".join(lines)
