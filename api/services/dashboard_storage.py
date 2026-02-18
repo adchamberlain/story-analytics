@@ -109,8 +109,11 @@ def update_dashboard(dashboard_id: str, **fields) -> SavedDashboard | None:
     data = json.loads(path.read_text())
     now = datetime.now(timezone.utc).isoformat()
 
+    # Only allow updating presentation fields — protect id and timestamps
+    _UPDATABLE = {"title", "description", "charts", "filters"}
     for key, value in fields.items():
-        data[key] = value
+        if key in _UPDATABLE:
+            data[key] = value
 
     data["updated_at"] = now
     path.write_text(json.dumps(data, indent=2))

@@ -33,7 +33,7 @@ class PostgresConnector(DatabaseConnector):
             dbname=credentials["database"],
             user=credentials["username"],
             password=credentials["password"],
-            options=f"-c search_path={credentials.get('schema', 'public')}" if credentials.get("schema") else None,
+            options=f"-c search_path={self._quote_identifier(credentials.get('schema', 'public'))}" if credentials.get("schema") else None,
         )
 
     def test_connection(self, credentials: dict) -> ConnectorResult:

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useAuthStore } from '../../stores/authStore'
 
 type Visibility = 'private' | 'team' | 'public'
@@ -19,6 +19,11 @@ export function ShareModal({ dashboardId, onClose }: ShareModalProps) {
   const [saving, setSaving] = useState(false)
   const [copiedLink, setCopiedLink] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const copyTimer = useRef<ReturnType<typeof setTimeout>>()
+
+  useEffect(() => {
+    return () => clearTimeout(copyTimer.current)
+  }, [])
 
   const headers: Record<string, string> = { 'Content-Type': 'application/json' }
   if (token) headers['Authorization'] = `Bearer ${token}`
@@ -72,7 +77,8 @@ export function ShareModal({ dashboardId, onClose }: ShareModalProps) {
   const handleCopyLink = async () => {
     await navigator.clipboard.writeText(shareUrl)
     setCopiedLink(true)
-    setTimeout(() => setCopiedLink(false), 2000)
+    clearTimeout(copyTimer.current)
+    copyTimer.current = setTimeout(() => setCopiedLink(false), 2000)
   }
 
   const visibilityOptions: { value: Visibility; label: string; description: string }[] = [
