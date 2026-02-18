@@ -102,8 +102,9 @@ export const useDataStore = create<DataState>((set, get) => ({
   confirmReplace: async () => {
     const conflict = get().duplicateConflict
     if (!conflict) return
-    set({ duplicateConflict: null })
-    await get().uploadCSV(conflict.file, true)
+    // Keep conflict state until upload succeeds (uploadCSV clears it via set())
+    const file = conflict.file
+    await get().uploadCSV(file, true)
   },
 
   cancelReplace: () => {

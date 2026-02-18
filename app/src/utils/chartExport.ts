@@ -43,8 +43,8 @@ export async function exportPDF(
   const canvas = await svgToCanvas(svgElement, 2)
 
   // Landscape A4-ish proportions, sized to chart aspect ratio
-  const imgWidth = canvas.width
-  const imgHeight = canvas.height
+  const imgWidth = canvas.width || 1  // Guard against zero-width canvas
+  const imgHeight = canvas.height || 1
   const pdfWidth = 297 // A4 landscape width in mm
   const pdfHeight = (imgHeight / imgWidth) * pdfWidth
 
