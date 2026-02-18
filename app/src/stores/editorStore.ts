@@ -427,7 +427,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
 
   updateConfig: (partial: Partial<EditorConfig>) => {
-    const { config, configHistory, chartId } = get()
+    const { config, configHistory } = get()
 
     // Push current config to history (for undo)
     const newHistory = [...configHistory, { ...config }].slice(-MAX_HISTORY)
