@@ -2,6 +2,26 @@
 
 ## 2026-02-18
 
+### Session: Bug hunt round 21 (7 fixes, 474 tests)
+
+**Round 21 — 7 fixes across 7 files (6 source + 1 test)**
+
+Backend (4 fixes):
+- `duckdb_service.py`: **CRITICAL** — `execute_query()` accepted arbitrary SQL (DROP TABLE, DELETE, INSERT) with no read-only validation, unlike `/query-raw` which correctly checks. Added `_is_read_only_sql()` static method, enforcement in `execute_query()`, and semicolon stripping.
+- `charts_v2.py`: Multi-Y UNPIVOT branch ignored `request.series` — series column was missing from subquery SELECT, outer SELECT, and GROUP BY. Silent data loss when users selected multi-Y + series. Added series column threading throughout.
+- `dashboards_v2.py`: Health cache evicted oldest entry even when `dashboard_id` was already cached (update, not insert). Added `dashboard_id not in _health_cache` guard.
+- `openai_provider.py`: Duplicate system message when `system_prompt` provided AND messages list contained `role="system"` entries. Added `continue` skip in message loop.
+
+Frontend (3 fixes):
+- `dataStore.ts`: `confirmReplace` didn't guard against double-clicks — two concurrent `uploadCSV(file, true)` calls could race. Added `uploading` state check.
+- `dataStore.ts`: `loadPreview` had no staleness guard — racing preview fetches from rapid uploads could overwrite correct data. Added monotonic request counter (`previewRequestId`).
+- `useObservablePlot.ts`: Seed `getBoundingClientRect()` captured height=0 before flex layout resolved, overwriting valid size and causing chart blank-flash. Added `rect.height > 0` guard.
+
+Dropped (false positive): Layout generator "double y-advance" — traced through all cases and confirmed both advances serve correct, distinct purposes (wrap past partial row vs complete filled row).
+
+**Test suite growth: 451 → 474 tests (381 Python + 93 frontend)**
+- 23 new tests across 10 test classes: TestExecuteQueryReadOnly (8), TestIsReadOnlySql (8), TestMultiYUnpivotSeriesColumn, TestDashboardLayoutGenerator, TestHealthCacheEviction, TestOpenAINoDoubleSystemMessage, TestUseObservablePlotSeedHeight, TestConfirmReplaceDoubleSubmit, TestLoadPreviewStalenessGuard
+
 ### Session: macOS app packaging plan
 
 **Created implementation plan:** `docs/plans/2026-02-18-macos-app-packaging.md`

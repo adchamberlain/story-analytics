@@ -324,6 +324,19 @@ class DuckDBService:
         table_name = f"src_{source_id}"
         return self.execute_query(f"SELECT * FROM {table_name} LIMIT {limit}", source_id)
 
+    @staticmethod
+    def _is_read_only_sql(sql: str) -> bool:
+        """Check whether *sql* is a read-only statement (SELECT / WITH / EXPLAIN).
+
+        Strips leading SQL comments before inspecting the first keyword so that
+        ``-- comment\\nDROP TABLE …`` cannot bypass the check.
+        """
+        stripped = re.sub(
+            r'^\s*(/\*.*?\*/\s*|--[^\n]*(?:\n|$)\s*)*', '', sql, flags=re.DOTALL,
+        )
+        m = re.match(r'\s*(\w+)', stripped)
+        return bool(m) and m.group(1).upper() in ("SELECT", "WITH", "EXPLAIN")
+
     def execute_query(self, sql: str, source_id: str, params: dict[str, str | int | float] | None = None) -> QueryResult:
         """Execute a SQL query against an uploaded source's table.
 
@@ -334,6 +347,14 @@ class DuckDBService:
         """
         if not _SAFE_SOURCE_ID_RE.match(source_id):
             raise ValueError(f"Invalid source_id: {source_id}")
+
+        # Enforce read-only: only SELECT / WITH / EXPLAIN are allowed
+        if not self._is_read_only_sql(sql):
+            raise ValueError("Only SELECT, WITH, and EXPLAIN statements are allowed.")
+
+        # Strip semicolons to prevent piggy-backed DML
+        sql = sql.replace(";", "")
+
         table_name = f"src_{source_id}"
 
         # Replace generic table references with the actual table name

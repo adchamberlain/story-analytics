@@ -46,7 +46,7 @@ export function useObservablePlot(
 
     // Seed size immediately so the render effect can fire
     const rect = el.getBoundingClientRect()
-    if (rect.width > 0) setSize({ width: rect.width, height: rect.height })
+    if (rect.width > 0 && rect.height > 0) setSize({ width: rect.width, height: rect.height })
 
     return () => ro.disconnect()
     // eslint-disable-next-line react-hooks/exhaustive-deps
