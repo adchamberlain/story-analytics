@@ -148,13 +148,18 @@ export const useDataStore = create<DataState>((set, get) => ({
       if (!res.ok) throw new Error(`Preview failed: ${res.status}`)
 
       const preview: PreviewData = await res.json()
-      // Only apply if this is still the latest request (stale-guard)
+      // Only apply data if this is still the latest request (stale-guard)
       if (requestId === previewRequestId) {
         set({ preview, loadingPreview: false })
+      } else {
+        // Still clear the spinner even for stale responses
+        set({ loadingPreview: false })
       }
     } catch (e) {
       if (requestId === previewRequestId) {
         set({ loadingPreview: false, error: e instanceof Error ? e.message : String(e) })
+      } else {
+        set({ loadingPreview: false })
       }
     }
   },

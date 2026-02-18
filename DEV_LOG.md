@@ -2,6 +2,23 @@
 
 ## 2026-02-18
 
+### Session: Bug hunt round 26 — 7 fixes across auth, export, editor, data store (541 tests)
+
+6 parallel scanning agents across settings/auth, editor page/toolbox, dashboard builder, data upload/preview, static export, and connection service. Triaged ~15 candidates, kept 7 confirmed real bugs.
+
+**Fixes applied:**
+1. **Magic link timezone crash** — `expires_at` column was `DateTime` (naive); `is_valid` compared it with `datetime.now(timezone.utc)` (aware), raising `TypeError`. Changed to `DateTime(timezone=True)` (magic_link.py:27)
+2. **`loadingPreview` stuck spinner** — stale preview responses (from rapid `loadPreview` calls) never cleared `loadingPreview`, leaving spinner visible forever. Added `else` branches to clear the flag for stale responses (dataStore.ts:153-163)
+3. **Static export `clientWidth === 0`** — `container.clientWidth` is 0 before browser layout completes, producing zero-width SVGs. Added `|| 640` fallback (static_export.py:190)
+4. **Export legend missing for multi-Y** — legend condition checked `series` (explicit only) but not `implicitSeries` (from multi-Y UNPIVOT), so multi-Y charts had no legend. Changed to `implicitSeries` (static_export.py:305)
+5. **Multi-Y bar `fx: x` crash** — non-stacked multi-Y bar charts applied `fx: x` faceting, breaking rendering. Added `isMultiY` to the skip condition (static_export.py:228)
+6. **Export config merge order** — typed fields (`x`, `y`, `series`, `horizontal`, `sort`) were set first, then `**(chart.config or {})` overwrote them. Reversed merge order so typed fields win (dashboards_v2.py:515-522)
+7. **Cmd+Enter double-fire** — keyboard shortcut called `handleRunQuery()` without checking `sqlExecuting`, allowing duplicate queries while one was running. Added `!sqlExecuting` guard (Toolbox.tsx:92)
+
+Tests: 440 Python + 101 frontend = **541 total** (5 new Python + 2 new frontend regression tests)
+
+---
+
 ### Session: Bug hunt round 25 — 7 fixes across query engine, editor, Gemini, LLM parsing (529 tests)
 
 6 parallel scanning agents across chart proposer/editor, DuckDB query execution, frontend stores, dashboard/sharing, chart rendering, and LLM providers. Triaged ~20+ candidates, kept 7 confirmed real bugs.
