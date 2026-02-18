@@ -301,7 +301,7 @@ async def build_query(request: BuildQueryRequest):
                 f"SELECT {x_sel}, metric_name, {agg}(metric_value) AS metric_value"
                 f"\nFROM {unpivot}"
                 f"\nGROUP BY {x_expr}, metric_name"
-                f"\nORDER BY {x_expr}"
+                f"\nORDER BY {x_expr} LIMIT 10000"
             )
     else:
         # ── Single-Y branch (existing logic) ────────────────────────────────
@@ -472,7 +472,9 @@ async def propose(request: ProposeRequest):
 def _validate_readonly_sql(sql: str) -> str | None:
     """Return an error message if SQL is not a read-only SELECT/WITH statement."""
     import re
-    first_kw = re.match(r'\s*(\w+)', sql)
+    # Strip leading SQL comments (block and line) before checking the first keyword
+    stripped = re.sub(r'^\s*(/\*.*?\*/\s*|--[^\n]*\n\s*)*', '', sql, flags=re.DOTALL)
+    first_kw = re.match(r'\s*(\w+)', stripped)
     if not first_kw or first_kw.group(1).upper() not in ("SELECT", "WITH"):
         return "Only SELECT queries can be saved"
     return None
