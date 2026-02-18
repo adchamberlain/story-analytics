@@ -23,7 +23,7 @@ class MagicLink(Base):
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String, nullable=False, index=True)
     token = Column(String, unique=True, nullable=False, index=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     expires_at = Column(DateTime(timezone=True), nullable=False)
     used = Column(Boolean, default=False)
 

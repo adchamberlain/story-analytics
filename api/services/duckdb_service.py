@@ -16,7 +16,7 @@ from dataclasses import dataclass
 import duckdb
 
 # source_id values are 12-char hex strings from uuid4().hex[:12]
-_SAFE_SOURCE_ID_RE = re.compile(r"^[a-f0-9]{1,32}$")
+_SAFE_SOURCE_ID_RE = re.compile(r"^[a-f0-9]{12}$")
 
 
 DATA_DIR = Path(__file__).parent.parent.parent / "data" / "uploads"
@@ -370,12 +370,13 @@ class DuckDBService:
                 # Get the stem of the original filename as a possible table reference
                 stem = meta.path.stem
                 for ref in [stem, stem.lower(), stem.upper(), "data", "uploaded_data"]:
-                    # Use word-boundary regex for both the check and the substitution
-                    # to avoid false-positive substring matches (e.g. "sales" in "wholesale_sales")
-                    if re.search(r'\b' + re.escape(ref) + r'\b', processed_sql):
+                    # Only replace table references after FROM/JOIN keywords to avoid
+                    # corrupting column aliases, CTEs, or string literals that share the name.
+                    pattern = r'(?i)(\b(?:FROM|JOIN)\b\s+)' + re.escape(ref) + r'\b'
+                    if re.search(pattern, processed_sql):
                         processed_sql = re.sub(
-                            r'\b' + re.escape(ref) + r'\b',
-                            table_name,
+                            pattern,
+                            lambda m: m.group(1) + table_name,
                             processed_sql,
                         )
                         break

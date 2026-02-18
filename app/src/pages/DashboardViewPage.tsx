@@ -59,8 +59,11 @@ export function DashboardViewPage() {
   const gridRef = useRef<HTMLDivElement>(null)
   const refreshErrorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // Pin state
+  // Pin state — sync when dashboardId changes (component may be reused across navigations)
   const [isPinned, setIsPinned] = useState(() => localStorage.getItem('pinnedDashboardId') === dashboardId)
+  useEffect(() => {
+    setIsPinned(localStorage.getItem('pinnedDashboardId') === dashboardId)
+  }, [dashboardId])
 
   // Share modal state
   const [showShareModal, setShowShareModal] = useState(false)

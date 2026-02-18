@@ -197,11 +197,11 @@ export function ObservableChartFactory({
     const offset = smartOffset(ctx, closestX, yVal)
 
     // Update the annotation with the selected point
-    const annotations = store.config.annotations
+    const annotations = store.config.annotations ?? { lines: [], texts: [], ranges: [] }
     store.updateConfig({
       annotations: {
         ...annotations,
-        texts: annotations.texts.map((t) =>
+        texts: (annotations.texts ?? []).map((t) =>
           t.id === activeId
             ? { ...t, x: closestX as number | string, y: yVal, ...offset, position: undefined }
             : t
@@ -1071,8 +1071,8 @@ function buildPlotOptions(
   // Y-axis bounds — only set domain when at least one bound is provided.
   // Compute the missing bound from the data to avoid [value, undefined] which
   // Observable Plot cannot handle.
+  // For horizontal bars the numeric axis is x (not y), so apply bounds there.
   if (config.yAxisMin !== undefined || config.yAxisMax !== undefined) {
-    const yOpts = (overrides.y as Record<string, unknown>) ?? { ...getBaseAxis(), grid: true }
     const yCol = config.y as string | undefined
     let dataMin = 0
     let dataMax = 0
@@ -1084,8 +1084,16 @@ function buildPlotOptions(
         dataMax = nums.reduce((a, b) => (a > b ? a : b), nums[0])
       }
     }
-    yOpts.domain = [config.yAxisMin ?? dataMin, config.yAxisMax ?? dataMax]
-    overrides.y = yOpts
+    const domain = [config.yAxisMin ?? dataMin, config.yAxisMax ?? dataMax]
+    if (config.horizontal) {
+      const xOpts = (overrides.x as Record<string, unknown>) ?? { ...getBaseAxis() }
+      xOpts.domain = domain
+      overrides.x = xOpts
+    } else {
+      const yOpts = (overrides.y as Record<string, unknown>) ?? { ...getBaseAxis(), grid: true }
+      yOpts.domain = domain
+      overrides.y = yOpts
+    }
   }
 
   // Chart-type-specific grid rules (overridden by explicit showGrid toggle)
