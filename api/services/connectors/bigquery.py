@@ -93,6 +93,7 @@ class BigQueryConnector(DatabaseConnector):
             else:
                 tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".parquet")
                 pq_path = Path(tmp.name)
+                tmp.close()  # Close file handle; we only need the path
 
             pq.write_table(arrow_table, str(pq_path))
 

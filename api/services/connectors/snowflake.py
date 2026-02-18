@@ -44,18 +44,22 @@ class SnowflakeConnector(DatabaseConnector):
         return kwargs
 
     def test_connection(self, credentials: dict) -> ConnectorResult:
+        conn = None
         try:
             import snowflake.connector
             conn = snowflake.connector.connect(**self._get_connect_kwargs(credentials))
             cursor = conn.cursor()
             cursor.execute("SELECT 1")
             cursor.close()
-            conn.close()
             return ConnectorResult(success=True, message="Connected to Snowflake.")
         except Exception as e:
             return ConnectorResult(success=False, message=f"Connection failed: {e}")
+        finally:
+            if conn:
+                conn.close()
 
     def list_tables(self, credentials: dict) -> ConnectorResult:
+        conn = None
         try:
             import snowflake.connector
             conn = snowflake.connector.connect(**self._get_connect_kwargs(credentials))
@@ -63,23 +67,33 @@ class SnowflakeConnector(DatabaseConnector):
             cursor.execute("SHOW TABLES")
             tables = [row[1] for row in cursor.fetchall()]  # name is column index 1
             cursor.close()
-            conn.close()
             return ConnectorResult(success=True, tables=tables)
         except Exception as e:
             return ConnectorResult(success=False, message=f"Failed to list tables: {e}")
+        finally:
+            if conn:
+                conn.close()
+
+    @staticmethod
+    def _quote_identifier(name: str) -> str:
+        """Quote a Snowflake identifier (table/column name) safely."""
+        return '"' + name.replace('"', '""') + '"'
 
     def get_table_schema(self, table: str, credentials: dict) -> ConnectorResult:
+        conn = None
         try:
             import snowflake.connector
             conn = snowflake.connector.connect(**self._get_connect_kwargs(credentials))
             cursor = conn.cursor()
-            cursor.execute(f"DESCRIBE TABLE {table}")
+            cursor.execute(f"DESCRIBE TABLE {self._quote_identifier(table)}")
             columns = [ColumnInfo(name=row[0], type=row[1]) for row in cursor.fetchall()]
             cursor.close()
-            conn.close()
             return ConnectorResult(success=True, columns=columns)
         except Exception as e:
             return ConnectorResult(success=False, message=f"Failed to get schema: {e}")
+        finally:
+            if conn:
+                conn.close()
 
     def sync_to_duckdb(
         self,
@@ -97,7 +111,7 @@ class SnowflakeConnector(DatabaseConnector):
         try:
             cursor = conn.cursor()
             for table in tables:
-                cursor.execute(f"SELECT * FROM {table}")
+                cursor.execute(f"SELECT * FROM {self._quote_identifier(table)}")
                 columns = [desc[0] for desc in cursor.description]
                 rows = cursor.fetchall()
                 arrow_table = pa.table(
@@ -112,6 +126,7 @@ class SnowflakeConnector(DatabaseConnector):
                 else:
                     tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".parquet")
                     pq_path = Path(tmp.name)
+                    tmp.close()  # Close file handle; we only need the path
                     pq.write_table(arrow_table, str(pq_path))
 
                 # Ingest into DuckDB

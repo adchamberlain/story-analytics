@@ -223,7 +223,9 @@ class DuckDBService:
         try:
             cursor = conn.cursor()
             for table in table_names:
-                cursor.execute(f"SELECT * FROM {table}")
+                # Quote table name to prevent SQL injection
+                quoted_table = '"' + table.replace('"', '""') + '"'
+                cursor.execute(f"SELECT * FROM {quoted_table}")
                 columns = [desc[0] for desc in cursor.description]
                 rows = cursor.fetchall()
                 arrow_table = pa.table(
@@ -239,6 +241,7 @@ class DuckDBService:
                 else:
                     tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".parquet")
                     pq_path = Path(tmp.name)
+                    tmp.close()  # Close file handle; we only need the path
                     pq.write_table(arrow_table, str(pq_path))
 
                 schema = self.ingest_parquet(pq_path, table.lower())
@@ -427,14 +430,20 @@ class DuckDBService:
         )
 
     def _detect_delimiter(self, path: Path) -> str:
-        """Auto-detect CSV delimiter."""
+        """Auto-detect CSV delimiter.
+
+        The returned delimiter is escaped for safe use in SQL strings
+        (single quotes doubled).
+        """
         with open(path, 'r', newline='') as f:
             sample = f.read(8192)
         try:
             dialect = csv.Sniffer().sniff(sample)
-            return dialect.delimiter
+            delim = dialect.delimiter
         except csv.Error:
-            return ','
+            delim = ','
+        # Escape single quotes to prevent SQL injection when interpolated
+        return delim.replace("'", "''")
 
 
 def q(col_name: str) -> str:

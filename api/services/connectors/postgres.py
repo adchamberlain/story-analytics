@@ -32,17 +32,21 @@ class PostgresConnector(DatabaseConnector):
         )
 
     def test_connection(self, credentials: dict) -> ConnectorResult:
+        conn = None
         try:
             conn = self._connect(credentials)
             cursor = conn.cursor()
             cursor.execute("SELECT 1")
             cursor.close()
-            conn.close()
             return ConnectorResult(success=True, message="Connected to PostgreSQL.")
         except Exception as e:
             return ConnectorResult(success=False, message=f"Connection failed: {e}")
+        finally:
+            if conn:
+                conn.close()
 
     def list_tables(self, credentials: dict) -> ConnectorResult:
+        conn = None
         try:
             conn = self._connect(credentials)
             cursor = conn.cursor()
@@ -55,12 +59,15 @@ class PostgresConnector(DatabaseConnector):
             )
             tables = [row[0] for row in cursor.fetchall()]
             cursor.close()
-            conn.close()
             return ConnectorResult(success=True, tables=tables)
         except Exception as e:
             return ConnectorResult(success=False, message=f"Failed to list tables: {e}")
+        finally:
+            if conn:
+                conn.close()
 
     def get_table_schema(self, table: str, credentials: dict) -> ConnectorResult:
+        conn = None
         try:
             conn = self._connect(credentials)
             cursor = conn.cursor()
@@ -73,10 +80,12 @@ class PostgresConnector(DatabaseConnector):
             )
             columns = [ColumnInfo(name=row[0], type=row[1]) for row in cursor.fetchall()]
             cursor.close()
-            conn.close()
             return ConnectorResult(success=True, columns=columns)
         except Exception as e:
             return ConnectorResult(success=False, message=f"Failed to get schema: {e}")
+        finally:
+            if conn:
+                conn.close()
 
     def sync_to_duckdb(
         self,
@@ -111,6 +120,7 @@ class PostgresConnector(DatabaseConnector):
                 else:
                     tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".parquet")
                     pq_path = Path(tmp.name)
+                    tmp.close()  # Close file handle; we only need the path
 
                 pq.write_table(arrow_table, str(pq_path))
 
