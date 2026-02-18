@@ -2,6 +2,25 @@
 
 ## 2026-02-18
 
+### Session: 7 UX fixes — bar sort/colors, paste preview, pie sizing, PNG titles, stale source, test isolation (582 tests)
+
+User-reported bugs fixed across chart rendering, data ingestion, export, and test suite.
+
+**Fixes applied:**
+1. **Bar chart sort-by-value broken** — explicit ordinal domain in `buildPlotOptions` overrode Plot's `sort` option in mark definitions. Conditionally skip domain when `chartType === 'BarChart' && config.sort !== false` (ObservableChartFactory.tsx:1028-1045)
+2. **Bar chart all same color** — non-series bars used `fill: colors[0]` (single color) instead of `fill: x` (per-category coloring). Changed both vertical and horizontal bar marks (ObservableChartFactory.tsx:381,403)
+3. **Paste data skipped preview step** — `safeReturnTo` useEffect auto-navigated away the instant `source` was set, bypassing the "Check your data" step. Removed auto-redirect; moved `returnTo` logic into the "Use this data" button handler. Also added name input to `PasteDataInput` and optional `name` field to backend paste endpoint (SourcePickerPage.tsx, PasteDataInput.tsx, dataStore.ts, data.py)
+4. **New chart loaded stale source data** — Zustand `dataStore` persisted across navigations, showing previous chart's data on the source picker. Added mount reset effect `useDataStore.getState().reset()` (SourcePickerPage.tsx:32-34)
+5. **Pie chart tiny on dashboards** — SVG was constrained to a square (`Math.min(width, height)`) with 160px label space. Changed to full `width × effectiveHeight` with proportionally scaled label space (ObservableChartFactory.tsx:1247-1258)
+6. **PNG export missing titles in dark mode** — export only captured SVG chart, not HTML title elements (white text invisible on white PNG background). Added `addTextToCanvas()` to composite title/subtitle/source onto the canvas (chartExport.ts:137-199, ChartWrapper.tsx, SharePanel.tsx)
+7. **Test suite polluted data/uploads/** — `DuckDBService()` in tests wrote CSV files to real uploads directory. Added autouse `_isolate_uploads` fixture that monkeypatches `DATA_DIR` to `tmp_path`. Deleted 20 test-created directories (conftest.py)
+
+**New endpoints:** `PATCH /sources/{id}/rename` — rename a data source on disk.
+
+Tests: 481 Python + 101 frontend = **582 total** (14 new tests across 2 files)
+
+---
+
 ### Session: Bug hunt round 28 (final) — 9 fixes across JWT auth, Plot theme, chart storage, dashboard grid, config, chart editor, magic link (573 tests)
 
 6 parallel scanning agents across chart editor, sharing/grid, security/database, remaining pages, frontend utils, and build query logic. Triaged ~12 candidates, kept 9 confirmed real bugs.
