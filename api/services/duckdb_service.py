@@ -315,6 +315,8 @@ class DuckDBService:
             processed_sql = self._substitute_filter_params(processed_sql, params)
 
         result = self._conn.execute(processed_sql)
+        if result.description is None:
+            return QueryResult(columns=[], rows=[], row_count=0)
         columns = [desc[0] for desc in result.description]
         rows_raw = result.fetchall()
         rows = [dict(zip(columns, row)) for row in rows_raw]

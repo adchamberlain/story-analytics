@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import difflib
 import re
+import threading
 import traceback
 from datetime import datetime, timezone
 
@@ -247,6 +248,7 @@ def _compute_health_status(
 
 _HEALTH_CACHE_MAX = 100
 _health_cache: dict[str, HealthCheckResponse] = {}
+_health_cache_lock = threading.Lock()
 
 
 # ── Endpoints ────────────────────────────────────────────────────────────────
@@ -332,7 +334,7 @@ async def get_dashboard(dashboard_id: str, filters: str | None = None):
                 horizontal=False, sort=True, config=None,
                 data=[], columns=[],
                 error=f"Chart {chart_id} not found",
-                error_type="source_missing",
+                error_type="chart_not_found",
                 health_status="error",
                 health_issues=[f"Chart {chart_id} not found"],
                 layout=layout,
@@ -435,22 +437,25 @@ async def run_health_check(dashboard_id: str):
     )
 
     # Evict oldest entries if cache exceeds max size
-    if len(_health_cache) >= _HEALTH_CACHE_MAX:
-        oldest_key = next(iter(_health_cache))
-        del _health_cache[oldest_key]
-    _health_cache[dashboard_id] = result
+    with _health_cache_lock:
+        if len(_health_cache) >= _HEALTH_CACHE_MAX:
+            oldest_key = next(iter(_health_cache))
+            del _health_cache[oldest_key]
+        _health_cache[dashboard_id] = result
     return result
 
 
 @router.get("/{dashboard_id}/health", response_model=HealthCheckResponse)
 async def get_health(dashboard_id: str):
     """Get cached health check results (without re-running checks)."""
-    if dashboard_id not in _health_cache:
+    with _health_cache_lock:
+        cached = _health_cache.get(dashboard_id)
+    if cached is None:
         raise HTTPException(
             status_code=404,
             detail="No health check results found. Run POST /health-check first.",
         )
-    return _health_cache[dashboard_id]
+    return cached
 
 
 @router.put("/{dashboard_id}", response_model=DashboardResponse)
