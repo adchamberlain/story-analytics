@@ -1346,7 +1346,6 @@ function PieChartComponent({ data, config, height, autoHeight }: { data: Record<
         .text((d) => d.data.value > 0 ? d.data.label : '')
     }
 
-    return () => { el.innerHTML = '' }
   }, [data, config, height, autoHeight, resolved, chartTheme])
 
   if (data.length === 0) return <p className="text-sm text-text-muted">No data</p>
@@ -1414,7 +1413,6 @@ function TreemapComponent({ data, config, height, autoHeight }: { data: Record<s
       .attr('fill', resolved === 'dark' ? '#e2e8f0' : '#fff')
       .text((d) => (d.x1 - d.x0) > 40 ? d.data.name : '')
 
-    return () => { el.innerHTML = '' }
   }, [data, config, height, autoHeight, resolved, themePalette])
 
   if (data.length === 0) return <p className="text-sm text-text-muted">No data</p>

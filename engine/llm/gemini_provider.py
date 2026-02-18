@@ -152,6 +152,9 @@ class GeminiProvider(LLMProvider):
 
         # Convert messages to Gemini format
         # Gemini uses "user" and "model" (not "assistant")
+        if not messages:
+            raise ValueError("generate() requires at least one message")
+
         gemini_history = []
         for msg in messages[:-1]:  # All except the last message
             if msg.role == "system":

@@ -378,6 +378,8 @@ async def preview_data(source_id: str, limit: int = 10):
 @router.post("/query", response_model=QueryResponse)
 async def execute_query(request: QueryRequest):
     """Execute SQL against an uploaded data source."""
+    if not _SAFE_SOURCE_ID_RE.match(request.source_id):
+        raise HTTPException(status_code=400, detail="Invalid source_id")
     service = get_duckdb_service()
     try:
         result = service.execute_query(request.sql, request.source_id)
