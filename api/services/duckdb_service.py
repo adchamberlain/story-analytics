@@ -322,6 +322,7 @@ class DuckDBService:
 
     def get_distinct_values(self, source_id: str, column: str, limit: int = 500) -> list[str]:
         """Get distinct values for a column, useful for dropdown filter options."""
+        limit = max(1, min(limit, 10_000))  # Clamp to prevent DoS
         table_name = f"src_{source_id}"
         result = self._conn.execute(
             f"SELECT DISTINCT CAST({q(column)} AS VARCHAR) AS val "

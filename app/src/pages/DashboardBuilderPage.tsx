@@ -45,6 +45,7 @@ export function DashboardBuilderPage() {
   const [chartErrors, setChartErrors] = useState<Record<string, string>>({})
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
 
   // Load existing dashboard if editing
   useEffect(() => {
@@ -134,13 +135,14 @@ export function DashboardBuilderPage() {
   const handleDelete = useCallback(async () => {
     if (!dashboardId) return
     setDeleting(true)
+    setDeleteError(null)
     try {
       const res = await fetch(`/api/v2/dashboards/${dashboardId}`, { method: 'DELETE' })
       if (!res.ok) throw new Error('Delete failed')
       navigate('/dashboards')
     } catch {
+      setDeleteError('Failed to delete dashboard. Please try again.')
       setDeleting(false)
-      setConfirmDelete(false)
     }
   }, [dashboardId, navigate])
 
@@ -347,6 +349,9 @@ export function DashboardBuilderPage() {
             <p className="text-[14px] text-text-muted leading-relaxed mb-5">
               Are you sure you want to delete <span className="font-medium text-text-secondary">"{store.title || 'Untitled'}"</span>? This cannot be undone.
             </p>
+            {deleteError && (
+              <p className="text-[13px] text-red-500 mb-3">{deleteError}</p>
+            )}
             <div className="flex gap-3 justify-end">
               <button
                 onClick={() => setConfirmDelete(false)}

@@ -159,10 +159,12 @@ async def query_raw(request: RawQueryRequest):
     if not sql:
         return RawQueryResponse(success=False, error="SQL query is empty")
 
-    # Safety: append LIMIT 10000 if user SQL has no LIMIT clause
-    sql_upper = sql.rstrip(";").upper()
-    if "LIMIT" not in sql_upper:
-        sql = sql.rstrip(";") + " LIMIT 10000"
+    # Safety: append LIMIT 10000 if user SQL has no top-level LIMIT clause.
+    # Use regex to match LIMIT as a standalone keyword (not inside comments/strings).
+    import re as _re
+    sql_no_trailing = sql.rstrip(";")
+    if not _re.search(r'\bLIMIT\s+\d', sql_no_trailing, _re.IGNORECASE):
+        sql = sql_no_trailing + " LIMIT 10000"
 
     try:
         result = service._conn.execute(sql)
@@ -318,6 +320,7 @@ async def paste_data(request: PasteRequest):
 @router.get("/preview/{source_id}", response_model=PreviewResponse)
 async def preview_data(source_id: str, limit: int = 10):
     """Get first N rows of an uploaded source."""
+    limit = max(1, min(limit, 10_000))  # Clamp to prevent DoS
     service = get_duckdb_service()
     try:
         result = service.get_preview(source_id, limit)
