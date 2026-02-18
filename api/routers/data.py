@@ -168,10 +168,14 @@ async def query_raw(request: RawQueryRequest):
 
     try:
         result = service._conn.execute(sql)
-        col_names = [desc[0] for desc in result.description]
-        col_types = [str(desc[1]) for desc in result.description]
-        rows_raw = result.fetchall()
-        rows = [dict(zip(col_names, row)) for row in rows_raw]
+        if result.description:
+            col_names = [desc[0] for desc in result.description]
+            col_types = [str(desc[1]) for desc in result.description]
+            rows_raw = result.fetchall()
+            rows = [dict(zip(col_names, row)) for row in rows_raw]
+        else:
+            # Non-SELECT statements (INSERT, UPDATE, DELETE) have no description
+            col_names, col_types, rows = [], [], []
 
         return RawQueryResponse(
             success=True,

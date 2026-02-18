@@ -52,7 +52,8 @@ export function AIChat() {
 
   // Check if AI is available and which provider
   useEffect(() => {
-    fetch('/api/v2/charts/ai-status')
+    const abortController = new AbortController()
+    fetch('/api/v2/charts/ai-status', { signal: abortController.signal })
       .then((res) => {
         if (!res.ok) {
           setAiAvailable(false)
@@ -66,7 +67,10 @@ export function AIChat() {
           setAiAvailable(true)
         }
       })
-      .catch(() => setAiAvailable(false))
+      .catch((err) => {
+        if (err.name !== 'AbortError') setAiAvailable(false)
+      })
+    return () => abortController.abort()
   }, [])
 
   const providerLabel = aiStatus?.provider

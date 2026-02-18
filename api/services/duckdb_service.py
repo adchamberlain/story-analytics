@@ -458,11 +458,16 @@ def q(col_name: str) -> str:
 
 # ── Singleton ────────────────────────────────────────────────────────────────
 
+import threading
+
 _service: DuckDBService | None = None
+_service_lock = threading.Lock()
 
 
 def get_duckdb_service() -> DuckDBService:
     global _service
     if _service is None:
-        _service = DuckDBService()
+        with _service_lock:
+            if _service is None:
+                _service = DuckDBService()
     return _service

@@ -18,6 +18,7 @@ export function ShareModal({ dashboardId, onClose }: ShareModalProps) {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [copiedLink, setCopiedLink] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const headers: Record<string, string> = { 'Content-Type': 'application/json' }
   if (token) headers['Authorization'] = `Bearer ${token}`
@@ -44,6 +45,7 @@ export function ShareModal({ dashboardId, onClose }: ShareModalProps) {
     const prev = visibility
     setVisibility(newVisibility)
     setSaving(true)
+    setError(null)
     try {
       const res = await fetch(`/api/v2/dashboards/${dashboardId}/sharing`, {
         method: 'PUT',
@@ -52,8 +54,8 @@ export function ShareModal({ dashboardId, onClose }: ShareModalProps) {
       })
       if (!res.ok) throw new Error(`Save failed: ${res.status}`)
     } catch {
-      // Revert on failure
       setVisibility(prev)
+      setError('Failed to update visibility. Please try again.')
     } finally {
       setSaving(false)
     }
@@ -133,6 +135,9 @@ export function ShareModal({ dashboardId, onClose }: ShareModalProps) {
                 </div>
                 {saving && (
                   <p className="text-xs text-text-muted mt-1">Saving...</p>
+                )}
+                {error && (
+                  <p className="text-xs text-red-500 mt-1">{error}</p>
                 )}
               </div>
 
