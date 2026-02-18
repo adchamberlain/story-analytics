@@ -44,7 +44,7 @@ export function ChartWrapper({ title, subtitle, source, sourceUrl, chartUrl, chi
 
   return (
     <div
-      className={`rounded-2xl border shadow-card flex flex-col ${compact ? 'group overflow-hidden' : ''} ${!cardBg ? 'bg-surface-raised' : ''} ${!cardBorder ? 'border-border-default' : ''} ${className}`}
+      className={`rounded-2xl border shadow-card flex flex-col overflow-hidden ${compact ? 'group' : ''} ${!cardBg ? 'bg-surface-raised' : ''} ${!cardBorder ? 'border-border-default' : ''} ${className}`}
       style={{
         ...(cardBg ? { backgroundColor: cardBg } : {}),
         ...(cardBorder ? { borderColor: cardBorder } : {}),
@@ -57,8 +57,6 @@ export function ChartWrapper({ title, subtitle, source, sourceUrl, chartUrl, chi
             style={{
               height: theme.accent!.barHeight,
               background: theme.accent!.color,
-              borderTopLeftRadius: 'inherit',
-              borderTopRightRadius: 'inherit',
             }}
           />
           <div
