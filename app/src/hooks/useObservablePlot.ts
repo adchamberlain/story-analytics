@@ -5,16 +5,19 @@ import { useRef, useEffect, useState, useCallback } from 'react'
  * Returns a ref to attach to a container element.
  * Uses a callback ref so the ResizeObserver re-attaches when the DOM element
  * is remounted (e.g. switching between Plot-based and non-Plot chart types).
+ *
+ * The render function receives both measured width and height. Height is 0 if
+ * the container has no intrinsic height yet (e.g. flex layout not resolved).
  */
 export function useObservablePlot(
-  renderFn: (width: number) => HTMLElement | SVGSVGElement,
+  renderFn: (width: number, height: number) => HTMLElement | SVGSVGElement | null,
   deps: unknown[] = []
 ) {
   const containerRef = useRef<HTMLDivElement>(null)
   const observerRef = useRef<ResizeObserver | null>(null)
-  const [width, setWidth] = useState(0)
+  const [size, setSize] = useState({ width: 0, height: 0 })
 
-  // Track container width via ResizeObserver.
+  // Track container size via ResizeObserver.
   // Re-run whenever deps change so we re-attach if the element was remounted.
   useEffect(() => {
     const el = containerRef.current
@@ -27,34 +30,40 @@ export function useObservablePlot(
 
     const ro = new ResizeObserver((entries) => {
       for (const entry of entries) {
-        const w = entry.contentRect.width
-        if (w > 0) setWidth(w)
+        const { width, height } = entry.contentRect
+        if (width > 0) {
+          setSize((prev) => {
+            if (prev.width === width && prev.height === height) return prev
+            return { width, height }
+          })
+        }
       }
     })
     ro.observe(el)
     observerRef.current = ro
 
-    // Seed width immediately so the render effect can fire
+    // Seed size immediately so the render effect can fire
     const rect = el.getBoundingClientRect()
-    if (rect.width > 0) setWidth(rect.width)
+    if (rect.width > 0) setSize({ width: rect.width, height: rect.height })
 
     return () => ro.disconnect()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [...deps])
 
-  // Render plot when width or deps change
+  // Render plot when size or deps change
   useEffect(() => {
     const el = containerRef.current
-    if (!el || width === 0) return
+    if (!el || size.width === 0) return
 
-    const plot = renderFn(width)
+    const plot = renderFn(size.width, size.height)
+    if (!plot) return // render deferred (e.g. waiting for height measurement)
     el.replaceChildren(plot)
 
     return () => {
       plot.remove()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [width, ...deps])
+  }, [size.width, size.height, ...deps])
 
   /** Get the rendered SVG element for export */
   const getSvgElement = useCallback((): SVGSVGElement | null => {

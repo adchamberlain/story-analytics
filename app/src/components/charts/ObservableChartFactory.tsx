@@ -20,6 +20,8 @@ interface ObservableChartFactoryProps {
   config: ChartConfig
   chartType: ChartType
   height?: number
+  /** When true, use CSS flex layout to determine chart height from the container. */
+  autoHeight?: boolean
   /** When true, point note labels are draggable (editor only). */
   editable?: boolean
 }
@@ -33,6 +35,7 @@ export function ObservableChartFactory({
   config,
   chartType,
   height = 320,
+  autoHeight = false,
   editable = false,
 }: ObservableChartFactoryProps) {
   const resolved = useThemeStore((s) => s.resolved)
@@ -58,12 +61,15 @@ export function ObservableChartFactory({
   const plotRef = useRef<PlotElement | null>(null)
 
   const { containerRef } = useObservablePlot(
-    (width) => {
+    (width, measuredHeight) => {
+      const plotHeight = autoHeight ? measuredHeight : height
+      if (plotHeight <= 0) return null // waiting for flex layout to resolve
+
       const marks = buildMarks(chartType, data, config, colors, chartTheme)
       const bgColor = getComputedStyle(document.documentElement).getPropertyValue('--color-surface-raised').trim() || '#1e293b'
       const textColor = getComputedStyle(document.documentElement).getPropertyValue('--color-text-primary').trim() || '#e2e8f0'
       const annotationMarks = buildAnnotationMarks(config.annotations, bgColor, textColor)
-      const plotOptions = buildPlotOptions(chartType, data, config, colors, width, height, chartTheme)
+      const plotOptions = buildPlotOptions(chartType, data, config, colors, width, plotHeight, chartTheme)
       const plot = Plot.plot({ ...plotOptions, marks: [...marks, ...annotationMarks] })
 
       // Store plot ref for scale inversion in click handler
@@ -143,7 +149,7 @@ export function ObservableChartFactory({
 
       return plot
     },
-    [data, config, chartType, height, resolved, editable, chartTheme]
+    [data, config, chartType, height, autoHeight, resolved, editable, chartTheme]
   )
 
   // ── Click-to-place handler ─────────────────────────────────────────────────
@@ -217,15 +223,23 @@ export function ObservableChartFactory({
   }
 
   if (chartType === 'PieChart') {
-    return <PieChartComponent data={data} config={config} height={height} />
+    return <PieChartComponent data={data} config={config} height={height} autoHeight={autoHeight} />
   }
 
   if (chartType === 'Treemap') {
-    return <TreemapComponent data={data} config={config} height={height} />
+    return <TreemapComponent data={data} config={config} height={height} autoHeight={autoHeight} />
   }
 
+  // Auto-height: flex layout fills available space. Fixed: explicit pixel height.
+  const rootStyle: React.CSSProperties = autoHeight
+    ? { display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, width: '100%' }
+    : { width: '100%' }
+  const chartStyle: React.CSSProperties = autoHeight
+    ? { flex: 1, minHeight: 0, width: '100%', cursor: placingId ? 'crosshair' : undefined }
+    : { width: '100%', height, cursor: placingId ? 'crosshair' : undefined }
+
   return (
-    <div style={{ width: '100%' }}>
+    <div style={rootStyle}>
       {legendItems.length > 0 && (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '14px', padding: '0 0 6px', fontSize: 12 }}>
           {legendItems.map((item) => (
@@ -244,7 +258,7 @@ export function ObservableChartFactory({
       <div
         ref={containerRef}
         onClick={placingId ? handleChartClick : undefined}
-        style={{ width: '100%', height, cursor: placingId ? 'crosshair' : undefined }}
+        style={chartStyle}
       />
     </div>
   )
@@ -1150,7 +1164,7 @@ function BigValueChart({ data, config }: { data: Record<string, unknown>[]; conf
   )
 }
 
-function PieChartComponent({ data, config, height }: { data: Record<string, unknown>[]; config: ChartConfig; height: number }) {
+function PieChartComponent({ data, config, height, autoHeight }: { data: Record<string, unknown>[]; config: ChartConfig; height: number; autoHeight?: boolean }) {
   const containerRef = useRef<HTMLDivElement>(null)
   const resolved = useThemeStore((s) => s.resolved)
   const chartTheme = useChartThemeStore((s) => s.theme)
@@ -1164,7 +1178,9 @@ function PieChartComponent({ data, config, height }: { data: Record<string, unkn
     const labelField = config.x ?? Object.keys(data[0])[0]
     const valueField = (config.value ?? config.y ?? Object.keys(data[0])[1]) as string
     const width = el.clientWidth
-    const size = Math.min(width, height)
+    const effectiveHeight = autoHeight ? el.clientHeight : height
+    if (effectiveHeight <= 0) return // waiting for layout
+    const size = Math.min(width, effectiveHeight)
 
     // Reserve space for external labels
     const isExternal = chartTheme.pie.labelStyle === 'external'
@@ -1291,13 +1307,13 @@ function PieChartComponent({ data, config, height }: { data: Record<string, unkn
     }
 
     return () => { el.innerHTML = '' }
-  }, [data, config, height, resolved, chartTheme])
+  }, [data, config, height, autoHeight, resolved, chartTheme])
 
   if (data.length === 0) return <p className="text-sm text-text-muted">No data</p>
-  return <div ref={containerRef} style={{ width: '100%', height }} />
+  return <div ref={containerRef} style={{ width: '100%', ...(autoHeight ? { height: '100%' } : { height }) }} />
 }
 
-function TreemapComponent({ data, config, height }: { data: Record<string, unknown>[]; config: ChartConfig; height: number }) {
+function TreemapComponent({ data, config, height, autoHeight }: { data: Record<string, unknown>[]; config: ChartConfig; height: number; autoHeight?: boolean }) {
   const containerRef = useRef<HTMLDivElement>(null)
   const resolved = useThemeStore((s) => s.resolved)
   const themePalette = useChartThemeStore((s) => s.theme.palette.colors)
@@ -1311,6 +1327,8 @@ function TreemapComponent({ data, config, height }: { data: Record<string, unkno
     const labelField = config.x ?? Object.keys(data[0])[0]
     const valueField = (config.value ?? config.y ?? Object.keys(data[0])[1]) as string
     const width = el.clientWidth
+    const effectiveHeight = autoHeight ? el.clientHeight : height
+    if (effectiveHeight <= 0) return // waiting for layout
 
     const treeData = data.map((d) => ({
       name: String(d[labelField] ?? ''),
@@ -1321,14 +1339,14 @@ function TreemapComponent({ data, config, height }: { data: Record<string, unkno
     const rootData: TreeNode = { name: 'root', value: 0, children: treeData }
     const root = d3.hierarchy(rootData).sum((d) => d.value)
 
-    d3.treemap<TreeNode>().size([width, height]).padding(2)(root)
+    d3.treemap<TreeNode>().size([width, effectiveHeight]).padding(2)(root)
 
     const colors = config.colorRange ? [...config.colorRange] : config.color ? [config.color] : [...themePalette]
     const colorScale = d3.scaleOrdinal(colors)
 
     const svg = d3.select(el).append('svg')
       .attr('width', width)
-      .attr('height', height)
+      .attr('height', effectiveHeight)
 
     type TreeLeaf = d3.HierarchyRectangularNode<TreeNode>
     const nodes = root.leaves() as TreeLeaf[]
@@ -1353,10 +1371,10 @@ function TreemapComponent({ data, config, height }: { data: Record<string, unkno
       .text((d) => (d.x1 - d.x0) > 40 ? d.data.name : '')
 
     return () => { el.innerHTML = '' }
-  }, [data, config, height, resolved, themePalette])
+  }, [data, config, height, autoHeight, resolved, themePalette])
 
   if (data.length === 0) return <p className="text-sm text-text-muted">No data</p>
-  return <div ref={containerRef} style={{ width: '100%', height }} />
+  return <div ref={containerRef} style={{ width: '100%', ...(autoHeight ? { height: '100%' } : { height }) }} />
 }
 
 function DataTableChart({ data }: { data: Record<string, unknown>[]; config: ChartConfig }) {

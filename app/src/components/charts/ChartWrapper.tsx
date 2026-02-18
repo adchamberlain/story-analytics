@@ -111,7 +111,7 @@ export function ChartWrapper({ title, subtitle, source, sourceUrl, chartUrl, chi
         )}
 
         {/* Chart area */}
-        <div ref={chartAreaRef} className={`flex-1 min-h-0 overflow-hidden ${compact ? 'mt-2' : 'mt-3'}`}>
+        <div ref={chartAreaRef} className={`flex-1 min-h-0 overflow-hidden flex flex-col ${compact ? 'mt-2' : 'mt-3'}`}>
           {children}
         </div>
 

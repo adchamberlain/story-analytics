@@ -313,7 +313,6 @@ export function DashboardBuilderPage() {
                   <div key={ref.chart_id}>
                     <BuilderGridCard
                       chartFullData={chartData[ref.chart_id]}
-                      gridH={gridLayout.find((l) => l.i === ref.chart_id)?.h ?? 5}
                       onRemove={() => store.removeChart(ref.chart_id)}
                     />
                   </div>
@@ -369,11 +368,9 @@ export function DashboardBuilderPage() {
 
 function BuilderGridCard({
   chartFullData,
-  gridH,
   onRemove,
 }: {
   chartFullData?: ChartFullData
-  gridH: number
   onRemove: () => void
 }) {
   // Still loading chart data
@@ -420,10 +417,6 @@ function BuilderGridCard({
     chartConfig.colorRange = paletteColors
   }
 
-  // Compute chart height from grid row height (60px) and gap (24px)
-  const cellHeight = gridH * 60 + (gridH - 1) * 24
-  const chartHeight = Math.max(cellHeight - 122, 120)
-
   return (
     <div className="group relative h-full">
       {/* Remove button overlay */}
@@ -448,7 +441,7 @@ function BuilderGridCard({
           data={chartFullData.data}
           config={chartConfig}
           chartType={chartType}
-          height={chartHeight}
+          autoHeight
         />
       </ChartWrapper>
     </div>

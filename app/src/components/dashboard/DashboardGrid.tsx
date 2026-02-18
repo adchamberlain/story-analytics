@@ -115,15 +115,6 @@ export function DashboardGrid({ charts, dashboardId, editable = false, onLayoutC
     )
   }
 
-  // Build a height map from the computed layout so each cell knows its grid height
-  const heightMap = useMemo(() => {
-    const map: Record<string, number> = {}
-    for (const item of layout) {
-      map[item.i] = item.h
-    }
-    return map
-  }, [layout])
-
   return (
     <div ref={containerRef as React.RefObject<HTMLDivElement>}>
       {mounted && (
@@ -153,7 +144,7 @@ export function DashboardGrid({ charts, dashboardId, editable = false, onLayoutC
         >
           {charts.map((chart) => (
             <div key={chart.chart_id} className="overflow-hidden">
-              <DashboardChartCell chart={chart} dashboardId={dashboardId} editable={editable} gridH={heightMap[chart.chart_id] ?? 5} />
+              <DashboardChartCell chart={chart} dashboardId={dashboardId} editable={editable} />
             </div>
           ))}
         </GridLayout>
@@ -184,12 +175,10 @@ function DashboardChartCell({
   chart,
   dashboardId,
   editable,
-  gridH,
 }: {
   chart: ChartWithData
   dashboardId?: string
   editable: boolean
-  gridH: number
 }) {
   if (chart.error) {
     if (chart.error_type === 'schema_change') {
@@ -254,12 +243,6 @@ function DashboardChartCell({
     chartConfig.colorRange = paletteColors
   }
 
-  // Compute available chart height from grid row height (60px) and gap (24px)
-  // Overhead: p-5 padding (40px), title+subtitle (~58px), mb-1.5 (6px),
-  // chart gap mt-2 (8px), legend (~24px), footer mt-3 (12px), source (~18px)
-  const cellHeight = gridH * 60 + (gridH - 1) * 24
-  const chartHeight = Math.max(cellHeight - 166, 120)
-
   return (
     <div className="group relative h-full">
       {editable && (
@@ -285,7 +268,7 @@ function DashboardChartCell({
           data={chart.data}
           config={chartConfig}
           chartType={chartType}
-          height={chartHeight}
+          autoHeight
         />
       </ChartWrapper>
     </div>
