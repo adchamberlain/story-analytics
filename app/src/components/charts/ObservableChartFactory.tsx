@@ -1194,8 +1194,10 @@ function PieChartComponent({ data, config, height, autoHeight }: { data: Record<
     const el = containerRef.current
     el.innerHTML = ''
 
-    const labelField = config.x ?? Object.keys(data[0])[0]
-    const valueField = (config.value ?? config.y ?? Object.keys(data[0])[1]) as string
+    const keys = Object.keys(data[0])
+    const labelField = config.x ?? keys[0]
+    const valueField = (config.value ?? config.y ?? keys[1]) as string | undefined
+    if (!valueField) return // Single-column data — no numeric column to chart
     const width = el.clientWidth
     const effectiveHeight = autoHeight ? el.clientHeight : height
     if (effectiveHeight <= 0) return // waiting for layout
@@ -1345,8 +1347,10 @@ function TreemapComponent({ data, config, height, autoHeight }: { data: Record<s
     const el = containerRef.current
     el.innerHTML = ''
 
-    const labelField = config.x ?? Object.keys(data[0])[0]
-    const valueField = (config.value ?? config.y ?? Object.keys(data[0])[1]) as string
+    const keys = Object.keys(data[0])
+    const labelField = config.x ?? keys[0]
+    const valueField = (config.value ?? config.y ?? keys[1]) as string | undefined
+    if (!valueField) return // Single-column data — no numeric column to chart
     const width = el.clientWidth
     const effectiveHeight = autoHeight ? el.clientHeight : height
     if (effectiveHeight <= 0) return // waiting for layout
