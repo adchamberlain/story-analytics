@@ -102,7 +102,8 @@ export const useDashboardBuilderStore = create<DashboardBuilderState>((set, get)
   },
 
   save: async () => {
-    const { dashboardId, title, description, charts } = get()
+    const { dashboardId, title, description, charts, saving } = get()
+    if (saving) return null  // Prevent concurrent saves (e.g. double-click)
     if (!title.trim()) {
       set({ error: 'Dashboard title is required' })
       return null
@@ -140,13 +141,14 @@ export const useDashboardBuilderStore = create<DashboardBuilderState>((set, get)
     set({ loading: true, error: null })
 
     try {
-      // Fetch the dashboard metadata (not the full data version)
-      const res = await fetch(`/api/v2/dashboards/`)
-      if (!res.ok) throw new Error(`Load failed: ${res.statusText}`)
+      // Fetch single dashboard metadata by ID
+      const res = await fetch(`/api/v2/dashboards/${dashboardId}`)
+      if (!res.ok) {
+        if (res.status === 404) throw new Error('Dashboard not found')
+        throw new Error(`Load failed: ${res.statusText}`)
+      }
 
-      const dashboards = await res.json()
-      const dashboard = dashboards.find((d: { id: string }) => d.id === dashboardId)
-      if (!dashboard) throw new Error('Dashboard not found')
+      const dashboard = await res.json()
 
       set({
         loading: false,

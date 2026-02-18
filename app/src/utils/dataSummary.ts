@@ -74,8 +74,8 @@ export function buildDataSummary(
     }
 
     if (category === 'numeric' && numericValues.length > 0) {
-      summary.min = Math.min(...numericValues)
-      summary.max = Math.max(...numericValues)
+      summary.min = numericValues.reduce((a, b) => Math.min(a, b), Infinity)
+      summary.max = numericValues.reduce((a, b) => Math.max(a, b), -Infinity)
       summary.mean = Math.round((numericValues.reduce((a, b) => a + b, 0) / numericValues.length) * 100) / 100
     } else if (category === 'date' && seen.size > 0) {
       const sorted = [...seen].sort()

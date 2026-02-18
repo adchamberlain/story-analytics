@@ -1050,7 +1050,7 @@ function buildPlotOptions(
   // Y-axis bounds
   if (config.yAxisMin !== undefined || config.yAxisMax !== undefined) {
     const yOpts = (overrides.y as Record<string, unknown>) ?? { ...getBaseAxis(), grid: true }
-    if (config.yAxisMin !== undefined) yOpts.domain = [config.yAxisMin, config.yAxisMax ?? undefined]
+    yOpts.domain = [config.yAxisMin ?? undefined, config.yAxisMax ?? undefined]
     overrides.y = yOpts
   }
 
@@ -1191,6 +1191,8 @@ function PieChartComponent({ data, config, height, autoHeight }: { data: Record<
       label: String(d[labelField] ?? ''),
       value: Number(d[valueField] ?? 0),
     })).filter((d) => d.value > 0)
+
+    if (pieData.length === 0) return  // No valid slices (all zero/negative)
 
     const total = d3.sum(pieData, (d) => d.value)
 

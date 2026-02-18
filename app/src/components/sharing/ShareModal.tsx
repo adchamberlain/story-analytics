@@ -41,17 +41,19 @@ export function ShareModal({ dashboardId, onClose }: ShareModalProps) {
   }, [dashboardId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleVisibilityChange = async (newVisibility: Visibility) => {
+    const prev = visibility
     setVisibility(newVisibility)
     setSaving(true)
     try {
-      await fetch(`/api/v2/dashboards/${dashboardId}/sharing`, {
+      const res = await fetch(`/api/v2/dashboards/${dashboardId}/sharing`, {
         method: 'PUT',
         headers,
         body: JSON.stringify({ visibility: newVisibility }),
       })
+      if (!res.ok) throw new Error(`Save failed: ${res.status}`)
     } catch {
       // Revert on failure
-      setVisibility(visibility)
+      setVisibility(prev)
     } finally {
       setSaving(false)
     }

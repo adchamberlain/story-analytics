@@ -37,7 +37,10 @@ export function SourcePickerPage() {
   useEffect(() => {
     setLoading(true)
     fetch('/api/data/sources')
-      .then((res) => res.json())
+      .then((res) => {
+        if (!res.ok) throw new Error(`Sources fetch failed: ${res.status}`)
+        return res.json()
+      })
       .then((data: SourceSummary[]) => {
         setSources(data)
         setLoading(false)
