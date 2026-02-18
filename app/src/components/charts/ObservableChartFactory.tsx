@@ -495,9 +495,13 @@ function buildHeatMapMarks(
   _colors: readonly string[] | string[]
 ): Plot.Markish[] {
   if (!x || !y) return []
-  const fill = series ?? y
+  // HeatMap: x and y are the two categorical axes, fill encodes the value.
+  // When series is provided, use it as the fill (color) dimension.
+  // When no series, y doubles as the fill (numeric heat value).
+  const yAxis = series ?? y
+  const fill = series ? y : y
   return [
-    Plot.cell(data, { x, y: series ? series : x, fill, tip: true }),
+    Plot.cell(data, { x, y: yAxis, fill, tip: true }),
   ]
 }
 
@@ -520,8 +524,8 @@ function buildAnnotationMarks(annotations?: Annotations, bgColor = '#1e293b', _t
 
   const marks: Plot.Markish[] = []
 
-  // Reference lines
-  for (const line of annotations.lines) {
+  // Reference lines (guard against legacy data missing sub-arrays)
+  for (const line of annotations.lines ?? []) {
     const color = line.color ?? '#e45756'
     const strokeDash = line.strokeDash ?? [6, 4]
 

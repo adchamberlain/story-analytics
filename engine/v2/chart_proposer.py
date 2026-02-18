@@ -148,15 +148,21 @@ def _parse_proposal(response: str) -> ProposedChart:
             error=f"Failed to parse LLM response as JSON: {e}\nResponse: {response[:500]}",
         )
 
+    # Normalize string "null" → None (LLMs sometimes return the literal string)
+    def _nullable(val: str | None) -> str | None:
+        if isinstance(val, str) and val.strip().lower() == "null":
+            return None
+        return val
+
     return ProposedChart(
         success=True,
         chart_type=data.get("chart_type", "BarChart"),
-        title=data.get("title"),
-        subtitle=data.get("subtitle"),
-        source=data.get("source"),
-        x=data.get("x"),
-        y=data.get("y"),
-        series=data.get("series"),
+        title=_nullable(data.get("title")),
+        subtitle=_nullable(data.get("subtitle")),
+        source=_nullable(data.get("source")),
+        x=_nullable(data.get("x")),
+        y=_nullable(data.get("y")),
+        series=_nullable(data.get("series")),
         horizontal=data.get("horizontal", False),
         sort=data.get("sort", True),
         reasoning=data.get("reasoning"),

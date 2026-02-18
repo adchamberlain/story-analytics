@@ -355,8 +355,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
 
   saveNew: async () => {
-    const { sourceId, config, sql } = get()
+    const { sourceId, config, sql, saving } = get()
     if (!sourceId || !sql) return null
+    if (saving) return null  // Prevent duplicate saves from double-click
 
     set({ saving: true, error: null })
 
@@ -596,8 +597,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
 
   save: async () => {
-    const { chartId, config, sql } = get()
+    const { chartId, config, sql, saving } = get()
     if (!chartId) return
+    if (saving) return  // Prevent duplicate saves from double-click
 
     set({ saving: true, error: null })
 

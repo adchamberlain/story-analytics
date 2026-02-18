@@ -336,6 +336,8 @@ class DuckDBService:
 
     def get_distinct_values(self, source_id: str, column: str, limit: int = 500) -> list[str]:
         """Get distinct values for a column, useful for dropdown filter options."""
+        if not _SAFE_SOURCE_ID_RE.match(source_id):
+            raise ValueError(f"Invalid source_id: {source_id}")
         limit = max(1, min(limit, 10_000))  # Clamp to prevent DoS
         table_name = f"src_{source_id}"
         result = self._conn.execute(
