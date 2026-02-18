@@ -471,8 +471,9 @@ async def update(dashboard_id: str, request: UpdateDashboardRequest):
     fields: dict = {}
     for key, value in raw.items():
         if key == "charts" and value is not None:
-            fields["charts"] = [c.model_dump() for c in request.charts]  # type: ignore[union-attr]
+            fields["charts"] = value  # already list[dict] from model_dump
         elif key == "filters" and value is not None:
+            # Re-serialize from Pydantic to exclude None values in filter specs
             fields["filters"] = [f.model_dump(exclude_none=True) for f in request.filters]  # type: ignore[union-attr]
         else:
             fields[key] = value

@@ -75,7 +75,7 @@ export function DashboardBuilderPage() {
     addChartHandled.current = true
     store.addChart(addChartId)
     store.save().then((id) => {
-      if (id) navigate(`/dashboard/${id}`)
+      if (id) navigate(`/dashboard/${id}/edit`)
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, store.dashboardId])

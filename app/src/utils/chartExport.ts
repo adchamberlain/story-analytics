@@ -29,7 +29,11 @@ export function exportPNG(svgElement: SVGSVGElement, filename: string, scale = 2
   svgToCanvas(svgElement, scale)
     .then((canvas) => {
       canvas.toBlob((blob) => {
-        if (blob) downloadBlob(blob, `${sanitizeFilename(filename)}.png`)
+        if (blob) {
+          downloadBlob(blob, `${sanitizeFilename(filename)}.png`)
+        } else {
+          console.error('PNG export failed: canvas.toBlob returned null')
+        }
       }, 'image/png')
     })
     .catch((err) => {
@@ -46,14 +50,14 @@ export async function exportPDF(
   const { jsPDF } = await import('jspdf')
   const canvas = await svgToCanvas(svgElement, 2)
 
-  // Landscape A4-ish proportions, sized to chart aspect ratio
+  // Size page to chart aspect ratio using A4 dimensions
   const imgWidth = canvas.width || 1  // Guard against zero-width canvas
   const imgHeight = canvas.height || 1
-  const pdfWidth = 297 // A4 landscape width in mm
+  const isLandscape = imgWidth > imgHeight
+  const pdfWidth = isLandscape ? 297 : 210  // A4 landscape vs portrait width in mm
   const pdfHeight = (imgHeight / imgWidth) * pdfWidth
 
   const doc = new jsPDF({
-    orientation: imgWidth > imgHeight ? 'landscape' : 'portrait',
     unit: 'mm',
     format: [pdfWidth, pdfHeight + 30], // Extra space for title/source
   })

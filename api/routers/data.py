@@ -138,14 +138,13 @@ async def delete_source(source_id: str):
 
     # Drop the DuckDB table and remove from in-memory registry atomically
     table_name = f"src_{source_id}"
-    try:
-        with service._lock:
+    with service._lock:
+        try:
             service._conn.execute(f"DROP TABLE IF EXISTS {table_name}")
-    except Exception:
-        pass
-
-    # Remove inside lock to avoid race with concurrent iterators
-    service._sources.pop(source_id, None)
+        except Exception:
+            pass
+        # Remove inside lock to avoid race with concurrent iterators
+        service._sources.pop(source_id, None)
 
     # Delete upload directory from disk
     upload_dir = Path(__file__).parent.parent.parent / "data" / "uploads" / source_id
@@ -349,12 +348,14 @@ async def paste_data(request: PasteRequest):
 @router.get("/preview/{source_id}", response_model=PreviewResponse)
 async def preview_data(source_id: str, limit: int = 10):
     """Get first N rows of an uploaded source."""
+    if not _SAFE_SOURCE_ID_RE.match(source_id):
+        raise HTTPException(status_code=400, detail="Invalid source_id")
     limit = max(1, min(limit, 10_000))  # Clamp to prevent DoS
     service = get_duckdb_service()
     try:
         result = service.get_preview(source_id, limit)
-    except Exception as e:
-        raise HTTPException(status_code=404, detail=f"Source not found: {e}")
+    except Exception:
+        raise HTTPException(status_code=404, detail="Source not found")
 
     return PreviewResponse(
         columns=result.columns,

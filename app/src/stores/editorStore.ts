@@ -154,6 +154,9 @@ const DATA_KEYS: (keyof EditorConfig)[] = ['x', 'y', 'series', 'aggregation', 't
 /** Debounce timer for auto buildQuery calls from updateConfig */
 let _buildQueryTimer: ReturnType<typeof setTimeout>
 
+/** Monotonically increasing counter for unique chat message IDs */
+let _msgIdCounter = 0
+
 export const useEditorStore = create<EditorState>((set, get) => ({
   // Initial state
   chartId: null,
@@ -668,7 +671,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     if (chatLoading) return  // Prevent concurrent chat requests
     if (!chartId) {
       const errorMsg: ChatMessage = {
-        id: `msg-${Date.now()}`,
+        id: `msg-${Date.now()}-${++_msgIdCounter}`,
         role: 'assistant',
         content: 'Please save your chart first before using the AI Assistant.',
         timestamp: Date.now(),
@@ -678,7 +681,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }
 
     const userMsg: ChatMessage = {
-      id: `msg-${Date.now()}`,
+      id: `msg-${Date.now()}-${++_msgIdCounter}`,
       role: 'user',
       content: message,
       timestamp: Date.now(),
@@ -752,7 +755,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       if (rc.annotations !== undefined) newConfig.annotations = rc.annotations
 
       const assistantMsg: ChatMessage = {
-        id: `msg-${Date.now()}`,
+        id: `msg-${Date.now()}-${++_msgIdCounter}`,
         role: 'assistant',
         content: result.explanation ?? 'Done.',
         timestamp: Date.now(),
@@ -767,7 +770,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       }))
     } catch (e) {
       const errorMsg: ChatMessage = {
-        id: `msg-${Date.now()}`,
+        id: `msg-${Date.now()}-${++_msgIdCounter}`,
         role: 'assistant',
         content: `Error: ${e instanceof Error ? e.message : String(e)}`,
         timestamp: Date.now(),

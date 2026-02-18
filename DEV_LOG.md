@@ -2,6 +2,23 @@
 
 ## 2026-02-18
 
+### Session: macOS app packaging plan
+
+**Created implementation plan:** `docs/plans/2026-02-18-macos-app-packaging.md`
+
+Goal: Package Story Analytics as a downloadable macOS `.app` distributed via GitHub Releases, with GitHub Pages integration for permanent shareable chart/dashboard links.
+
+5 phases, 16 tasks:
+1. **Serve frontend from FastAPI** — single-process production mode (2 tasks)
+2. **Publisher abstraction** — pluggable `Publisher` interface with `LocalDownloadPublisher` + artifact builders (3 tasks)
+3. **GitHub Pages publishing** — token storage, GitHub API publisher, settings UI, publish buttons (5 tasks)
+4. **macOS packaging** — pywebview native window, PyInstaller spec, icon, data directory (4 tasks)
+5. **Distribution** — code signing, notarization, DMG creation, GitHub Release pipeline (4 tasks)
+
+Key finding: SVG/PNG/PDF export and dashboard HTML export already fully implemented. New work is packaging shell, publisher abstraction, and GitHub Pages integration. Architecture leaves door open for a future hosted publish service.
+
+To be picked up in a future session after current bug hunt is complete.
+
 ### Session: Bug hunt rounds 18–20 (31 fixes, 415 tests)
 
 **Round 18 — 9 fixes (Round 2 from prior session)**

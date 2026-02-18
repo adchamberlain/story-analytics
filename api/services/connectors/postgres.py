@@ -137,10 +137,9 @@ class PostgresConnector(DatabaseConnector):
                     pq_path = Path(tmp.name)
                     tmp.close()  # Close file handle; we only need the path
 
-                pq.write_table(arrow_table, str(pq_path))
-
-                # Ingest into DuckDB
+                # Wrap write + ingest so temp file is always cleaned up
                 try:
+                    pq.write_table(arrow_table, str(pq_path))
                     source_schema = duckdb_service.ingest_parquet(pq_path, table.lower())
                     results.append({
                         "source_id": source_schema.source_id,
