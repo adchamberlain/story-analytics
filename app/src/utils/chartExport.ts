@@ -24,10 +24,17 @@ export function exportSVG(svgElement: SVGSVGElement, filename: string): void {
   downloadBlob(blob, `${sanitizeFilename(filename)}.svg`)
 }
 
-/** Render an SVG element to a PNG at 2x resolution and download */
-export function exportPNG(svgElement: SVGSVGElement, filename: string, scale = 2): void {
+/** Render an SVG element to a PNG at 2x resolution and download.
+ *  Optionally draws title, subtitle, and source text around the chart. */
+export function exportPNG(
+  svgElement: SVGSVGElement,
+  filename: string,
+  scale = 2,
+  metadata?: { title?: string; subtitle?: string; source?: string },
+): void {
   svgToCanvas(svgElement, scale)
-    .then((canvas) => {
+    .then((chartCanvas) => {
+      const canvas = addTextToCanvas(chartCanvas, scale, metadata)
       canvas.toBlob((blob) => {
         if (blob) {
           downloadBlob(blob, `${sanitizeFilename(filename)}.png`)
@@ -125,6 +132,72 @@ function svgToCanvas(svgElement: SVGSVGElement, scale = 2): Promise<HTMLCanvasEl
     img.onerror = reject
     img.src = svgDataUrl
   })
+}
+
+/** Compose title/subtitle/source text around a chart canvas */
+function addTextToCanvas(
+  chartCanvas: HTMLCanvasElement,
+  scale: number,
+  metadata?: { title?: string; subtitle?: string; source?: string },
+): HTMLCanvasElement {
+  if (!metadata?.title && !metadata?.subtitle && !metadata?.source) return chartCanvas
+
+  const pad = 20 * scale
+  const titleSize = 18 * scale
+  const subtitleSize = 13 * scale
+  const sourceSize = 10 * scale
+  const lineGap = 6 * scale
+
+  // Measure header height
+  let headerH = pad
+  if (metadata.title) headerH += titleSize + lineGap
+  if (metadata.subtitle) headerH += subtitleSize + lineGap
+
+  // Measure footer height
+  let footerH = pad
+  if (metadata.source) footerH += sourceSize + lineGap
+
+  const totalW = chartCanvas.width + pad * 2
+  const totalH = headerH + chartCanvas.height + footerH
+
+  const canvas = document.createElement('canvas')
+  canvas.width = totalW
+  canvas.height = totalH
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return chartCanvas
+
+  // White background
+  ctx.fillStyle = '#ffffff'
+  ctx.fillRect(0, 0, totalW, totalH)
+
+  // Title
+  let y = pad
+  if (metadata.title) {
+    ctx.fillStyle = '#1e293b'
+    ctx.font = `bold ${titleSize}px Inter, system-ui, sans-serif`
+    ctx.fillText(metadata.title, pad, y + titleSize * 0.85)
+    y += titleSize + lineGap
+  }
+
+  // Subtitle
+  if (metadata.subtitle) {
+    ctx.fillStyle = '#64748b'
+    ctx.font = `${subtitleSize}px Inter, system-ui, sans-serif`
+    ctx.fillText(metadata.subtitle, pad, y + subtitleSize * 0.85)
+    y += subtitleSize + lineGap
+  }
+
+  // Chart image
+  ctx.drawImage(chartCanvas, pad, headerH)
+
+  // Source
+  if (metadata.source) {
+    ctx.fillStyle = '#94a3b8'
+    ctx.font = `${sourceSize}px Inter, system-ui, sans-serif`
+    ctx.fillText(`Source: ${metadata.source}`, pad, headerH + chartCanvas.height + sourceSize + lineGap)
+  }
+
+  return canvas
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────────

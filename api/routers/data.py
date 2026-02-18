@@ -82,6 +82,11 @@ class TableInfo(BaseModel):
 
 class PasteRequest(BaseModel):
     data: str
+    name: str | None = None
+
+
+class RenameRequest(BaseModel):
+    name: str
 
 
 # ── Endpoints ────────────────────────────────────────────────────────────────
@@ -314,9 +319,15 @@ async def paste_data(request: PasteRequest):
     try:
         service = get_duckdb_service()
 
-        # Replace previous pasted source if it exists (avoid accumulating duplicates).
-        # Use a sentinel prefix so we never collide with a user-uploaded "pasted_data.csv".
-        paste_filename = "__paste__.csv"
+        # Determine filename: use user-provided name or fall back to sentinel.
+        if request.name and request.name.strip():
+            paste_filename = request.name.strip()
+            if not paste_filename.lower().endswith('.csv'):
+                paste_filename += '.csv'
+        else:
+            paste_filename = "__paste__.csv"
+
+        # Replace previous source with same filename if it exists.
         existing_paste_id = service.find_source_by_filename(paste_filename)
         if existing_paste_id:
             table_name = f"src_{existing_paste_id}"
@@ -356,6 +367,35 @@ async def paste_data(request: PasteRequest):
             for c in schema.columns
         ],
     )
+
+
+@router.patch("/sources/{source_id}/rename")
+async def rename_source(source_id: str, request: RenameRequest):
+    """Rename a data source (update the display filename)."""
+    if not _SAFE_SOURCE_ID_RE.match(source_id):
+        raise HTTPException(status_code=400, detail="Invalid source_id")
+
+    name = request.name.strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="Name cannot be empty")
+
+    # Ensure .csv extension
+    if not name.lower().endswith('.csv'):
+        name = name + '.csv'
+
+    service = get_duckdb_service()
+    meta = service._sources.get(source_id)
+    if not meta:
+        raise HTTPException(status_code=404, detail="Source not found")
+
+    # Rename the file on disk
+    old_path = meta.path
+    new_path = old_path.parent / Path(name).name  # sanitize
+    if old_path != new_path:
+        old_path.rename(new_path)
+        meta.path = new_path
+
+    return {"ok": True, "filename": new_path.name}
 
 
 @router.get("/preview/{source_id}", response_model=PreviewResponse)

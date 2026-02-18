@@ -46,7 +46,7 @@ interface DataState {
   uploadCSV: (file: File, replace?: boolean) => Promise<void>
   confirmReplace: () => Promise<void>
   cancelReplace: () => void
-  pasteData: (text: string) => Promise<void>
+  pasteData: (text: string, name?: string) => Promise<void>
   loadPreview: (sourceId: string) => Promise<void>
   reset: () => void
 }
@@ -114,14 +114,17 @@ export const useDataStore = create<DataState>((set, get) => ({
     set({ duplicateConflict: null })
   },
 
-  pasteData: async (text: string) => {
+  pasteData: async (text: string, name?: string) => {
     set({ uploading: true, error: null, source: null, preview: null })
 
     try {
+      const payload: Record<string, string> = { data: text }
+      if (name) payload.name = name
+
       const res = await fetch(`${API_BASE}/paste`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ data: text }),
+        body: JSON.stringify(payload),
       })
 
       if (!res.ok) {

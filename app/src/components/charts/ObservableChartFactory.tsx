@@ -340,7 +340,7 @@ function buildBarMarks(
   y: string | undefined,
   series: string | undefined,
   config: ChartConfig,
-  colors: readonly string[] | string[],
+  _colors: readonly string[] | string[],
   chartTheme?: ChartTheme,
 ): Plot.Markish[] {
   if (!x || !y) return []
@@ -378,7 +378,7 @@ function buildBarMarks(
       }
     } else {
       marks.push(
-        Plot.barX(data, { x: y, y: x, fill: colors[0], ...sortOpt }),
+        Plot.barX(data, { x: y, y: x, fill: x, ...sortOpt }),
         Plot.tip(data, Plot.pointerY({ x: y, y: x })),
       )
     }
@@ -400,7 +400,7 @@ function buildBarMarks(
       )
     } else {
       marks.push(
-        Plot.barY(data, { x, y, fill: colors[0], ...sortOpt }),
+        Plot.barY(data, { x, y, fill: x, ...sortOpt }),
         Plot.tip(data, Plot.pointerX({ x, y })),
       )
     }
@@ -1025,16 +1025,21 @@ function buildPlotOptions(
   if (config.x && data.length > 0) {
     const sample = data[0][config.x]
     if (typeof sample === 'string' && !/^\d{4}-\d{2}/.test(sample)) {
-      const seen = new Set<string>()
-      const domain: string[] = []
-      for (const row of data) {
-        const v = row[config.x] as string
-        if (!seen.has(v)) { seen.add(v); domain.push(v) }
-      }
-      if (config.horizontal) {
-        overrides.y = { ...getBaseAxis(), domain }
-      } else {
-        overrides.x = { ...getBaseAxis(), domain }
+      // Skip explicit domain for bar charts when sorting is enabled —
+      // Observable Plot's sort option in marks needs to control the domain.
+      const skipDomain = chartType === 'BarChart' && config.sort !== false
+      if (!skipDomain) {
+        const seen = new Set<string>()
+        const domain: string[] = []
+        for (const row of data) {
+          const v = row[config.x] as string
+          if (!seen.has(v)) { seen.add(v); domain.push(v) }
+        }
+        if (config.horizontal) {
+          overrides.y = { ...getBaseAxis(), domain }
+        } else {
+          overrides.x = { ...getBaseAxis(), domain }
+        }
       }
     }
   }
@@ -1239,12 +1244,14 @@ function PieChartComponent({ data, config, height, autoHeight }: { data: Record<
     const width = containerWidth || el.clientWidth
     const effectiveHeight = autoHeight ? el.clientHeight : height
     if (width <= 0 || effectiveHeight <= 0) return // waiting for layout
-    const size = Math.min(width, effectiveHeight)
 
-    // Reserve space for external labels
+    // Reserve space for external labels — scale with available space
     const isExternal = chartTheme.pie.labelStyle === 'external'
-    const labelSpace = isExternal ? 80 : 20
-    const radius = (size - labelSpace * 2) / 2
+    const hLabelSpace = isExternal ? Math.min(80, width * 0.18) : 10
+    const vLabelSpace = isExternal ? Math.min(30, effectiveHeight * 0.08) : 10
+    const maxRadiusW = (width - hLabelSpace * 2) / 2
+    const maxRadiusH = (effectiveHeight - vLabelSpace * 2) / 2
+    const radius = Math.max(40, Math.min(maxRadiusW, maxRadiusH))
 
     const pieData = data.map((d) => ({
       label: String(d[labelField] ?? ''),
@@ -1266,11 +1273,11 @@ function PieChartComponent({ data, config, height, autoHeight }: { data: Record<
 
     const svg = d3.select(el).append('svg')
       .attr('width', width)
-      .attr('height', size)
-      .attr('viewBox', `0 0 ${width} ${size}`)
+      .attr('height', effectiveHeight)
+      .attr('viewBox', `0 0 ${width} ${effectiveHeight}`)
 
     const g = svg.append('g')
-      .attr('transform', `translate(${width / 2},${size / 2})`)
+      .attr('transform', `translate(${width / 2},${effectiveHeight / 2})`)
 
     const sliceStroke = chartTheme.pie.sliceStroke || (resolved === 'dark' ? '#1e293b' : '#ffffff')
     const sliceStrokeWidth = chartTheme.pie.sliceStrokeWidth ?? 1
