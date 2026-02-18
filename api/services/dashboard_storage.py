@@ -107,8 +107,12 @@ def load_dashboard(dashboard_id: str) -> SavedDashboard | None:
     if not path.exists():
         return None
 
-    data = json.loads(path.read_text())
-    return _safe_load_dashboard(data)
+    try:
+        data = json.loads(path.read_text())
+        return _safe_load_dashboard(data)
+    except Exception:
+        logger.warning("Failed to load dashboard %s (corrupted or schema mismatch?)", dashboard_id)
+        return None
 
 
 def list_dashboards() -> list[SavedDashboard]:
