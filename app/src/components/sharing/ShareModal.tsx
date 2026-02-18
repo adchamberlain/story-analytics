@@ -25,8 +25,11 @@ export function ShareModal({ dashboardId, onClose }: ShareModalProps) {
     return () => clearTimeout(copyTimer.current)
   }, [])
 
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-  if (token) headers['Authorization'] = `Bearer ${token}`
+  const buildHeaders = () => {
+    const h: Record<string, string> = { 'Content-Type': 'application/json' }
+    if (token) h['Authorization'] = `Bearer ${token}`
+    return h
+  }
 
   // Fetch current visibility
   useEffect(() => {
@@ -34,7 +37,7 @@ export function ShareModal({ dashboardId, onClose }: ShareModalProps) {
     const fetchMeta = async () => {
       try {
         const res = await fetch(`/api/v2/dashboards/${dashboardId}/sharing`, {
-          headers,
+          headers: buildHeaders(),
           signal: abortController.signal,
         })
         if (res.ok) {
@@ -60,7 +63,7 @@ export function ShareModal({ dashboardId, onClose }: ShareModalProps) {
     try {
       const res = await fetch(`/api/v2/dashboards/${dashboardId}/sharing`, {
         method: 'PUT',
-        headers,
+        headers: buildHeaders(),
         body: JSON.stringify({ visibility: newVisibility }),
       })
       if (!res.ok) throw new Error(`Save failed: ${res.status}`)

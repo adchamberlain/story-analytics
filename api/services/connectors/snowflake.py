@@ -122,15 +122,14 @@ class SnowflakeConnector(DatabaseConnector):
                     cache_subdir = cache_dir / table.lower()
                     cache_subdir.mkdir(parents=True, exist_ok=True)
                     pq_path = cache_subdir / f"{table.lower()}.parquet"
-                    pq.write_table(arrow_table, str(pq_path))
                 else:
                     tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".parquet")
                     pq_path = Path(tmp.name)
                     tmp.close()  # Close file handle; we only need the path
-                    pq.write_table(arrow_table, str(pq_path))
 
-                # Ingest into DuckDB
+                # Wrap write + ingest so temp file is always cleaned up
                 try:
+                    pq.write_table(arrow_table, str(pq_path))
                     schema = duckdb_service.ingest_parquet(pq_path, table.lower())
                     results.append({
                         "source_id": schema.source_id,

@@ -9,6 +9,7 @@ import json
 import logging
 import os
 import re
+import tempfile
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -60,9 +61,21 @@ def save_connection(
     )
 
     path = CONNECTIONS_DIR / f"{connection_id}.json"
-    tmp_path = path.with_suffix(".json.tmp")
-    tmp_path.write_text(json.dumps(asdict(conn), indent=2))
-    os.replace(str(tmp_path), str(path))
+    fd, tmp_name = tempfile.mkstemp(dir=CONNECTIONS_DIR, suffix=".tmp")
+    try:
+        os.write(fd, json.dumps(asdict(conn), indent=2).encode())
+        os.close(fd)
+        os.replace(tmp_name, str(path))
+    except BaseException:
+        try:
+            os.close(fd)
+        except OSError:
+            pass
+        try:
+            os.unlink(tmp_name)
+        except OSError:
+            pass
+        raise
     return conn
 
 

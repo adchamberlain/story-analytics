@@ -19,22 +19,37 @@ export function SharePanel({ chartId, title, source, chartRef }: SharePanelProps
 
   const chartUrl = `${window.location.origin}/chart/${chartId}`
   const embedCode = `<iframe src="${chartUrl}" width="100%" height="450" frameborder="0"></iframe>`
-  const copyTimer = useRef<ReturnType<typeof setTimeout>>()
+  const urlCopyTimer = useRef<ReturnType<typeof setTimeout>>()
+  const embedCopyTimer = useRef<ReturnType<typeof setTimeout>>()
 
   useEffect(() => {
-    return () => clearTimeout(copyTimer.current)
+    return () => {
+      clearTimeout(urlCopyTimer.current)
+      clearTimeout(embedCopyTimer.current)
+    }
   }, [])
 
-  const copyToClipboard = useCallback(async (text: string, setter: (v: boolean) => void) => {
+  const copyUrl = useCallback(async () => {
     try {
-      await navigator.clipboard.writeText(text)
-      setter(true)
-      clearTimeout(copyTimer.current)
-      copyTimer.current = setTimeout(() => setter(false), 2000)
+      await navigator.clipboard.writeText(chartUrl)
+      setCopiedUrl(true)
+      clearTimeout(urlCopyTimer.current)
+      urlCopyTimer.current = setTimeout(() => setCopiedUrl(false), 2000)
     } catch {
       // Clipboard API can fail in insecure contexts or iframes — ignore silently
     }
-  }, [])
+  }, [chartUrl])
+
+  const copyEmbed = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(embedCode)
+      setCopiedEmbed(true)
+      clearTimeout(embedCopyTimer.current)
+      embedCopyTimer.current = setTimeout(() => setCopiedEmbed(false), 2000)
+    } catch {
+      // Clipboard API can fail in insecure contexts or iframes — ignore silently
+    }
+  }, [embedCode])
 
   const getSvg = useCallback((): SVGSVGElement | null => {
     return chartRef.current?.querySelector('svg') ?? null
@@ -68,7 +83,7 @@ export function SharePanel({ chartId, title, source, chartRef }: SharePanelProps
     <div className="flex flex-wrap items-center gap-2">
       {/* Copy URL */}
       <button
-        onClick={() => copyToClipboard(chartUrl, setCopiedUrl)}
+        onClick={copyUrl}
         className={copiedUrl ? successBtnClass : btnClass}
       >
         {copiedUrl ? 'Copied!' : 'Copy URL'}
@@ -76,7 +91,7 @@ export function SharePanel({ chartId, title, source, chartRef }: SharePanelProps
 
       {/* Copy embed code */}
       <button
-        onClick={() => copyToClipboard(embedCode, setCopiedEmbed)}
+        onClick={copyEmbed}
         className={copiedEmbed ? successBtnClass : btnClass}
       >
         {copiedEmbed ? 'Copied!' : 'Embed'}

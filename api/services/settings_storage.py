@@ -9,6 +9,7 @@ that reads env vars still works without restart.
 
 import json
 import os
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 from dataclasses import dataclass, asdict, fields as dc_fields
@@ -83,11 +84,23 @@ def save_settings(**fields: str) -> AppSettings:
 
     current.updated_at = datetime.now(timezone.utc).isoformat()
 
-    # Persist to disk atomically
+    # Persist to disk atomically via uniquely-named temp file
     SETTINGS_PATH.parent.mkdir(parents=True, exist_ok=True)
-    tmp_path = SETTINGS_PATH.with_suffix(".json.tmp")
-    tmp_path.write_text(json.dumps(asdict(current), indent=2))
-    os.replace(str(tmp_path), str(SETTINGS_PATH))
+    fd, tmp_name = tempfile.mkstemp(dir=SETTINGS_PATH.parent, suffix=".tmp")
+    try:
+        os.write(fd, json.dumps(asdict(current), indent=2).encode())
+        os.close(fd)
+        os.replace(tmp_name, str(SETTINGS_PATH))
+    except BaseException:
+        try:
+            os.close(fd)
+        except OSError:
+            pass
+        try:
+            os.unlink(tmp_name)
+        except OSError:
+            pass
+        raise
 
     # Push keys into os.environ so downstream code works immediately.
     # Clear env var when key is removed so providers stop using the old key.

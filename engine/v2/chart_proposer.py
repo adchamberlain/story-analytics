@@ -63,7 +63,7 @@ CHART TYPES (pick one):
 - Histogram: For showing distribution of a single numeric variable.
 
 DuckDB SQL REMINDERS:
-- Use STRFTIME(column, '%Y-%m') for date formatting, NOT TO_CHAR
+- Use STRFTIME('%Y-%m', column) for date formatting, NOT TO_CHAR
 - Use DATE_TRUNC('month', column) for date grouping
 - Use COALESCE(x, default) not NVL or IFNULL
 - Use CASE WHEN ... THEN ... ELSE ... END not IFF

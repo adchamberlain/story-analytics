@@ -7,6 +7,7 @@ import json
 import logging
 import os
 import re
+import tempfile
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -66,10 +67,22 @@ def save_dashboard(
 
 
 def _atomic_write(path: Path, content: str) -> None:
-    """Write content to a file atomically via temp file + rename."""
-    tmp_path = path.with_suffix(".json.tmp")
-    tmp_path.write_text(content)
-    os.replace(str(tmp_path), str(path))
+    """Write content to a file atomically via uniquely-named temp file + rename."""
+    fd, tmp_name = tempfile.mkstemp(dir=path.parent, suffix=".tmp")
+    try:
+        os.write(fd, content.encode())
+        os.close(fd)
+        os.replace(tmp_name, str(path))
+    except BaseException:
+        try:
+            os.close(fd)
+        except OSError:
+            pass
+        try:
+            os.unlink(tmp_name)
+        except OSError:
+            pass
+        raise
 
 
 def _safe_load_dashboard(data: dict) -> SavedDashboard:

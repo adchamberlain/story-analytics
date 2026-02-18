@@ -136,8 +136,8 @@ export function DashboardViewPage() {
     if (isPinned) {
       localStorage.removeItem('pinnedDashboardId')
       setIsPinned(false)
-    } else {
-      localStorage.setItem('pinnedDashboardId', dashboardId!)
+    } else if (dashboardId) {
+      localStorage.setItem('pinnedDashboardId', dashboardId)
       setIsPinned(true)
     }
   }

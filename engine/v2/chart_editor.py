@@ -109,12 +109,15 @@ def _format_data_context(data_summary: dict) -> str:
         lines.append(", ".join(parts))
 
     sample_rows = data_summary.get("sample_rows", [])
+    total_rows = data_summary.get("row_count", len(sample_rows))
     if sample_rows:
         lines.append("Sample rows:")
         for row in sample_rows[:5]:
             row_parts = [f"{k}={v}" for k, v in row.items()]
             lines.append(f"  {', '.join(row_parts)}")
-        if len(sample_rows) > 5:
+        if total_rows > len(sample_rows):
+            lines.append(f"  ... (showing {min(5, len(sample_rows))} of {total_rows} rows)")
+        elif len(sample_rows) > 5:
             lines.append(f"  ... ({len(sample_rows)} rows total)")
 
     return "\n".join(lines)

@@ -18,14 +18,15 @@ export function EditorPage() {
   const isNew = chartId === 'new'
   const sourceId = searchParams.get('sourceId')
 
-  // Load chart or init new on mount
+  // Load chart or init new on mount; reset store before loading a different chart
   useEffect(() => {
     if (isNew && sourceId) {
+      store.reset()
       store.initNew(sourceId)
     } else if (chartId && chartId !== 'new' && chartId !== store.chartId) {
+      store.reset()
       store.loadChart(chartId)
     }
-    return () => store.reset()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chartId, sourceId])
 
