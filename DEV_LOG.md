@@ -2,6 +2,23 @@
 
 ## 2026-02-18
 
+### Session: Bug hunt round 25 — 7 fixes across query engine, editor, Gemini, LLM parsing (529 tests)
+
+6 parallel scanning agents across chart proposer/editor, DuckDB query execution, frontend stores, dashboard/sharing, chart rendering, and LLM providers. Triaged ~20+ candidates, kept 7 confirmed real bugs.
+
+**Fixes applied:**
+1. **Table-name substitution `in` vs `\b` mismatch** — substring check `"sales" in "wholesale_sales"` matched but word-boundary `\bsales\b` didn't, so loop broke early skipping valid fallbacks. Changed guard to `re.search(r'\b...\b', ...)` (duckdb_service.py:372-381)
+2. **Missing LIMIT on aggregation queries** — COUNT(*) and general aggregation branches in `build_query` had no LIMIT, allowing unbounded GROUP BY results. Added `LIMIT 10000` (charts_v2.py:344,365)
+3. **`discard()` doesn't reset `customSql` for SQL mode** — SQL editor textarea kept showing unsaved edits after discard; `buildQuery()` was a no-op in SQL mode. Now restores `customSql` and calls `executeCustomSql()` for SQL-mode charts (editorStore.ts:662-680)
+4. **`undo()`/`redo()` don't refresh data** — config was restored but `buildQuery()` never called, leaving chart data stale after undo. Added `buildQuery()` call for non-SQL mode (editorStore.ts:582-604)
+5. **Gemini consecutive same-role messages crash** — filtering system messages could produce two consecutive `user` entries, violating Gemini's strict alternation. Added merge logic for consecutive same-role messages (gemini_provider.py:158-170)
+6. **Gemini `generate_with_image` wrong content types** — mixed `types.Part` and raw `str` at top level of `contents`. Wrapped both in a single `types.Content` (gemini_provider.py:275)
+7. **Boolean `"false"` string treated as truthy** — LLMs sometimes return `"false"` (string) instead of `false` (boolean). Added `_coerce_bool()` helper for `horizontal` and `sort` fields (chart_proposer.py:133-139,191-192)
+
+Tests: 430 Python + 99 frontend = **529 total** (6 new regression tests, 1 updated)
+
+---
+
 ### Session: Bug hunt round 24 — 5 fixes across threading, export, editor, charts, paste (509 tests)
 
 5 parallel scanning agents across chart v2 router, conversation engine, static export, data router, and editor/chart UI. Triaged ~25+ candidates, dropped architectural items, kept 5 confirmed real bugs.
