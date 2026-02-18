@@ -7,6 +7,7 @@ or Snowflake sources.
 import uuid
 import csv
 import tempfile
+import threading
 from datetime import datetime, timezone
 from pathlib import Path
 from dataclasses import dataclass
@@ -457,8 +458,6 @@ def q(col_name: str) -> str:
 
 
 # ── Singleton ────────────────────────────────────────────────────────────────
-
-import threading
 
 _service: DuckDBService | None = None
 _service_lock = threading.Lock()
