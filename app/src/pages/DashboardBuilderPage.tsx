@@ -55,12 +55,14 @@ export function DashboardBuilderPage() {
   }, [dashboardId])
 
   // Auto-add chart when returning from chart creation flow.
-  // Wait for the dashboard to finish loading so addChart doesn't get overwritten,
-  // then auto-save and navigate to the dashboard view page.
+  // Guard on store.dashboardId (not store.loading) because loading starts as false
+  // and the load effect hasn't set it to true yet on the first render — using loading
+  // as the guard causes a race where addChart fires before the dashboard is loaded.
+  // dashboardId starts as null and only gets set when load() completes successfully.
   const addChartHandled = useRef(false)
   useEffect(() => {
     const addChartId = searchParams.get('addChart')
-    if (!addChartId || store.loading || addChartHandled.current) return
+    if (!addChartId || !store.dashboardId || addChartHandled.current) return
 
     addChartHandled.current = true
     store.addChart(addChartId)
@@ -68,7 +70,7 @@ export function DashboardBuilderPage() {
       if (id) navigate(`/dashboard/${id}`)
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams, store.loading])
+  }, [searchParams, store.dashboardId])
 
   // Fetch full chart data for all referenced charts
   useEffect(() => {
