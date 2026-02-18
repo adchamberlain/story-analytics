@@ -2,6 +2,25 @@
 
 ## 2026-02-18
 
+### Session: Bug hunt round 28 (final) — 9 fixes across JWT auth, Plot theme, chart storage, dashboard grid, config, chart editor, magic link (573 tests)
+
+6 parallel scanning agents across chart editor, sharing/grid, security/database, remaining pages, frontend utils, and build query logic. Triaged ~12 candidates, kept 9 confirmed real bugs.
+
+**Fixes applied:**
+1. **`int(user_id)` crash on malformed JWT** — non-numeric `sub` claim in JWT causes unhandled `ValueError` on `int()` cast. Added try/except guard (dependencies.py:38)
+2. **`gridColor` not valid Observable Plot property** — Plot accepts `grid: true | string` (where string is a color), not a separate `gridColor` property. Changed to pass color through `grid` directly (plotTheme.ts:100)
+3. **`reasoning` field missing default in SavedChart** — dataclass field ordering required `reasoning: str | None` (no default) before `created_at: str` (no default). Old charts without `reasoning` key fail to load. Moved `reasoning` after required fields with `= None` default (chart_storage.py:39-41)
+4. **`generateLayout` auto-placed items overlap persisted items** — auto-placed items started at y=0 regardless of persisted items, causing visual overlap. Added cursor advancement past persisted item bounds (DashboardGrid.tsx:65-78)
+5. **`secret_key` evaluated at import time** — `os.environ.get()` in field default evaluates at class definition time, before pydantic-settings loads `.env` file. Changed to plain string default so `.env` override works (config.py:17)
+6. **`onLayoutChange` x uses raw `item.w` instead of clamped `w`** — `x` position was computed from pre-clamped `item.w`, potentially allowing x=1 for full-width items if react-grid-layout reported fractional widths. Extracted local `w` variable (DashboardGrid.tsx:142-148)
+7. **`_parse_edit_response` crashes on non-dict JSON** — if LLM returns a JSON array or primitive, `data.get("config")` throws `AttributeError`. Added `isinstance(data, dict)` guard (chart_editor.py:204-208)
+8. **`update_chart` unhandled `json.loads` crash** — corrupted chart JSON file causes unhandled `JSONDecodeError` in update path (load_chart already had a guard, update_chart didn't). Added try/except (chart_storage.py:170-173)
+9. **`is_valid` timezone crash on SQLite** — SQLite may strip timezone info from `expires_at`, producing naive datetime. Comparison with `datetime.now(timezone.utc)` raises `TypeError`. Added timezone normalization (magic_link.py:40-44)
+
+Tests: 472 Python + 101 frontend = **573 total** (1 new test file with 18 tests)
+
+---
+
 ### Session: Bug hunt round 27 — 9 fixes across auth, chart factory, dashboard, schema, DuckDB (555 tests)
 
 6 parallel scanning agents across schema analyzer, chart factory, dashboard pages, API middleware, DuckDB service, and conversation engine. Triaged ~15 candidates, kept 9 confirmed real bugs.

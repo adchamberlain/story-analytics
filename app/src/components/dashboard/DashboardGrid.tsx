@@ -64,6 +64,7 @@ function generateLayout(charts: ChartWithData[]): Layout {
     // If the chart has a persisted layout, use it (but clamp w to 1 or 2)
     if (chart.layout) {
       const w = chart.layout.w >= 2 ? 2 : 1
+      const itemBottom = chart.layout.y + chart.layout.h
       items.push({
         i: chart.chart_id,
         x: chart.layout.x >= 1 && w === 1 ? 1 : 0,
@@ -74,6 +75,11 @@ function generateLayout(charts: ChartWithData[]): Layout {
         maxW: 2,
         minH: 3,
       })
+      // Advance cursor past persisted items so auto-placed items don't overlap
+      if (itemBottom > y) {
+        y = itemBottom
+        x = 0
+      }
       continue
     }
 
@@ -133,11 +139,14 @@ export function DashboardGrid({ charts, dashboardId, editable = false, onLayoutC
           onLayoutChange={(currentLayout: Layout) => {
             if (editable && onLayoutChange) {
               // Clamp all items to strict 2-col: w must be 1 or 2, x must be 0 or 1
-              const clamped = [...currentLayout].map(item => ({
-                ...item,
-                w: item.w >= 2 ? 2 : 1,
-                x: item.w >= 2 ? 0 : (item.x >= 1 ? 1 : 0),
-              }))
+              const clamped = [...currentLayout].map(item => {
+                const w = item.w >= 2 ? 2 : 1
+                return {
+                  ...item,
+                  w,
+                  x: w >= 2 ? 0 : (item.x >= 1 ? 1 : 0),
+                }
+              })
               onLayoutChange(clamped)
             }
           }}

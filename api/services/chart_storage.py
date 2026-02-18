@@ -36,9 +36,9 @@ class SavedChart:
     series: str | None
     horizontal: bool
     sort: bool
-    reasoning: str | None
     created_at: str
     updated_at: str
+    reasoning: str | None = None
     config: dict | None = None  # Visual config blob (palette, toggles, axis labels)
     connection_id: str | None = None  # Database connection this data came from
     source_table: str | None = None   # Original table name (e.g., "INVOICES")
@@ -167,7 +167,11 @@ def update_chart(chart_id: str, **fields) -> SavedChart | None:
     if not path.exists():
         return None
 
-    data = json.loads(path.read_text())
+    try:
+        data = json.loads(path.read_text())
+    except (json.JSONDecodeError, OSError):
+        logger.warning("Failed to read chart %s for update (corrupted?)", chart_id)
+        return None
     now = datetime.now(timezone.utc).isoformat()
 
     # Only allow updating presentation fields — protect id, source_id, sql, timestamps

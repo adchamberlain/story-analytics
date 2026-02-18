@@ -97,7 +97,7 @@ export function plotDefaults(overrides: Record<string, unknown> = {}, chartTheme
     marginLeft: chartTheme?.plot.marginLeft ?? 48,
     grid: false, // top-level grid (x-axis) — controlled per chart type
     x: { line: xLine, tickSize: 0, labelOffset: 8 },
-    y: { line: yLine, tickSize: 0, labelOffset: 8, grid: gridY, ...(gridColor ? { gridColor } : {}) },
+    y: { line: yLine, tickSize: 0, labelOffset: 8, grid: !gridY ? false : (gridColor || true) },
     color: { range: [...palette] },
     ...overrides,
   }
