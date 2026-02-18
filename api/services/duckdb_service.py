@@ -61,7 +61,7 @@ class DuckDBService:
 
     def __init__(self) -> None:
         self._conn = duckdb.connect(":memory:")
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()
         self._sources: dict[str, SourceMeta] = {}
         DATA_DIR.mkdir(parents=True, exist_ok=True)
         self._reload_uploaded_sources()

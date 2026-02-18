@@ -660,14 +660,17 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
 
   discard: () => {
-    const { savedConfig } = get()
+    const { savedConfig, savedSql } = get()
     if (!savedConfig) return
 
     set({
       config: { ...savedConfig },
+      sql: savedSql,
       configHistory: [],
       configFuture: [],
     })
+    // Re-run query with restored config to refresh data
+    get().buildQuery()
   },
 
   sendChatMessage: async (message: string) => {

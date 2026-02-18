@@ -185,13 +185,14 @@ def export_dashboard_html(
     function renderChart(container, chart) {{
       const {{ chartType, data, config }} = chart;
       const x = config.x, y = config.y, series = config.series;
+      const isMultiY = Array.isArray(y) && y.length > 1;
       const colors = config.color ? [config.color] : [...COLORS];
       const width = container.clientWidth;
       const height = 320;
 
       if (chartType === "BigValue") {{
         const row = data[0] || {{}};
-        const val = row[config.value || config.y] ?? "—";
+        const val = row[config.value || (isMultiY ? y[0] : y)] ?? "—";
         const formatted = typeof val === "number"
           ? (config.valueFormat === "currency" ? "$" + val.toLocaleString() : val.toLocaleString())
           : String(val);
@@ -212,32 +213,36 @@ def export_dashboard_html(
 
       const plotData = maybeParseDates(data, x);
       const marks = [];
+      // For multi-Y, treat the data as having an implicit "metric" series column
+      // produced by UNPIVOT on the backend.  The first y value is used as accessor.
+      const yField = isMultiY ? y[0] : y;
+      const implicitSeries = isMultiY ? "metric" : series;
 
       if (chartType === "BarChart") {{
         if (config.horizontal) {{
-          marks.push(series
-            ? Plot.barX(plotData, {{ x: y, y: x, fill: series }})
-            : Plot.barX(plotData, {{ x: y, y: x, fill: colors[0] }}));
+          marks.push(implicitSeries
+            ? Plot.barX(plotData, {{ x: yField, y: x, fill: implicitSeries }})
+            : Plot.barX(plotData, {{ x: yField, y: x, fill: colors[0] }}));
         }} else {{
-          marks.push(series
-            ? Plot.barY(plotData, {{ x, y, fill: series, ...(config.stacked ? {{}} : {{ fx: x }}) }})
-            : Plot.barY(plotData, {{ x, y, fill: colors[0] }}));
+          marks.push(implicitSeries
+            ? Plot.barY(plotData, {{ x, y: yField, fill: implicitSeries, ...(config.stacked ? {{}} : {{ fx: x }}) }})
+            : Plot.barY(plotData, {{ x, y: yField, fill: colors[0] }}));
         }}
       }} else if (chartType === "LineChart") {{
-        marks.push(series
-          ? Plot.lineY(plotData, {{ x, y, stroke: series, strokeWidth: 2 }})
-          : Plot.lineY(plotData, {{ x, y, stroke: colors[0], strokeWidth: 2 }}));
+        marks.push(implicitSeries
+          ? Plot.lineY(plotData, {{ x, y: yField, stroke: implicitSeries, strokeWidth: 2 }})
+          : Plot.lineY(plotData, {{ x, y: yField, stroke: colors[0], strokeWidth: 2 }}));
       }} else if (chartType === "AreaChart") {{
-        marks.push(series
-          ? Plot.areaY(plotData, {{ x, y, fill: series, fillOpacity: 0.15 }})
-          : Plot.areaY(plotData, {{ x, y, fill: colors[0] + "26" }}));
-        marks.push(series
-          ? Plot.lineY(plotData, {{ x, y, stroke: series, strokeWidth: 2 }})
-          : Plot.lineY(plotData, {{ x, y, stroke: colors[0], strokeWidth: 2 }}));
+        marks.push(implicitSeries
+          ? Plot.areaY(plotData, {{ x, y: yField, fill: implicitSeries, fillOpacity: 0.15 }})
+          : Plot.areaY(plotData, {{ x, y: yField, fill: colors[0] + "26" }}));
+        marks.push(implicitSeries
+          ? Plot.lineY(plotData, {{ x, y: yField, stroke: implicitSeries, strokeWidth: 2 }})
+          : Plot.lineY(plotData, {{ x, y: yField, stroke: colors[0], strokeWidth: 2 }}));
       }} else if (chartType === "ScatterPlot") {{
-        marks.push(series
-          ? Plot.dot(plotData, {{ x, y, fill: series, r: 4 }})
-          : Plot.dot(plotData, {{ x, y, fill: colors[0], r: 4 }}));
+        marks.push(implicitSeries
+          ? Plot.dot(plotData, {{ x, y: yField, fill: implicitSeries, r: 4 }})
+          : Plot.dot(plotData, {{ x, y: yField, fill: colors[0], r: 4 }}));
       }} else if (chartType === "Histogram") {{
         marks.push(Plot.rectY(plotData, {{ ...Plot.binX({{ y: "count" }}, {{ x }}), fill: colors[0] }}));
       }}

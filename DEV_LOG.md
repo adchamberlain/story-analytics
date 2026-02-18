@@ -2,6 +2,21 @@
 
 ## 2026-02-18
 
+### Session: Bug hunt round 24 — 5 fixes across threading, export, editor, charts, paste (509 tests)
+
+5 parallel scanning agents across chart v2 router, conversation engine, static export, data router, and editor/chart UI. Triaged ~25+ candidates, dropped architectural items, kept 5 confirmed real bugs.
+
+**Fixes applied:**
+1. **Deadlock on BaseException during CSV ingest** — `threading.Lock()` is non-reentrant; when `BaseException` (MemoryError, KeyboardInterrupt) was raised inside a locked block, the cleanup handler tried `with self._lock:` again, causing permanent deadlock. Changed to `threading.RLock()` (duckdb_service.py:64)
+2. **Multi-Y charts blank in static HTML export** — `renderChart` passed `config.y` directly to Observable Plot channel accessors. When `y` was an array (multi-Y), Plot received an array instead of a field name. Added `isMultiY` detection: uses `y[0]` as accessor and `"metric"` as implicit series (static_export.py:187)
+3. **`discard` doesn't restore SQL or data** — `discard()` only reset `config` to `savedConfig` but left `sql` stale, so `isDirty()` stayed true and the "Unsaved" badge persisted. Now also restores `sql: savedSql` and calls `buildQuery()` to refresh data (editorStore.ts:662-672)
+4. **Pie/Treemap no ResizeObserver** — `PieChartComponent` and `TreemapComponent` used `el.clientWidth` once at mount but had no `ResizeObserver`, so they wouldn't re-render when container resized. Added ResizeObserver + `containerWidth` state (ObservableChartFactory.tsx:1201,1355)
+5. **pasted_data.csv filename collision** — paste handler used `"pasted_data.csv"` as the sentinel filename; a user-uploaded file with the same name would be found by `find_source_by_filename` and destroyed. Changed sentinel to `"__paste__.csv"` (data.py:318)
+
+Tests: 412 Python + 97 frontend = **509 total** (5 new regression tests, 1 updated)
+
+---
+
 ### Session: Bug hunt round 23b — late-arriving agent findings (3 fixes, 498 tests)
 
 3 additional bugs from Round 23 scanning agents, confirmed and fixed:
