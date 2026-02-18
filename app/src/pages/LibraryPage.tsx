@@ -162,19 +162,29 @@ export function LibraryPage() {
   const handleDelete = async (chartId: string) => {
     setDeletingId(chartId)
     setConfirmingId(null)
-    await store.deleteChart(chartId)
-    setDeletingId(null)
+    try {
+      await store.deleteChart(chartId)
+    } catch {
+      // deleteChart handles its own error state in the store
+    } finally {
+      setDeletingId(null)
+    }
   }
 
   const handleBulkDelete = async () => {
     setBulkDeleting(true)
-    for (const id of selectedIds) {
-      await store.deleteChart(id)
+    try {
+      for (const id of selectedIds) {
+        await store.deleteChart(id)
+      }
+      setSelectedIds(new Set())
+      setSelectMode(false)
+      setBulkConfirm(false)
+    } catch {
+      // Individual failures handled by store
+    } finally {
+      setBulkDeleting(false)
     }
-    setSelectedIds(new Set())
-    setSelectMode(false)
-    setBulkConfirm(false)
-    setBulkDeleting(false)
   }
 
   return (

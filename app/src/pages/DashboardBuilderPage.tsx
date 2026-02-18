@@ -62,6 +62,10 @@ export function DashboardBuilderPage() {
   // as the guard causes a race where addChart fires before the dashboard is loaded.
   // dashboardId starts as null and only gets set when load() completes successfully.
   const addChartHandled = useRef(false)
+  // Reset when dashboardId changes so addChart works across navigations
+  useEffect(() => {
+    addChartHandled.current = false
+  }, [dashboardId])
   useEffect(() => {
     const addChartId = searchParams.get('addChart')
     if (!addChartId || !store.dashboardId || addChartHandled.current) return

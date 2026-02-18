@@ -519,7 +519,11 @@ async def export_html(dashboard_id: str):
         charts=charts_for_export,
     )
 
-    filename = f"{dashboard_data.title.replace(' ', '_').lower()}.html"
+    # Sanitize filename: strip anything outside alphanumeric, underscore, hyphen
+    safe_title = re.sub(r'[^\w\-]', '_', dashboard_data.title).strip('_').lower()
+    if not safe_title:
+        safe_title = "dashboard"
+    filename = f"{safe_title}.html"
     return HTMLResponse(
         content=html,
         headers={

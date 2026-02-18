@@ -326,6 +326,11 @@ export function DashboardViewPage() {
 function DashboardShareLinks({ dashboardId }: { dashboardId: string }) {
   const [copiedUrl, setCopiedUrl] = useState(false)
   const [copiedEmbed, setCopiedEmbed] = useState(false)
+  const timerRef = useRef<ReturnType<typeof setTimeout>>()
+
+  useEffect(() => {
+    return () => clearTimeout(timerRef.current)
+  }, [])
 
   const url = `${window.location.origin}/dashboard/${dashboardId}`
   const embedCode = `<iframe src="${url}" width="100%" height="800" frameborder="0"></iframe>`
@@ -333,7 +338,8 @@ function DashboardShareLinks({ dashboardId }: { dashboardId: string }) {
   const copy = async (text: string, setter: (v: boolean) => void) => {
     await navigator.clipboard.writeText(text)
     setter(true)
-    setTimeout(() => setter(false), 2000)
+    clearTimeout(timerRef.current)
+    timerRef.current = setTimeout(() => setter(false), 2000)
   }
 
   const btnClass = 'text-xs px-3 py-1.5 rounded border border-border-default text-text-on-surface hover:bg-surface-secondary transition-colors'
