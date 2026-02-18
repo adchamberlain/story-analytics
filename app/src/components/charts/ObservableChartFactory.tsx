@@ -1049,7 +1049,8 @@ function getUniqueSeries(data: Record<string, unknown>[], field: string): string
     const v = String(row[field] ?? '')
     if (!seen.has(v)) { seen.add(v); result.push(v) }
   }
-  return result
+  // Sort alphabetically to match Observable Plot's default ordinal domain ordering
+  return result.sort()
 }
 
 // ── Date Parsing Helper ─────────────────────────────────────────────────────
