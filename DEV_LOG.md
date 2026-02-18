@@ -2,6 +2,18 @@
 
 ## 2026-02-18
 
+### Session: Bug hunt round 23b — late-arriving agent findings (3 fixes, 498 tests)
+
+3 additional bugs from Round 23 scanning agents, confirmed and fixed:
+
+1. **Stale `chatMessages` snapshot** — `sendChatMessage` captured `chatMessages` via `get()` then spread it in `set()`, losing any messages added between the snapshot and the update (race with concurrent responses). Switched to Zustand functional updater `set((state) => ({ chatMessages: [...state.chatMessages, ...] }))` (editorStore.ts:683,694)
+2. **`_sources` TOCTOU KeyError** — `execute_query` checked `source_id in self._sources` then accessed `self._sources[source_id]` — concurrent `remove_source` between check and access caused KeyError. Switched to `.get()` pattern (duckdb_service.py:368)
+3. **`load_dashboard` unhandled exception** — `load_dashboard` had no try/except around JSON parse + dataclass construction, unlike `list_dashboards` which did. Corrupted file caused 500 instead of graceful None return (dashboard_storage.py:110)
+
+Tests: 405 Python + 93 frontend = **498 total** (3 new regression tests added)
+
+---
+
 ### Session: Bug hunt round 23 — broad sweep (7 fixes, 495 tests)
 
 5 parallel scanning agents across conversation engine, API routers, frontend stores, DuckDB services, and frontend pages. Triaged ~20 candidates, dropped defensive/stylistic items, kept 7 confirmed bugs.

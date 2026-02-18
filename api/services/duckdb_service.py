@@ -365,9 +365,10 @@ class DuckDBService:
         if table_name not in processed_sql:
             # Try to find what table the SQL references and substitute
             # Common patterns: FROM data, FROM "data", FROM table_name
-            if source_id in self._sources:
+            meta = self._sources.get(source_id)
+            if meta:
                 # Get the stem of the original filename as a possible table reference
-                stem = self._sources[source_id].path.stem
+                stem = meta.path.stem
                 for ref in [stem, stem.lower(), stem.upper(), "data", "uploaded_data"]:
                     if ref in processed_sql:
                         # Use word-boundary regex to avoid corrupting substrings

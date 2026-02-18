@@ -2264,3 +2264,60 @@ class TestHealthCacheInvalidateOnDelete:
         assert m, "remove_dashboard function not found"
         body = m.group(0)
         assert "_health_cache.pop(dashboard_id" in body, "Health cache not cleared in delete handler"
+
+
+# ── Round 23b regression tests ────────────────────────────────────────────
+
+
+@pytest.mark.unit
+class TestChatMessagesFunctionalUpdater:
+    """Regression: sendChatMessage must use functional updater to avoid stale chatMessages snapshot."""
+
+    def test_no_stale_spread_in_send_chat(self):
+        from pathlib import Path
+        import re
+        source = Path("app/src/stores/editorStore.ts").read_text()
+        # Find the sendChatMessage function body
+        m = re.search(r'sendChatMessage: async.*?^\s{2}\},', source, re.DOTALL | re.MULTILINE)
+        assert m, "sendChatMessage function not found"
+        body = m.group(0)
+        # Should NOT destructure chatMessages from get() since we use functional updaters
+        assert "chatMessages" not in body.split("\n")[1], "chatMessages should not be destructured from get()"
+        # Should use functional updater form: set((state) => ...)
+        assert "state.chatMessages" in body, "Should use state.chatMessages via functional updater"
+
+
+@pytest.mark.unit
+class TestSourcesDictGetPattern:
+    """Regression: execute_query must use _sources.get() to avoid TOCTOU KeyError."""
+
+    def test_uses_get_not_bracket(self):
+        from pathlib import Path
+        import re
+        source = Path("api/services/duckdb_service.py").read_text()
+        # Find the execute_query method and the table substitution block
+        m = re.search(r'def execute_query.*?return QueryResult', source, re.DOTALL)
+        assert m, "execute_query method not found"
+        body = m.group(0)
+        # Should use .get() pattern, not direct bracket access after 'in' check
+        assert "self._sources.get(source_id)" in body or "meta = self._sources.get(" in body, \
+            "Should use .get() to avoid TOCTOU KeyError"
+        # Should NOT have the old pattern: if source_id in self._sources: ... self._sources[source_id]
+        assert "if source_id in self._sources:" not in body, \
+            "Should not use 'in' check followed by bracket access"
+
+
+@pytest.mark.unit
+class TestLoadDashboardErrorHandling:
+    """Regression: load_dashboard must catch errors like load_chart does."""
+
+    def test_try_except_in_load_dashboard(self):
+        from pathlib import Path
+        import re
+        source = Path("api/services/dashboard_storage.py").read_text()
+        m = re.search(r'def load_dashboard.*?(?=\ndef )', source, re.DOTALL)
+        assert m, "load_dashboard function not found"
+        body = m.group(0)
+        assert "try:" in body, "load_dashboard should have try/except"
+        assert "except Exception:" in body, "load_dashboard should catch Exception"
+        assert "return None" in body, "load_dashboard should return None on error"
