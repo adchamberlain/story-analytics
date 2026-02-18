@@ -2,7 +2,6 @@
 Data router: CSV upload, schema inspection, and query execution.
 """
 
-import re
 import shutil
 import tempfile
 from pathlib import Path
