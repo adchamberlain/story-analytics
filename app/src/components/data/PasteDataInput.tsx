@@ -1,17 +1,19 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 
 interface PasteDataInputProps {
-  onSubmit: (text: string) => void
+  onSubmit: (text: string, name: string) => void
   uploading: boolean
 }
 
 export function PasteDataInput({ onSubmit, uploading }: PasteDataInputProps) {
   const [text, setText] = useState('')
+  const [name, setName] = useState('')
+  const nameRef = useRef<HTMLInputElement>(null)
 
   const handleSubmit = useCallback(() => {
     const trimmed = text.trim()
-    if (trimmed) onSubmit(trimmed)
-  }, [text, onSubmit])
+    if (trimmed) onSubmit(trimmed, name.trim())
+  }, [text, name, onSubmit])
 
   const hasData = text.trim().length > 0
 
@@ -36,10 +38,29 @@ export function PasteDataInput({ onSubmit, uploading }: PasteDataInputProps) {
         style={{ padding: '14px 16px', minHeight: '160px', maxHeight: '400px' }}
       />
 
-      <div className="flex items-center justify-between" style={{ marginTop: '14px' }}>
-        <p className="text-[13px] text-text-muted">
-          Tab-separated (from spreadsheets) or comma-separated
-        </p>
+      <p className="text-[13px] text-text-muted" style={{ marginTop: '10px' }}>
+        Tab-separated (from spreadsheets) or comma-separated
+      </p>
+
+      {/* Name input — shown once data is pasted */}
+      {hasData && (
+        <div style={{ marginTop: '14px' }}>
+          <label className="block text-[13px] font-medium text-text-secondary" style={{ marginBottom: '6px' }}>
+            Source name
+          </label>
+          <input
+            ref={nameRef}
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="e.g. Sales Data Q4"
+            disabled={uploading}
+            className="w-full px-3 py-2 text-[14px] border border-border-default rounded-lg bg-surface-secondary text-text-primary placeholder:text-text-muted focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400"
+          />
+        </div>
+      )}
+
+      <div className="flex justify-end" style={{ marginTop: '14px' }}>
         <button
           onClick={handleSubmit}
           disabled={!hasData || uploading}
@@ -57,7 +78,7 @@ export function PasteDataInput({ onSubmit, uploading }: PasteDataInputProps) {
             if (hasData && !uploading) e.currentTarget.style.backgroundColor = '#3b82f6'
           }}
         >
-          {uploading ? 'Processing...' : 'Use this data'}
+          {uploading ? 'Processing...' : 'Preview data'}
         </button>
       </div>
     </div>

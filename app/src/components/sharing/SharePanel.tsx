@@ -62,8 +62,8 @@ export function SharePanel({ chartId, title, source, chartRef }: SharePanelProps
 
   const handleExportPNG = useCallback(() => {
     const svg = getSvg()
-    if (svg) exportPNG(svg, title ?? 'chart')
-  }, [getSvg, title])
+    if (svg) exportPNG(svg, title ?? 'chart', 2, { title, source })
+  }, [getSvg, title, source])
 
   const handleExportPDF = useCallback(async () => {
     const svg = getSvg()

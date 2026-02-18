@@ -23,19 +23,27 @@ export function SourcePickerPage() {
   const [refreshKey, setRefreshKey] = useState(0)
   const [showRecent, setShowRecent] = useState(false)
   const [inputMode, setInputMode] = useState<'upload' | 'paste'>('upload')
+  const [sourceName, setSourceName] = useState('')
 
   const dataStore = useDataStore()
 
-  // When returnTo is set (e.g. from Manage Sources), redirect after upload completes.
+  // Reset stale data source state from a previous visit so the user always
+  // starts on the "Choose a data source" step instead of the old preview.
+  useEffect(() => {
+    useDataStore.getState().reset()
+  }, [])
+
   // Validate returnTo is a same-origin relative path to prevent open redirect.
   const safeReturnTo = returnTo && returnTo.startsWith('/') && !returnTo.startsWith('//') ? returnTo : null
+
+  // Initialize source name when a source is loaded (strip .csv extension for editing)
   useEffect(() => {
-    if (safeReturnTo && dataStore.source && !dataStore.uploading) {
-      dataStore.reset()
-      navigate(safeReturnTo)
+    if (dataStore.source) {
+      const fn = dataStore.source.filename
+      const isPaste = fn === '__paste__.csv'
+      setSourceName(isPaste ? '' : fn.replace(/\.csv$/i, ''))
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [safeReturnTo, dataStore.source, dataStore.uploading, navigate])
+  }, [dataStore.source])
 
   useEffect(() => {
     setLoading(true)
@@ -68,8 +76,8 @@ export function SourcePickerPage() {
   )
 
   const handlePasteSubmit = useCallback(
-    async (text: string) => {
-      await dataStore.pasteData(text)
+    async (text: string, name: string) => {
+      await dataStore.pasteData(text, name || undefined)
     },
     [dataStore]
   )
@@ -114,9 +122,23 @@ export function SourcePickerPage() {
             <h1 className="text-[28px] font-bold text-text-primary tracking-tight" style={{ marginBottom: '8px' }}>
               Check your data
             </h1>
-            <p className="text-[15px] text-text-muted leading-relaxed" style={{ marginBottom: '32px' }}>
-              {dataStore.source.filename} — {dataStore.source.row_count.toLocaleString()} rows, {dataStore.source.columns.length} columns
+            <p className="text-[15px] text-text-muted leading-relaxed" style={{ marginBottom: '24px' }}>
+              {dataStore.source.row_count.toLocaleString()} rows, {dataStore.source.columns.length} columns
             </p>
+
+            {/* Source name input */}
+            <div style={{ marginBottom: '24px' }}>
+              <label className="block text-[13px] font-medium text-text-secondary" style={{ marginBottom: '6px' }}>
+                Name
+              </label>
+              <input
+                type="text"
+                value={sourceName}
+                onChange={(e) => setSourceName(e.target.value)}
+                placeholder="e.g. Sales Data Q4"
+                className="w-full px-3 py-2 text-[15px] border border-border-default rounded-lg bg-surface text-text-primary placeholder:text-text-muted focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400"
+              />
+            </div>
 
             <DataPreview
               filename={dataStore.source.filename}
@@ -128,10 +150,30 @@ export function SourcePickerPage() {
 
             <div style={{ display: 'flex', gap: '12px', marginTop: '24px' }}>
               <button
-                onClick={() => {
-                  const params = new URLSearchParams({ sourceId: dataStore.source!.source_id })
-                  if (returnToDashboard) params.set('returnToDashboard', returnToDashboard)
-                  navigate(`/editor/new?${params}`)
+                onClick={async () => {
+                  const sid = dataStore.source!.source_id
+                  // Rename if user provided a name different from current filename
+                  const trimmed = sourceName.trim()
+                  if (trimmed) {
+                    try {
+                      await fetch(`/api/data/sources/${sid}/rename`, {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ name: trimmed }),
+                      })
+                    } catch {
+                      // Non-critical — continue even if rename fails
+                    }
+                  }
+                  // Navigate: back to returnTo page, or to editor
+                  if (safeReturnTo) {
+                    dataStore.reset()
+                    navigate(safeReturnTo)
+                  } else {
+                    const params = new URLSearchParams({ sourceId: sid })
+                    if (returnToDashboard) params.set('returnToDashboard', returnToDashboard)
+                    navigate(`/editor/new?${params}`)
+                  }
                 }}
                 className="text-[15px] font-medium rounded-lg transition-colors"
                 style={{

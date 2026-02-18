@@ -29,8 +29,8 @@ export function ChartWrapper({ title, subtitle, source, sourceUrl, chartUrl, chi
 
   const handleExportPNG = useCallback(() => {
     const svg = chartAreaRef.current?.querySelector('svg')
-    if (svg) exportPNG(svg, title ?? 'chart')
-  }, [title])
+    if (svg) exportPNG(svg, title ?? 'chart', 2, { title, subtitle, source })
+  }, [title, subtitle, source])
 
   const handleExportPDF = useCallback(async () => {
     const svg = chartAreaRef.current?.querySelector('svg')
