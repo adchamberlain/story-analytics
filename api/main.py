@@ -51,6 +51,9 @@ app.include_router(settings_router, prefix="/api")
 async def startup():
     """Create database tables on startup."""
     create_tables()
+    # Ensure default user exists so sharing/metadata FK constraints are satisfied
+    from .services.metadata_db import ensure_default_user
+    ensure_default_user()
 
 
 @app.get("/")

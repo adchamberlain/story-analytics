@@ -81,8 +81,10 @@ export function DashboardBuilderPage() {
     const missing = store.charts.filter((c) => !chartData[c.chart_id] && !chartErrors[c.chart_id])
     if (missing.length === 0) return
 
+    const abortController = new AbortController()
+
     for (const ref of missing) {
-      fetch(`/api/v2/charts/${ref.chart_id}`)
+      fetch(`/api/v2/charts/${ref.chart_id}`, { signal: abortController.signal })
         .then((res) => {
           if (!res.ok) throw new Error(`Chart ${ref.chart_id} not found`)
           return res.json()
@@ -107,10 +109,13 @@ export function DashboardBuilderPage() {
             },
           }))
         })
-        .catch(() => {
+        .catch((err) => {
+          if (err.name === 'AbortError') return
           setChartErrors((prev) => ({ ...prev, [ref.chart_id]: 'Failed to load chart' }))
         })
     }
+
+    return () => abortController.abort()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [store.charts.map((c) => c.chart_id).join(',')])
 
