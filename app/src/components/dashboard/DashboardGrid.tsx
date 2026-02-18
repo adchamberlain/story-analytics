@@ -255,9 +255,10 @@ function DashboardChartCell({
   }
 
   // Compute available chart height from grid row height (60px) and gap (24px)
-  // Overhead: p-5 padding (40px), header (~35px), chart gap (8px), footer gap + source (~24px), potential legend (~15px)
+  // Overhead: p-5 padding (40px), title+subtitle (~58px), mb-1.5 (6px),
+  // chart gap mt-2 (8px), legend (~24px), footer mt-3 (12px), source (~18px)
   const cellHeight = gridH * 60 + (gridH - 1) * 24
-  const chartHeight = Math.max(cellHeight - 122, 120)
+  const chartHeight = Math.max(cellHeight - 166, 120)
 
   return (
     <div className="group relative h-full">
