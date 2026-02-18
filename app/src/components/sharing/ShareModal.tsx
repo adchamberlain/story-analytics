@@ -25,21 +25,27 @@ export function ShareModal({ dashboardId, onClose }: ShareModalProps) {
 
   // Fetch current visibility
   useEffect(() => {
+    const abortController = new AbortController()
     const fetchMeta = async () => {
       try {
-        const res = await fetch(`/api/v2/dashboards/${dashboardId}/sharing`, { headers })
+        const res = await fetch(`/api/v2/dashboards/${dashboardId}/sharing`, {
+          headers,
+          signal: abortController.signal,
+        })
         if (res.ok) {
           const data = await res.json()
           setVisibility(data.visibility ?? 'private')
         }
-      } catch {
+      } catch (err) {
+        if (err instanceof DOMException && err.name === 'AbortError') return
         // Default to private if endpoint not available
       } finally {
-        setLoading(false)
+        if (!abortController.signal.aborted) setLoading(false)
       }
     }
     fetchMeta()
-  }, [dashboardId]) // eslint-disable-line react-hooks/exhaustive-deps
+    return () => abortController.abort()
+  }, [dashboardId, token]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleVisibilityChange = async (newVisibility: Visibility) => {
     const prev = visibility

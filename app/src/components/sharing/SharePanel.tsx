@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import { exportSVG, exportPNG, exportPDF } from '../../utils/chartExport'
 
 interface SharePanelProps {
@@ -19,11 +19,17 @@ export function SharePanel({ chartId, title, source, chartRef }: SharePanelProps
 
   const chartUrl = `${window.location.origin}/chart/${chartId}`
   const embedCode = `<iframe src="${chartUrl}" width="100%" height="450" frameborder="0"></iframe>`
+  const copyTimer = useRef<ReturnType<typeof setTimeout>>()
+
+  useEffect(() => {
+    return () => clearTimeout(copyTimer.current)
+  }, [])
 
   const copyToClipboard = useCallback(async (text: string, setter: (v: boolean) => void) => {
     await navigator.clipboard.writeText(text)
     setter(true)
-    setTimeout(() => setter(false), 2000)
+    clearTimeout(copyTimer.current)
+    copyTimer.current = setTimeout(() => setter(false), 2000)
   }, [])
 
   const getSvg = useCallback((): SVGSVGElement | null => {
