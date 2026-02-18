@@ -498,7 +498,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
             // Rebuild query with restored/validated columns
             get().buildQuery()
           })
-          .catch(() => {})
+          .catch(() => {
+            set({ sqlError: 'Failed to restore source columns. Try reloading the page.' })
+          })
       }
     }
   },

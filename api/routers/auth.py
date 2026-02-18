@@ -195,6 +195,13 @@ async def update_preferences(
         current_user.preferred_provider = preferences.preferred_provider
 
     if preferences.preferred_source:
+        # Prevent path traversal: reject directory separators and parent references
+        import re as _re
+        if _re.search(r'[/\\]|\.\.', preferences.preferred_source):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid source name",
+            )
         # Validate that the source exists
         from pathlib import Path
         source_dir = Path("sources") / preferences.preferred_source
