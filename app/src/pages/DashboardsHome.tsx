@@ -15,6 +15,9 @@ export function DashboardsHome() {
   const [dashboards, setDashboards] = useState<DashboardSummary[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [onboardingDismissed, setOnboardingDismissed] = useState(
+    () => localStorage.getItem('onboarding_complete') === 'true'
+  )
 
   useEffect(() => {
     const abortController = new AbortController()
@@ -68,11 +71,10 @@ export function DashboardsHome() {
         <h1 className="text-[28px] font-bold text-text-primary tracking-tight">Dashboards</h1>
       </div>
 
-      {dashboards.length === 0 && !localStorage.getItem('onboarding_complete') ? (
+      {dashboards.length === 0 && !onboardingDismissed ? (
         <OnboardingWizard onDismiss={() => {
           localStorage.setItem('onboarding_complete', 'true')
-          // Force re-render
-          window.location.reload()
+          setOnboardingDismissed(true)
         }} />
       ) : dashboards.length === 0 ? (
         <div className="text-center py-20 border-2 border-dashed border-border-default rounded-xl">

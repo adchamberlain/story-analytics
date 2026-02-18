@@ -382,6 +382,15 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 function CollapsibleSection({ title, count, children }: { title: string; count?: number; children: React.ReactNode }) {
   const [open, setOpen] = useState((count ?? 0) > 0)
 
+  // Auto-expand when items are added to a previously-empty section
+  const prevCount = useRef(count ?? 0)
+  useEffect(() => {
+    if (prevCount.current === 0 && (count ?? 0) > 0) {
+      setOpen(true)
+    }
+    prevCount.current = count ?? 0
+  }, [count])
+
   return (
     <div>
       <button

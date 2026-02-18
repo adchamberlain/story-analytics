@@ -204,7 +204,7 @@ async def update_preferences(
             )
         # Validate that the source exists
         from pathlib import Path
-        source_dir = Path("sources") / preferences.preferred_source
+        source_dir = Path(__file__).parent.parent.parent / "sources" / preferences.preferred_source
         if not source_dir.exists():
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,

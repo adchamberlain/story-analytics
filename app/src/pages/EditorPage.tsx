@@ -69,7 +69,7 @@ export function EditorPage() {
   const isDirty = store.isDirty()
 
   // Save button enabled logic
-  const canSave = isNew || !store.chartId
+  const canSave = (isNew || !store.chartId)
     ? store.config.dataMode === 'sql'
       ? !!store.sql && !store.error  // SQL mode: enabled when query has been run (even with 0 rows)
       : !!store.sql                  // Table mode: enabled when SQL exists (user mapped x column)

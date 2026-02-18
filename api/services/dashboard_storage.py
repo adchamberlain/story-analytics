@@ -5,11 +5,12 @@ Mirrors chart_storage.py — local-first, Git-friendly persistence.
 
 import json
 import logging
+import os
 import re
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass, asdict, fields as dc_fields
 
 logger = logging.getLogger(__name__)
 
@@ -60,8 +61,21 @@ def save_dashboard(
     )
 
     path = DASHBOARDS_DIR / f"{dashboard_id}.json"
-    path.write_text(json.dumps(asdict(dashboard), indent=2))
+    _atomic_write(path, json.dumps(asdict(dashboard), indent=2))
     return dashboard
+
+
+def _atomic_write(path: Path, content: str) -> None:
+    """Write content to a file atomically via temp file + rename."""
+    tmp_path = path.with_suffix(".json.tmp")
+    tmp_path.write_text(content)
+    os.replace(str(tmp_path), str(path))
+
+
+def _safe_load_dashboard(data: dict) -> SavedDashboard:
+    """Load a SavedDashboard from dict, ignoring unknown keys from newer versions."""
+    known = {f.name for f in dc_fields(SavedDashboard)}
+    return SavedDashboard(**{k: v for k, v in data.items() if k in known})
 
 
 def _validate_id(dashboard_id: str) -> bool:
@@ -78,7 +92,7 @@ def load_dashboard(dashboard_id: str) -> SavedDashboard | None:
         return None
 
     data = json.loads(path.read_text())
-    return SavedDashboard(**data)
+    return _safe_load_dashboard(data)
 
 
 def list_dashboards() -> list[SavedDashboard]:
@@ -90,7 +104,7 @@ def list_dashboards() -> list[SavedDashboard]:
     for path in sorted(DASHBOARDS_DIR.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True):
         try:
             data = json.loads(path.read_text())
-            dashboards.append(SavedDashboard(**data))
+            dashboards.append(_safe_load_dashboard(data))
         except Exception:
             logger.warning("Skipping corrupted dashboard file: %s", path.name)
             continue
@@ -116,8 +130,8 @@ def update_dashboard(dashboard_id: str, **fields) -> SavedDashboard | None:
             data[key] = value
 
     data["updated_at"] = now
-    path.write_text(json.dumps(data, indent=2))
-    return SavedDashboard(**data)
+    _atomic_write(path, json.dumps(data, indent=2))
+    return _safe_load_dashboard(data)
 
 
 def delete_dashboard(dashboard_id: str) -> bool:

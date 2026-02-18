@@ -130,16 +130,17 @@ class SnowflakeConnector(DatabaseConnector):
                     pq.write_table(arrow_table, str(pq_path))
 
                 # Ingest into DuckDB
-                schema = duckdb_service.ingest_parquet(pq_path, table.lower())
-                results.append({
-                    "source_id": schema.source_id,
-                    "filename": schema.filename,
-                    "row_count": schema.row_count,
-                    "column_count": len(schema.columns),
-                })
-
-                if not cache_dir:
-                    pq_path.unlink(missing_ok=True)
+                try:
+                    schema = duckdb_service.ingest_parquet(pq_path, table.lower())
+                    results.append({
+                        "source_id": schema.source_id,
+                        "filename": schema.filename,
+                        "row_count": schema.row_count,
+                        "column_count": len(schema.columns),
+                    })
+                finally:
+                    if not cache_dir:
+                        pq_path.unlink(missing_ok=True)
 
             cursor.close()
         finally:

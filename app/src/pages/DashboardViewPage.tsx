@@ -113,12 +113,12 @@ export function DashboardViewPage() {
     return () => clearInterval(interval)
   }, [])
 
-  // Cleanup error timer on unmount
+  // Cleanup error timer on unmount or dashboard change
   useEffect(() => {
     return () => {
       if (refreshErrorTimerRef.current) clearTimeout(refreshErrorTimerRef.current)
     }
-  }, [])
+  }, [dashboardId])
 
   // Stale pin cleanup: if this dashboard 404'd and it's pinned, clear the pin
   useEffect(() => {

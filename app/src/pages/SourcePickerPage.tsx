@@ -32,7 +32,8 @@ export function SourcePickerPage() {
       dataStore.reset()
       navigate(returnTo)
     }
-  }, [returnTo, dataStore.source, dataStore.uploading, navigate, dataStore])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [returnTo, dataStore.source, dataStore.uploading, navigate])
 
   useEffect(() => {
     setLoading(true)

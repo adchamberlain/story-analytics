@@ -61,6 +61,7 @@ class DuckDBService:
 
     def __init__(self) -> None:
         self._conn = duckdb.connect(":memory:")
+        self._lock = threading.Lock()
         self._sources: dict[str, SourceMeta] = {}
         DATA_DIR.mkdir(parents=True, exist_ok=True)
         self._reload_uploaded_sources()
@@ -79,6 +80,9 @@ class DuckDBService:
             if not subdir.is_dir():
                 continue
             source_id = subdir.name
+            if not _SAFE_SOURCE_ID_RE.match(source_id):
+                print(f"[DuckDB] Skipping unsafe source_id directory: {source_id!r}")
+                continue
             csv_file = next(subdir.glob("*.csv"), None)
             if not csv_file:
                 continue
@@ -86,10 +90,11 @@ class DuckDBService:
             table_name = f"src_{source_id}"
             try:
                 delimiter = self._detect_delimiter(csv_file)
-                self._conn.execute(f"""
-                    CREATE OR REPLACE TABLE {table_name} AS
-                    SELECT * FROM read_csv_auto('{_sql_string(str(csv_file))}', delim='{delimiter}', header=true)
-                """)
+                with self._lock:
+                    self._conn.execute(f"""
+                        CREATE OR REPLACE TABLE {table_name} AS
+                        SELECT * FROM read_csv_auto('{_sql_string(str(csv_file))}', delim='{delimiter}', header=true)
+                    """)
                 self._sources[source_id] = SourceMeta(
                     path=csv_file,
                     ingested_at=datetime.fromtimestamp(csv_file.stat().st_mtime, tz=timezone.utc),
@@ -122,7 +127,6 @@ class DuckDBService:
             import shutil
             shutil.copy2(file_path, stored_path)
 
-        self._sources[source_id] = SourceMeta(path=stored_path, ingested_at=datetime.now(timezone.utc))
         table_name = f"src_{source_id}"
 
         # Detect delimiter
@@ -133,19 +137,20 @@ class DuckDBService:
         for skip in [0, 1, 2, 3, 4, 5]:
             try:
                 skip_clause = f", skip={skip}" if skip > 0 else ""
-                self._conn.execute(f"""
-                    CREATE OR REPLACE TABLE {table_name} AS
-                    SELECT * FROM read_csv_auto(
-                        '{_sql_string(str(stored_path))}', delim='{delimiter}', header=true{skip_clause}
-                    )
-                """)
-                # Verify we got at least 1 column and 1 row
-                row_count = self._conn.execute(
-                    f"SELECT COUNT(*) FROM {table_name}"
-                ).fetchone()[0]
-                col_count = len(self._conn.execute(
-                    f"DESCRIBE {table_name}"
-                ).fetchall())
+                with self._lock:
+                    self._conn.execute(f"""
+                        CREATE OR REPLACE TABLE {table_name} AS
+                        SELECT * FROM read_csv_auto(
+                            '{_sql_string(str(stored_path))}', delim='{delimiter}', header=true{skip_clause}
+                        )
+                    """)
+                    # Verify we got at least 1 column and 1 row
+                    row_count = self._conn.execute(
+                        f"SELECT COUNT(*) FROM {table_name}"
+                    ).fetchone()[0]
+                    col_count = len(self._conn.execute(
+                        f"DESCRIBE {table_name}"
+                    ).fetchall())
                 if col_count >= 1 and row_count >= 1:
                     if skip > 0:
                         print(f"[DuckDB] Parsed {filename} after skipping {skip} leading line(s)")
@@ -158,11 +163,13 @@ class DuckDBService:
             # All attempts failed — clean up and raise a user-friendly message
             import shutil
             shutil.rmtree(dest, ignore_errors=True)
-            del self._sources[source_id]
             raise ValueError(
                 f"Could not parse \"{filename}\". "
                 "Check that the file is a valid CSV with a header row."
             )
+
+        # Register source only after successful table creation
+        self._sources[source_id] = SourceMeta(path=stored_path, ingested_at=datetime.now(timezone.utc))
 
         # Get schema info
         schema = self._inspect_table(table_name, source_id, filename)
@@ -173,14 +180,23 @@ class DuckDBService:
         source_id = uuid.uuid4().hex[:12]
         table_name = f"src_{source_id}"
 
-        self._conn.execute(f"""
-            CREATE OR REPLACE TABLE {table_name} AS
-            SELECT * FROM read_parquet('{_sql_string(str(parquet_path))}')
-        """)
-
-        self._sources[source_id] = SourceMeta(path=parquet_path, ingested_at=datetime.now(timezone.utc))
-        schema = self._inspect_table(table_name, source_id, table_name_hint)
-        return schema
+        try:
+            with self._lock:
+                self._conn.execute(f"""
+                    CREATE OR REPLACE TABLE {table_name} AS
+                    SELECT * FROM read_parquet('{_sql_string(str(parquet_path))}')
+                """)
+            self._sources[source_id] = SourceMeta(path=parquet_path, ingested_at=datetime.now(timezone.utc))
+            schema = self._inspect_table(table_name, source_id, table_name_hint)
+            return schema
+        except Exception:
+            self._sources.pop(source_id, None)
+            try:
+                with self._lock:
+                    self._conn.execute(f"DROP TABLE IF EXISTS {table_name}")
+            except Exception:
+                pass
+            raise
 
     def ingest_from_snowflake(
         self,
@@ -331,11 +347,12 @@ class DuckDBService:
         if params:
             processed_sql = self._substitute_filter_params(processed_sql, params)
 
-        result = self._conn.execute(processed_sql)
-        if result.description is None:
-            return QueryResult(columns=[], rows=[], row_count=0)
-        columns = [desc[0] for desc in result.description]
-        rows_raw = result.fetchall()
+        with self._lock:
+            result = self._conn.execute(processed_sql)
+            if result.description is None:
+                return QueryResult(columns=[], rows=[], row_count=0)
+            columns = [desc[0] for desc in result.description]
+            rows_raw = result.fetchall()
         rows = [dict(zip(columns, row)) for row in rows_raw]
 
         return QueryResult(columns=columns, rows=rows, row_count=len(rows))
@@ -346,12 +363,13 @@ class DuckDBService:
             raise ValueError(f"Invalid source_id: {source_id}")
         limit = max(1, min(limit, 10_000))  # Clamp to prevent DoS
         table_name = f"src_{source_id}"
-        result = self._conn.execute(
-            f"SELECT DISTINCT CAST({q(column)} AS VARCHAR) AS val "
-            f"FROM {table_name} WHERE {q(column)} IS NOT NULL "
-            f"ORDER BY val LIMIT {limit}"
-        )
-        return [row[0] for row in result.fetchall()]
+        with self._lock:
+            result = self._conn.execute(
+                f"SELECT DISTINCT CAST({q(column)} AS VARCHAR) AS val "
+                f"FROM {table_name} WHERE {q(column)} IS NOT NULL "
+                f"ORDER BY val LIMIT {limit}"
+            )
+            return [row[0] for row in result.fetchall()]
 
     @staticmethod
     def _substitute_filter_params(sql: str, params: dict[str, str | int | float]) -> str:
@@ -394,6 +412,8 @@ class DuckDBService:
 
     def get_schema(self, source_id: str) -> SourceSchema:
         """Get schema information for an uploaded source."""
+        if not _SAFE_SOURCE_ID_RE.match(source_id):
+            raise ValueError(f"Invalid source_id: {source_id}")
         table_name = f"src_{source_id}"
         meta = self._sources.get(source_id)
         filename = meta.path.name if meta else "unknown"
@@ -401,52 +421,53 @@ class DuckDBService:
 
     def _inspect_table(self, table_name: str, source_id: str, filename: str) -> SourceSchema:
         """Inspect a DuckDB table and return schema info."""
-        # Get column types
-        desc = self._conn.execute(f"DESCRIBE {table_name}").fetchall()
+        with self._lock:
+            # Get column types
+            desc = self._conn.execute(f"DESCRIBE {table_name}").fetchall()
 
-        # Get row count
-        row_count = self._conn.execute(f"SELECT COUNT(*) FROM {table_name}").fetchone()[0]
+            # Get row count
+            row_count = self._conn.execute(f"SELECT COUNT(*) FROM {table_name}").fetchone()[0]
 
-        columns: list[ColumnInfo] = []
-        for col_name, col_type, *_ in desc:
-            # Sample values
-            samples = self._conn.execute(
-                f"SELECT DISTINCT CAST({q(col_name)} AS VARCHAR) FROM {table_name} "
-                f"WHERE {q(col_name)} IS NOT NULL LIMIT 5"
-            ).fetchall()
-            sample_values = [str(s[0]) for s in samples]
+            columns: list[ColumnInfo] = []
+            for col_name, col_type, *_ in desc:
+                # Sample values
+                samples = self._conn.execute(
+                    f"SELECT DISTINCT CAST({q(col_name)} AS VARCHAR) FROM {table_name} "
+                    f"WHERE {q(col_name)} IS NOT NULL LIMIT 5"
+                ).fetchall()
+                sample_values = [str(s[0]) for s in samples]
 
-            # Null count
-            null_count = self._conn.execute(
-                f"SELECT COUNT(*) FROM {table_name} WHERE {q(col_name)} IS NULL"
-            ).fetchone()[0]
+                # Null count
+                null_count = self._conn.execute(
+                    f"SELECT COUNT(*) FROM {table_name} WHERE {q(col_name)} IS NULL"
+                ).fetchone()[0]
 
-            # Distinct count
-            distinct_count = self._conn.execute(
-                f"SELECT COUNT(DISTINCT {q(col_name)}) FROM {table_name}"
-            ).fetchone()[0]
+                # Distinct count
+                distinct_count = self._conn.execute(
+                    f"SELECT COUNT(DISTINCT {q(col_name)}) FROM {table_name}"
+                ).fetchone()[0]
 
-            # Min/max for numeric and date types
-            min_val = max_val = None
-            if any(t in col_type.upper() for t in ['INT', 'FLOAT', 'DOUBLE', 'DECIMAL', 'NUMERIC', 'DATE', 'TIMESTAMP']):
-                try:
-                    minmax = self._conn.execute(
-                        f"SELECT MIN(CAST({q(col_name)} AS VARCHAR)), MAX(CAST({q(col_name)} AS VARCHAR)) FROM {table_name}"
-                    ).fetchone()
-                    min_val, max_val = minmax[0], minmax[1]
-                except duckdb.Error:
-                    pass
+                # Min/max for numeric and date types
+                min_val = max_val = None
+                if any(t in col_type.upper() for t in ['INT', 'FLOAT', 'DOUBLE', 'DECIMAL', 'NUMERIC', 'DATE', 'TIMESTAMP']):
+                    try:
+                        minmax = self._conn.execute(
+                            f"SELECT CAST(MIN({q(col_name)}) AS VARCHAR), CAST(MAX({q(col_name)}) AS VARCHAR) FROM {table_name}"
+                        ).fetchone()
+                        min_val, max_val = minmax[0], minmax[1]
+                    except duckdb.Error:
+                        pass
 
-            columns.append(ColumnInfo(
-                name=col_name,
-                type=col_type,
-                nullable=null_count > 0,
-                sample_values=sample_values,
-                null_count=null_count,
-                distinct_count=distinct_count,
-                min_value=min_val,
-                max_value=max_val,
-            ))
+                columns.append(ColumnInfo(
+                    name=col_name,
+                    type=col_type,
+                    nullable=null_count > 0,
+                    sample_values=sample_values,
+                    null_count=null_count,
+                    distinct_count=distinct_count,
+                    min_value=min_val,
+                    max_value=max_val,
+                ))
 
         return SourceSchema(
             source_id=source_id,

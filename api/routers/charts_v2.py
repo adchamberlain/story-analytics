@@ -13,7 +13,7 @@ from pydantic import BaseModel
 from ..services.duckdb_service import get_duckdb_service, q
 from ..services.chart_storage import save_chart, load_chart, list_charts, delete_chart, update_chart
 
-from engine.v2.schema_analyzer import DataProfile
+from engine.v2.schema_analyzer import DataProfile, ColumnProfile
 from engine.v2.chart_proposer import propose_chart
 from engine.v2.chart_editor import edit_chart
 
@@ -392,15 +392,15 @@ async def propose(request: ProposeRequest):
         filename=schema.filename,
         row_count=schema.row_count,
         columns=[
-            type('ColumnProfile', (), {
-                'name': c.name,
-                'type': c.type,
-                'sample_values': c.sample_values,
-                'distinct_count': c.distinct_count,
-                'null_count': c.null_count,
-                'min_value': c.min_value,
-                'max_value': c.max_value,
-            })
+            ColumnProfile(
+                name=c.name,
+                type=c.type,
+                sample_values=c.sample_values,
+                distinct_count=c.distinct_count,
+                null_count=c.null_count,
+                min_value=c.min_value,
+                max_value=c.max_value,
+            )
             for c in schema.columns
         ],
     )
@@ -422,7 +422,9 @@ async def propose(request: ProposeRequest):
     columns = []
     if proposal.sql:
         import re as _re
-        first_kw = _re.match(r'\s*(\w+)', proposal.sql)
+        # Strip leading SQL comments before checking the first keyword
+        sql_stripped = _re.sub(r'^\s*(/\*.*?\*/\s*|--[^\n]*(?:\n|$)\s*)*', '', proposal.sql, flags=_re.DOTALL)
+        first_kw = _re.match(r'\s*(\w+)', sql_stripped)
         if not first_kw or first_kw.group(1).upper() not in ("SELECT", "WITH"):
             return ProposeResponse(success=False, error="AI generated non-SELECT SQL")
         try:
@@ -473,7 +475,7 @@ def _validate_readonly_sql(sql: str) -> str | None:
     """Return an error message if SQL is not a read-only SELECT/WITH statement."""
     import re
     # Strip leading SQL comments (block and line) before checking the first keyword
-    stripped = re.sub(r'^\s*(/\*.*?\*/\s*|--[^\n]*\n\s*)*', '', sql, flags=re.DOTALL)
+    stripped = re.sub(r'^\s*(/\*.*?\*/\s*|--[^\n]*(?:\n|$)\s*)*', '', sql, flags=re.DOTALL)
     first_kw = re.match(r'\s*(\w+)', stripped)
     if not first_kw or first_kw.group(1).upper() not in ("SELECT", "WITH"):
         return "Only SELECT queries can be saved"

@@ -161,7 +161,7 @@ def edit_chart(
             messages=messages,
             system_prompt=SYSTEM_PROMPT,
             temperature=0.2,
-            max_tokens=1024,
+            max_tokens=2048,
         )
     except Exception as e:
         traceback.print_exc()
@@ -179,19 +179,17 @@ def _parse_edit_response(response: str) -> EditResult:
     if json_match:
         json_str = json_match.group(1).strip()
 
-    # If no fences, extract the first complete JSON object (LLMs often append explanation text)
+    # If no fences, extract the first complete JSON object using the standard parser
+    # (the naive brace-counter fails on braces inside JSON string values)
     if not json_match:
         open_idx = json_str.find("{")
         if open_idx >= 0:
-            depth = 0
-            for i, ch in enumerate(json_str[open_idx:], start=open_idx):
-                if ch == "{":
-                    depth += 1
-                elif ch == "}":
-                    depth -= 1
-                    if depth == 0:
-                        json_str = json_str[open_idx : i + 1]
-                        break
+            try:
+                decoder = json.JSONDecoder()
+                obj, _ = decoder.raw_decode(json_str, open_idx)
+                json_str = json.dumps(obj)
+            except json.JSONDecodeError:
+                pass  # Fall through to the main parse attempt
 
     try:
         data = json.loads(json_str)

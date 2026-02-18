@@ -175,8 +175,13 @@ def get_dashboard_meta(dashboard_id: str) -> dict | None:
         conn.close()
 
 
+_VALID_VISIBILITY = {"private", "team", "public"}
+
+
 def update_dashboard_visibility(dashboard_id: str, visibility: str) -> None:
     """Update dashboard visibility (private, team, public)."""
+    if visibility not in _VALID_VISIBILITY:
+        raise ValueError(f"Invalid visibility: {visibility!r}. Must be one of {_VALID_VISIBILITY}")
     conn = _get_conn()
     try:
         conn.execute(
@@ -216,8 +221,9 @@ def share_dashboard(dashboard_id: str, user_id: str, access_level: str = "view")
         share_id = uuid.uuid4().hex[:12]
         now = datetime.now(timezone.utc).isoformat()
         conn.execute(
-            "INSERT OR REPLACE INTO dashboard_shares (id, dashboard_id, user_id, access_level, created_at) "
-            "VALUES (?, ?, ?, ?, ?)",
+            "INSERT INTO dashboard_shares (id, dashboard_id, user_id, access_level, created_at) "
+            "VALUES (?, ?, ?, ?, ?) "
+            "ON CONFLICT(dashboard_id, user_id) DO UPDATE SET access_level = excluded.access_level",
             (share_id, dashboard_id, user_id, access_level, now),
         )
         conn.commit()

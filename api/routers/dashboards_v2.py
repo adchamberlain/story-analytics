@@ -415,8 +415,11 @@ async def get_dashboard(dashboard_id: str, filters: str | None = None):
 @router.post("/{dashboard_id}/health-check", response_model=HealthCheckResponse)
 async def run_health_check(dashboard_id: str):
     """Run data-level health checks for all charts in a dashboard."""
-    # Re-use get_dashboard to get full chart state
-    dashboard_data = await get_dashboard(dashboard_id)
+    # Re-use get_dashboard; its 404 propagates with correct status
+    try:
+        dashboard_data = await get_dashboard(dashboard_id)
+    except HTTPException:
+        raise  # Preserve 404 from get_dashboard
 
     chart_results: list[ChartHealthResult] = []
     worst_status = "healthy"
@@ -495,7 +498,10 @@ async def update(dashboard_id: str, request: UpdateDashboardRequest):
 @router.get("/{dashboard_id}/export/html")
 async def export_html(dashboard_id: str):
     """Export a dashboard as a self-contained HTML file."""
-    dashboard_data = await get_dashboard(dashboard_id)
+    try:
+        dashboard_data = await get_dashboard(dashboard_id)
+    except HTTPException:
+        raise  # Preserve 404 from get_dashboard
 
     charts_for_export = []
     for chart in dashboard_data.charts:
@@ -570,6 +576,11 @@ async def update_sharing(dashboard_id: str, request: UpdateSharingRequest):
     """Update dashboard visibility."""
     if request.visibility not in ("private", "team", "public"):
         raise HTTPException(status_code=400, detail="Invalid visibility. Use: private, team, public")
+
+    # Verify the dashboard exists before creating/updating metadata
+    dashboard = load_dashboard(dashboard_id)
+    if not dashboard:
+        raise HTTPException(status_code=404, detail="Dashboard not found")
 
     meta = get_dashboard_meta(dashboard_id)
     if not meta:

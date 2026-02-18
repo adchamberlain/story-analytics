@@ -98,15 +98,16 @@ class BigQueryConnector(DatabaseConnector):
             pq.write_table(arrow_table, str(pq_path))
 
             # Ingest into DuckDB
-            source_schema = duckdb_service.ingest_parquet(pq_path, table.lower())
-            results.append({
-                "source_id": source_schema.source_id,
-                "filename": source_schema.filename,
-                "row_count": source_schema.row_count,
-                "column_count": len(source_schema.columns),
-            })
-
-            if not cache_dir:
-                pq_path.unlink(missing_ok=True)
+            try:
+                source_schema = duckdb_service.ingest_parquet(pq_path, table.lower())
+                results.append({
+                    "source_id": source_schema.source_id,
+                    "filename": source_schema.filename,
+                    "row_count": source_schema.row_count,
+                    "column_count": len(source_schema.columns),
+                })
+            finally:
+                if not cache_dir:
+                    pq_path.unlink(missing_ok=True)
 
         return results

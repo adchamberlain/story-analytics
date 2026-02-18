@@ -55,6 +55,7 @@ export function AIChat() {
     const abortController = new AbortController()
     fetch('/api/v2/charts/ai-status', { signal: abortController.signal })
       .then((res) => {
+        if (abortController.signal.aborted) return
         if (!res.ok) {
           setAiAvailable(false)
           return
@@ -62,6 +63,7 @@ export function AIChat() {
         return res.json()
       })
       .then((data) => {
+        if (abortController.signal.aborted) return
         if (data) {
           setAiStatus(data)
           setAiAvailable(true)
