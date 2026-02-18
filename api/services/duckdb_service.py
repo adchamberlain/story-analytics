@@ -84,7 +84,7 @@ class DuckDBService:
                 delimiter = self._detect_delimiter(csv_file)
                 self._conn.execute(f"""
                     CREATE OR REPLACE TABLE {table_name} AS
-                    SELECT * FROM read_csv_auto('{csv_file}', delim='{delimiter}', header=true)
+                    SELECT * FROM read_csv_auto('{_sql_string(str(csv_file))}', delim='{delimiter}', header=true)
                 """)
                 self._sources[source_id] = SourceMeta(
                     path=csv_file,
@@ -129,7 +129,7 @@ class DuckDBService:
                 self._conn.execute(f"""
                     CREATE OR REPLACE TABLE {table_name} AS
                     SELECT * FROM read_csv_auto(
-                        '{stored_path}', delim='{delimiter}', header=true{skip_clause}
+                        '{_sql_string(str(stored_path))}', delim='{delimiter}', header=true{skip_clause}
                     )
                 """)
                 # Verify we got at least 1 column and 1 row
@@ -168,7 +168,7 @@ class DuckDBService:
 
         self._conn.execute(f"""
             CREATE OR REPLACE TABLE {table_name} AS
-            SELECT * FROM read_parquet('{parquet_path}')
+            SELECT * FROM read_parquet('{_sql_string(str(parquet_path))}')
         """)
 
         self._sources[source_id] = SourceMeta(path=parquet_path, ingested_at=datetime.now(timezone.utc))
@@ -455,6 +455,14 @@ def q(col_name: str) -> str:
     """
     escaped = col_name.replace('"', '""')
     return f'"{escaped}"'
+
+
+def _sql_string(value: str) -> str:
+    """Escape a value for use inside a SQL single-quoted string literal.
+
+    Doubles any embedded single quotes to prevent SQL injection.
+    """
+    return value.replace("'", "''")
 
 
 # ── Singleton ────────────────────────────────────────────────────────────────

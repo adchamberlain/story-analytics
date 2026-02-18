@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useEditorStore } from '../../stores/editorStore'
 import { ChartTypeSelector } from './ChartTypeSelector'
 import { PaletteSelector } from './PaletteSelector'
@@ -32,6 +32,11 @@ export function Toolbox() {
 
   const [sqlSuccess, setSqlSuccess] = useState<string | null>(null)
   const sqlSuccessTimer = useRef<ReturnType<typeof setTimeout>>()
+
+  // Clean up pending timer on unmount
+  useEffect(() => {
+    return () => clearTimeout(sqlSuccessTimer.current)
+  }, [])
 
   const handleRunQuery = async () => {
     setSqlSuccess(null)

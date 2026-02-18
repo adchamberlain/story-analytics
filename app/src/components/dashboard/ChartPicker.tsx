@@ -35,7 +35,8 @@ export function ChartPicker({ excludeIds, onAdd, onCreateNew, onClose }: ChartPi
   const [search, setSearch] = useState('')
 
   useEffect(() => {
-    fetch('/api/v2/charts/')
+    const abortController = new AbortController()
+    fetch('/api/v2/charts/', { signal: abortController.signal })
       .then((res) => {
         if (!res.ok) throw new Error(`Charts fetch failed: ${res.status}`)
         return res.json()
@@ -44,7 +45,10 @@ export function ChartPicker({ excludeIds, onAdd, onCreateNew, onClose }: ChartPi
         setCharts(data)
         setLoading(false)
       })
-      .catch(() => setLoading(false))
+      .catch((err) => {
+        if (err.name !== 'AbortError') setLoading(false)
+      })
+    return () => abortController.abort()
   }, [])
 
   const excludeSet = new Set(excludeIds)

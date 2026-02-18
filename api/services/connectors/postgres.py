@@ -12,6 +12,11 @@ from .base import DatabaseConnector, ColumnInfo, ConnectorResult
 
 class PostgresConnector(DatabaseConnector):
 
+    @staticmethod
+    def _quote_identifier(name: str) -> str:
+        """Quote a PostgreSQL identifier (table/schema name) safely."""
+        return '"' + name.replace('"', '""') + '"'
+
     @property
     def db_type(self) -> str:
         return "postgres"
@@ -104,7 +109,7 @@ class PostgresConnector(DatabaseConnector):
             schema_name = credentials.get("schema", "public")
 
             for table in tables:
-                cursor.execute(f'SELECT * FROM "{schema_name}"."{table}"')
+                cursor.execute(f'SELECT * FROM {self._quote_identifier(schema_name)}.{self._quote_identifier(table)}')
                 col_names = [desc[0] for desc in cursor.description]
                 rows = cursor.fetchall()
 

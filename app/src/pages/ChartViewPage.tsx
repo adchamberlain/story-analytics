@@ -42,7 +42,8 @@ export function ChartViewPage() {
     setLoading(true)
     setError(null)
 
-    fetch(`/api/v2/charts/${chartId}`)
+    const abortController = new AbortController()
+    fetch(`/api/v2/charts/${chartId}`, { signal: abortController.signal })
       .then(async (res) => {
         if (!res.ok) {
           const body = await res.json().catch(() => ({ detail: res.statusText }))
@@ -55,9 +56,11 @@ export function ChartViewPage() {
         setLoading(false)
       })
       .catch((e) => {
+        if (e.name === 'AbortError') return
         setError(e instanceof Error ? e.message : String(e))
         setLoading(false)
       })
+    return () => abortController.abort()
   }, [chartId])
 
   if (loading) {
