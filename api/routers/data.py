@@ -314,8 +314,10 @@ async def paste_data(request: PasteRequest):
     try:
         service = get_duckdb_service()
 
-        # Replace previous pasted_data source if it exists (avoid accumulating duplicates)
-        existing_paste_id = service.find_source_by_filename("pasted_data.csv")
+        # Replace previous pasted source if it exists (avoid accumulating duplicates).
+        # Use a sentinel prefix so we never collide with a user-uploaded "pasted_data.csv".
+        paste_filename = "__paste__.csv"
+        existing_paste_id = service.find_source_by_filename(paste_filename)
         if existing_paste_id:
             table_name = f"src_{existing_paste_id}"
             with service._lock:
@@ -325,7 +327,7 @@ async def paste_data(request: PasteRequest):
                     pass
                 service._sources.pop(existing_paste_id, None)
 
-        schema = service.ingest_csv(tmp_path, "pasted_data.csv")
+        schema = service.ingest_csv(tmp_path, paste_filename)
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
     except Exception:

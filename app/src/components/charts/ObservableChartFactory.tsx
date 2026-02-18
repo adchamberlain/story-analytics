@@ -1,4 +1,4 @@
-import { useRef, useEffect, useCallback } from 'react'
+import { useRef, useEffect, useCallback, useState } from 'react'
 import * as Plot from '@observablehq/plot'
 import * as d3 from 'd3'
 import { useObservablePlot } from '../../hooks/useObservablePlot'
@@ -1200,8 +1200,21 @@ function BigValueChart({ data, config }: { data: Record<string, unknown>[]; conf
 
 function PieChartComponent({ data, config, height, autoHeight }: { data: Record<string, unknown>[]; config: ChartConfig; height: number; autoHeight?: boolean }) {
   const containerRef = useRef<HTMLDivElement>(null)
+  const [containerWidth, setContainerWidth] = useState(0)
   const resolved = useThemeStore((s) => s.resolved)
   const chartTheme = useChartThemeStore((s) => s.theme)
+
+  // ResizeObserver to re-render when container width changes
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    const ro = new ResizeObserver((entries) => {
+      const w = entries[0]?.contentRect.width ?? 0
+      if (w > 0) setContainerWidth(w)
+    })
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
 
   useEffect(() => {
     const el = containerRef.current
@@ -1215,7 +1228,7 @@ function PieChartComponent({ data, config, height, autoHeight }: { data: Record<
     const labelField = config.x ?? keys[0]
     const valueField = (config.value ?? config.y ?? keys[1]) as string | undefined
     if (!valueField) return // Single-column data — no numeric column to chart
-    const width = el.clientWidth
+    const width = containerWidth || el.clientWidth
     const effectiveHeight = autoHeight ? el.clientHeight : height
     if (width <= 0 || effectiveHeight <= 0) return // waiting for layout
     const size = Math.min(width, effectiveHeight)
@@ -1346,7 +1359,7 @@ function PieChartComponent({ data, config, height, autoHeight }: { data: Record<
         .text((d) => d.data.value > 0 ? d.data.label : '')
     }
 
-  }, [data, config, height, autoHeight, resolved, chartTheme])
+  }, [data, config, height, autoHeight, resolved, chartTheme, containerWidth])
 
   if (data.length === 0) return <p className="text-sm text-text-muted">No data</p>
   return <div ref={containerRef} style={{ width: '100%', ...(autoHeight ? { height: '100%' } : { height }) }} />
@@ -1354,8 +1367,21 @@ function PieChartComponent({ data, config, height, autoHeight }: { data: Record<
 
 function TreemapComponent({ data, config, height, autoHeight }: { data: Record<string, unknown>[]; config: ChartConfig; height: number; autoHeight?: boolean }) {
   const containerRef = useRef<HTMLDivElement>(null)
+  const [containerWidth, setContainerWidth] = useState(0)
   const resolved = useThemeStore((s) => s.resolved)
   const themePalette = useChartThemeStore((s) => s.theme.palette.colors)
+
+  // ResizeObserver to re-render when container width changes
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    const ro = new ResizeObserver((entries) => {
+      const w = entries[0]?.contentRect.width ?? 0
+      if (w > 0) setContainerWidth(w)
+    })
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
 
   useEffect(() => {
     const el = containerRef.current
@@ -1369,7 +1395,7 @@ function TreemapComponent({ data, config, height, autoHeight }: { data: Record<s
     const labelField = config.x ?? keys[0]
     const valueField = (config.value ?? config.y ?? keys[1]) as string | undefined
     if (!valueField) return // Single-column data — no numeric column to chart
-    const width = el.clientWidth
+    const width = containerWidth || el.clientWidth
     const effectiveHeight = autoHeight ? el.clientHeight : height
     if (width <= 0 || effectiveHeight <= 0) return // waiting for layout
 
@@ -1413,7 +1439,7 @@ function TreemapComponent({ data, config, height, autoHeight }: { data: Record<s
       .attr('fill', resolved === 'dark' ? '#e2e8f0' : '#fff')
       .text((d) => (d.x1 - d.x0) > 40 ? d.data.name : '')
 
-  }, [data, config, height, autoHeight, resolved, themePalette])
+  }, [data, config, height, autoHeight, resolved, themePalette, containerWidth])
 
   if (data.length === 0) return <p className="text-sm text-text-muted">No data</p>
   return <div ref={containerRef} style={{ width: '100%', ...(autoHeight ? { height: '100%' } : { height }) }} />

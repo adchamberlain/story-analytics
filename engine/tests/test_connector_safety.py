@@ -823,7 +823,8 @@ class TestDuckDBConnectionLocking:
         import threading
         svc = DuckDBService()
         assert hasattr(svc, '_lock')
-        assert isinstance(svc._lock, type(threading.Lock()))
+        # RLock (reentrant) prevents deadlock in BaseException cleanup paths
+        assert isinstance(svc._lock, type(threading.RLock()))
 
 
 @pytest.mark.unit
