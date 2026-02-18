@@ -473,8 +473,7 @@ async def update(dashboard_id: str, request: UpdateDashboardRequest):
         if key == "charts" and value is not None:
             fields["charts"] = value  # already list[dict] from model_dump
         elif key == "filters" and value is not None:
-            # Re-serialize from Pydantic to exclude None values in filter specs
-            fields["filters"] = [f.model_dump(exclude_none=True) for f in request.filters]  # type: ignore[union-attr]
+            fields["filters"] = value  # already list[dict] from model_dump
         else:
             fields[key] = value
 
@@ -547,6 +546,8 @@ async def remove_dashboard(dashboard_id: str):
     """Delete a dashboard."""
     if not delete_dashboard(dashboard_id):
         raise HTTPException(status_code=404, detail="Dashboard not found")
+    with _health_cache_lock:
+        _health_cache.pop(dashboard_id, None)
     return {"deleted": True}
 
 

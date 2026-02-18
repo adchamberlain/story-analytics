@@ -522,7 +522,7 @@ class DuckDBService:
         The returned delimiter is escaped for safe use in SQL strings
         (single quotes doubled).
         """
-        with open(path, 'r', newline='') as f:
+        with open(path, 'r', newline='', encoding='utf-8', errors='replace') as f:
             sample = f.read(8192)
         _SAFE_DELIMITERS = {',', '\t', '|', ';', ' ', ':'}
         try:

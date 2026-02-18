@@ -48,16 +48,16 @@ export function EditorPage() {
     }
   }, [isNew, store, navigate, returnToDashboard])
 
-  // Keyboard shortcuts
+  // Keyboard shortcuts — use getState() to avoid reinstalling on every Zustand update
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       const mod = e.metaKey || e.ctrlKey
       if (mod && e.key === 'z' && !e.shiftKey) {
         e.preventDefault()
-        store.undo()
+        useEditorStore.getState().undo()
       } else if (mod && e.key === 'z' && e.shiftKey) {
         e.preventDefault()
-        store.redo()
+        useEditorStore.getState().redo()
       } else if (mod && e.key === 's') {
         e.preventDefault()
         handleSave()
@@ -65,7 +65,7 @@ export function EditorPage() {
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [store, handleSave])
+  }, [handleSave])
 
   const isDirty = store.isDirty()
 

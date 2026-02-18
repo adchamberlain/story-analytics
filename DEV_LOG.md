@@ -2,6 +2,23 @@
 
 ## 2026-02-18
 
+### Session: Bug hunt round 23 — broad sweep (7 fixes, 495 tests)
+
+5 parallel scanning agents across conversation engine, API routers, frontend stores, DuckDB services, and frontend pages. Triaged ~20 candidates, dropped defensive/stylistic items, kept 7 confirmed bugs.
+
+**Fixes applied:**
+1. **Dashboard PUT filter data loss** — `update()` re-serialized filters via `model_dump(exclude_none=True)` which stripped explicitly-set `null` values; now uses `value` from `model_dump(exclude_unset=True)` directly (dashboards_v2.py:475)
+2. **Pie/Treemap blank flash** — useEffect cleanup return caused `el.innerHTML = ''` to fire before every re-render; removed since top-of-effect `el.innerHTML = ''` already handles it (ObservableChartFactory.tsx:1349,1417)
+3. **Gemini empty messages crash** — `generate()` would send empty string to Gemini API if called with zero messages; added early ValueError guard (gemini_provider.py:153)
+4. **Keyboard shortcut handler churn** — EditorPage useEffect depended on `store` (new ref every Zustand update), reinstalling keydown listener every keystroke; switched to `useEditorStore.getState()` inside handler (EditorPage.tsx:52-68)
+5. **Query endpoint source_id validation gap** — `/data/query` lacked router-level format check, reflecting raw user input in error messages; added `_SAFE_SOURCE_ID_RE` guard with 400 status (data.py:378)
+6. **CSV delimiter detection encoding** — `open()` without encoding fails on ASCII-locale Docker containers; added `encoding='utf-8', errors='replace'` (duckdb_service.py:525)
+7. **Health cache stale after dashboard delete** — `remove_dashboard` didn't clear `_health_cache` entry; added `_health_cache.pop()` (dashboards_v2.py:549)
+
+Tests: 402 Python + 93 frontend = **495 total** (8 new regression tests added)
+
+---
+
 ### Session: Bug hunt round 22 — chart/dashboard creation flow (10 fixes, 487 tests)
 
 Focus: user flow for creating and saving new charts and dashboards.
