@@ -590,7 +590,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
 
   save: async () => {
-    const { chartId, config } = get()
+    const { chartId, config, sql } = get()
     if (!chartId) return
 
     set({ saving: true, error: null })
@@ -604,6 +604,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           title: config.title,
           subtitle: config.subtitle || null,
           source: config.source || null,
+          sql,
           x: config.x,
           y: config.y,
           series: config.series,

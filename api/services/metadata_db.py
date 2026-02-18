@@ -144,13 +144,17 @@ def get_user_by_id(user_id: str) -> dict | None:
 # ── Dashboard Metadata ───────────────────────────────────────────────────────
 
 def set_dashboard_meta(dashboard_id: str, owner_id: str, visibility: str = "private") -> None:
-    """Create or update dashboard metadata."""
+    """Create or update dashboard metadata.
+
+    Preserves created_at on update (INSERT OR REPLACE would overwrite it).
+    """
     conn = _get_conn()
     try:
         now = datetime.now(timezone.utc).isoformat()
         conn.execute(
-            "INSERT OR REPLACE INTO dashboard_meta (dashboard_id, owner_id, visibility, created_at) "
-            "VALUES (?, ?, ?, ?)",
+            "INSERT INTO dashboard_meta (dashboard_id, owner_id, visibility, created_at) "
+            "VALUES (?, ?, ?, ?) "
+            "ON CONFLICT(dashboard_id) DO UPDATE SET owner_id = excluded.owner_id, visibility = excluded.visibility",
             (dashboard_id, owner_id, visibility, now),
         )
         conn.commit()

@@ -6,11 +6,22 @@ Credentials are NOT persisted — they're provided at sync time or loaded from .
 """
 
 import json
+import logging
 import os
+import re
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from dataclasses import dataclass, asdict
+
+logger = logging.getLogger(__name__)
+
+_SAFE_ID_RE = re.compile(r"^[a-f0-9]{1,32}$")
+
+
+def _validate_id(connection_id: str) -> bool:
+    """Return True if connection_id is a safe hex string (no path traversal)."""
+    return bool(_SAFE_ID_RE.match(connection_id))
 
 
 CONNECTIONS_DIR = Path(__file__).parent.parent.parent / "data" / "connections"
@@ -55,6 +66,8 @@ def save_connection(
 
 def load_connection(connection_id: str) -> ConnectionInfo | None:
     """Load a connection from disk."""
+    if not _validate_id(connection_id):
+        return None
     path = CONNECTIONS_DIR / f"{connection_id}.json"
     if not path.exists():
         return None
@@ -70,14 +83,20 @@ def list_connections() -> list[ConnectionInfo]:
 
     connections = []
     for path in sorted(CONNECTIONS_DIR.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True):
-        data = json.loads(path.read_text())
-        connections.append(ConnectionInfo(**data))
+        try:
+            data = json.loads(path.read_text())
+            connections.append(ConnectionInfo(**data))
+        except Exception:
+            logger.warning("Skipping corrupted connection file: %s", path.name)
+            continue
 
     return connections
 
 
 def delete_connection(connection_id: str) -> bool:
     """Delete a connection."""
+    if not _validate_id(connection_id):
+        return False
     path = CONNECTIONS_DIR / f"{connection_id}.json"
     if path.exists():
         path.unlink()

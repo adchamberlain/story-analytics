@@ -59,6 +59,10 @@ async def get_settings():
 async def update_settings(request: UpdateSettingsRequest):
     """Update provider and/or API keys. Returns masked keys."""
     fields = {k: v for k, v in request.model_dump().items() if v is not None}
+    # Never accept masked keys back — they'd overwrite the real key
+    for key in list(fields):
+        if key.endswith("_api_key") and isinstance(fields[key], str) and fields[key].endswith("****"):
+            del fields[key]
     s = save_settings(**fields)
     return SettingsResponse(
         ai_provider=s.ai_provider,

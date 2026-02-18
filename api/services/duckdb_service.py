@@ -438,8 +438,12 @@ class DuckDBService:
 
 
 def q(col_name: str) -> str:
-    """Quote a column name for DuckDB SQL."""
-    return f'"{col_name}"'
+    """Quote a column name for DuckDB SQL.
+
+    Escapes embedded double quotes by doubling them, per SQL standard.
+    """
+    escaped = col_name.replace('"', '""')
+    return f'"{escaped}"'
 
 
 # ── Singleton ────────────────────────────────────────────────────────────────
