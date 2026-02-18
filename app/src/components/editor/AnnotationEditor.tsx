@@ -16,7 +16,10 @@ function useAnnotationContext(): AnnotationDataContext {
   const data = useEditorStore((s) => s.data)
   const config = useEditorStore((s) => s.config)
   const columnTypes = useEditorStore((s) => s.columnTypes)
-  return { data, xColumn: config.x ?? undefined, yColumn: (config.y as string | null) ?? undefined, columnTypes }
+  // Multi-Y charts UNPIVOT into metric_name/metric_value columns
+  const isMultiY = Array.isArray(config.y) && config.y.length > 1
+  const yColumn = isMultiY ? 'metric_value' : (Array.isArray(config.y) ? config.y[0] : config.y) ?? undefined
+  return { data, xColumn: config.x ?? undefined, yColumn, columnTypes }
 }
 
 export function AnnotationEditor() {
