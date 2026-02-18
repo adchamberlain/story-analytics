@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useMemo } from 'react'
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import {
   GridLayout,
@@ -37,7 +37,7 @@ interface ChartFullData {
 export function DashboardBuilderPage() {
   const { dashboardId } = useParams<{ dashboardId: string }>()
   const navigate = useNavigate()
-  const [searchParams, setSearchParams] = useSearchParams()
+  const [searchParams] = useSearchParams()
   const store = useDashboardBuilderStore()
 
   // Full chart data cache for rendering previews
@@ -54,16 +54,21 @@ export function DashboardBuilderPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dashboardId])
 
-  // Auto-add chart when returning from chart creation flow
+  // Auto-add chart when returning from chart creation flow.
+  // Wait for the dashboard to finish loading so addChart doesn't get overwritten,
+  // then auto-save and navigate to the dashboard view page.
+  const addChartHandled = useRef(false)
   useEffect(() => {
     const addChartId = searchParams.get('addChart')
-    if (addChartId) {
-      store.addChart(addChartId)
-      searchParams.delete('addChart')
-      setSearchParams(searchParams, { replace: true })
-    }
+    if (!addChartId || store.loading || addChartHandled.current) return
+
+    addChartHandled.current = true
+    store.addChart(addChartId)
+    store.save().then((id) => {
+      if (id) navigate(`/dashboard/${id}`)
+    })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams])
+  }, [searchParams, store.loading])
 
   // Fetch full chart data for all referenced charts
   useEffect(() => {
