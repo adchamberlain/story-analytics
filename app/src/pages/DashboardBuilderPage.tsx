@@ -42,6 +42,7 @@ export function DashboardBuilderPage() {
 
   // Full chart data cache for rendering previews
   const [chartData, setChartData] = useState<Record<string, ChartFullData>>({})
+  const [chartErrors, setChartErrors] = useState<Record<string, string>>({})
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
 
@@ -76,14 +77,16 @@ export function DashboardBuilderPage() {
   useEffect(() => {
     if (store.charts.length === 0) return
 
-    const missing = store.charts.filter((c) => !chartData[c.chart_id])
+    const missing = store.charts.filter((c) => !chartData[c.chart_id] && !chartErrors[c.chart_id])
     if (missing.length === 0) return
 
     for (const ref of missing) {
       fetch(`/api/v2/charts/${ref.chart_id}`)
-        .then((res) => res.ok ? res.json() : null)
+        .then((res) => {
+          if (!res.ok) throw new Error(`Chart ${ref.chart_id} not found`)
+          return res.json()
+        })
         .then((result) => {
-          if (!result) return
           const chart = result.chart
           setChartData((prev) => ({
             ...prev,
@@ -103,7 +106,9 @@ export function DashboardBuilderPage() {
             },
           }))
         })
-        .catch(() => {})
+        .catch(() => {
+          setChartErrors((prev) => ({ ...prev, [ref.chart_id]: 'Failed to load chart' }))
+        })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [store.charts.map((c) => c.chart_id).join(',')])
@@ -313,6 +318,7 @@ export function DashboardBuilderPage() {
                   <div key={ref.chart_id}>
                     <BuilderGridCard
                       chartFullData={chartData[ref.chart_id]}
+                      chartError={chartErrors[ref.chart_id]}
                       onRemove={() => store.removeChart(ref.chart_id)}
                     />
                   </div>
@@ -368,11 +374,31 @@ export function DashboardBuilderPage() {
 
 function BuilderGridCard({
   chartFullData,
+  chartError,
   onRemove,
 }: {
   chartFullData?: ChartFullData
+  chartError?: string
   onRemove: () => void
 }) {
+  // Error loading chart
+  if (chartError) {
+    return (
+      <div className="group relative bg-surface-raised rounded-2xl border border-red-500/30 shadow-card h-full flex items-center justify-center cursor-grab active:cursor-grabbing">
+        <button
+          onClick={(e) => { e.stopPropagation(); onRemove() }}
+          className="absolute top-2 right-2 z-10 text-[12px] text-red-400 hover:text-red-300 bg-surface-raised/80 backdrop-blur-sm transition-all opacity-0 group-hover:opacity-100 px-2 py-1 rounded-lg border border-red-500/20"
+        >
+          Remove
+        </button>
+        <div className="text-center px-4">
+          <p className="text-sm font-medium text-red-400">Chart unavailable</p>
+          <p className="text-xs text-text-muted mt-1">{chartError}</p>
+        </div>
+      </div>
+    )
+  }
+
   // Still loading chart data
   if (!chartFullData) {
     return (

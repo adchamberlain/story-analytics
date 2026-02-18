@@ -89,7 +89,6 @@ export function tickFormatter(opts: NumberFormatOptions = {}): (value: number) =
  */
 export function detectFormat(value: number): NumberFormatType {
   const abs = Math.abs(value)
-  if (abs > 0 && abs < 1) return 'percent'
   if (abs >= 1000) return 'compact'
   return 'number'
 }

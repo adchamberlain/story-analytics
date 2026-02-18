@@ -154,16 +154,6 @@ export function autoFormat(
       return formatPercent(value, options)
     }
 
-    // Auto-detect if value looks like a percentage (between -1 and 1)
-    if (Math.abs(value) <= 1 && value !== 0) {
-      // Could be a percentage - check if it makes sense
-      const asPercent = value * 100
-      if (asPercent !== Math.floor(asPercent)) {
-        // Has decimals when multiplied by 100, probably a percentage
-        return formatPercent(value, options)
-      }
-    }
-
     // Use compact for large numbers, regular for small
     if (Math.abs(value) >= 10_000) {
       return formatCompact(value, options)

@@ -36,7 +36,10 @@ export function ChartPicker({ excludeIds, onAdd, onCreateNew, onClose }: ChartPi
 
   useEffect(() => {
     fetch('/api/v2/charts/')
-      .then((res) => res.json())
+      .then((res) => {
+        if (!res.ok) throw new Error(`Charts fetch failed: ${res.status}`)
+        return res.json()
+      })
       .then((data: PickerChart[]) => {
         setCharts(data)
         setLoading(false)

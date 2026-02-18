@@ -243,8 +243,9 @@ def _compute_health_status(
     return ("healthy", [])
 
 
-# ── Health check cache ──────────────────────────────────────────────────────
+# ── Health check cache (bounded LRU) ───────────────────────────────────────
 
+_HEALTH_CACHE_MAX = 100
 _health_cache: dict[str, HealthCheckResponse] = {}
 
 
@@ -433,6 +434,10 @@ async def run_health_check(dashboard_id: str):
         overall_status=worst_status,
     )
 
+    # Evict oldest entries if cache exceeds max size
+    if len(_health_cache) >= _HEALTH_CACHE_MAX:
+        oldest_key = next(iter(_health_cache))
+        del _health_cache[oldest_key]
     _health_cache[dashboard_id] = result
     return result
 

@@ -71,9 +71,9 @@ export function EditorPage() {
   // Save button enabled logic
   const canSave = isNew || !store.chartId
     ? store.config.dataMode === 'sql'
-      ? store.data.length > 0  // SQL mode: enabled when query has been run
-      : !!store.sql            // Table mode: enabled when SQL exists (user mapped x column)
-    : isDirty                  // Existing chart: enabled when dirty
+      ? !!store.sql && !store.error  // SQL mode: enabled when query has been run (even with 0 rows)
+      : !!store.sql                  // Table mode: enabled when SQL exists (user mapped x column)
+    : isDirty                        // Existing chart: enabled when dirty
 
   // Map EditorConfig → ChartConfig for the renderer
   // Multi-Y: backend UNPIVOT produces metric_name/metric_value columns

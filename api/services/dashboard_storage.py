@@ -4,13 +4,18 @@ Mirrors chart_storage.py — local-first, Git-friendly persistence.
 """
 
 import json
+import logging
+import re
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from dataclasses import dataclass, asdict
 
+logger = logging.getLogger(__name__)
 
 DASHBOARDS_DIR = Path(__file__).parent.parent.parent / "data" / "dashboards"
+
+_SAFE_ID_RE = re.compile(r"^[a-f0-9]{1,32}$")
 
 
 @dataclass
@@ -59,8 +64,15 @@ def save_dashboard(
     return dashboard
 
 
+def _validate_id(dashboard_id: str) -> bool:
+    """Return True if dashboard_id is a safe hex string (no path traversal)."""
+    return bool(_SAFE_ID_RE.match(dashboard_id))
+
+
 def load_dashboard(dashboard_id: str) -> SavedDashboard | None:
     """Load a dashboard from disk."""
+    if not _validate_id(dashboard_id):
+        return None
     path = DASHBOARDS_DIR / f"{dashboard_id}.json"
     if not path.exists():
         return None
@@ -76,14 +88,20 @@ def list_dashboards() -> list[SavedDashboard]:
 
     dashboards = []
     for path in sorted(DASHBOARDS_DIR.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True):
-        data = json.loads(path.read_text())
-        dashboards.append(SavedDashboard(**data))
+        try:
+            data = json.loads(path.read_text())
+            dashboards.append(SavedDashboard(**data))
+        except Exception:
+            logger.warning("Skipping corrupted dashboard file: %s", path.name)
+            continue
 
     return dashboards
 
 
 def update_dashboard(dashboard_id: str, **fields) -> SavedDashboard | None:
     """Update a dashboard on disk. Merges provided fields."""
+    if not _validate_id(dashboard_id):
+        return None
     path = DASHBOARDS_DIR / f"{dashboard_id}.json"
     if not path.exists():
         return None
@@ -101,6 +119,8 @@ def update_dashboard(dashboard_id: str, **fields) -> SavedDashboard | None:
 
 def delete_dashboard(dashboard_id: str) -> bool:
     """Delete a dashboard."""
+    if not _validate_id(dashboard_id):
+        return False
     path = DASHBOARDS_DIR / f"{dashboard_id}.json"
     if path.exists():
         path.unlink()
