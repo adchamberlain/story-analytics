@@ -2,7 +2,30 @@
 
 ## 2026-02-18
 
-### Session: Bug hunt round 21 (7 fixes, 474 tests)
+### Session: Bug hunt round 22 — chart/dashboard creation flow (10 fixes, 487 tests)
+
+Focus: user flow for creating and saving new charts and dashboards.
+
+**Round 22 — 10 fixes across 9 files**
+
+Frontend (6 fixes):
+- `editorStore.ts`: AI assistant config changes (x, y, series) on existing table-mode charts never rebuilt the data query — chart showed stale data. Removed `!chartId` guard on `buildQuery` trigger in `updateConfig`.
+- `editorStore.ts`: SQL changes on existing charts didn't mark the chart dirty — `isDirty()` only compared `config` vs `savedConfig`, ignoring `sql`. Added `savedSql` tracking field set in `loadChart`, `save`, `saveNew`, and compared in `isDirty()`.
+- `editorStore.ts`: `setDataMode` table-restore failure wrote to `sqlError` (hidden in table mode) instead of `error`. User saw blank chart with no explanation.
+- `EditorPage.tsx`: Table-mode `canSave` didn't check `!store.error` — user could save a chart with stale data after a failed query rebuild.
+- `DashboardBuilderPage.tsx`: `handleAddChart` from chart picker never called `store.save()` — chart addition silently lost on Back/refresh. Added auto-save matching the query-param flow.
+- `ObservableChartFactory.tsx`: Horizontal bar block unconditionally overwrote `marginLeft` to 100, losing the +24px from `yAxisTitle`. Reordered so horizontal runs first, then yAxisTitle adds on top.
+
+Backend (4 fixes):
+- `data.py`: Replace upload path had `_sources.pop(existing_id)` outside the lock — race condition with concurrent readers. Moved inside `with service._lock:` block.
+- `data.py`: Paste endpoint called `ingest_csv("pasted_data.csv")` with no duplicate check — every paste silently created a new source. Added `find_source_by_filename` + replace logic.
+- `chart_storage.py` + `dashboard_storage.py`: `_atomic_write` double-closed fd on `os.replace` failure — after successful `os.close(fd)`, the except block tried `os.close(fd)` again. Added `fd_closed` tracking flag.
+- `chart_storage.py`: `load_chart` and `update_chart` had no exception handling around `_safe_load_chart` — legacy chart files missing required fields (e.g., `reasoning`, `horizontal`) caused unhandled `TypeError` → 500 error. Added try/except with graceful `None` return.
+
+**Test suite growth: 474 → 487 tests (394 Python + 93 frontend)**
+- 13 new tests across 11 test classes: TestUpdateConfigBuildQueryForExistingCharts, TestSqlDirtyTracking (2), TestHandleAddChartAutoSave, TestReplaceSourcesPopInsideLock, TestPasteDeduplication, TestSetDataModeErrorField, TestCanSaveTableModeErrorCheck, TestSafeLoadChartExceptionHandling (2), TestMarginLeftOrdering, TestAtomicWriteDoubleClose (2)
+
+
 
 **Round 21 — 7 fixes across 7 files (6 source + 1 test)**
 

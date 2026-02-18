@@ -107,6 +107,7 @@ interface EditorState {
   // Editable config
   config: EditorConfig
   savedConfig: EditorConfig | null
+  savedSql: string | null
 
   // History (undo/redo)
   configHistory: EditorConfig[]
@@ -171,6 +172,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   availableTables: [],
   config: { ...DEFAULT_CONFIG },
   savedConfig: null,
+  savedSql: null,
   configHistory: [],
   configFuture: [],
   chatMessages: [],
@@ -182,11 +184,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   setPlacingAnnotation: (id) => set({ placingAnnotationId: id }),
 
   isDirty: () => {
-    const { config, savedConfig, data, chartId } = get()
+    const { config, savedConfig, data, chartId, sql, savedSql } = get()
     // New unsaved chart: dirty if we have data
     if (!chartId && !savedConfig) return data.length > 0
     if (!savedConfig) return false
-    return JSON.stringify(config) !== JSON.stringify(savedConfig)
+    return JSON.stringify(config) !== JSON.stringify(savedConfig) || sql !== savedSql
   },
 
   loadChart: async (chartId: string) => {
@@ -255,6 +257,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         columns: result.columns ?? [],
         columnTypes,
         sql: chart.sql ?? null,
+        savedSql: chart.sql ?? null,
         customSql: loadedDataMode === 'sql' ? (chart.sql ?? '') : '',
         sqlError: null,
         sqlExecuting: false,
@@ -412,6 +415,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         saving: false,
         chartId: saved.id,
         savedConfig: { ...config },
+        savedSql: sql,
         configHistory: [],
         configFuture: [],
       })
@@ -439,10 +443,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       configFuture: [], // Clear redo stack on new change
     })
 
-    // Auto-trigger buildQuery in new chart mode when data-relevant keys change
+    // Auto-trigger buildQuery when data-relevant keys change
     // Skip in SQL mode — user controls query execution manually
     const currentConfig = get().config
-    if (!chartId && currentConfig.dataMode !== 'sql') {
+    if (currentConfig.dataMode !== 'sql') {
       const changedKeys = Object.keys(partial) as (keyof EditorConfig)[]
       if (changedKeys.some((k) => DATA_KEYS.includes(k))) {
         // Debounce: cancel previous pending buildQuery before scheduling a new one
@@ -507,7 +511,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
             get().buildQuery()
           })
           .catch(() => {
-            set({ sqlError: 'Failed to restore source columns. Try reloading the page.' })
+            set({ error: 'Failed to restore source columns. Try reloading the page.' })
           })
       }
     }
@@ -649,7 +653,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       }
 
       // Snapshot saved state and clear undo/redo history
-      set({ saving: false, savedConfig: { ...config }, configHistory: [], configFuture: [] })
+      set({ saving: false, savedConfig: { ...config }, savedSql: sql, configHistory: [], configFuture: [] })
     } catch (e) {
       set({ saving: false, error: e instanceof Error ? e.message : String(e) })
     }
@@ -798,6 +802,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       availableTables: [],
       config: { ...DEFAULT_CONFIG },
       savedConfig: null,
+      savedSql: null,
       configHistory: [],
       configFuture: [],
       chatMessages: [],

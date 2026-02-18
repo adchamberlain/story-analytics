@@ -96,15 +96,18 @@ def save_chart(
 def _atomic_write(path: Path, content: str) -> None:
     """Write content to a file atomically via uniquely-named temp file + rename."""
     fd, tmp_name = tempfile.mkstemp(dir=path.parent, suffix=".tmp")
+    fd_closed = False
     try:
         os.write(fd, content.encode())
         os.close(fd)
+        fd_closed = True
         os.replace(tmp_name, str(path))
     except BaseException:
-        try:
-            os.close(fd)
-        except OSError:
-            pass
+        if not fd_closed:
+            try:
+                os.close(fd)
+            except OSError:
+                pass
         try:
             os.unlink(tmp_name)
         except OSError:
@@ -131,8 +134,12 @@ def load_chart(chart_id: str) -> SavedChart | None:
     if not path.exists():
         return None
 
-    data = json.loads(path.read_text())
-    return _safe_load_chart(data)
+    try:
+        data = json.loads(path.read_text())
+        return _safe_load_chart(data)
+    except Exception:
+        logger.warning("Failed to load chart %s (schema mismatch?)", chart_id)
+        return None
 
 
 def list_charts() -> list[SavedChart]:
@@ -172,7 +179,11 @@ def update_chart(chart_id: str, **fields) -> SavedChart | None:
 
     data["updated_at"] = now
     _atomic_write(path, json.dumps(data, indent=2))
-    return _safe_load_chart(data)
+    try:
+        return _safe_load_chart(data)
+    except Exception:
+        logger.warning("Failed to reload chart %s after update (schema mismatch?)", chart_id)
+        return None
 
 
 def delete_chart(chart_id: str) -> bool:

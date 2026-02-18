@@ -73,7 +73,7 @@ export function EditorPage() {
   const canSave = (isNew || !store.chartId)
     ? store.config.dataMode === 'sql'
       ? !!store.sql && !store.error  // SQL mode: enabled when query has been run (even with 0 rows)
-      : !!store.sql                  // Table mode: enabled when SQL exists (user mapped x column)
+      : !!store.sql && !store.error  // Table mode: also gate on no error to prevent saving stale data
     : isDirty                        // Existing chart: enabled when dirty
 
   // Map EditorConfig → ChartConfig for the renderer

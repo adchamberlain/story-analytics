@@ -234,12 +234,12 @@ async def upload_csv(file: UploadFile = File(...), replace: str = Form("")):
     # If replacing, delete the old source first
     if existing_id and replace == "true":
         table_name = f"src_{existing_id}"
-        try:
-            with service._lock:
+        with service._lock:
+            try:
                 service._conn.execute(f"DROP TABLE IF EXISTS {table_name}")
-        except Exception:
-            pass
-        service._sources.pop(existing_id, None)
+            except Exception:
+                pass
+            service._sources.pop(existing_id, None)
         upload_dir = Path(__file__).parent.parent.parent / "data" / "uploads" / existing_id
         if upload_dir.exists():
             shutil.rmtree(upload_dir)
@@ -313,6 +313,18 @@ async def paste_data(request: PasteRequest):
 
     try:
         service = get_duckdb_service()
+
+        # Replace previous pasted_data source if it exists (avoid accumulating duplicates)
+        existing_paste_id = service.find_source_by_filename("pasted_data.csv")
+        if existing_paste_id:
+            table_name = f"src_{existing_paste_id}"
+            with service._lock:
+                try:
+                    service._conn.execute(f"DROP TABLE IF EXISTS {table_name}")
+                except Exception:
+                    pass
+                service._sources.pop(existing_paste_id, None)
+
         schema = service.ingest_csv(tmp_path, "pasted_data.csv")
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))

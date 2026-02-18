@@ -69,15 +69,18 @@ def save_dashboard(
 def _atomic_write(path: Path, content: str) -> None:
     """Write content to a file atomically via uniquely-named temp file + rename."""
     fd, tmp_name = tempfile.mkstemp(dir=path.parent, suffix=".tmp")
+    fd_closed = False
     try:
         os.write(fd, content.encode())
         os.close(fd)
+        fd_closed = True
         os.replace(tmp_name, str(path))
     except BaseException:
-        try:
-            os.close(fd)
-        except OSError:
-            pass
+        if not fd_closed:
+            try:
+                os.close(fd)
+            except OSError:
+                pass
         try:
             os.unlink(tmp_name)
         except OSError:
