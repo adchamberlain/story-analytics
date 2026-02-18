@@ -148,6 +148,12 @@ def _parse_proposal(response: str) -> ProposedChart:
             error=f"Failed to parse LLM response as JSON: {e}\nResponse: {response[:500]}",
         )
 
+    if not isinstance(data, dict):
+        return ProposedChart(
+            success=False,
+            error=f"LLM response must be a JSON object, got {type(data).__name__}",
+        )
+
     # Normalize string "null" → None (LLMs sometimes return the literal string)
     def _nullable(val: str | None) -> str | None:
         if isinstance(val, str) and val.strip().lower() == "null":

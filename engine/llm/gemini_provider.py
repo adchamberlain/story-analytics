@@ -191,8 +191,8 @@ class GeminiProvider(LLMProvider):
                         f"Response blocked by Gemini safety filters: {block_reason}"
                     )
 
-                # Extract content
-                content = response.text
+                # Extract content — response.text can be None for non-text responses
+                content = response.text or ""
 
                 # Build usage dict if available
                 usage = None
@@ -293,8 +293,8 @@ class GeminiProvider(LLMProvider):
                         f"Response blocked by Gemini safety filters: {block_reason}"
                     )
 
-                # Extract content
-                content = response.text
+                # Extract content — response.text can be None for non-text responses
+                content = response.text or ""
 
                 # Build usage dict if available
                 usage = None

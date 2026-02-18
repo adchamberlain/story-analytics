@@ -310,9 +310,12 @@ async def get_dashboard(dashboard_id: str, filters: str | None = None):
     filter_params: dict[str, str | int | float] = {}
     if filters:
         try:
-            filter_params = _json.loads(filters)
+            parsed = _json.loads(filters)
+            if not isinstance(parsed, dict):
+                raise HTTPException(status_code=400, detail="filters must be a JSON object")
+            filter_params = parsed
         except (ValueError, TypeError):
-            pass
+            raise HTTPException(status_code=400, detail="filters must be valid JSON")
 
     db = get_duckdb_service()
     charts_with_data: list[ChartWithData] = []

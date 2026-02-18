@@ -664,7 +664,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
 
   sendChatMessage: async (message: string) => {
-    const { chartId, config, columns, data, columnTypes, chatMessages } = get()
+    const { chartId, config, columns, data, columnTypes, chatMessages, chatLoading } = get()
+    if (chatLoading) return  // Prevent concurrent chat requests
     if (!chartId) {
       const errorMsg: ChatMessage = {
         id: `msg-${Date.now()}`,
