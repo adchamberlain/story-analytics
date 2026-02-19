@@ -1,5 +1,6 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import { useEditorStore } from '../../stores/editorStore'
+import { analyzeDataShape } from '../../utils/analyzeDataShape'
 import { ChartTypeSelector } from './ChartTypeSelector'
 import { PaletteSelector } from './PaletteSelector'
 import { ColumnDropdown } from './ColumnDropdown'
@@ -62,6 +63,13 @@ export function Toolbox() {
   const isMultiY = Array.isArray(config.y) && config.y.length > 1
   const hasY = Array.isArray(config.y) ? config.y.length > 0 : !!config.y
 
+  const shapeAdvice = useMemo(
+    () => data.length > 0
+      ? analyzeDataShape(data, columns, columnTypes, config.chartType, config as unknown as Record<string, unknown>)
+      : [],
+    [data, columns, columnTypes, config.chartType, config.metricLabel, config.value],
+  )
+
   return (
     <div className="p-4 space-y-5">
       {/* Chart Type */}
@@ -71,6 +79,34 @@ export function Toolbox() {
           onChange={(chartType: ChartType) => updateConfig({ chartType })}
         />
       </Section>
+
+      {/* Shape Advisor Banner */}
+      {shapeAdvice.length > 0 && (
+        <div className="space-y-1.5 px-0.5">
+          {shapeAdvice.map((advice, i) => (
+            <div
+              key={i}
+              className={`text-xs rounded-lg px-3 py-2 ${
+                advice.level === 'warning'
+                  ? 'bg-amber-50 text-amber-800 border border-amber-200'
+                  : 'bg-blue-50 text-blue-800 border border-blue-200'
+              }`}
+            >
+              <span>{advice.message}</span>
+              {advice.action && advice.action.type === 'switchChart' && advice.action.chartType && (
+                <button
+                  onClick={() => updateConfig({ chartType: advice.action!.chartType! })}
+                  className={`ml-1.5 font-medium underline ${
+                    advice.level === 'warning' ? 'text-amber-900' : 'text-blue-900'
+                  }`}
+                >
+                  {advice.action.label}
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Data Section with Mode Toggle */}
       <Section title="Data">
