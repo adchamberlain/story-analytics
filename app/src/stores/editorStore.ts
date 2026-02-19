@@ -152,7 +152,7 @@ interface EditorState {
 const MAX_HISTORY = 50
 
 /** Keys that trigger auto build-query in new chart mode */
-const DATA_KEYS: (keyof EditorConfig)[] = ['x', 'y', 'series', 'aggregation', 'timeGrain']
+const DATA_KEYS: (keyof EditorConfig)[] = ['x', 'y', 'series', 'aggregation', 'timeGrain', 'value', 'metricLabel']
 
 /** Debounce timer for auto buildQuery calls from updateConfig */
 let _buildQueryTimer: ReturnType<typeof setTimeout>
@@ -326,6 +326,32 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   buildQuery: async () => {
     const { sourceId, config } = get()
     if (config.dataMode === 'sql') return  // Never auto-build in SQL mode
+
+    // BigValue charts use value/metricLabel instead of x/y — fetch all rows
+    if (config.chartType === 'BigValue') {
+      if (!sourceId || !config.value) return
+      try {
+        const res = await fetch('/api/data/query', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ source_id: sourceId, sql: 'SELECT * FROM data' }),
+        })
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({ detail: res.statusText }))
+          throw new Error(body.detail ?? `Query failed: ${res.status}`)
+        }
+        const result = await res.json()
+        set({
+          data: result.rows ?? [],
+          sql: `SELECT * FROM data`,
+          error: null,
+        })
+      } catch (e) {
+        set({ error: e instanceof Error ? e.message : String(e) })
+      }
+      return
+    }
+
     if (!sourceId || !config.x) return
 
     try {

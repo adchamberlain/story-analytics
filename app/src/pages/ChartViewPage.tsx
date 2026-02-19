@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom'
 import { ChartWrapper } from '../components/charts/ChartWrapper'
 import { ObservableChartFactory } from '../components/charts/ObservableChartFactory'
 import { SharePanel } from '../components/sharing/SharePanel'
+import { ThemeToggle } from '../components/layout/ThemeToggle'
 import { PALETTES } from '../themes/plotTheme'
 import type { ChartConfig, ChartType } from '../types/chart'
 import type { PaletteKey } from '../themes/plotTheme'
@@ -130,12 +131,15 @@ export function ChartViewPage() {
         <Link to="/library" className="text-sm text-text-secondary hover:text-text-on-surface transition-colors">
           &larr; Library
         </Link>
-        <Link
-          to={`/editor/${chartId}`}
-          className="text-sm px-3 py-1.5 rounded border border-border-default text-text-on-surface hover:bg-surface-secondary transition-colors"
-        >
-          Edit
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link
+            to={`/editor/${chartId}`}
+            className="text-sm px-3 py-1.5 rounded border border-border-default text-text-on-surface hover:bg-surface-secondary transition-colors"
+          >
+            Edit
+          </Link>
+          <ThemeToggle />
+        </div>
       </header>
 
       {/* Chart */}

@@ -194,9 +194,12 @@ class DuckDBService:
         schema = self._inspect_table(table_name, source_id, filename)
         return schema
 
-    def ingest_parquet(self, parquet_path: Path, table_name_hint: str) -> SourceSchema:
-        """Load a parquet file into DuckDB and return schema information."""
-        source_id = uuid.uuid4().hex[:12]
+    def ingest_parquet(self, parquet_path: Path, table_name_hint: str, *, source_id: str | None = None) -> SourceSchema:
+        """Load a parquet file into DuckDB and return schema information.
+
+        Pass an existing ``source_id`` to reuse it (e.g. when re-syncing from Snowflake).
+        """
+        source_id = source_id or uuid.uuid4().hex[:12]
         table_name = f"src_{source_id}"
 
         try:
@@ -287,7 +290,9 @@ class DuckDBService:
                     tmp.close()  # Close file handle; we only need the path
                     pq.write_table(arrow_table, str(pq_path))
 
-                schema = self.ingest_parquet(pq_path, table.lower())
+                # Reuse the old source_id when re-syncing so existing charts keep working
+                existing_id = self.find_source_by_filename(table.lower())
+                schema = self.ingest_parquet(pq_path, table.lower(), source_id=existing_id)
                 results.append(schema)
 
                 if not cache:
@@ -313,7 +318,9 @@ class DuckDBService:
             if not subdir.is_dir():
                 continue
             for pq_file in subdir.glob("*.parquet"):
-                schema = self.ingest_parquet(pq_file, subdir.name)
+                # Reuse existing source_id so charts survive server restarts
+                existing_id = self.find_source_by_filename(subdir.name)
+                schema = self.ingest_parquet(pq_file, subdir.name, source_id=existing_id)
                 results.append(schema)
         return results
 
@@ -437,9 +444,13 @@ class DuckDBService:
         return _re.sub(r'\$\{inputs\.(\w+)\}', _replacer, sql)
 
     def find_source_by_filename(self, filename: str) -> str | None:
-        """Return the source_id of an existing source with this filename, or None."""
+        """Return the source_id of an existing source with this filename, or None.
+
+        Matches against both the full filename (e.g. ``sales.csv``) and the
+        stem without extension (e.g. ``orders`` matching ``orders.parquet``).
+        """
         for sid, meta in self._sources.items():
-            if meta.path.name == filename:
+            if meta.path.name == filename or meta.path.stem == filename:
                 return sid
         return None
 

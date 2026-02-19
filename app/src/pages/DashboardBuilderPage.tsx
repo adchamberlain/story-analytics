@@ -48,13 +48,19 @@ export function DashboardBuilderPage() {
   const [deleteError, setDeleteError] = useState<string | null>(null)
 
   // Load existing dashboard if editing — clear stale chart cache on navigation
+  // AbortController cancels stale fetches (e.g. StrictMode double-fire) so a late
+  // response doesn't overwrite state modified by the addChart effect.
   useEffect(() => {
     setChartData({})
     setChartErrors({})
+    const controller = new AbortController()
     if (dashboardId) {
-      store.load(dashboardId)
+      store.load(dashboardId, controller.signal)
     }
-    return () => store.reset()
+    return () => {
+      controller.abort()
+      store.reset()
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dashboardId])
 
@@ -78,7 +84,7 @@ export function DashboardBuilderPage() {
     addChartHandled.current = true
     store.addChart(addChartId)
     store.save().then((id) => {
-      if (id) navigate(`/dashboard/${id}/edit`)
+      if (id) navigate(`/dashboard/${id}/edit`, { replace: true })
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, store.dashboardId, dashboardId])
