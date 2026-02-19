@@ -2,7 +2,8 @@ import { useEffect, useState, useCallback } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { FileDropzone } from '../components/data/FileDropzone'
 import { PasteDataInput } from '../components/data/PasteDataInput'
-import { DatabaseConnector } from '../components/data/DatabaseConnector'
+import { DatabaseConnector, type SyncedInfo } from '../components/data/DatabaseConnector'
+import { DataShaper } from '../components/data/DataShaper'
 import { DataPreview } from '../components/data/DataPreview'
 import { useDataStore } from '../stores/dataStore'
 
@@ -24,6 +25,10 @@ export function SourcePickerPage() {
   const [showRecent, setShowRecent] = useState(false)
   const [inputMode, setInputMode] = useState<'upload' | 'paste'>('upload')
   const [sourceName, setSourceName] = useState('')
+
+  // Database wizard state
+  const [dbStep, setDbStep] = useState<'connector' | 'shaper'>('connector')
+  const [syncedInfo, setSyncedInfo] = useState<SyncedInfo | null>(null)
 
   const dataStore = useDataStore()
 
@@ -82,8 +87,29 @@ export function SourcePickerPage() {
     [dataStore]
   )
 
-  const handleSynced = useCallback(() => {
+  const handleSynced = useCallback((info: SyncedInfo) => {
+    setSyncedInfo(info)
+    setDbStep('shaper')
     setRefreshKey((k) => k + 1)
+  }, [])
+
+  const handleShaperApprove = useCallback((sql: string) => {
+    if (!syncedInfo) return
+    const params = new URLSearchParams({ sourceId: syncedInfo.sourceId })
+    if (returnToDashboard) params.set('returnToDashboard', returnToDashboard)
+    navigate(`/editor/new?${params}`, { state: { initialSql: sql } })
+  }, [syncedInfo, navigate, returnToDashboard])
+
+  const handleShaperSkip = useCallback(() => {
+    if (!syncedInfo) return
+    const params = new URLSearchParams({ sourceId: syncedInfo.sourceId })
+    if (returnToDashboard) params.set('returnToDashboard', returnToDashboard)
+    navigate(`/editor/new?${params}`)
+  }, [syncedInfo, navigate, returnToDashboard])
+
+  const handleShaperBack = useCallback(() => {
+    setSyncedInfo(null)
+    setDbStep('connector')
   }, [])
 
   // Deduplicate sources by name, keeping only the most recent (last in the list)
@@ -116,8 +142,19 @@ export function SourcePickerPage() {
       </header>
 
       <main style={{ maxWidth: '640px', margin: '0 auto', padding: '48px 40px' }}>
-        {dataStore.source ? (
-          /* Step 2: Data preview */
+        {/* DataShaper wizard step (after DB sync) */}
+        {dbStep === 'shaper' && syncedInfo ? (
+          <DataShaper
+            sourceId={syncedInfo.sourceId}
+            tableName={syncedInfo.tableName}
+            rowCount={syncedInfo.rowCount}
+            columns={syncedInfo.columns}
+            onApprove={handleShaperApprove}
+            onSkip={handleShaperSkip}
+            onBack={handleShaperBack}
+          />
+        ) : dataStore.source ? (
+          /* Step 2: Data preview (CSV/paste) */
           <>
             <h1 className="text-[28px] font-bold text-text-primary tracking-tight" style={{ marginBottom: '8px' }}>
               Check your data
