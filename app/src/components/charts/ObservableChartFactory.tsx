@@ -9,6 +9,7 @@ import { useEditorStore } from '../../stores/editorStore'
 import { getXValues, getYForX, resolveOffset, smartOffset } from '../../utils/annotationDefaults'
 import type { ChartConfig, ChartType, Annotations, PointAnnotation, HighlightRange } from '../../types/chart'
 import type { ChartTheme } from '../../themes/chartThemes'
+import { shouldShowGrid, formatBigValue } from './bigValueHelpers'
 
 /** Minimal type for the Observable Plot element with scale access. */
 interface PlotElement extends HTMLElement {
@@ -1172,28 +1173,66 @@ function maybeParseDates(
 function BigValueChart({ data, config }: { data: Record<string, unknown>[]; config: ChartConfig }) {
   if (data.length === 0) return null
 
+  // Grid mode: multiple rows + metricLabel set
+  if (shouldShowGrid(data.length, config.metricLabel)) {
+    const positiveIsGood = config.positiveIsGood !== false
+    return (
+      <div
+        className="grid gap-4 w-full py-4"
+        style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}
+      >
+        {data.map((row, i) => {
+          const label = config.metricLabel ? String(row[config.metricLabel] ?? '') : `Metric ${i + 1}`
+          const valueField = config.value ?? (Array.isArray(config.y) ? config.y[0] : config.y)
+          const value = valueField ? row[valueField as string] : null
+          const compValue = config.comparisonValue ? row[config.comparisonValue] : null
+          const delta = (typeof value === 'number' && typeof compValue === 'number')
+            ? value - compValue
+            : null
+
+          return (
+            <div
+              key={i}
+              className="rounded-xl border border-border-default bg-surface p-4 flex flex-col"
+            >
+              <div className="text-xs font-medium text-text-muted mb-1 truncate">{label}</div>
+              <div className="text-2xl font-bold text-chart-blue">
+                {formatBigValue(value, config.valueFormat)}
+              </div>
+              {delta !== null && (
+                <div
+                  className={`text-xs mt-1 font-medium ${
+                    (delta >= 0) === positiveIsGood ? 'text-chart-green' : 'text-chart-red'
+                  }`}
+                >
+                  {delta >= 0 ? '+' : ''}{delta.toLocaleString()}
+                  {config.comparisonLabel && (
+                    <span className="text-text-muted ml-1 font-normal">{config.comparisonLabel}</span>
+                  )}
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    )
+  }
+
+  // Single-value mode (original behavior)
   const row = data[0]
   const valueField = config.value ?? (Array.isArray(config.y) ? config.y[0] : config.y)
   const value = valueField ? row[valueField as string] : null
   const compValue = config.comparisonValue ? row[config.comparisonValue] : null
-
-  let formattedValue = String(value ?? '—')
-  if (typeof value === 'number') {
-    if (config.valueFormat === 'currency') formattedValue = `$${value.toLocaleString()}`
-    else if (config.valueFormat === 'percent') formattedValue = `${value.toFixed(1)}%`
-    else formattedValue = value.toLocaleString()
-  }
+  const positiveIsGood = config.positiveIsGood !== false
 
   const delta = (typeof value === 'number' && typeof compValue === 'number')
     ? value - compValue
     : null
 
-  const positiveIsGood = config.positiveIsGood !== false
-
   return (
     <div className="flex flex-col items-center justify-center h-full py-8">
       <div className="text-4xl font-bold text-chart-blue">
-        {formattedValue}
+        {formatBigValue(value, config.valueFormat)}
       </div>
       {delta !== null && (
         <div
