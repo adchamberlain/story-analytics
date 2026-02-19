@@ -2,6 +2,7 @@ import { useEffect, useState, useRef, useCallback } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { DashboardGrid } from '../components/dashboard/DashboardGrid'
 import { ShareModal } from '../components/sharing/ShareModal'
+import { ThemeToggle } from '../components/layout/ThemeToggle'
 import { formatTimeAgo } from '../utils/formatters'
 
 interface ChartWithData {
@@ -237,6 +238,7 @@ export function DashboardViewPage() {
           >
             Edit
           </Link>
+          <ThemeToggle />
         </div>
       </header>
 

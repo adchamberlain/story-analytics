@@ -40,7 +40,7 @@ interface DashboardBuilderState {
   setPickerOpen: (open: boolean) => void
   updateLayouts: (layouts: Array<{ i: string; x: number; y: number; w: number; h: number }>) => void
   save: () => Promise<string | null>
-  load: (dashboardId: string) => Promise<void>
+  load: (dashboardId: string, signal?: AbortSignal) => Promise<void>
   reset: () => void
 }
 
@@ -137,18 +137,20 @@ export const useDashboardBuilderStore = create<DashboardBuilderState>((set, get)
     }
   },
 
-  load: async (dashboardId) => {
+  load: async (dashboardId, signal) => {
     set({ loading: true, error: null })
 
     try {
       // Fetch single dashboard metadata by ID
-      const res = await fetch(`/api/v2/dashboards/${dashboardId}`)
+      const res = await fetch(`/api/v2/dashboards/${dashboardId}`, { signal })
+      if (signal?.aborted) return
       if (!res.ok) {
         if (res.status === 404) throw new Error('Dashboard not found')
         throw new Error(`Load failed: ${res.statusText}`)
       }
 
       const dashboard = await res.json()
+      if (signal?.aborted) return
 
       set({
         loading: false,
@@ -162,6 +164,7 @@ export const useDashboardBuilderStore = create<DashboardBuilderState>((set, get)
         })),
       })
     } catch (e) {
+      if (e instanceof DOMException && e.name === 'AbortError') return
       set({ loading: false, error: e instanceof Error ? e.message : String(e) })
     }
   },
