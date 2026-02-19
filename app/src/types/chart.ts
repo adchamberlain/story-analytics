@@ -172,6 +172,8 @@ export interface ChartConfig {
   legendLabel?: string
 
   /** KPI/BigValue options */
+  /** Column containing metric name labels for KPI grid mode */
+  metricLabel?: string
   /** Column containing comparison value (e.g., previous period) */
   comparisonValue?: string
   /** Label for comparison (e.g., "vs last month") */

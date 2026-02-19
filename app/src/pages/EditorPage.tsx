@@ -1,5 +1,5 @@
-import { useEffect, useCallback } from 'react'
-import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
+import { useEffect, useCallback, useRef } from 'react'
+import { useParams, useNavigate, useSearchParams, useLocation } from 'react-router-dom'
 import { useEditorStore } from '../stores/editorStore'
 import { useDataStore } from '../stores/dataStore'
 import { ChartWrapper } from '../components/charts/ChartWrapper'
@@ -13,10 +13,13 @@ export function EditorPage() {
   const { chartId } = useParams<{ chartId: string }>()
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
+  const location = useLocation()
   const store = useEditorStore()
 
   const isNew = chartId === 'new'
   const sourceId = searchParams.get('sourceId')
+  const initialSql = (location.state as { initialSql?: string } | null)?.initialSql
+  const initialSqlApplied = useRef(false)
 
   // Load chart or init new on mount; reset store before loading a different chart
   useEffect(() => {
@@ -29,6 +32,17 @@ export function EditorPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chartId, sourceId])
+
+  // Auto-execute initial SQL passed from DataShaper wizard
+  useEffect(() => {
+    if (initialSql && !initialSqlApplied.current && isNew && sourceId && !store.loading) {
+      initialSqlApplied.current = true
+      store.setDataMode('sql')
+      store.setCustomSql(initialSql)
+      store.executeCustomSql()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialSql, store.loading])
 
   // Dual save paths
   const returnToDashboard = searchParams.get('returnToDashboard')
@@ -97,6 +111,7 @@ export function EditorPage() {
     comparisonLabel: store.config.comparisonLabel || undefined,
     valueFormat: store.config.valueFormat || undefined,
     positiveIsGood: store.config.positiveIsGood,
+    metricLabel: store.config.metricLabel ?? undefined,
   }
 
   // Apply palette colors
