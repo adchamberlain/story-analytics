@@ -11,8 +11,26 @@ interface SavedConnection {
   created_at: string
 }
 
+export interface SyncedColumnInfo {
+  name: string
+  type: string
+  nullable: boolean
+  sample_values: string[]
+  null_count: number
+  distinct_count: number
+  min_value: string | null
+  max_value: string | null
+}
+
+export interface SyncedInfo {
+  sourceId: string
+  tableName: string
+  rowCount: number
+  columns: SyncedColumnInfo[]
+}
+
 interface DatabaseConnectorProps {
-  onSynced: () => void
+  onSynced: (info: SyncedInfo) => void
 }
 
 const DB_LABELS: Record<DbType, string> = {
@@ -52,7 +70,7 @@ export function DatabaseConnector({ onSynced }: DatabaseConnectorProps) {
   const [testing, setTesting] = useState(false)
   const [testMessage, setTestMessage] = useState<string | null>(null)
   const [tables, setTables] = useState<string[]>([])
-  const [selectedTables, setSelectedTables] = useState<Set<string>>(new Set())
+  const [selectedTable, setSelectedTable] = useState<string | null>(null)
   const [activeConnectionId, setActiveConnectionId] = useState<string | null>(null)
 
   // Fetch saved connections
@@ -92,7 +110,7 @@ export function DatabaseConnector({ onSynced }: DatabaseConnectorProps) {
     setError(null)
     setTestMessage(null)
     setTables([])
-    setSelectedTables(new Set())
+    setSelectedTable(null)
     setActiveConnectionId(null)
     setTesting(false)
   }
@@ -145,7 +163,7 @@ export function DatabaseConnector({ onSynced }: DatabaseConnectorProps) {
       if (data.success) {
         setTestMessage(data.message)
         setTables(data.tables || [])
-        setSelectedTables(new Set(data.tables || []))
+        setSelectedTable(null)
         setStep('tables')
       } else {
         setError(data.message)
@@ -206,7 +224,7 @@ export function DatabaseConnector({ onSynced }: DatabaseConnectorProps) {
       if (testData.success) {
         setTestMessage(testData.message)
         setTables(testData.tables || [])
-        setSelectedTables(new Set(testData.tables || []))
+        setSelectedTable(null)
         setStep('tables')
       } else {
         setError(testData.message)
@@ -218,21 +236,8 @@ export function DatabaseConnector({ onSynced }: DatabaseConnectorProps) {
     }
   }
 
-  const handleToggleTable = (table: string) => {
-    setSelectedTables((prev) => {
-      const next = new Set(prev)
-      if (next.has(table)) next.delete(table)
-      else next.add(table)
-      return next
-    })
-  }
-
-  const handleToggleAll = () => {
-    setSelectedTables(selectedTables.size === tables.length ? new Set() : new Set(tables))
-  }
-
   const handleSync = async () => {
-    if (!activeConnectionId || selectedTables.size === 0) return
+    if (!activeConnectionId || !selectedTable) return
     setStep('syncing')
     setError(null)
 
@@ -240,11 +245,26 @@ export function DatabaseConnector({ onSynced }: DatabaseConnectorProps) {
       const res = await fetch(`/api/connections/${activeConnectionId}/sync`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tables: Array.from(selectedTables), credentials: buildCredentials(), username: username || null }),
+        body: JSON.stringify({ tables: [selectedTable], credentials: buildCredentials(), username: username || null }),
       })
       const data = await res.json()
       if (!res.ok) { setError(data.detail || 'Sync failed'); setStep('tables'); return }
-      onSynced()
+
+      // The sync response contains synced_sources: [{ source_id, table_name, row_count }]
+      // Fetch full schema for the synced source to get column metadata
+      const synced = data.synced_sources?.[0]
+      if (!synced) { setError('Sync completed but no source returned'); setStep('tables'); return }
+
+      const schemaRes = await fetch(`/api/data/schema/${synced.source_id}`)
+      if (!schemaRes.ok) { setError('Failed to fetch schema after sync'); setStep('tables'); return }
+      const schemaData = await schemaRes.json()
+
+      onSynced({
+        sourceId: synced.source_id,
+        tableName: selectedTable,
+        rowCount: schemaData.row_count,
+        columns: schemaData.columns,
+      })
       resetForm()
       setStep('closed')
     } catch (err: unknown) {
@@ -450,7 +470,7 @@ export function DatabaseConnector({ onSynced }: DatabaseConnectorProps) {
     )
   }
 
-  // ── Table picker ──────────────────────────────────────────────────────────
+  // ── Table picker (single select) ───────────────────────────────────────────
   if (step === 'tables') {
     return (
       <div className="rounded-2xl border border-border-default bg-surface-raised overflow-hidden">
@@ -458,7 +478,7 @@ export function DatabaseConnector({ onSynced }: DatabaseConnectorProps) {
           className="border-b border-border-default flex items-center justify-between"
           style={{ padding: '20px 28px' }}
         >
-          <h3 className="text-[17px] font-semibold text-text-primary">Select Tables to Import</h3>
+          <h3 className="text-[17px] font-semibold text-text-primary">Choose a Table</h3>
           <button
             onClick={handleClose}
             className="flex items-center justify-center rounded-lg text-text-icon hover:text-text-primary hover:bg-surface-secondary transition-colors"
@@ -475,12 +495,7 @@ export function DatabaseConnector({ onSynced }: DatabaseConnectorProps) {
               <p className="text-[14px]" style={{ color: '#22c55e' }}>{testMessage}</p>
             </div>
           )}
-          <div className="flex items-center justify-between">
-            <button onClick={handleToggleAll} className="text-[14px] font-medium transition-colors" style={{ color: '#3b82f6' }}>
-              {selectedTables.size === tables.length ? 'Deselect All' : 'Select All'}
-            </button>
-            <span className="text-[13px] text-text-muted">{selectedTables.size} of {tables.length} selected</span>
-          </div>
+          <p className="text-[13px] text-text-muted">{tables.length} table{tables.length !== 1 ? 's' : ''} available</p>
           <div className="overflow-y-auto border border-border-default rounded-xl divide-y divide-border-subtle" style={{ maxHeight: '280px' }}>
             {tables.map((table) => (
               <label
@@ -489,10 +504,11 @@ export function DatabaseConnector({ onSynced }: DatabaseConnectorProps) {
                 style={{ gap: '14px', padding: '14px 20px' }}
               >
                 <input
-                  type="checkbox"
-                  checked={selectedTables.has(table)}
-                  onChange={() => handleToggleTable(table)}
-                  className="rounded border-border-strong text-blue-600 focus:ring-blue-500"
+                  type="radio"
+                  name="table-select"
+                  checked={selectedTable === table}
+                  onChange={() => setSelectedTable(table)}
+                  className="border-border-strong text-blue-600 focus:ring-blue-500"
                 />
                 <span className="text-[15px] text-text-primary">{table}</span>
               </label>
@@ -502,11 +518,11 @@ export function DatabaseConnector({ onSynced }: DatabaseConnectorProps) {
           <div className="flex items-center" style={{ gap: '12px', paddingTop: '4px' }}>
             <button
               onClick={handleSync}
-              disabled={selectedTables.size === 0}
+              disabled={!selectedTable}
               className="text-[14px] rounded-xl bg-blue-600 text-white hover:bg-blue-700 transition-colors font-medium disabled:opacity-50"
               style={{ padding: '10px 24px' }}
             >
-              Import {selectedTables.size} Table{selectedTables.size !== 1 ? 's' : ''}
+              Import Table
             </button>
             <button
               onClick={handleClose}
@@ -526,7 +542,7 @@ export function DatabaseConnector({ onSynced }: DatabaseConnectorProps) {
     return (
       <div className="rounded-2xl border border-border-default bg-surface-raised text-center" style={{ padding: '48px 32px' }}>
         <Spinner className="h-8 w-8 mx-auto text-blue-500" />
-        <p className="text-[15px] font-medium text-text-primary" style={{ marginTop: '16px' }}>Importing tables...</p>
+        <p className="text-[15px] font-medium text-text-primary" style={{ marginTop: '16px' }}>Importing table...</p>
         <p className="text-[13px] text-text-muted" style={{ marginTop: '6px' }}>This may take a moment</p>
       </div>
     )

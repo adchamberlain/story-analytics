@@ -566,6 +566,14 @@ function BigValueColumnMapping({
   return (
     <div className="space-y-2">
       <ColumnDropdown
+        label="Label column"
+        value={config.metricLabel}
+        columns={columns}
+        columnTypes={columnTypes}
+        allowNone
+        onChange={(metricLabel) => updateConfig({ metricLabel })}
+      />
+      <ColumnDropdown
         label="Value column"
         value={config.value}
         columns={columns}

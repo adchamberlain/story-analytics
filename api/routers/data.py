@@ -4,6 +4,7 @@ Data router: CSV upload, schema inspection, and query execution.
 
 import shutil
 import tempfile
+from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException
@@ -93,21 +94,26 @@ class RenameRequest(BaseModel):
 
 @router.get("/sources", response_model=list[SourceSummary])
 async def list_sources():
-    """List all data sources currently loaded in DuckDB."""
+    """List all data sources currently loaded in DuckDB, newest first."""
     service = get_duckdb_service()
-    results = []
+    results: list[tuple[datetime, SourceSummary]] = []
     for source_id in list(service._sources):
         try:
             schema = service.get_schema(source_id)
-            results.append(SourceSummary(
-                source_id=schema.source_id,
-                name=schema.filename,
-                row_count=schema.row_count,
-                column_count=len(schema.columns),
+            ingested_at = service.get_ingested_at(source_id)
+            results.append((
+                ingested_at or datetime.min.replace(tzinfo=timezone.utc),
+                SourceSummary(
+                    source_id=schema.source_id,
+                    name=schema.filename,
+                    row_count=schema.row_count,
+                    column_count=len(schema.columns),
+                ),
             ))
         except Exception:
             continue
-    return results
+    results.sort(key=lambda t: t[0], reverse=True)
+    return [summary for _, summary in results]
 
 @router.get("/tables", response_model=list[TableInfo])
 async def list_tables():
