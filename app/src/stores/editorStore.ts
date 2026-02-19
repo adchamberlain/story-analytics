@@ -37,6 +37,7 @@ export interface EditorConfig {
   comparisonLabel: string
   valueFormat: 'currency' | 'percent' | 'number' | ''
   positiveIsGood: boolean
+  metricLabel: string | null
 }
 
 const DEFAULT_CONFIG: EditorConfig = {
@@ -66,6 +67,7 @@ const DEFAULT_CONFIG: EditorConfig = {
   comparisonLabel: '',
   valueFormat: '',
   positiveIsGood: true,
+  metricLabel: null,
 }
 
 export interface TableInfoItem {
@@ -232,6 +234,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         comparisonLabel: chart.config?.comparisonLabel ?? '',
         valueFormat: chart.config?.valueFormat ?? '',
         positiveIsGood: chart.config?.positiveIsGood ?? true,
+        metricLabel: chart.config?.metricLabel ?? null,
       }
 
       const loadedDataMode = config.dataMode
@@ -401,6 +404,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
             comparisonLabel: config.comparisonLabel,
             valueFormat: config.valueFormat || undefined,
             positiveIsGood: config.positiveIsGood,
+            metricLabel: config.metricLabel,
           },
         }),
       })
@@ -647,6 +651,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
             comparisonLabel: config.comparisonLabel,
             valueFormat: config.valueFormat || undefined,
             positiveIsGood: config.positiveIsGood,
+            metricLabel: config.metricLabel,
           },
         }),
       })
