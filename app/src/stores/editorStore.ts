@@ -38,6 +38,7 @@ export interface EditorConfig {
   valueFormat: 'currency' | 'percent' | 'number' | ''
   positiveIsGood: boolean
   metricLabel: string | null
+  unitColumn: string | null
 }
 
 const DEFAULT_CONFIG: EditorConfig = {
@@ -68,6 +69,7 @@ const DEFAULT_CONFIG: EditorConfig = {
   valueFormat: '',
   positiveIsGood: true,
   metricLabel: null,
+  unitColumn: null,
 }
 
 export interface TableInfoItem {
@@ -235,6 +237,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         valueFormat: chart.config?.valueFormat ?? '',
         positiveIsGood: chart.config?.positiveIsGood ?? true,
         metricLabel: chart.config?.metricLabel ?? null,
+        unitColumn: chart.config?.unitColumn ?? null,
       }
 
       const loadedDataMode = config.dataMode
@@ -431,6 +434,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
             valueFormat: config.valueFormat || undefined,
             positiveIsGood: config.positiveIsGood,
             metricLabel: config.metricLabel,
+            unitColumn: config.unitColumn,
           },
         }),
       })
@@ -678,6 +682,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
             valueFormat: config.valueFormat || undefined,
             positiveIsGood: config.positiveIsGood,
             metricLabel: config.metricLabel,
+            unitColumn: config.unitColumn,
           },
         }),
       })

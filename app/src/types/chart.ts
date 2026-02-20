@@ -180,6 +180,8 @@ export interface ChartConfig {
   comparisonLabel?: string
   /** Whether positive change is good (default: true) */
   positiveIsGood?: boolean
+  /** Column containing unit strings (e.g. "USD", "percent", "count") for per-row formatting */
+  unitColumn?: string
   /** Column(s) for sparkline data (time series) */
   sparklineX?: string
   sparklineY?: string

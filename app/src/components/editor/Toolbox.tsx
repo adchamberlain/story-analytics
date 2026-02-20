@@ -617,6 +617,14 @@ function BigValueColumnMapping({
         onChange={(value) => updateConfig({ value })}
       />
       <ColumnDropdown
+        label="Unit column"
+        value={config.unitColumn}
+        columns={columns}
+        columnTypes={columnTypes}
+        allowNone
+        onChange={(unitColumn) => updateConfig({ unitColumn })}
+      />
+      <ColumnDropdown
         label="Goal / comparison column"
         value={config.comparisonValue}
         columns={columns}
