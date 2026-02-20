@@ -19,7 +19,6 @@ sources/*/connection.yaml
 # Development files (private)
 DEV_LOG.md
 DEV_PLAN.md
-CLAUDE.md
 business-records/
 docs/plans/
 
