@@ -85,7 +85,9 @@ function generateLayout(charts: ChartWithData[]): Layout {
 
     // Auto-generate: full → w=2, half → w=1
     const w = chart.width === 'full' ? 2 : 1
-    const h = 5
+    // BigValue KPI grids need more vertical space for multiple cards
+    const isBigValue = chart.chart_type === 'BigValue'
+    const h = isBigValue ? 7 : 5
 
     // If this item won't fit on the current row, wrap
     if (x + w > 2) {
@@ -244,6 +246,8 @@ function DashboardChartCell({
     comparisonLabel: (chart.config?.comparisonLabel as string) || undefined,
     valueFormat: (chart.config?.valueFormat as ChartConfig['valueFormat']) || undefined,
     positiveIsGood: (chart.config?.positiveIsGood as boolean) ?? true,
+    metricLabel: (chart.config?.metricLabel as string) ?? undefined,
+    unitColumn: (chart.config?.unitColumn as string) ?? undefined,
   }
 
   const palette = (chart.config?.palette as PaletteKey) ?? 'default'

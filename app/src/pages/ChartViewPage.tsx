@@ -115,6 +115,8 @@ export function ChartViewPage() {
     comparisonLabel: (chart.config?.comparisonLabel as string) || undefined,
     valueFormat: (chart.config?.valueFormat as ChartConfig['valueFormat']) || undefined,
     positiveIsGood: (chart.config?.positiveIsGood as boolean) ?? true,
+    metricLabel: (chart.config?.metricLabel as string) ?? undefined,
+    unitColumn: (chart.config?.unitColumn as string) ?? undefined,
   }
 
   // Apply palette colors

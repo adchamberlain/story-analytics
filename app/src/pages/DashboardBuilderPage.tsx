@@ -465,6 +465,8 @@ function BuilderGridCard({
     comparisonLabel: (chartFullData.config?.comparisonLabel as string) || undefined,
     valueFormat: (chartFullData.config?.valueFormat as ChartConfig['valueFormat']) || undefined,
     positiveIsGood: (chartFullData.config?.positiveIsGood as boolean) ?? true,
+    metricLabel: (chartFullData.config?.metricLabel as string) ?? undefined,
+    unitColumn: (chartFullData.config?.unitColumn as string) ?? undefined,
   }
 
   const palette = (chartFullData.config?.palette as PaletteKey) ?? 'default'
