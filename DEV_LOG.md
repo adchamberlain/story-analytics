@@ -1,5 +1,43 @@
 # Dev Log
 
+## 2026-02-19
+
+### Session: Database import wizard, KPI grid, shape advisor, and KPI bug fixes (621 tests)
+
+Implemented the full database import wizard redesign (6 tasks) and KPI grid + shape advisor feature (6 tasks) via subagent-driven development, then fixed several KPI-related bugs discovered during testing.
+
+**Database Import Wizard (6 tasks)**
+1. **Source list ordering** — `list_sources()` in `data.py` now sorts by `ingested_at` descending so newest sources appear first
+2. **SQL builder utility** — `app/src/utils/buildShaperSql.ts` — pure function generating SQL from shaper config (column selection, date range, aggregation)
+3. **DatabaseConnector single table select** — replaced multi-select checkboxes with single-select radio buttons, updated `onSynced` callback with table metadata
+4. **DataShaper component** — `app/src/components/data/DataShaper.tsx` — full shaping wizard with column selection, date range filter, aggregation toggle, live SQL preview, data preview
+5. **SourcePickerPage integration** — wired DataShaper into the source picker flow with connector→shaper step transition
+6. **EditorPage initial SQL** — accepts `location.state.initialSql` to auto-execute shaped SQL on load
+
+**KPI Grid + Shape Advisor (6 tasks)**
+7. **BigValue grid rendering** — multi-row KPI cards in a CSS grid when `metricLabel` is set
+8. **BigValue helpers** — `shouldShowGrid()`, `formatBigValue()` with currency/percent/number formatting
+9. **BigValue column mapping** — label, value, goal/comparison, comparison label, format, and positiveIsGood controls in Toolbox
+10. **Label column dropdown** — dedicated dropdown for `metricLabel` field
+11. **Data shape advisor** — `analyzeDataShape()` utility with rules for BigValue, Line, Pie, Bar chart type suggestions; banner in Toolbox
+12. **Shape advisor banner** — amber/blue styled tips with optional chart-type switch buttons
+
+**Bug fixes discovered during testing:**
+- **Missing DataShaper.tsx** — file was created in worktree but never committed (gitignored); recreated after worktree removal
+- **Dashboard addChart race condition** — React StrictMode double-fired load effect, second load overwrote charts added by `addChart`. Fixed with AbortController in `dashboardBuilderStore.load()`
+- **KPI chart empty state** — `buildQuery()` required `config.x` but BigValue uses `config.value`. Added BigValue-specific query path and `value`/`metricLabel` to `DATA_KEYS`
+- **KPI grid single-value on dashboard** — `metricLabel` missing from chartConfig in `DashboardGrid.tsx` and `DashboardBuilderPage.tsx`
+- **Unit column not used** — Added `unitColumn` config field across entire stack (ChartConfig type, EditorConfig, Toolbox dropdown, all chartConfig construction sites). Per-row formatting: "USD"→`$`, "percent"→`%`, "count"/"score"→plain number
+- **Comparison showed absolute diff** — Changed from `value - target` to percentage delta `((value - target) / target) × 100`. Now shows "+7.0% vs. target" instead of "+84,500"
+- **ChartViewPage missing `metricLabel`** — library view showed single KPI instead of grid. Added `metricLabel` + `unitColumn`
+- **Dashboard KPI grid clipped** — BigValue charts defaulted to `h=5` (300px), too small for 6 cards. Changed to `h=7` for BigValue type in `generateLayout`
+
+**New helpers:** `unitToFormat()`, `computePctDelta()`, `formatDelta()` in `bigValueHelpers.ts`
+
+Tests: 485 Python + 136 frontend = **621 total** (35 new frontend tests)
+
+---
+
 ## 2026-02-18
 
 ### Session: 7 UX fixes — bar sort/colors, paste preview, pie sizing, PNG titles, stale source, test isolation (582 tests)
