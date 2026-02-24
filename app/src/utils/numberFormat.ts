@@ -12,6 +12,7 @@ export interface NumberFormatOptions {
   decimals?: number      // decimal places
   prefix?: string        // custom prefix
   suffix?: string        // custom suffix
+  locale?: string        // BCP 47 locale tag (default: 'en-US')
 }
 
 const COMPACT_SUFFIXES = [
@@ -25,7 +26,7 @@ const COMPACT_SUFFIXES = [
  * Format a number according to the specified format type.
  */
 export function formatNumber(value: number, opts: NumberFormatOptions = {}): string {
-  const { type = 'number', currency = 'USD', decimals, prefix = '', suffix = '' } = opts
+  const { type = 'number', currency = 'USD', decimals, prefix = '', suffix = '', locale = 'en-US' } = opts
 
   if (!isFinite(value)) return String(value)
 
@@ -34,7 +35,7 @@ export function formatNumber(value: number, opts: NumberFormatOptions = {}): str
   switch (type) {
     case 'currency': {
       const d = decimals ?? (value % 1 === 0 ? 0 : 2)
-      formatted = new Intl.NumberFormat('en-US', {
+      formatted = new Intl.NumberFormat(locale, {
         style: 'currency',
         currency,
         minimumFractionDigits: d,
@@ -56,7 +57,7 @@ export function formatNumber(value: number, opts: NumberFormatOptions = {}): str
         const d = decimals ?? 1
         formatted = `${(value / match.divisor).toFixed(d)}${match.suffix}`
       } else {
-        formatted = value.toLocaleString('en-US', {
+        formatted = value.toLocaleString(locale, {
           maximumFractionDigits: decimals ?? 0,
         })
       }
@@ -64,7 +65,7 @@ export function formatNumber(value: number, opts: NumberFormatOptions = {}): str
     }
 
     default: {
-      formatted = value.toLocaleString('en-US', {
+      formatted = value.toLocaleString(locale, {
         minimumFractionDigits: decimals ?? 0,
         maximumFractionDigits: decimals ?? 2,
       })

@@ -14,6 +14,8 @@ export interface FormatOptions {
   suffix?: string
   /** Show sign for positive numbers (default: false) */
   showPositiveSign?: boolean
+  /** BCP 47 locale tag (default: 'en-US') */
+  locale?: string
 }
 
 /**
@@ -77,7 +79,7 @@ export function formatCurrency(
 
   // Use Intl.NumberFormat for full currency formatting
   const sign = showPositiveSign && value > 0 ? '+' : ''
-  const formatted = new Intl.NumberFormat('en-US', {
+  const formatted = new Intl.NumberFormat(rest.locale || 'en-US', {
     style: 'currency',
     currency,
     minimumFractionDigits: rest.decimals ?? 0,
@@ -120,10 +122,10 @@ export function formatNumber(
     return '—'
   }
 
-  const { decimals, prefix = '', suffix = '', showPositiveSign = false } = options
+  const { decimals, prefix = '', suffix = '', showPositiveSign = false, locale } = options
   const sign = value < 0 ? '-' : showPositiveSign && value > 0 ? '+' : ''
 
-  const formatted = new Intl.NumberFormat('en-US', {
+  const formatted = new Intl.NumberFormat(locale || 'en-US', {
     minimumFractionDigits: decimals ?? 0,
     maximumFractionDigits: decimals ?? 2,
   }).format(Math.abs(value))
