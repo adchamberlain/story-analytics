@@ -98,7 +98,7 @@ export async function exportPDF(
 // ── Shared Helpers ──────────────────────────────────────────────────────────
 
 /** Convert an SVG element to a canvas at a given scale */
-function svgToCanvas(svgElement: SVGSVGElement, scale = 2): Promise<HTMLCanvasElement> {
+export function svgToCanvas(svgElement: SVGSVGElement, scale = 2): Promise<HTMLCanvasElement> {
   return new Promise((resolve, reject) => {
     const bbox = svgElement.getBoundingClientRect()
     const width = bbox.width * scale

@@ -11,6 +11,7 @@ import { SourcePickerPage } from './pages/SourcePickerPage'
 import { ChartViewPage } from './pages/ChartViewPage'
 import { PublicChartPage } from './pages/PublicChartPage'
 import { EmbedChartPage } from './pages/EmbedChartPage'
+import { EmbedDashboardPage } from './pages/EmbedDashboardPage'
 import { LoginPage } from './pages/LoginPage'
 import { HomeRedirect } from './components/HomeRedirect'
 import { ThemeBuilderPage } from './pages/ThemeBuilderPage'
@@ -38,6 +39,7 @@ function App() {
       <Route path="/chart/:chartId" element={<ChartViewPage />} />
       <Route path="/public/chart/:chartId" element={<PublicChartPage />} />
       <Route path="/embed/chart/:chartId" element={<EmbedChartPage />} />
+      <Route path="/embed/dashboard/:dashboardId" element={<EmbedDashboardPage />} />
 
       {/* Catch-all */}
       <Route path="*" element={<Navigate to="/" replace />} />
