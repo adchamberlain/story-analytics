@@ -63,6 +63,22 @@ export function EmbedChartPage() {
     }
   }, [chartData])
 
+  // Set og:image meta tag for social previews
+  useEffect(() => {
+    if (!chartId) return
+    const ogUrl = `/api/v2/charts/${chartId}/snapshot.png`
+    let meta = document.querySelector('meta[property="og:image"]') as HTMLMetaElement | null
+    if (!meta) {
+      meta = document.createElement('meta')
+      meta.setAttribute('property', 'og:image')
+      document.head.appendChild(meta)
+    }
+    meta.setAttribute('content', ogUrl)
+    return () => {
+      meta?.remove()
+    }
+  }, [chartId])
+
   if (error) {
     return (
       <div style={{ padding: 24, fontFamily: 'system-ui', color: '#666', fontSize: 14 }}>
@@ -131,6 +147,13 @@ export function EmbedChartPage() {
           Source: {chart.source}
         </p>
       )}
+      <noscript>
+        <img
+          src={`/api/v2/charts/${chartId}/snapshot.png`}
+          alt={chart.title || 'Chart'}
+          style={{ maxWidth: '100%' }}
+        />
+      </noscript>
     </div>
   )
 }

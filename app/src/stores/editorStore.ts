@@ -918,6 +918,26 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const res = await fetch(`/api/v2/charts/${chartId}/publish`, { method: 'PUT' })
       if (res.ok) {
         set({ status: 'published' })
+
+        // Auto-generate snapshot after successful publish
+        const svgEl = document.querySelector('.chart-area svg') as SVGSVGElement | null
+        if (svgEl) {
+          try {
+            const { svgToCanvas } = await import('../utils/chartExport')
+            const canvas = await svgToCanvas(svgEl, 2)
+            canvas.toBlob(async (blob) => {
+              if (blob) {
+                await fetch(`/api/v2/charts/${chartId}/snapshot`, {
+                  method: 'POST',
+                  body: blob,
+                  headers: { 'Content-Type': 'image/png' },
+                })
+              }
+            }, 'image/png')
+          } catch (e) {
+            console.warn('Snapshot generation failed:', e)
+          }
+        }
       }
     } catch {
       // Non-critical
