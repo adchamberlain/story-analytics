@@ -1,7 +1,43 @@
-import { useCallback, useRef } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { exportSVG, exportPNG, exportPDF } from '../../utils/chartExport'
 import { useChartThemeStore } from '../../stores/chartThemeStore'
+
+// -- Font injection helper ---------------------------------------------------
+
+/** Inject the theme's font into the document head (Google Fonts link or @font-face for uploaded fonts). */
+function injectThemeFont(fontUrl: string | undefined) {
+  if (!fontUrl) return
+  if (fontUrl.startsWith('data:')) {
+    // Uploaded font — inject @font-face via <style>
+    const id = `theme-font-face`
+    let style = document.getElementById(id) as HTMLStyleElement | null
+    if (!style) {
+      style = document.createElement('style')
+      style.id = id
+      document.head.appendChild(style)
+    }
+    // We can't know the exact family name without the theme, so we use a stable name
+    style.textContent = `@font-face { font-family: 'theme-custom-font'; src: url('${fontUrl}'); font-display: swap; }`
+  } else if (fontUrl.startsWith('http')) {
+    // Google Font URL — inject <link>
+    if (!document.querySelector(`link[href="${fontUrl}"]`)) {
+      const link = document.createElement('link')
+      link.rel = 'stylesheet'
+      link.href = fontUrl
+      document.head.appendChild(link)
+    }
+  }
+}
+
+// -- Logo position map -------------------------------------------------------
+
+const LOGO_POSITION_STYLES: Record<string, React.CSSProperties> = {
+  'top-left': { position: 'absolute', top: 8, left: 8 },
+  'top-right': { position: 'absolute', top: 8, right: 8 },
+  'bottom-left': { position: 'absolute', bottom: 40, left: 8 },
+  'bottom-right': { position: 'absolute', bottom: 40, right: 8 },
+}
 
 interface ChartWrapperProps {
   title?: string
@@ -37,19 +73,46 @@ export function ChartWrapper({ title, subtitle, source, sourceUrl, chartUrl, chi
     if (svg) await exportPDF(svg, title ?? 'chart', { title, source })
   }, [title, source])
 
+  // Inject theme font on mount / theme change
+  useEffect(() => {
+    injectThemeFont(theme.fontUrl)
+  }, [theme.fontUrl])
+
   const hasAccent = !!theme.accent
   const cardBg = theme.card.background || undefined
   const cardBorder = theme.card.borderColor || undefined
   const btnColor = theme.card.textSecondary || undefined
 
+  // Logo settings
+  const logoUrl = theme.logoUrl
+  const logoPosition = theme.logoPosition ?? 'top-left'
+  const logoSize = theme.logoSize ?? 60
+
   return (
     <div
       className={`rounded-2xl border shadow-card flex flex-col overflow-hidden ${compact ? 'group' : ''} ${!cardBg ? 'bg-surface-raised' : ''} ${!cardBorder ? 'border-border-default' : ''} ${className}`}
       style={{
+        position: 'relative',
+        fontFamily: theme.font.family || undefined,
         ...(cardBg ? { backgroundColor: cardBg } : {}),
         ...(cardBorder ? { borderColor: cardBorder } : {}),
       }}
     >
+      {/* Theme logo overlay */}
+      {logoUrl && (
+        <img
+          src={logoUrl}
+          alt="Chart logo"
+          data-testid="chart-logo"
+          style={{
+            ...LOGO_POSITION_STYLES[logoPosition],
+            width: logoSize,
+            height: 'auto',
+            pointerEvents: 'none',
+            zIndex: 10,
+          }}
+        />
+      )}
       {/* Accent bar + tag */}
       {hasAccent && (
         <div className="relative">
