@@ -10,6 +10,7 @@ import { getXValues, getYForX, resolveOffset, smartOffset } from '../../utils/an
 import type { ChartConfig, ChartType, Annotations, PointAnnotation, HighlightRange } from '../../types/chart'
 import type { ChartTheme } from '../../themes/chartThemes'
 import { shouldShowGrid, formatBigValue, computePctDelta, formatDelta } from './bigValueHelpers'
+import { RichDataTable } from './table/RichDataTable'
 
 /** Minimal type for the Observable Plot element with scale access. */
 interface PlotElement extends HTMLElement {
@@ -220,7 +221,7 @@ export function ObservableChartFactory({
   }
 
   if (chartType === 'DataTable') {
-    return <DataTableChart data={data} config={config} />
+    return <RichDataTable data={data} config={config} />
   }
 
   if (chartType === 'PieChart') {
@@ -1674,39 +1675,3 @@ function TreemapComponent({ data, config, height, autoHeight }: { data: Record<s
   return <div ref={containerRef} style={{ width: '100%', ...(autoHeight ? { height: '100%' } : { height }) }} />
 }
 
-function DataTableChart({ data }: { data: Record<string, unknown>[]; config: ChartConfig }) {
-  if (data.length === 0) return <p className="text-sm text-text-muted">No data</p>
-
-  const columns = Object.keys(data[0])
-
-  return (
-    <div className="overflow-auto max-h-80">
-      <table className="w-full text-sm border-collapse">
-        <thead>
-          <tr className="border-t border-border-default">
-            {columns.map((col) => (
-              <th
-                key={col}
-                className="text-left px-3 py-2 border-b-2 border-border-default font-semibold text-text-primary"
-                style={{ fontSize: 13 }}
-              >
-                {col}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {data.map((row, i) => (
-            <tr key={i} className={i % 2 === 0 ? 'bg-surface' : 'bg-surface-secondary'}>
-              {columns.map((col) => (
-                <td key={col} className="px-3 py-1.5 border-b border-border-subtle" style={{ fontSize: 12 }}>
-                  {String(row[col] ?? '')}
-                </td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  )
-}
