@@ -182,6 +182,17 @@ const CHART_TYPES: { type: ChartType; label: string; icon: ReactNode }[] = [
       </svg>
     ),
   },
+  {
+    type: 'ChoroplethMap',
+    label: 'Map',
+    icon: (
+      <svg viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5">
+        <path d="M3,6 L9,3 L15,6 L21,3 L21,18 L15,21 L9,18 L3,21 Z" fillOpacity="0.25" stroke="currentColor" strokeWidth="1.5" fill="none" />
+        <line x1="9" y1="3" x2="9" y2="18" stroke="currentColor" strokeWidth="1" opacity="0.5" />
+        <line x1="15" y1="6" x2="15" y2="21" stroke="currentColor" strokeWidth="1" opacity="0.5" />
+      </svg>
+    ),
+  },
 ]
 
 interface ChartTypeSelectorProps {

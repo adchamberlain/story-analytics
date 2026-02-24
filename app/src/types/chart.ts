@@ -22,6 +22,7 @@ export type ChartType =
   | 'RangePlot'
   | 'BulletBar'
   | 'SmallMultiples'
+  | 'ChoroplethMap'
 
 // =============================================================================
 // Annotation Types
@@ -46,8 +47,10 @@ export interface PointAnnotation {
   text: string
   /** @deprecated Use dx/dy. Kept for backward compat with saved JSON. */
   position?: AnnotationPosition
-  dx?: number   // pixel offset from anchor dot
-  dy?: number   // pixel offset from anchor dot
+  dx?: number      // pixel offset from anchor dot
+  dy?: number      // pixel offset from anchor dot
+  dxRatio?: number  // proportional offset (0-1 of plot width) for responsive
+  dyRatio?: number  // proportional offset (0-1 of plot height) for responsive
   fontSize?: number
   color?: string
 }
@@ -236,6 +239,16 @@ export interface ChartConfig {
 
   /** Rich Data Table: per-column configuration */
   tableColumns?: Record<string, TableColumnConfig>
+
+  /** Choropleth map options */
+  basemap?: string            // BasemapId: 'world' | 'us-states' | 'us-counties' | 'europe'
+  geoJoinColumn?: string      // Data column to match against geography IDs
+  geoValueColumn?: string     // Data column for choropleth coloring
+  geoColorScale?: string      // 'sequential' | 'diverging'
+  geoProjection?: string      // D3 projection name
+
+  /** Data mode (used by editor) */
+  dataMode?: 'table' | 'sql'
 
   /** Additional props */
   extraProps?: Record<string, unknown>

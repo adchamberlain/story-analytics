@@ -48,6 +48,12 @@ export interface EditorConfig {
   // Small multiples
   facetColumn: string | null
   chartSubtype: 'line' | 'bar' | 'area' | 'scatter'
+  // Choropleth map
+  basemap: string
+  geoJoinColumn: string | null
+  geoValueColumn: string | null
+  geoColorScale: string
+  geoProjection: string
 }
 
 const DEFAULT_CONFIG: EditorConfig = {
@@ -85,6 +91,11 @@ const DEFAULT_CONFIG: EditorConfig = {
   targetColumn: null,
   facetColumn: null,
   chartSubtype: 'line',
+  basemap: 'world',
+  geoJoinColumn: null,
+  geoValueColumn: null,
+  geoColorScale: 'sequential',
+  geoProjection: 'geoEqualEarth',
 }
 
 export interface TableInfoItem {
@@ -263,6 +274,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         targetColumn: chart.config?.targetColumn ?? null,
         facetColumn: chart.config?.facetColumn ?? null,
         chartSubtype: chart.config?.chartSubtype ?? 'line',
+        basemap: chart.config?.basemap ?? 'world',
+        geoJoinColumn: chart.config?.geoJoinColumn ?? null,
+        geoValueColumn: chart.config?.geoValueColumn ?? null,
+        geoColorScale: chart.config?.geoColorScale ?? 'sequential',
+        geoProjection: chart.config?.geoProjection ?? 'geoEqualEarth',
       }
 
       const loadedDataMode = config.dataMode
@@ -467,6 +483,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
             targetColumn: config.targetColumn ?? undefined,
             facetColumn: config.facetColumn ?? undefined,
             chartSubtype: config.chartSubtype !== 'line' ? config.chartSubtype : undefined,
+            basemap: config.basemap !== 'world' ? config.basemap : undefined,
+            geoJoinColumn: config.geoJoinColumn ?? undefined,
+            geoValueColumn: config.geoValueColumn ?? undefined,
+            geoColorScale: config.geoColorScale !== 'sequential' ? config.geoColorScale : undefined,
+            geoProjection: config.geoProjection !== 'geoEqualEarth' ? config.geoProjection : undefined,
           },
         }),
       })
@@ -721,6 +742,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
             targetColumn: config.targetColumn ?? undefined,
             facetColumn: config.facetColumn ?? undefined,
             chartSubtype: config.chartSubtype !== 'line' ? config.chartSubtype : undefined,
+            basemap: config.basemap !== 'world' ? config.basemap : undefined,
+            geoJoinColumn: config.geoJoinColumn ?? undefined,
+            geoValueColumn: config.geoValueColumn ?? undefined,
+            geoColorScale: config.geoColorScale !== 'sequential' ? config.geoColorScale : undefined,
+            geoProjection: config.geoProjection !== 'geoEqualEarth' ? config.geoProjection : undefined,
           },
         }),
       })
