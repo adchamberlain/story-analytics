@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useDroppable } from '@dnd-kit/core'
 import { useFolderStore, type Folder } from '../../stores/folderStore'
 import { useLibraryStore } from '../../stores/libraryStore'
 
@@ -76,22 +77,16 @@ export function FolderSidebar() {
         <span className="text-[11px] text-text-muted">{charts.length}</span>
       </button>
 
-      {/* Unfiled */}
-      <button
+      {/* Unfiled — droppable target */}
+      <DroppableUnfiled
+        active={folderFilter === 'unfiled'}
+        count={unfiledCount}
         onClick={() => setFolderFilter('unfiled')}
-        className={`text-left text-[13px] rounded-lg transition-colors flex items-center justify-between px-2 py-1.5 ${
-          folderFilter === 'unfiled'
-            ? 'bg-blue-500/10 text-blue-600 font-medium'
-            : 'text-text-secondary hover:bg-surface-secondary'
-        }`}
-      >
-        Unfiled
-        <span className="text-[11px] text-text-muted">{unfiledCount}</span>
-      </button>
+      />
 
       {/* Folder list */}
       {folders.map((folder) => (
-        <FolderItem
+        <DroppableFolderItem
           key={folder.id}
           folder={folder}
           count={folderCounts[folder.id] ?? 0}
@@ -146,6 +141,65 @@ export function FolderSidebar() {
   )
 }
 
+// ── Droppable Unfiled ───────────────────────────────────────────────────────
+
+function DroppableUnfiled({ active, count, onClick }: { active: boolean; count: number; onClick: () => void }) {
+  const { setNodeRef, isOver } = useDroppable({
+    id: 'folder-unfiled',
+    data: { folderId: null },
+  })
+
+  return (
+    <button
+      ref={setNodeRef}
+      onClick={onClick}
+      data-testid="droppable-folder-unfiled"
+      className={`text-left text-[13px] rounded-lg transition-colors flex items-center justify-between px-2 py-1.5 ${
+        isOver
+          ? 'bg-blue-500/20 border border-blue-400 text-blue-600 font-medium'
+          : active
+            ? 'bg-blue-500/10 text-blue-600 font-medium'
+            : 'text-text-secondary hover:bg-surface-secondary'
+      }`}
+    >
+      Unfiled
+      <span className="text-[11px] text-text-muted">{count}</span>
+    </button>
+  )
+}
+
+// ── Droppable Folder Item ───────────────────────────────────────────────────
+
+function DroppableFolderItem(props: {
+  folder: Folder
+  count: number
+  active: boolean
+  editing: boolean
+  confirmDelete: boolean
+  editName: string
+  onClick: () => void
+  onStartEdit: () => void
+  onEditChange: (name: string) => void
+  onEditSubmit: () => void
+  onEditCancel: () => void
+  onRequestDelete: () => void
+  onConfirmDelete: () => void
+  onCancelDelete: () => void
+}) {
+  const { setNodeRef, isOver } = useDroppable({
+    id: `folder-${props.folder.id}`,
+    data: { folderId: props.folder.id },
+  })
+
+  return (
+    <div ref={setNodeRef} data-testid={`droppable-folder-${props.folder.id}`}>
+      <FolderItem {...props} isOver={isOver} />
+    </div>
+  )
+}
+
+// ── Folder Item ─────────────────────────────────────────────────────────────
+
 function FolderItem({
   folder,
   count,
@@ -161,6 +215,7 @@ function FolderItem({
   onRequestDelete,
   onConfirmDelete,
   onCancelDelete,
+  isOver = false,
 }: {
   folder: Folder
   count: number
@@ -176,6 +231,7 @@ function FolderItem({
   onRequestDelete: () => void
   onConfirmDelete: () => void
   onCancelDelete: () => void
+  isOver?: boolean
 }) {
   if (editing) {
     return (
@@ -208,9 +264,11 @@ function FolderItem({
   return (
     <div
       className={`group flex items-center justify-between rounded-lg transition-colors cursor-pointer px-2 py-1.5 ${
-        active
-          ? 'bg-blue-500/10 text-blue-600 font-medium'
-          : 'text-text-secondary hover:bg-surface-secondary'
+        isOver
+          ? 'bg-blue-500/20 border border-blue-400 text-blue-600 font-medium'
+          : active
+            ? 'bg-blue-500/10 text-blue-600 font-medium'
+            : 'text-text-secondary hover:bg-surface-secondary'
       }`}
     >
       <button onClick={onClick} className="text-left text-[13px] flex-1 truncate">
