@@ -485,6 +485,21 @@ export function ThemeBuilderPage() {
                 </div>
               </div>
 
+              {/* Custom CSS */}
+              <div className={sectionClass}>
+                <h3 className="text-[14px] font-semibold text-text-primary mb-3">Custom CSS</h3>
+                <p className="text-[12px] text-text-muted mb-2">
+                  CSS overrides scoped to the chart container. Use <code className="text-[11px] bg-surface-inset px-1 rounded">.sa-chart</code> as the root selector.
+                </p>
+                <textarea
+                  value={editing.customCss ?? ''}
+                  onChange={(e) => setEditing({ ...editing, customCss: e.target.value || undefined })}
+                  placeholder={`.sa-chart .plot-title {\n  letter-spacing: 0.02em;\n}`}
+                  rows={6}
+                  className="w-full px-3 py-2 text-[13px] font-mono rounded-lg bg-surface-input border border-border-strong text-text-primary focus:outline-none focus:ring-2 focus:ring-blue-500/40 resize-y"
+                />
+              </div>
+
               {/* Live preview */}
               <div className={sectionClass}>
                 <h3 className="text-[14px] font-semibold text-text-primary mb-3">Preview</h3>

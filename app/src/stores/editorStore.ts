@@ -54,6 +54,8 @@ export interface EditorConfig {
   geoValueColumn: string | null
   geoColorScale: string
   geoProjection: string
+  // Locale override
+  locale: string
 }
 
 const DEFAULT_CONFIG: EditorConfig = {
@@ -96,6 +98,7 @@ const DEFAULT_CONFIG: EditorConfig = {
   geoValueColumn: null,
   geoColorScale: 'sequential',
   geoProjection: 'geoEqualEarth',
+  locale: '',
 }
 
 export interface TableInfoItem {
@@ -134,6 +137,9 @@ interface EditorState {
   sqlError: string | null
   sqlExecuting: boolean
   availableTables: TableInfoItem[]
+
+  // Custom GeoJSON for choropleth
+  customGeoData: import('geojson').FeatureCollection | null
 
   // Editable config
   config: EditorConfig
@@ -204,6 +210,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   sqlError: null,
   sqlExecuting: false,
   availableTables: [],
+  customGeoData: null,
   config: { ...DEFAULT_CONFIG },
   savedConfig: null,
   savedSql: null,
@@ -279,6 +286,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         geoValueColumn: chart.config?.geoValueColumn ?? null,
         geoColorScale: chart.config?.geoColorScale ?? 'sequential',
         geoProjection: chart.config?.geoProjection ?? 'geoEqualEarth',
+        locale: chart.config?.locale ?? '',
       }
 
       const loadedDataMode = config.dataMode
@@ -488,6 +496,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
             geoValueColumn: config.geoValueColumn ?? undefined,
             geoColorScale: config.geoColorScale !== 'sequential' ? config.geoColorScale : undefined,
             geoProjection: config.geoProjection !== 'geoEqualEarth' ? config.geoProjection : undefined,
+            locale: config.locale || undefined,
           },
         }),
       })
@@ -747,6 +756,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
             geoValueColumn: config.geoValueColumn ?? undefined,
             geoColorScale: config.geoColorScale !== 'sequential' ? config.geoColorScale : undefined,
             geoProjection: config.geoProjection !== 'geoEqualEarth' ? config.geoProjection : undefined,
+            locale: config.locale || undefined,
           },
         }),
       })
@@ -941,6 +951,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       sqlError: null,
       sqlExecuting: false,
       availableTables: [],
+      customGeoData: null,
       config: { ...DEFAULT_CONFIG },
       savedConfig: null,
       savedSql: null,

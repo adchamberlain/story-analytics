@@ -2,6 +2,40 @@
 
 ## 2026-02-24
 
+### Session: Clean Up Deferred Items from Phases 1-4
+
+Closed 5 deferred items from the Datawrapper parity roadmap (Phases 1-4). All quick wins, no architectural changes.
+
+**1. Security Headers Middleware** (`api/main.py`)
+- `SecurityHeadersMiddleware` (BaseHTTPMiddleware): `X-Content-Type-Options: nosniff` + `Referrer-Policy` on all routes; CSP, Permissions-Policy, X-Frame-Options on `/embed/` and `/public/` routes.
+- 18 pytest tests in `api/tests/test_security_headers.py`.
+
+**2. Per-Chart Locale Override** (`chart.ts`, `editorStore.ts`, `Toolbox.tsx`)
+- Added `locale` field to `ChartConfig`, `EditorConfig`, and `DEFAULT_CONFIG`.
+- Locale dropdown in Toolbox ("Global default" + 12 SUPPORTED_LOCALES).
+- Persisted through save/load cycle.
+
+**3. Custom CSS Override in Theme Builder** (`chartThemes.ts`, `ThemeBuilderPage.tsx`)
+- Added `customCss?: string` to `ChartTheme` interface.
+- Monospace textarea section in ThemeBuilderPage between Plot Settings and Preview.
+
+**4. Custom GeoJSON/TopoJSON Upload** (`editorStore.ts`, `Toolbox.tsx`, `ChoroplethMap.tsx`)
+- "Custom upload..." option in basemap dropdown shows file input for `.json/.geojson/.topojson`.
+- `loadCustomGeoJSON()` (already existed) parses file; result stored in EditorStore `customGeoData`.
+- ChoroplethMap uses custom FeatureCollection when `basemap === 'custom'`.
+
+**5. Playwright E2E Test Suite** (`app/e2e/`)
+- `helpers.ts`: `createTestChart`, `publishChart`, `deleteChart`, `waitForChart`, `saveScreenshot`.
+- `embed.spec.ts`: Desktop (1280px) + mobile (375px) rendering, missing chart error.
+- `chart-types.spec.ts`: Bar, Line, Pie screenshot captures.
+- `themes.spec.ts`: Same chart in all 9 curated themes.
+
+**Stats:** 100 backend tests, 359 frontend tests, TypeScript clean.
+
+---
+
+## 2026-02-24
+
 ### Session: Visual QA Pass & Bug Fixes
 
 Ran full visual QA pass using Playwright screenshots across all pages, chart types, and viewports. Found and fixed 3 issues:
