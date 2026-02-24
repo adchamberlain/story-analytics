@@ -22,15 +22,46 @@ export const CHART_COLORS = [
 /** Single-series default */
 export const PRIMARY_COLOR = '#18a1cd'
 
-/** Monochrome palettes — reordered for max spread so any prefix is distinct */
+/** Named palettes — reordered for max spread so any prefix is distinct */
 export const PALETTES = {
+  // -- Categorical --
   default: [...CHART_COLORS],
+  tableau10: ['#4e79a7', '#f28e2b', '#e15759', '#76b7b2', '#59a14f', '#edc948', '#b07aa1', '#ff9da7'],
+  colorbrewer_set2: ['#66c2a5', '#fc8d62', '#8da0cb', '#e78ac3', '#a6d854', '#ffd92f', '#e5c494', '#b3b3b3'],
+  colorbrewer_paired: ['#a6cee3', '#1f78b4', '#b2df8a', '#33a02c', '#fb9a99', '#e31a1c', '#fdbf6f', '#ff7f00'],
+  datawrapper: ['#1d81a2', '#e6574f', '#9bc53d', '#ffa630', '#6e52b5', '#43b08c', '#d4459c', '#a0522d'],
+  vibrant: ['#ee4035', '#f37736', '#fdf498', '#7bc043', '#0392cf', '#d63ce0', '#e8d21d', '#1ab394'],
+  // -- Sequential --
   blues: ['#08519c', '#c6dbef', '#6baed6', '#3182bd', '#9ecae1'],
   reds: ['#a50f15', '#fcbba1', '#fb6a4a', '#de2d26', '#fc9272'],
   greens: ['#006d2c', '#c7e9c0', '#74c476', '#31a354', '#a1d99b'],
+  purples: ['#3f007d', '#dadaeb', '#9e9ac8', '#6a51a3', '#bcbddc'],
+  oranges: ['#7f2704', '#fdd0a2', '#fd8d3c', '#d94701', '#fdae6b'],
+  warm: ['#fee391', '#fec44f', '#fe9929', '#ec7014', '#cc4c02', '#993404', '#662506'],
+  cool: ['#e0f3db', '#a8ddb5', '#7bccc4', '#4eb3d3', '#2b8cbe', '#0868ac', '#084081'],
+  // -- Diverging --
+  redBlue: ['#b2182b', '#ef8a62', '#fddbc7', '#f7f7f7', '#d1e5f0', '#67a9cf', '#2166ac'],
+  brownTeal: ['#8c510a', '#d8b365', '#f6e8c3', '#f5f5f5', '#c7eae5', '#5ab4ac', '#01665e'],
+  pinkGreen: ['#c51b7d', '#e9a3c9', '#fde0ef', '#f7f7f7', '#e6f5d0', '#a1d76a', '#4d9221'],
 } as const
 
 export type PaletteKey = keyof typeof PALETTES
+
+/** Palette category labels for UI grouping */
+export const PALETTE_CATEGORIES: { label: string; keys: PaletteKey[] }[] = [
+  {
+    label: 'Categorical',
+    keys: ['default', 'tableau10', 'colorbrewer_set2', 'colorbrewer_paired', 'datawrapper', 'vibrant'],
+  },
+  {
+    label: 'Sequential',
+    keys: ['blues', 'reds', 'greens', 'purples', 'oranges', 'warm', 'cool'],
+  },
+  {
+    label: 'Diverging',
+    keys: ['redBlue', 'brownTeal', 'pinkGreen'],
+  },
+]
 
 // -- Typography & Spacing ----------------------------------------------------
 
