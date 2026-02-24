@@ -2,6 +2,31 @@
 
 ## 2026-02-24
 
+### Session: Phase 5 — Close Remaining Datawrapper Parity Gaps
+
+**11 tasks across 5 parallel worktree sessions**, all merged to main. 535 total tests (130 backend + 405 frontend).
+
+**Session A — Embed Bundle + Archive:**
+- Separate Vite embed entry point (embed.html, 2.62KB gzipped) — no router, no stores, no AI chat
+- Archive/soft-delete with restore: `archived_at` timestamp, `/archive` + `/restore` endpoints, `?status=active|archived|all` filtering, library UI toggle
+
+**Session B — Static PNG + Dashboard Embed:**
+- Snapshot upload/serve endpoints (`data/snapshots/`), auto-generate PNG on publish, `<noscript>` fallback + `og:image`
+- EmbedDashboardPage at `/embed/dashboard/:id` with PostMessage resize, public dashboard endpoint, embed code in ShareModal
+
+**Session C — Theme Builder Completion:**
+- FontPicker: 50 Google Fonts searchable dropdown + .woff2/.ttf upload, font injection via `<link>`/`<style>` tags
+- Logo uploader: base64 storage, 4-corner position radio, size slider, absolutely positioned in ChartWrapper
+
+**Session D — Data Source Enhancements:**
+- Configurable polling interval: Toolbox dropdown (off, 30s, 1m, 5m, 15m), `setInterval` re-fetch in embed
+- File-based data cache (`data/cache/`): TTL-based, `X-Data-Staleness` header, staleness indicator in embed footer
+
+**Session E — Maps, Templates, Organization:**
+- Map zoom/pan: d3-zoom on ChoroplethMap, +/-/Reset controls, pinch-to-zoom
+- Template gallery: TemplateGallery modal in LibraryPage, EditorPage loads template from query param
+- Drag-and-drop folders: @dnd-kit, DraggableChartCard + DroppableFolderItem with visual highlight
+
 ### Session: Clean Up Deferred Items from Phases 1-4
 
 Closed 5 deferred items from the Datawrapper parity roadmap (Phases 1-4). All quick wins, no architectural changes.
