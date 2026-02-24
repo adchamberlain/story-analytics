@@ -6,7 +6,7 @@ import { plotDefaults } from '../../themes/plotTheme'
 import { useThemeStore } from '../../stores/themeStore'
 import { useChartThemeStore } from '../../stores/chartThemeStore'
 import { useEditorStore } from '../../stores/editorStore'
-import { getXValues, getYForX, resolveOffset, smartOffset } from '../../utils/annotationDefaults'
+import { getXValues, getYForX, resolveResponsiveOffset, computeRatios, smartOffset, shouldCollapseAnnotations } from '../../utils/annotationDefaults'
 import type { ChartConfig, ChartType, Annotations, PointAnnotation, HighlightRange } from '../../types/chart'
 import type { ChartTheme } from '../../themes/chartThemes'
 import { shouldShowGrid, formatBigValue, computePctDelta, formatDelta } from './bigValueHelpers'
@@ -61,10 +61,15 @@ export function ObservableChartFactory({
   // Ref to the Observable Plot element — used for scale inversion on click-to-place
   const plotRef = useRef<PlotElement | null>(null)
 
+  // Track container width for responsive annotation collapse
+  const [chartWidth, setChartWidth] = useState(0)
+
   const { containerRef } = useObservablePlot(
     (width, measuredHeight) => {
       const plotHeight = autoHeight ? measuredHeight : height
       if (plotHeight <= 0) return null // waiting for flex layout to resolve
+      setChartWidth(width)
+      const collapsed = shouldCollapseAnnotations(width)
 
       const marks = buildMarks(chartType, data, config, colors, chartTheme)
       const bgColor = getComputedStyle(document.documentElement).getPropertyValue('--color-surface-raised').trim() || '#1e293b'
@@ -97,7 +102,8 @@ export function ObservableChartFactory({
       }
 
       // Highlight ranges first (renders behind point notes in z-order)
-      if (svg && config.annotations?.ranges?.length) {
+      // Skip SVG annotations when collapsed (< 400px) — they become footnotes instead
+      if (!collapsed && svg && config.annotations?.ranges?.length) {
         appendHighlightRanges({
           svg: svg as SVGSVGElement,
           plotEl,
@@ -124,7 +130,7 @@ export function ObservableChartFactory({
       }
 
       // Point notes on top
-      if (svg && config.annotations?.texts?.length) {
+      if (!collapsed && svg && config.annotations?.texts?.length) {
         appendPointNotes({
           svg: svg as SVGSVGElement,
           plotEl,
@@ -133,14 +139,14 @@ export function ObservableChartFactory({
           textColor,
           fontFamily: chartTheme.font.family || 'Inter, system-ui, sans-serif',
           editable,
-          onDragEnd: (id, dx, dy) => {
+          onDragEnd: (id, dx, dy, dxRatio, dyRatio) => {
             const store = useEditorStore.getState()
             const anns = store.config.annotations
             store.updateConfig({
               annotations: {
                 ...anns,
                 texts: (anns?.texts ?? []).map((t) =>
-                  t.id === id ? { ...t, dx, dy, position: undefined } : t
+                  t.id === id ? { ...t, dx, dy, dxRatio, dyRatio, position: undefined } : t
                 ),
               },
             })
@@ -261,6 +267,27 @@ export function ObservableChartFactory({
         onClick={placingId ? handleChartClick : undefined}
         style={chartStyle}
       />
+      {/* Collapsed footnotes: show annotation text below chart on narrow screens */}
+      {shouldCollapseAnnotations(chartWidth) && config.annotations && (
+        (() => {
+          const notes = [
+            ...(config.annotations.texts ?? []).map((t) => t.text),
+            ...(config.annotations.lines ?? []).filter((l) => l.label).map((l) => l.label!),
+            ...(config.annotations.ranges ?? []).filter((r) => r.label).map((r) => r.label!),
+          ]
+          if (notes.length === 0) return null
+          return (
+            <div style={{ padding: '8px 4px 0', fontSize: 11, color: 'var(--color-text-secondary)', lineHeight: '1.4' }}>
+              {notes.map((note, i) => (
+                <div key={i} style={{ marginBottom: 2 }}>
+                  <span style={{ fontWeight: 600, marginRight: 4 }}>{i + 1}.</span>
+                  {note}
+                </div>
+              ))}
+            </div>
+          )
+        })()
+      )}
     </div>
   )
 }
@@ -778,7 +805,7 @@ interface AppendPointNotesOpts {
   textColor: string
   fontFamily: string
   editable: boolean
-  onDragEnd: (id: string, dx: number, dy: number) => void
+  onDragEnd: (id: string, dx: number, dy: number, dxRatio: number, dyRatio: number) => void
 }
 
 function appendPointNotes({ svg, plotEl, annotations, bgColor, textColor, fontFamily, editable, onDragEnd }: AppendPointNotesOpts) {
@@ -791,17 +818,22 @@ function appendPointNotes({ svg, plotEl, annotations, bgColor, textColor, fontFa
     return // scales unavailable (e.g. pie chart)
   }
 
-  // Plot area bounds for edge-clipping detection
+  // Plot area bounds for edge-clipping detection and responsive scaling
   const xRange = xScale.range as unknown as [number, number] | undefined
+  const yRange = yScale.range as unknown as [number, number] | undefined
   const plotLeft = xRange ? Math.min(xRange[0], xRange[1]) : 0
   const plotRight = xRange ? Math.max(xRange[0], xRange[1]) : svg.clientWidth
+  const plotWidth = plotRight - plotLeft
+  const plotTop = yRange ? Math.min(yRange[0], yRange[1]) : 0
+  const plotBottom = yRange ? Math.max(yRange[0], yRange[1]) : svg.clientHeight
+  const plotHeight = plotBottom - plotTop
 
   const g = d3.select(svg).append('g').attr('class', 'point-notes')
 
   for (const ann of annotations) {
     const color = ann.color ?? textColor
     const fontSize = ann.fontSize ?? 11
-    const { dx, dy } = resolveOffset(ann)
+    const { dx, dy } = resolveResponsiveOffset(ann, plotWidth, plotHeight)
 
     // Convert data coords → pixel coords
     const xVal = typeof ann.x === 'string' && /^\d{4}-\d{2}/.test(ann.x)
@@ -876,7 +908,8 @@ function appendPointNotes({ svg, plotEl, annotations, bgColor, textColor, fontFa
           d3.select(this).style('cursor', 'grab')
           const finalDx = Math.round(event.x - cx)
           const finalDy = Math.round(event.y - cy)
-          onDragEnd(ann.id, finalDx, finalDy)
+          const ratios = computeRatios(finalDx, finalDy, plotWidth, plotHeight)
+          onDragEnd(ann.id, finalDx, finalDy, ratios.dxRatio, ratios.dyRatio)
         })
 
       text.call(drag)

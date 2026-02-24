@@ -46,8 +46,10 @@ export interface PointAnnotation {
   text: string
   /** @deprecated Use dx/dy. Kept for backward compat with saved JSON. */
   position?: AnnotationPosition
-  dx?: number   // pixel offset from anchor dot
-  dy?: number   // pixel offset from anchor dot
+  dx?: number      // pixel offset from anchor dot
+  dy?: number      // pixel offset from anchor dot
+  dxRatio?: number  // proportional offset (0-1 of plot width) for responsive
+  dyRatio?: number  // proportional offset (0-1 of plot height) for responsive
   fontSize?: number
   color?: string
 }
