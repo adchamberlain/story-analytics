@@ -7,11 +7,12 @@ import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
-from fastapi import APIRouter, UploadFile, File, Form, HTTPException
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Response
 from pydantic import BaseModel
 
 from ..services.duckdb_service import get_duckdb_service, _SAFE_SOURCE_ID_RE
 from ..services.connectors.google_sheets import parse_sheets_url, build_export_url, fetch_sheet_csv
+from ..services.data_cache import get_cached, set_cached, get_staleness
 
 
 router = APIRouter(prefix="/data", tags=["data"])
@@ -505,7 +506,7 @@ def _build_upload_response(schema) -> UploadResponse:
 
 
 @router.post("/import/google-sheets", response_model=UploadResponse)
-async def import_google_sheets(request: GoogleSheetsRequest):
+async def import_google_sheets(request: GoogleSheetsRequest, response: Response):
     """Import data from a public Google Sheets document.
 
     The sheet must be publicly shared (Anyone with the link).
@@ -517,13 +518,27 @@ async def import_google_sheets(request: GoogleSheetsRequest):
 
     export_url = build_export_url(parsed["sheet_id"], parsed["gid"])
 
-    try:
-        csv_path = await fetch_sheet_csv(export_url)
-    except Exception as e:
-        raise HTTPException(
-            status_code=422,
-            detail=f"Could not fetch sheet: {e}. Make sure the sheet is publicly shared.",
-        )
+    # Check cache first
+    cached = get_cached(export_url)
+    staleness = 0
+    if cached:
+        # Write cached data to temp file
+        import tempfile as _tf
+        tmp = _tf.NamedTemporaryFile(delete=False, suffix=".csv")
+        tmp.write(cached["data"])
+        tmp.close()
+        csv_path = Path(tmp.name)
+        staleness = cached["age_seconds"]
+    else:
+        try:
+            csv_path = await fetch_sheet_csv(export_url)
+        except Exception as e:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Could not fetch sheet: {e}. Make sure the sheet is publicly shared.",
+            )
+        # Cache the fetched content
+        set_cached(export_url, csv_path.read_bytes())
 
     filename = request.name or f"gsheet_{parsed['sheet_id'][:8]}.csv"
     if not filename.lower().endswith(".csv"):
@@ -549,11 +564,12 @@ async def import_google_sheets(request: GoogleSheetsRequest):
     finally:
         csv_path.unlink(missing_ok=True)
 
+    response.headers["X-Data-Staleness"] = str(staleness)
     return _build_upload_response(schema)
 
 
 @router.post("/import/url", response_model=UploadResponse)
-async def import_from_url(request: UrlSourceRequest):
+async def import_from_url(request: UrlSourceRequest, response: Response):
     """Import CSV or JSON data from an external URL.
 
     Optionally pass custom HTTP headers for authenticated endpoints.
@@ -569,17 +585,27 @@ async def import_from_url(request: UrlSourceRequest):
 
     headers = request.headers or {}
 
-    try:
-        async with _httpx.AsyncClient(follow_redirects=True, timeout=30.0) as client:
-            resp = await client.get(url, headers=headers)
-            resp.raise_for_status()
-    except _httpx.HTTPStatusError as e:
-        raise HTTPException(status_code=422, detail=f"HTTP {e.response.status_code} fetching URL")
-    except Exception as e:
-        raise HTTPException(status_code=422, detail=f"Could not fetch URL: {e}")
+    # Check cache first
+    cached = get_cached(url, headers)
+    if cached:
+        content = cached["data"]
+        content_type = ""  # Will be inferred from URL extension
+        staleness = cached["age_seconds"]
+    else:
+        try:
+            async with _httpx.AsyncClient(follow_redirects=True, timeout=30.0) as client:
+                resp = await client.get(url, headers=headers)
+                resp.raise_for_status()
+        except _httpx.HTTPStatusError as e:
+            raise HTTPException(status_code=422, detail=f"HTTP {e.response.status_code} fetching URL")
+        except Exception as e:
+            raise HTTPException(status_code=422, detail=f"Could not fetch URL: {e}")
 
-    content = resp.content
-    content_type = resp.headers.get("content-type", "")
+        content = resp.content
+        content_type = resp.headers.get("content-type", "")
+        etag = resp.headers.get("etag")
+        set_cached(url, content, headers, etag=etag)
+        staleness = 0
 
     # Convert JSON array-of-objects to CSV
     import json as _json
@@ -641,4 +667,5 @@ async def import_from_url(request: UrlSourceRequest):
     finally:
         csv_path.unlink(missing_ok=True)
 
+    response.headers["X-Data-Staleness"] = str(staleness)
     return _build_upload_response(schema)
