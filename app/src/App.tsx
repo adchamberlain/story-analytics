@@ -11,6 +11,7 @@ import { SourcePickerPage } from './pages/SourcePickerPage'
 import { ChartViewPage } from './pages/ChartViewPage'
 import { LoginPage } from './pages/LoginPage'
 import { HomeRedirect } from './components/HomeRedirect'
+import { ThemeBuilderPage } from './pages/ThemeBuilderPage'
 
 function App() {
   return (
@@ -21,6 +22,7 @@ function App() {
         <Route path="/dashboards" element={<DashboardsHome />} />
         <Route path="/library" element={<LibraryPage />} />
         <Route path="/settings" element={<SettingsPage />} />
+        <Route path="/settings/themes" element={<ThemeBuilderPage />} />
         <Route path="/sources" element={<SourcesPage />} />
         <Route path="/dashboard/new" element={<DashboardBuilderPage />} />
         <Route path="/dashboard/:dashboardId/edit" element={<DashboardBuilderPage />} />
