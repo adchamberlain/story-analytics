@@ -201,6 +201,50 @@ export function resolveOffset(ann: Pick<PointAnnotation, 'dx' | 'dy' | 'position
   }
 }
 
+/**
+ * Resolve offset with responsive proportional scaling.
+ * If dxRatio/dyRatio are stored, use them relative to plotWidth/plotHeight.
+ * Falls back to pixel dx/dy or legacy position enum.
+ */
+export function resolveResponsiveOffset(
+  ann: Pick<PointAnnotation, 'dx' | 'dy' | 'position'> & { dxRatio?: number; dyRatio?: number },
+  plotWidth: number,
+  plotHeight: number,
+): { dx: number; dy: number } {
+  if (ann.dxRatio !== undefined && ann.dyRatio !== undefined && plotWidth > 0 && plotHeight > 0) {
+    return {
+      dx: Math.round(ann.dxRatio * plotWidth),
+      dy: Math.round(ann.dyRatio * plotHeight),
+    }
+  }
+  return resolveOffset(ann)
+}
+
+/**
+ * Compute proportional ratios from pixel offsets.
+ * Used after drag-end to store responsive positions.
+ */
+export function computeRatios(
+  dx: number,
+  dy: number,
+  plotWidth: number,
+  plotHeight: number,
+): { dxRatio: number; dyRatio: number } {
+  if (plotWidth <= 0 || plotHeight <= 0) return { dxRatio: 0, dyRatio: 0 }
+  return {
+    dxRatio: dx / plotWidth,
+    dyRatio: dy / plotHeight,
+  }
+}
+
+/**
+ * Whether annotations should collapse to footnotes at this width.
+ * Below 400px, SVG annotations are replaced with text footnotes.
+ */
+export function shouldCollapseAnnotations(containerWidth: number): boolean {
+  return containerWidth < 400
+}
+
 /** Compute smart dx/dy from data context — uses smartPosition then resolveOffset. */
 export function smartOffset(
   ctx: AnnotationDataContext,
