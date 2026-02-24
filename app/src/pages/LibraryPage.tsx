@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useLibraryStore } from '../stores/libraryStore'
+import { useFolderStore } from '../stores/folderStore'
+import { FolderSidebar } from '../components/library/FolderSidebar'
 import type { SortField, LibraryChart } from '../stores/libraryStore'
 
 // SVG icons for each chart type
@@ -198,8 +200,24 @@ export function LibraryPage() {
     }
   }
 
+  // Move-to-folder dropdown state
+  const [moveMenuId, setMoveMenuId] = useState<string | null>(null)
+  const folders = useFolderStore((s) => s.folders)
+
+  const handleMoveToFolder = async (chartId: string, folderId: string | null) => {
+    await store.moveToFolder(chartId, folderId)
+    setMoveMenuId(null)
+  }
+
   return (
-    <div style={{ padding: '48px 64px' }}>
+    <div className="flex" style={{ padding: '48px 32px 48px 32px' }}>
+      {/* Folder sidebar */}
+      <div className="shrink-0 pr-6 border-r border-border-subtle" style={{ width: 220, paddingTop: 8 }}>
+        <FolderSidebar />
+      </div>
+
+      {/* Main content */}
+      <div className="flex-1" style={{ paddingLeft: 32 }}>
       <div className="flex items-center justify-between" style={{ marginBottom: '40px' }}>
         <h1 className="text-[28px] font-bold text-text-primary tracking-tight">Chart Library</h1>
         <div className="flex items-center gap-4">
@@ -354,10 +372,15 @@ export function LibraryPage() {
               selectMode={selectMode}
               selected={selectedIds.has(chart.id)}
               onToggleSelect={() => toggleSelect(chart.id)}
+              folders={folders}
+              showMoveMenu={moveMenuId === chart.id}
+              onToggleMoveMenu={() => setMoveMenuId(moveMenuId === chart.id ? null : chart.id)}
+              onMoveToFolder={(folderId) => handleMoveToFolder(chart.id, folderId)}
             />
           ))}
         </div>
       )}
+      </div>
     </div>
   )
 }
@@ -374,6 +397,10 @@ function ChartCard({
   selectMode,
   selected,
   onToggleSelect,
+  folders,
+  showMoveMenu,
+  onToggleMoveMenu,
+  onMoveToFolder,
 }: {
   chart: LibraryChart
   deleting: boolean
@@ -384,6 +411,10 @@ function ChartCard({
   selectMode: boolean
   selected: boolean
   onToggleSelect: () => void
+  folders: { id: string; name: string }[]
+  showMoveMenu: boolean
+  onToggleMoveMenu: () => void
+  onMoveToFolder: (folderId: string | null) => void
 }) {
   const meta = CHART_TYPE_META[chart.chart_type] ?? { label: chart.chart_type, Icon: DefaultIcon, fg: '#64748b', bg: 'rgba(100,116,139,0.12)' }
   const { Icon } = meta
@@ -478,6 +509,43 @@ function ChartCard({
         >
           Edit
         </Link>
+        {/* Move to folder */}
+        <div className="relative">
+          <button
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); onToggleMoveMenu() }}
+            className="text-[13px] px-3 py-2 rounded-lg text-text-muted hover:text-text-secondary transition-colors font-medium"
+            title="Move to folder"
+          >
+            Move
+          </button>
+          {showMoveMenu && (
+            <div
+              className="absolute left-0 top-full mt-1 z-20 bg-surface-raised border border-border-default rounded-lg shadow-lg py-1"
+              style={{ minWidth: 160 }}
+              onClick={(e) => { e.preventDefault(); e.stopPropagation() }}
+            >
+              <button
+                onClick={() => onMoveToFolder(null)}
+                className={`w-full text-left text-[13px] px-3 py-1.5 hover:bg-surface-secondary transition-colors ${
+                  !chart.folder_id ? 'text-blue-500 font-medium' : 'text-text-secondary'
+                }`}
+              >
+                Unfiled
+              </button>
+              {folders.map((f) => (
+                <button
+                  key={f.id}
+                  onClick={() => onMoveToFolder(f.id)}
+                  className={`w-full text-left text-[13px] px-3 py-1.5 hover:bg-surface-secondary transition-colors ${
+                    chart.folder_id === f.id ? 'text-blue-500 font-medium' : 'text-text-secondary'
+                  }`}
+                >
+                  {f.name}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
         <div className="flex-1" />
         {confirming ? (
           <div className="flex items-center gap-2">
