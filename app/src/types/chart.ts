@@ -22,6 +22,7 @@ export type ChartType =
   | 'RangePlot'
   | 'BulletBar'
   | 'SmallMultiples'
+  | 'ChoroplethMap'
 
 // =============================================================================
 // Annotation Types
@@ -214,6 +215,16 @@ export interface ChartConfig {
 
   /** Custom tooltip template (e.g. "{{ column | format }}") */
   tooltipTemplate?: string
+
+  /** Choropleth map options */
+  basemap?: string            // BasemapId: 'world' | 'us-states' | 'us-counties' | 'europe'
+  geoJoinColumn?: string      // Data column to match against geography IDs
+  geoValueColumn?: string     // Data column for choropleth coloring
+  geoColorScale?: string      // 'sequential' | 'diverging'
+  geoProjection?: string      // D3 projection name
+
+  /** Data mode (used by editor) */
+  dataMode?: 'table' | 'sql'
 
   /** Additional props */
   extraProps?: Record<string, unknown>
