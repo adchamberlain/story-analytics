@@ -18,20 +18,52 @@ export function EditorPage() {
 
   const isNew = chartId === 'new'
   const sourceId = searchParams.get('sourceId')
+  const templateId = searchParams.get('template')
   const initialSql = (location.state as { initialSql?: string } | null)?.initialSql
   const initialSqlApplied = useRef(false)
+  const templateApplied = useRef(false)
 
   // Load chart or init new on mount; reset store before loading a different chart
   useEffect(() => {
     if (isNew && sourceId) {
       store.reset()
       store.initNew(sourceId)
+    } else if (isNew && templateId) {
+      // New chart from template — apply template config
+      if (!templateApplied.current) {
+        templateApplied.current = true
+        store.reset()
+        fetch(`/api/v2/templates/${templateId}`)
+          .then((res) => {
+            if (!res.ok) throw new Error('Template not found')
+            return res.json()
+          })
+          .then((tmpl) => {
+            const cfg: Partial<ChartConfig> & Record<string, unknown> = tmpl.config ?? {}
+            store.updateConfig({
+              chartType: (tmpl.chart_type ?? cfg.chartType ?? 'BarChart') as import('../types/chart').ChartType,
+              title: (cfg.title as string) ?? tmpl.name ?? '',
+              subtitle: (cfg.subtitle as string) ?? '',
+              ...(cfg.palette ? { palette: cfg.palette as import('../themes/plotTheme').PaletteKey } : {}),
+              ...(cfg.showGrid !== undefined ? { showGrid: cfg.showGrid as boolean } : {}),
+              ...(cfg.showLegend !== undefined ? { showLegend: cfg.showLegend as boolean } : {}),
+              ...(cfg.showValues !== undefined ? { showValues: cfg.showValues as boolean } : {}),
+              ...(cfg.horizontal !== undefined ? { horizontal: cfg.horizontal as boolean } : {}),
+              ...(cfg.stacked !== undefined ? { stacked: cfg.stacked as boolean } : {}),
+              ...(cfg.xAxisTitle ? { xAxisTitle: cfg.xAxisTitle as string } : {}),
+              ...(cfg.yAxisTitle ? { yAxisTitle: cfg.yAxisTitle as string } : {}),
+            })
+          })
+          .catch(() => {
+            // Template fetch failed — continue with defaults
+          })
+      }
     } else if (chartId && chartId !== 'new' && chartId !== store.chartId) {
       store.reset()
       store.loadChart(chartId)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chartId, sourceId])
+  }, [chartId, sourceId, templateId])
 
   // Auto-execute initial SQL passed from DataShaper wizard
   useEffect(() => {

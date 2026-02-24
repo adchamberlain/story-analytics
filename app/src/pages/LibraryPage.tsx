@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
+import { DndContext, DragOverlay, useDraggable, pointerWithin, type DragEndEvent, type DragStartEvent } from '@dnd-kit/core'
 import { useLibraryStore } from '../stores/libraryStore'
 import { useFolderStore } from '../stores/folderStore'
 import { FolderSidebar } from '../components/library/FolderSidebar'
+import { TemplateGallery } from '../components/TemplateGallery'
 import type { SortField, LibraryChart } from '../stores/libraryStore'
 
 // SVG icons for each chart type
@@ -130,6 +132,7 @@ const CHART_TYPE_META: Record<string, { label: string; Icon: () => JSX.Element; 
  */
 export function LibraryPage() {
   const store = useLibraryStore()
+  const navigate = useNavigate()
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [confirmingId, setConfirmingId] = useState<string | null>(null)
   const [duplicatingId, setDuplicatingId] = useState<string | null>(null)
@@ -137,6 +140,7 @@ export function LibraryPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [bulkConfirm, setBulkConfirm] = useState(false)
   const [bulkDeleting, setBulkDeleting] = useState(false)
+  const [showTemplateGallery, setShowTemplateGallery] = useState(false)
 
   useEffect(() => {
     store.loadCharts()
@@ -220,7 +224,30 @@ export function LibraryPage() {
     setMoveMenuId(null)
   }
 
+  // Drag-and-drop state
+  const [activeChartId, setActiveChartId] = useState<string | null>(null)
+  const draggedChart = activeChartId ? charts.find((c) => c.id === activeChartId) ?? store.charts.find((c) => c.id === activeChartId) : null
+
+  const handleDragStart = (event: DragStartEvent) => {
+    const chartId = event.active.data.current?.chartId as string | undefined
+    if (chartId) setActiveChartId(chartId)
+  }
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event
+    setActiveChartId(null)
+    if (!over) return
+
+    const chartId = active.data.current?.chartId as string | undefined
+    const folderId = over.data.current?.folderId as string | null | undefined
+
+    if (chartId && folderId !== undefined) {
+      store.moveToFolder(chartId, folderId)
+    }
+  }
+
   return (
+    <DndContext collisionDetection={pointerWithin} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
     <div className="flex" style={{ padding: '48px 32px 48px 32px' }}>
       {/* Folder sidebar */}
       <div className="shrink-0 pr-6 border-r border-border-subtle" style={{ width: 220, paddingTop: 8 }}>
@@ -232,6 +259,13 @@ export function LibraryPage() {
       <div className="flex items-center justify-between" style={{ marginBottom: '40px' }}>
         <h1 className="text-[28px] font-bold text-text-primary tracking-tight">Chart Library</h1>
         <div className="flex items-center gap-4">
+          <button
+            onClick={() => setShowTemplateGallery(true)}
+            className="text-[14px] font-medium rounded-lg border border-border-default text-text-secondary hover:text-text-primary hover:border-border-hover transition-colors inline-flex items-center gap-1.5"
+            style={{ padding: '7px 16px' }}
+          >
+            From Template
+          </button>
           <Link
             to="/editor/new/source"
             className="text-[14px] font-medium rounded-lg border border-border-default text-text-secondary hover:text-text-primary hover:border-border-hover transition-colors inline-flex items-center gap-1.5"
@@ -372,7 +406,7 @@ export function LibraryPage() {
       ) : (
         <div className="grid gap-7" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))' }}>
           {charts.map((chart) => (
-            <ChartCard
+            <DraggableChartCard
               key={chart.id}
               chart={chart}
               deleting={deletingId === chart.id}
@@ -389,11 +423,97 @@ export function LibraryPage() {
               showMoveMenu={moveMenuId === chart.id}
               onToggleMoveMenu={() => setMoveMenuId(moveMenuId === chart.id ? null : chart.id)}
               onMoveToFolder={(folderId) => handleMoveToFolder(chart.id, folderId)}
+              isDragging={activeChartId === chart.id}
             />
           ))}
         </div>
       )}
       </div>
+
+      {/* Template Gallery Modal */}
+      {showTemplateGallery && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-surface-primary rounded-2xl border border-border-default shadow-lg max-w-4xl w-full max-h-[80vh] overflow-y-auto p-8">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-bold text-text-primary">Choose a Template</h2>
+              <button
+                onClick={() => setShowTemplateGallery(false)}
+                className="text-[14px] text-text-secondary hover:text-text-primary transition-colors font-medium"
+              >
+                Close
+              </button>
+            </div>
+            <TemplateGallery onSelect={(t) => {
+              navigate(`/editor/new?template=${t.id}`)
+              setShowTemplateGallery(false)
+            }} />
+          </div>
+        </div>
+      )}
+
+      {/* Drag overlay */}
+      <DragOverlay>
+        {draggedChart ? (
+          <div className="bg-surface-raised rounded-xl border border-blue-500 shadow-lg p-4 opacity-80 w-64">
+            <p className="text-sm font-medium text-text-primary">{draggedChart.title || 'Untitled'}</p>
+          </div>
+        ) : null}
+      </DragOverlay>
+    </div>
+    </DndContext>
+  )
+}
+
+// ── Draggable Chart Card Wrapper ─────────────────────────────────────────────
+
+function DraggableChartCard(props: {
+  chart: LibraryChart
+  deleting: boolean
+  confirming: boolean
+  duplicating: boolean
+  onRequestDelete: () => void
+  onConfirmDelete: () => void
+  onCancelDelete: () => void
+  onDuplicate: () => void
+  selectMode: boolean
+  selected: boolean
+  onToggleSelect: () => void
+  folders: { id: string; name: string }[]
+  showMoveMenu: boolean
+  onToggleMoveMenu: () => void
+  onMoveToFolder: (folderId: string | null) => void
+  isDragging: boolean
+}) {
+  const { attributes, listeners, setNodeRef, transform } = useDraggable({
+    id: `chart-${props.chart.id}`,
+    data: { chartId: props.chart.id },
+    disabled: props.selectMode,
+  })
+
+  const style: React.CSSProperties = {
+    ...(transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` } : {}),
+    ...(props.isDragging ? { opacity: 0.4 } : {}),
+  }
+
+  return (
+    <div ref={setNodeRef} style={style} {...listeners} {...attributes} data-testid={`draggable-chart-${props.chart.id}`}>
+      <ChartCard
+        chart={props.chart}
+        deleting={props.deleting}
+        confirming={props.confirming}
+        duplicating={props.duplicating}
+        onRequestDelete={props.onRequestDelete}
+        onConfirmDelete={props.onConfirmDelete}
+        onCancelDelete={props.onCancelDelete}
+        onDuplicate={props.onDuplicate}
+        selectMode={props.selectMode}
+        selected={props.selected}
+        onToggleSelect={props.onToggleSelect}
+        folders={props.folders}
+        showMoveMenu={props.showMoveMenu}
+        onToggleMoveMenu={props.onToggleMoveMenu}
+        onMoveToFolder={props.onMoveToFolder}
+      />
     </div>
   )
 }
