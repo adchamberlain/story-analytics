@@ -193,6 +193,9 @@ export interface ChartConfig {
   /** Annotations */
   annotations?: Annotations
 
+  /** Custom tooltip template (e.g. "{{ column | format }}") */
+  tooltipTemplate?: string
+
   /** Additional props */
   extraProps?: Record<string, unknown>
 }
