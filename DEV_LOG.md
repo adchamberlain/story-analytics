@@ -1,5 +1,32 @@
 # Dev Log
 
+## 2026-02-24
+
+### Session: Datawrapper Parity — Phase 0 + Phase 1 (136 tests)
+
+Completed all Phase 0 infrastructure and Phase 1 features on the `worktree-datawrapper-parity` branch.
+
+**Phase 0: Autonomous Loop Infrastructure**
+- Playwright screenshot utility (`app/e2e/screenshot.ts`)
+- Backend stress test suite (22 edge-case tests for chart/dashboard storage, ID validation)
+- Frontend test harness: created missing `vitest.config.ts`, 41 formatter unit tests
+
+**Phase 1: Embeddable & Publishable**
+
+1. **Publish Workflow** — `status: draft|published` field on charts/dashboards, publish/unpublish API endpoints, public chart endpoint, PublicChartPage, Publish button in editor (10 publish tests)
+2. **Embed System** — EmbedChartPage with PostMessage height auto-resize via ResizeObserver, embed URL in SharePanel
+3. **Custom Tooltip Formatting** — `{{ column | format }}` template engine supporting currency/percent/compact/number, tooltip editor in Toolbox with column chips (10 template tests)
+4. **Chart Type Expansion (11 → 15)** — DotPlot (Cleveland style), RangePlot (min-max with endpoints), BulletBar (bar + target tick), SmallMultiples (Observable Plot `fy` faceting with line/bar/area/scatter subtypes). Type-specific Toolbox controls for minColumn, maxColumn, targetColumn, facetColumn, chartSubtype (10 type tests)
+
+**Test totals:** 104 frontend (vitest) + 32 backend (pytest) = 136 tests, all passing.
+
+**Commits:**
+- `2fc26a8` feat: add test infrastructure for Datawrapper parity roadmap
+- `4c89f71` feat: add publish/unpublish workflow for charts and dashboards
+- `fd06acd` feat: add embeddable chart pages with iframe auto-resize
+- `13fd951` feat: add custom tooltip template engine with {{ column | format }} syntax
+- `1d4ffd5` feat: add 4 new chart types — DotPlot, RangePlot, BulletBar, SmallMultiples
+
 ## 2026-02-19
 
 ### Session: Database import wizard, KPI grid, shape advisor, and KPI bug fixes (621 tests)
