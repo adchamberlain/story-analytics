@@ -18,11 +18,16 @@ export function ShareModal({ dashboardId, onClose }: ShareModalProps) {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [copiedLink, setCopiedLink] = useState(false)
+  const [copiedEmbed, setCopiedEmbed] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const copyTimer = useRef<ReturnType<typeof setTimeout>>()
+  const embedTimer = useRef<ReturnType<typeof setTimeout>>()
 
   useEffect(() => {
-    return () => clearTimeout(copyTimer.current)
+    return () => {
+      clearTimeout(copyTimer.current)
+      clearTimeout(embedTimer.current)
+    }
   }, [])
 
   const buildHeaders = () => {
@@ -76,6 +81,7 @@ export function ShareModal({ dashboardId, onClose }: ShareModalProps) {
   }
 
   const shareUrl = `${window.location.origin}/dashboard/${dashboardId}`
+  const embedCode = `<iframe src="${window.location.origin}/embed/dashboard/${dashboardId}" width="100%" height="600" frameborder="0"></iframe>`
 
   const handleCopyLink = async () => {
     try {
@@ -83,6 +89,17 @@ export function ShareModal({ dashboardId, onClose }: ShareModalProps) {
       setCopiedLink(true)
       clearTimeout(copyTimer.current)
       copyTimer.current = setTimeout(() => setCopiedLink(false), 2000)
+    } catch {
+      // Clipboard API can fail in insecure contexts or iframes — ignore silently
+    }
+  }
+
+  const handleCopyEmbed = async () => {
+    try {
+      await navigator.clipboard.writeText(embedCode)
+      setCopiedEmbed(true)
+      clearTimeout(embedTimer.current)
+      embedTimer.current = setTimeout(() => setCopiedEmbed(false), 2000)
     } catch {
       // Clipboard API can fail in insecure contexts or iframes — ignore silently
     }
@@ -180,6 +197,31 @@ export function ShareModal({ dashboardId, onClose }: ShareModalProps) {
                       }`}
                     >
                       {copiedLink ? 'Copied!' : 'Copy'}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Embed code */}
+              {visibility !== 'private' && (
+                <div>
+                  <label className="text-sm font-medium text-text-primary block mb-2">Embed Code</label>
+                  <div className="flex items-start gap-2">
+                    <textarea
+                      readOnly
+                      value={embedCode}
+                      rows={3}
+                      className="flex-1 text-xs px-3 py-2 rounded-lg border border-border-default bg-surface-secondary text-text-secondary font-mono resize-none"
+                    />
+                    <button
+                      onClick={handleCopyEmbed}
+                      className={`text-xs px-3 py-2 rounded-lg border transition-colors whitespace-nowrap ${
+                        copiedEmbed
+                          ? 'border-green-300 text-green-700 bg-green-50'
+                          : 'border-border-default text-text-on-surface hover:bg-surface-secondary'
+                      }`}
+                    >
+                      {copiedEmbed ? 'Copied!' : 'Copy'}
                     </button>
                   </div>
                 </div>

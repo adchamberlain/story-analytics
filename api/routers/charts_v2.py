@@ -6,14 +6,16 @@ The core product loop: upload → propose → render → save.
 from __future__ import annotations
 
 import traceback
+from pathlib import Path
 
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from ..services.duckdb_service import get_duckdb_service, q
-from ..services.chart_storage import save_chart, load_chart, list_charts, delete_chart, update_chart
+from ..services.chart_storage import save_chart, load_chart, list_charts, delete_chart, update_chart, _validate_id
 
 from engine.v2.schema_analyzer import DataProfile, ColumnProfile
 from engine.v2.chart_proposer import propose_chart
@@ -21,6 +23,8 @@ from engine.v2.chart_editor import edit_chart
 
 
 router = APIRouter(prefix="/v2/charts", tags=["charts-v2"])
+
+SNAPSHOTS_DIR = Path(__file__).parent.parent.parent / "data" / "snapshots"
 
 # Map Settings UI provider names → engine provider names
 _SETTINGS_TO_ENGINE_PROVIDER = {
@@ -706,6 +710,34 @@ async def get_public_chart(chart_id: str):
     if chart.status != "published":
         raise HTTPException(status_code=403, detail="Chart is not published")
     return _chart_to_response(chart)
+
+
+# ── Snapshot (static PNG fallback) ────────────────────────────────────────
+
+@router.post("/{chart_id}/snapshot")
+async def upload_snapshot(chart_id: str, request: Request):
+    """Upload a PNG snapshot for a chart (used as noscript fallback and OG image)."""
+    chart = load_chart(chart_id)
+    if not chart:
+        raise HTTPException(status_code=404, detail="Chart not found")
+    SNAPSHOTS_DIR.mkdir(parents=True, exist_ok=True)
+    body = await request.body()
+    if not body:
+        raise HTTPException(status_code=400, detail="Empty body")
+    path = SNAPSHOTS_DIR / f"{chart_id}.png"
+    path.write_bytes(body)
+    return {"success": True, "url": f"/api/v2/charts/{chart_id}/snapshot.png"}
+
+
+@router.get("/{chart_id}/snapshot.png")
+async def get_snapshot(chart_id: str):
+    """Serve the stored PNG snapshot for a chart."""
+    if not _validate_id(chart_id):
+        raise HTTPException(status_code=400, detail="Invalid chart ID")
+    path = SNAPSHOTS_DIR / f"{chart_id}.png"
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="Snapshot not found")
+    return FileResponse(path, media_type="image/png")
 
 
 # ── Duplicate & Template ──────────────────────────────────────────────────

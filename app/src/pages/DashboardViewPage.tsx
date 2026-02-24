@@ -338,7 +338,7 @@ function DashboardShareLinks({ dashboardId }: { dashboardId: string }) {
   }, [])
 
   const url = `${window.location.origin}/dashboard/${dashboardId}`
-  const embedCode = `<iframe src="${url}" width="100%" height="800" frameborder="0"></iframe>`
+  const embedCode = `<iframe src="${window.location.origin}/embed/dashboard/${dashboardId}" width="100%" height="600" frameborder="0"></iframe>`
 
   const copy = async (text: string, setter: (v: boolean) => void) => {
     await navigator.clipboard.writeText(text)

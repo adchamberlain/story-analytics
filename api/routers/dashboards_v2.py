@@ -541,6 +541,18 @@ async def remove_dashboard(dashboard_id: str):
 
 # ── Publish / Unpublish ──────────────────────────────────────────────────────
 
+@router.get("/{dashboard_id}/public", response_model=DashboardWithDataResponse)
+async def get_public_dashboard(dashboard_id: str):
+    """Get a published dashboard (no auth). Returns 403 for drafts."""
+    dashboard = load_dashboard(dashboard_id)
+    if not dashboard:
+        raise HTTPException(status_code=404, detail="Dashboard not found")
+    if dashboard.status != "published":
+        raise HTTPException(status_code=403, detail="Dashboard is not published")
+    # Reuse get_dashboard logic to load chart data
+    return await get_dashboard(dashboard_id)
+
+
 @router.put("/{dashboard_id}/publish", response_model=DashboardResponse)
 async def publish_dashboard(dashboard_id: str):
     """Publish a dashboard."""

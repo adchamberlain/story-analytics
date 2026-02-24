@@ -1,0 +1,113 @@
+import { useEffect, useState, useRef } from 'react'
+import { useParams } from 'react-router-dom'
+import { DashboardGrid } from '../components/dashboard/DashboardGrid'
+
+interface ChartWithData {
+  chart_id: string
+  width: string
+  chart_type: string
+  title: string | null
+  subtitle: string | null
+  source: string | null
+  x: string | null
+  y: string | string[] | null
+  series: string | null
+  horizontal: boolean
+  sort: boolean
+  config: Record<string, unknown> | null
+  data: Record<string, unknown>[]
+  columns: string[]
+  error: string | null
+  data_ingested_at?: string | null
+  freshness?: string | null
+  error_type?: string | null
+  error_suggestion?: string | null
+  health_status?: string
+  health_issues?: string[]
+  layout?: { x: number; y: number; w: number; h: number } | null
+}
+
+interface DashboardData {
+  id: string
+  title: string
+  description: string | null
+  charts: ChartWithData[]
+  created_at: string
+  updated_at: string
+  has_stale_data: boolean
+}
+
+/**
+ * Minimal embed view for dashboards. No navigation, no header, no editor UI.
+ * Fetches from the public endpoint, renders DashboardGrid in read-only mode.
+ * Sends PostMessage to parent for iframe auto-resize.
+ */
+export function EmbedDashboardPage() {
+  const { dashboardId } = useParams<{ dashboardId: string }>()
+  const [dashboard, setDashboard] = useState<DashboardData | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  // Fetch dashboard data from public endpoint
+  useEffect(() => {
+    if (!dashboardId) return
+    fetch(`/api/v2/dashboards/${dashboardId}/public`)
+      .then(async (res) => {
+        if (res.status === 403) throw new Error('This dashboard is not published')
+        if (!res.ok) throw new Error('Dashboard not found')
+        return res.json()
+      })
+      .then(setDashboard)
+      .catch((e) => setError(e.message))
+  }, [dashboardId])
+
+  // PostMessage height to parent for iframe auto-resize
+  useEffect(() => {
+    if (!dashboard) return
+    const sendHeight = () => {
+      const height = document.body.scrollHeight
+      window.parent.postMessage({ type: 'sa-resize', height }, '*')
+    }
+    // Send after render
+    const timer = setTimeout(sendHeight, 200)
+    // Observe for size changes
+    const observer = new ResizeObserver(sendHeight)
+    if (containerRef.current) observer.observe(containerRef.current)
+    return () => {
+      clearTimeout(timer)
+      observer.disconnect()
+    }
+  }, [dashboard])
+
+  if (error) {
+    return (
+      <div style={{ padding: 24, fontFamily: 'system-ui', color: '#666', fontSize: 14 }}>
+        {error}
+      </div>
+    )
+  }
+
+  if (!dashboard) {
+    return (
+      <div style={{ padding: 24, fontFamily: 'system-ui', color: '#999', fontSize: 14 }}>
+        Loading...
+      </div>
+    )
+  }
+
+  return (
+    <div ref={containerRef} style={{ padding: '16px 24px', fontFamily: 'system-ui' }}>
+      {dashboard.title && (
+        <h1 style={{ margin: '0 0 4px', fontSize: 20, fontWeight: 700, color: '#1a1a1a' }}>
+          {dashboard.title}
+        </h1>
+      )}
+      {dashboard.description && (
+        <p style={{ margin: '0 0 12px', fontSize: 14, color: '#666' }}>
+          {dashboard.description}
+        </p>
+      )}
+      <DashboardGrid charts={dashboard.charts} />
+    </div>
+  )
+}
