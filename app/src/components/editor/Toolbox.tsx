@@ -373,6 +373,38 @@ export function Toolbox() {
         </div>
       </Section>
 
+      {/* Tooltip Template */}
+      {!isBigValue && config.chartType !== 'DataTable' && (
+        <CollapsibleSection title="Tooltip">
+          <div className="space-y-2">
+            <textarea
+              value={config.tooltipTemplate ?? ''}
+              onChange={(e) => updateConfig({ tooltipTemplate: e.target.value || undefined })}
+              placeholder={`{{ ${config.x || 'column'} }}: {{ ${(Array.isArray(config.y) ? config.y[0] : config.y) || 'value'} | compact }}`}
+              rows={3}
+              className="w-full rounded-md border border-border-default bg-surface px-2 py-1.5 text-xs text-text-on-surface placeholder:text-text-muted focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono"
+            />
+            <div className="flex flex-wrap gap-1">
+              {columns.map((col) => (
+                <button
+                  key={col}
+                  onClick={() => {
+                    const current = config.tooltipTemplate ?? ''
+                    updateConfig({ tooltipTemplate: current + `{{ ${col} }}` })
+                  }}
+                  className="text-[10px] px-1.5 py-0.5 rounded bg-surface-inset text-text-secondary hover:bg-surface-secondary transition-colors"
+                >
+                  {col}
+                </button>
+              ))}
+            </div>
+            <p className="text-[10px] text-text-muted">
+              Formats: currency, percent, compact, number
+            </p>
+          </div>
+        </CollapsibleSection>
+      )}
+
       {/* Annotations */}
       <CollapsibleSection
         title="Annotations"

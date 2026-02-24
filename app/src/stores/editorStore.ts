@@ -39,6 +39,7 @@ export interface EditorConfig {
   positiveIsGood: boolean
   metricLabel: string | null
   unitColumn: string | null
+  tooltipTemplate: string
 }
 
 const DEFAULT_CONFIG: EditorConfig = {
@@ -70,6 +71,7 @@ const DEFAULT_CONFIG: EditorConfig = {
   positiveIsGood: true,
   metricLabel: null,
   unitColumn: null,
+  tooltipTemplate: '',
 }
 
 export interface TableInfoItem {
@@ -242,6 +244,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         positiveIsGood: chart.config?.positiveIsGood ?? true,
         metricLabel: chart.config?.metricLabel ?? null,
         unitColumn: chart.config?.unitColumn ?? null,
+        tooltipTemplate: chart.config?.tooltipTemplate ?? '',
       }
 
       const loadedDataMode = config.dataMode
@@ -440,6 +443,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
             positiveIsGood: config.positiveIsGood,
             metricLabel: config.metricLabel,
             unitColumn: config.unitColumn,
+            tooltipTemplate: config.tooltipTemplate || undefined,
           },
         }),
       })
@@ -688,6 +692,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
             positiveIsGood: config.positiveIsGood,
             metricLabel: config.metricLabel,
             unitColumn: config.unitColumn,
+            tooltipTemplate: config.tooltipTemplate || undefined,
           },
         }),
       })

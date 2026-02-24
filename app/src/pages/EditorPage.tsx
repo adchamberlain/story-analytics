@@ -112,6 +112,7 @@ export function EditorPage() {
     valueFormat: store.config.valueFormat || undefined,
     positiveIsGood: store.config.positiveIsGood,
     metricLabel: store.config.metricLabel ?? undefined,
+    tooltipTemplate: store.config.tooltipTemplate || undefined,
   }
 
   // Apply palette colors
