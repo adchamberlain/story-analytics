@@ -147,6 +147,7 @@ class SavedChartResponse(BaseModel):
     connection_id: str | None = None
     source_table: str | None = None
     status: str = "draft"
+    folder_id: str | None = None
 
 
 class ChartDataResponse(BaseModel):
@@ -166,6 +167,7 @@ class UpdateChartRequest(BaseModel):
     horizontal: bool | None = None
     sort: bool | None = None
     config: dict | None = None
+    folder_id: str | None = None
 
 
 class BuildQueryRequest(BaseModel):
@@ -219,6 +221,7 @@ def _chart_to_response(chart) -> SavedChartResponse:
         connection_id=chart.connection_id,
         source_table=chart.source_table,
         status=chart.status,
+        folder_id=chart.folder_id,
     )
 
 

@@ -3,7 +3,7 @@
 > **Design doc:** `docs/plans/2026-02-24-datawrapper-parity-design.md`
 > **Implementation plan:** `docs/plans/2026-02-24-datawrapper-parity-plan.md`
 
-## Current Phase: 2 — Themeable & Localizable
+## Current Phase: 4 — Maps
 
 ### Task 0: Development Loop Setup ✅
 - [x] Screenshot verification (Playwright)
@@ -92,41 +92,42 @@
 - [x] Tests: 17 colorblind simulation unit tests
 - [ ] Tests: Screenshot palette builder UI
 
-## Phase 3: Rich Tables & Data
+## Phase 3: Rich Tables & Data ✅
 
-### Task 9: Rich Data Tables
-- [ ] RichDataTable component (replace DataTableChart)
-- [ ] Column types: text, number, heatmap, bar, sparkline
-- [ ] Click-to-sort headers
-- [ ] Search bar (client-side filtering)
-- [ ] Pagination (10/25/50/100 rows)
-- [ ] Sticky header row
-- [ ] Per-column formatting and conditional coloring
-- [ ] Tests: Sort, search, pagination logic
+### Task 9: Rich Data Tables ✅
+- [x] RichDataTable component (replace DataTableChart)
+- [x] Column types: text, number, heatmap, bar, sparkline
+- [x] Click-to-sort headers
+- [x] Search bar (client-side filtering)
+- [x] Pagination (10/25/50/100 rows)
+- [x] Sticky header row
+- [x] Per-column formatting and conditional coloring
+- [x] Tests: Sort, search, pagination logic (27 tests)
 - [ ] Tests: Screenshot with heatmap + sparkline columns
 
-### Task 10: Google Sheets Connector
-- [ ] Backend: Parse Sheets URL → extract sheet ID
-- [ ] Backend: Fetch via public CSV export URL
-- [ ] Backend: Configurable polling interval
-- [ ] Frontend: GoogleSheetsInput component
-- [ ] Tests: URL parsing, CSV fetch
-- [ ] Tests: Auto-refresh on embed load
+### Task 10: Google Sheets Connector ✅
+- [x] Backend: Parse Sheets URL → extract sheet ID
+- [x] Backend: Fetch via public CSV export URL
+- [ ] Backend: Configurable polling interval — future enhancement
+- [x] Frontend: GoogleSheetsInput component
+- [x] Tests: URL parsing, CSV fetch (11 tests)
+- [ ] Tests: Auto-refresh on embed load — future enhancement
 
-### Task 11: External URL Data Source
-- [ ] Backend: Fetch CSV/JSON from any URL
-- [ ] Backend: Optional HTTP headers for auth
-- [ ] Backend: Cache with staleness indicator
-- [ ] Frontend: UrlSourceInput component
-- [ ] Tests: URL fetch, caching, stale indicator
+### Task 11: External URL Data Source ✅
+- [x] Backend: Fetch CSV/JSON from any URL
+- [x] Backend: Optional HTTP headers for auth
+- [ ] Backend: Cache with staleness indicator — future enhancement
+- [x] Frontend: UrlSourceInput component
+- [x] Tests: URL fetch, validation (5 tests)
 
-### Task 12: Folders & Organization
-- [ ] Backend: Folder storage service
-- [ ] Backend: Folder CRUD API
-- [ ] Frontend: Folder tree sidebar in library
-- [ ] Frontend: Drag charts into folders
-- [ ] Frontend: Search across all items
-- [ ] Tests: Folder CRUD, chart-folder association
+### Task 12: Folders & Organization ✅
+- [x] Backend: Folder storage service
+- [x] Backend: Folder CRUD API
+- [x] Frontend: Folder tree sidebar in library
+- [x] Frontend: Move-to-folder dropdown on chart cards
+- [x] Frontend: Search across all items
+- [x] Tests: Folder CRUD, chart-folder association (11 tests)
+- [ ] Frontend: Drag-and-drop charts into folders — future enhancement
 
 ## Phase 4: Maps
 

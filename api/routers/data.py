@@ -11,6 +11,7 @@ from fastapi import APIRouter, UploadFile, File, Form, HTTPException
 from pydantic import BaseModel
 
 from ..services.duckdb_service import get_duckdb_service, _SAFE_SOURCE_ID_RE
+from ..services.connectors.google_sheets import parse_sheets_url, build_export_url, fetch_sheet_csv
 
 
 router = APIRouter(prefix="/data", tags=["data"])
@@ -88,6 +89,17 @@ class PasteRequest(BaseModel):
 
 class RenameRequest(BaseModel):
     name: str
+
+
+class GoogleSheetsRequest(BaseModel):
+    url: str
+    name: str | None = None
+
+
+class UrlSourceRequest(BaseModel):
+    url: str
+    name: str | None = None
+    headers: dict[str, str] | None = None
 
 
 # ── Endpoints ────────────────────────────────────────────────────────────────
@@ -468,3 +480,165 @@ async def get_schema(source_id: str):
             for c in schema.columns
         ],
     )
+
+
+def _build_upload_response(schema) -> UploadResponse:
+    """Helper to build UploadResponse from a SourceSchema."""
+    return UploadResponse(
+        source_id=schema.source_id,
+        filename=schema.filename,
+        row_count=schema.row_count,
+        columns=[
+            ColumnInfoResponse(
+                name=c.name,
+                type=c.type,
+                nullable=c.nullable,
+                sample_values=c.sample_values,
+                null_count=c.null_count,
+                distinct_count=c.distinct_count,
+                min_value=c.min_value,
+                max_value=c.max_value,
+            )
+            for c in schema.columns
+        ],
+    )
+
+
+@router.post("/import/google-sheets", response_model=UploadResponse)
+async def import_google_sheets(request: GoogleSheetsRequest):
+    """Import data from a public Google Sheets document.
+
+    The sheet must be publicly shared (Anyone with the link).
+    """
+    try:
+        parsed = parse_sheets_url(request.url)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    export_url = build_export_url(parsed["sheet_id"], parsed["gid"])
+
+    try:
+        csv_path = await fetch_sheet_csv(export_url)
+    except Exception as e:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Could not fetch sheet: {e}. Make sure the sheet is publicly shared.",
+        )
+
+    filename = request.name or f"gsheet_{parsed['sheet_id'][:8]}.csv"
+    if not filename.lower().endswith(".csv"):
+        filename += ".csv"
+
+    service = get_duckdb_service()
+
+    # Replace existing source with same name
+    existing_id = service.find_source_by_filename(filename)
+    if existing_id:
+        table_name = f"src_{existing_id}"
+        with service._lock:
+            try:
+                service._conn.execute(f"DROP TABLE IF EXISTS {table_name}")
+            except Exception:
+                pass
+            service._sources.pop(existing_id, None)
+
+    try:
+        schema = service.ingest_csv(csv_path, filename, source_id=existing_id)
+    except Exception as e:
+        raise HTTPException(status_code=422, detail=f"Could not parse sheet data: {e}")
+    finally:
+        csv_path.unlink(missing_ok=True)
+
+    return _build_upload_response(schema)
+
+
+@router.post("/import/url", response_model=UploadResponse)
+async def import_from_url(request: UrlSourceRequest):
+    """Import CSV or JSON data from an external URL.
+
+    Optionally pass custom HTTP headers for authenticated endpoints.
+    """
+    import httpx as _httpx
+
+    url = request.url.strip()
+    if not url:
+        raise HTTPException(status_code=400, detail="URL is empty")
+
+    if not url.startswith(("http://", "https://")):
+        raise HTTPException(status_code=400, detail="URL must start with http:// or https://")
+
+    headers = request.headers or {}
+
+    try:
+        async with _httpx.AsyncClient(follow_redirects=True, timeout=30.0) as client:
+            resp = await client.get(url, headers=headers)
+            resp.raise_for_status()
+    except _httpx.HTTPStatusError as e:
+        raise HTTPException(status_code=422, detail=f"HTTP {e.response.status_code} fetching URL")
+    except Exception as e:
+        raise HTTPException(status_code=422, detail=f"Could not fetch URL: {e}")
+
+    content = resp.content
+    content_type = resp.headers.get("content-type", "")
+
+    # Convert JSON array-of-objects to CSV
+    import json as _json
+
+    if "json" in content_type or url.endswith(".json"):
+        try:
+            data = _json.loads(content)
+            if isinstance(data, list) and len(data) > 0 and isinstance(data[0], dict):
+                import csv as _csv
+                import io as _io
+
+                cols = list(data[0].keys())
+                buf = _io.StringIO()
+                writer = _csv.DictWriter(buf, fieldnames=cols)
+                writer.writeheader()
+                writer.writerows(data)
+                content = buf.getvalue().encode("utf-8")
+            else:
+                raise HTTPException(
+                    status_code=422,
+                    detail="JSON must be an array of objects [{...}, ...]",
+                )
+        except _json.JSONDecodeError as e:
+            raise HTTPException(status_code=422, detail=f"Invalid JSON: {e}")
+
+    # Write to temp file
+    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".csv")
+    tmp.write(content)
+    tmp.close()
+    csv_path = Path(tmp.name)
+
+    # Determine filename
+    filename = request.name
+    if not filename:
+        from urllib.parse import urlparse as _urlparse
+
+        path = _urlparse(url).path
+        filename = Path(path).stem or "url_import"
+    if not filename.lower().endswith(".csv"):
+        filename += ".csv"
+
+    service = get_duckdb_service()
+
+    # Replace existing source with same name
+    existing_id = service.find_source_by_filename(filename)
+    if existing_id:
+        table_name = f"src_{existing_id}"
+        with service._lock:
+            try:
+                service._conn.execute(f"DROP TABLE IF EXISTS {table_name}")
+            except Exception:
+                pass
+            service._sources.pop(existing_id, None)
+
+    try:
+        schema = service.ingest_csv(csv_path, filename, source_id=existing_id)
+    except Exception as e:
+        raise HTTPException(status_code=422, detail=f"Could not parse data: {e}")
+    finally:
+        csv_path.unlink(missing_ok=True)
+
+    return _build_upload_response(schema)
