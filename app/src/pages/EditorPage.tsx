@@ -213,6 +213,18 @@ export function EditorPage() {
           >
             {store.saving ? 'Saving...' : 'Save'}
           </button>
+          {store.chartId && !isNew && (
+            <button
+              onClick={store.status === 'published' ? store.unpublishChart : store.publishChart}
+              className={`px-3 py-2 text-xs rounded-lg border transition-colors font-medium ${
+                store.status === 'published'
+                  ? 'border-green-300 bg-green-50 text-green-700 hover:bg-green-100 dark:bg-green-900/20 dark:border-green-700 dark:text-green-400'
+                  : 'border-border-default text-text-on-surface hover:bg-surface-secondary'
+              }`}
+            >
+              {store.status === 'published' ? 'Published' : 'Publish'}
+            </button>
+          )}
         </div>
       </header>
 

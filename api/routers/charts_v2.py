@@ -146,6 +146,7 @@ class SavedChartResponse(BaseModel):
     config: dict | None = None
     connection_id: str | None = None
     source_table: str | None = None
+    status: str = "draft"
 
 
 class ChartDataResponse(BaseModel):
@@ -195,6 +196,30 @@ class EditRequest(BaseModel):
 class EditResponse(BaseModel):
     config: dict
     explanation: str
+
+
+def _chart_to_response(chart) -> SavedChartResponse:
+    """Convert a SavedChart to a SavedChartResponse."""
+    return SavedChartResponse(
+        id=chart.id,
+        source_id=chart.source_id,
+        chart_type=chart.chart_type,
+        title=chart.title,
+        subtitle=chart.subtitle,
+        source=chart.source,
+        sql=chart.sql,
+        x=chart.x,
+        y=chart.y,
+        series=chart.series,
+        horizontal=chart.horizontal,
+        sort=chart.sort,
+        created_at=chart.created_at,
+        updated_at=chart.updated_at,
+        config=chart.config,
+        connection_id=chart.connection_id,
+        source_table=chart.source_table,
+        status=chart.status,
+    )
 
 
 # ── Endpoints ────────────────────────────────────────────────────────────────
@@ -517,53 +542,14 @@ async def save(request: SaveRequest):
         source_table=request.source_table,
     )
 
-    return SavedChartResponse(
-        id=chart.id,
-        source_id=chart.source_id,
-        chart_type=chart.chart_type,
-        title=chart.title,
-        subtitle=chart.subtitle,
-        source=chart.source,
-        sql=chart.sql,
-        x=chart.x,
-        y=chart.y,
-        series=chart.series,
-        horizontal=chart.horizontal,
-        sort=chart.sort,
-        created_at=chart.created_at,
-        updated_at=chart.updated_at,
-        config=chart.config,
-        connection_id=chart.connection_id,
-        source_table=chart.source_table,
-    )
+    return _chart_to_response(chart)
 
 
 @router.get("/", response_model=list[SavedChartResponse])
 async def list_all():
     """List all saved charts."""
     charts = list_charts()
-    return [
-        SavedChartResponse(
-            id=c.id,
-            source_id=c.source_id,
-            chart_type=c.chart_type,
-            title=c.title,
-            subtitle=c.subtitle,
-            source=c.source,
-            sql=c.sql,
-            x=c.x,
-            y=c.y,
-            series=c.series,
-            horizontal=c.horizontal,
-            sort=c.sort,
-            created_at=c.created_at,
-            updated_at=c.updated_at,
-            config=c.config,
-            connection_id=c.connection_id,
-            source_table=c.source_table,
-        )
-        for c in charts
-    ]
+    return [_chart_to_response(c) for c in charts]
 
 
 @router.get("/{chart_id}", response_model=ChartDataResponse)
@@ -586,25 +572,7 @@ async def get_chart(chart_id: str):
             raise HTTPException(status_code=422, detail=f"Failed to execute chart SQL: {e}")
 
     return ChartDataResponse(
-        chart=SavedChartResponse(
-            id=chart.id,
-            source_id=chart.source_id,
-            chart_type=chart.chart_type,
-            title=chart.title,
-            subtitle=chart.subtitle,
-            source=chart.source,
-            sql=chart.sql,
-            x=chart.x,
-            y=chart.y,
-            series=chart.series,
-            horizontal=chart.horizontal,
-            sort=chart.sort,
-            created_at=chart.created_at,
-            updated_at=chart.updated_at,
-            config=chart.config,
-            connection_id=chart.connection_id,
-            source_table=chart.source_table,
-        ),
+        chart=_chart_to_response(chart),
         data=data,
         columns=columns,
     )
@@ -621,25 +589,7 @@ async def update(chart_id: str, request: UpdateChartRequest):
     if not chart:
         raise HTTPException(status_code=404, detail="Chart not found")
 
-    return SavedChartResponse(
-        id=chart.id,
-        source_id=chart.source_id,
-        chart_type=chart.chart_type,
-        title=chart.title,
-        subtitle=chart.subtitle,
-        source=chart.source,
-        sql=chart.sql,
-        x=chart.x,
-        y=chart.y,
-        series=chart.series,
-        horizontal=chart.horizontal,
-        sort=chart.sort,
-        created_at=chart.created_at,
-        updated_at=chart.updated_at,
-        config=chart.config,
-        connection_id=chart.connection_id,
-        source_table=chart.source_table,
-    )
+    return _chart_to_response(chart)
 
 
 @router.post("/edit", response_model=EditResponse)
@@ -672,3 +622,34 @@ async def remove_chart(chart_id: str):
     if not delete_chart(chart_id):
         raise HTTPException(status_code=404, detail="Chart not found")
     return {"deleted": True}
+
+
+# ── Publish / Unpublish ──────────────────────────────────────────────────────
+
+@router.put("/{chart_id}/publish", response_model=SavedChartResponse)
+async def publish_chart(chart_id: str):
+    """Publish a chart, making it accessible via the public endpoint."""
+    chart = update_chart(chart_id, status="published")
+    if not chart:
+        raise HTTPException(status_code=404, detail="Chart not found")
+    return _chart_to_response(chart)
+
+
+@router.put("/{chart_id}/unpublish", response_model=SavedChartResponse)
+async def unpublish_chart(chart_id: str):
+    """Unpublish a chart, reverting it to draft status."""
+    chart = update_chart(chart_id, status="draft")
+    if not chart:
+        raise HTTPException(status_code=404, detail="Chart not found")
+    return _chart_to_response(chart)
+
+
+@router.get("/{chart_id}/public", response_model=SavedChartResponse)
+async def get_public_chart(chart_id: str):
+    """Get a published chart (no auth required). Returns 403 for drafts."""
+    chart = load_chart(chart_id)
+    if not chart:
+        raise HTTPException(status_code=404, detail="Chart not found")
+    if chart.status != "published":
+        raise HTTPException(status_code=403, detail="Chart is not published")
+    return _chart_to_response(chart)

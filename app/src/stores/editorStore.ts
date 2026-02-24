@@ -95,6 +95,7 @@ interface EditorState {
   // Chart data
   chartId: string | null
   sourceId: string | null
+  status: 'draft' | 'published'
   data: Record<string, unknown>[]
   columns: string[]
   sql: string | null
@@ -148,6 +149,8 @@ interface EditorState {
   save: () => Promise<void>
   discard: () => void
   sendChatMessage: (message: string) => Promise<void>
+  publishChart: () => Promise<void>
+  unpublishChart: () => Promise<void>
   reset: () => void
 }
 
@@ -166,6 +169,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   // Initial state
   chartId: null,
   sourceId: null,
+  status: 'draft',
   data: [],
   columns: [],
   sql: null,
@@ -259,6 +263,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       set({
         loading: false,
         sourceId: chart.source_id,
+        status: chart.status ?? 'draft',
         data: result.data ?? [],
         columns: result.columns ?? [],
         columnTypes,
@@ -837,11 +842,38 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }
   },
 
+  publishChart: async () => {
+    const { chartId } = get()
+    if (!chartId) return
+    try {
+      const res = await fetch(`/api/v2/charts/${chartId}/publish`, { method: 'PUT' })
+      if (res.ok) {
+        set({ status: 'published' })
+      }
+    } catch {
+      // Non-critical
+    }
+  },
+
+  unpublishChart: async () => {
+    const { chartId } = get()
+    if (!chartId) return
+    try {
+      const res = await fetch(`/api/v2/charts/${chartId}/unpublish`, { method: 'PUT' })
+      if (res.ok) {
+        set({ status: 'draft' })
+      }
+    } catch {
+      // Non-critical
+    }
+  },
+
   reset: () => {
     clearTimeout(_buildQueryTimer)
     set({
       chartId: null,
       sourceId: null,
+      status: 'draft',
       data: [],
       columns: [],
       sql: null,
