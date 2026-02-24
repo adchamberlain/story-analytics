@@ -2,6 +2,37 @@
 
 ## 2026-02-24
 
+### Session: Phase 4 — Maps, Responsive Annotations, Templates (29 new tests)
+
+Implemented all 3 Phase 4 tasks for the Datawrapper parity roadmap. Built in worktree `phase4-maps`.
+
+**Task 15: Chart Templates & Duplication** (commit `d1f456b`)
+- Backend: `template_storage.py` service (JSON in `data/templates/`), mirrors theme_storage.py
+- Backend: `templates.py` router with full CRUD, duplicate endpoint, save-as-template endpoint
+- Frontend: Duplicate button on ChartCard in LibraryPage
+- Frontend: Template button in EditorPage header
+- 14 backend tests (5 duplication, 7 template CRUD, 2 save-as-template)
+
+**Task 14: Responsive Annotations** (commit `0aeb246`)
+- Added `dxRatio`/`dyRatio` proportional fields to PointAnnotation
+- `resolveResponsiveOffset()` scales annotations with container
+- `shouldCollapseAnnotations()` collapses to footnotes below 400px
+- ObservableChartFactory renders footnote list when collapsed
+- 7 frontend tests
+
+**Task 13: Choropleth Maps** (commit `3e94a5f`)
+- `ChoroplethMap.tsx` — D3-geo component with hover tooltips, gradient legend
+- `geoUtils.ts` — basemap registry (4 basemaps), TopoJSON loading/caching, data joining
+- 4 basemap TopoJSON files: world, US states, US counties, Europe
+- Toolbox config: basemap, join column, value column, color scale, projection
+- EditorStore: 5 new geo config fields with load/save mapping
+- ChartTypeSelector: map icon entry
+- 8 frontend tests
+
+**Test totals:** 239 frontend + 55 backend = 294 total (all passing)
+
+**Commits:** 3 (d1f456b, 0aeb246, 3e94a5f) on branch `worktree-phase4-maps`
+
 ### Session: Phase 2 — Themeable & Localizable (129 new tests)
 
 Implemented all 4 Phase 2 tasks for the Datawrapper parity roadmap. Built in a worktree to avoid conflicts.

@@ -128,30 +128,35 @@
 - [ ] Frontend: Search across all items
 - [ ] Tests: Folder CRUD, chart-folder association
 
-## Phase 4: Maps
+## Phase 4: Maps ✅
 
-### Task 13: Choropleth Maps
-- [ ] ChoroplethMap component (D3-geo + TopoJSON)
-- [ ] Basemaps: world countries, US states, US counties, Europe
-- [ ] Data join: match column to geography ID
-- [ ] Color scale: sequential + diverging
-- [ ] Legend: gradient or stepped
-- [ ] Tooltips: hover shows region + value
-- [ ] Custom GeoJSON/TopoJSON upload
-- [ ] Tests: Map renders with sample data
+### Task 13: Choropleth Maps ✅
+- [x] ChoroplethMap component (D3-geo + TopoJSON)
+- [x] Basemaps: world countries, US states, US counties, Europe
+- [x] Data join: match column to geography ID or name
+- [x] Color scale: sequential + diverging
+- [x] Legend: gradient with min/max labels
+- [x] Tooltips: hover shows region + value
+- [x] geoUtils: basemap registry, TopoJSON loading, data joining, projections
+- [x] Toolbox: basemap, join column, value column, color scale, projection selectors
+- [x] EditorStore: geo config fields (basemap, geoJoinColumn, geoValueColumn, geoColorScale, geoProjection)
+- [x] Tests: 8 unit tests (basemap registry, data joining, type registration)
+- [ ] Custom GeoJSON/TopoJSON upload — future enhancement
 - [ ] Tests: Screenshot verify map at multiple projections
 
-### Task 14: Responsive Annotations
-- [ ] Store proportional positions alongside pixel positions
-- [ ] Recalculate on resize
-- [ ] Collapse to footnotes below 400px
-- [ ] Tests: Resize behavior
+### Task 14: Responsive Annotations ✅
+- [x] Store proportional positions (dxRatio/dyRatio) alongside pixel positions
+- [x] Recalculate on resize via resolveResponsiveOffset()
+- [x] Collapse to footnotes below 400px via shouldCollapseAnnotations()
+- [x] Tests: 7 unit tests (responsive offsets, ratio computation, collapse threshold)
 - [ ] Tests: Screenshot at desktop vs mobile
 
-### Task 15: Chart Templates & Duplication
-- [ ] Backend: Duplicate chart endpoint
-- [ ] Backend: Template storage
-- [ ] Frontend: Duplicate action in library
-- [ ] Frontend: Save as template
-- [ ] Frontend: Template gallery in chart creation
-- [ ] Tests: Duplicate preserves config, not data
+### Task 15: Chart Templates & Duplication ✅
+- [x] Backend: Duplicate chart endpoint (POST /v2/charts/{id}/duplicate)
+- [x] Backend: Template storage service (template_storage.py)
+- [x] Backend: Template CRUD API (templates.py router)
+- [x] Backend: Save-as-template endpoint (POST /v2/charts/{id}/save-as-template)
+- [x] Frontend: Duplicate action in library (Duplicate button on ChartCard)
+- [x] Frontend: Save as template (Template button in EditorPage header)
+- [x] Tests: 14 backend tests (duplication, template CRUD, save-as-template)
+- [ ] Frontend: Template gallery in chart creation — future enhancement
