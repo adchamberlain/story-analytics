@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { CHART_THEMES, type ChartTheme } from '../themes/chartThemes'
 import { useChartThemeStore } from '../stores/chartThemeStore'
+import { FontPicker } from '../components/FontPicker'
 
 // -- Types -------------------------------------------------------------------
 
@@ -188,11 +189,6 @@ export function ThemeBuilderPage() {
     setEditing({ ...editing, palette: { ...editing.palette, primary: color } })
   }
 
-  const updateFont = (key: string, value: string) => {
-    if (!editing) return
-    setEditing({ ...editing, font: { ...editing.font, family: key === 'family' ? value : editing.font.family } })
-  }
-
   const updatePlotBg = (value: string) => {
     if (!editing) return
     setEditing({ ...editing, plot: { ...editing.plot, background: value } })
@@ -366,11 +362,12 @@ export function ThemeBuilderPage() {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="text-[12px] font-medium text-text-secondary block mb-1">Font Family</label>
-                    <input
+                    <FontPicker
                       value={editing.font.family}
-                      onChange={(e) => updateFont('family', e.target.value)}
-                      className={inputClass}
-                      placeholder="Inter, sans-serif"
+                      fontUrl={editing.fontUrl}
+                      onChange={(family, fontUrl) => {
+                        setEditing({ ...editing, font: { ...editing.font, family }, fontUrl })
+                      }}
                     />
                   </div>
                   <div>
@@ -482,6 +479,94 @@ export function ThemeBuilderPage() {
                       X Axis
                     </label>
                   </div>
+                </div>
+              </div>
+
+              {/* Logo */}
+              <div className={sectionClass}>
+                <h3 className="text-[14px] font-semibold text-text-primary mb-3">Logo</h3>
+                <div className="space-y-4">
+                  {/* Upload button / preview */}
+                  <div className="flex items-start gap-4">
+                    <div className="flex flex-col gap-2">
+                      <label className="text-[12px] font-medium text-text-secondary block">Upload Logo</label>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0]
+                          if (!file) return
+                          const reader = new FileReader()
+                          reader.onload = () => {
+                            setEditing({ ...editing, logoUrl: reader.result as string })
+                          }
+                          reader.readAsDataURL(file)
+                          e.target.value = ''
+                        }}
+                        className="text-[13px] text-text-secondary file:mr-2 file:px-3 file:py-1.5 file:rounded-lg file:border-0 file:text-[12px] file:font-medium file:bg-blue-600 file:text-white file:cursor-pointer hover:file:bg-blue-500"
+                      />
+                    </div>
+                    {editing.logoUrl && (
+                      <div className="flex flex-col items-center gap-2">
+                        <img
+                          src={editing.logoUrl}
+                          alt="Logo preview"
+                          style={{ width: editing.logoSize ?? 60 }}
+                          className="rounded border border-border-default"
+                        />
+                        <button
+                          onClick={() => setEditing({ ...editing, logoUrl: undefined, logoPosition: undefined, logoSize: undefined })}
+                          className="text-[11px] text-red-400 hover:text-red-500"
+                        >
+                          Remove logo
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Position & size (only shown when logo is set) */}
+                  {editing.logoUrl && (
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-[12px] font-medium text-text-secondary block mb-2">Position</label>
+                        <div className="grid grid-cols-2 gap-2">
+                          {(['top-left', 'top-right', 'bottom-left', 'bottom-right'] as const).map((pos) => (
+                            <label
+                              key={pos}
+                              className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-[12px] cursor-pointer border transition-colors ${
+                                (editing.logoPosition ?? 'top-left') === pos
+                                  ? 'border-blue-500 bg-blue-500/10 text-blue-500'
+                                  : 'border-border-default text-text-secondary hover:bg-surface-secondary'
+                              }`}
+                            >
+                              <input
+                                type="radio"
+                                name="logoPosition"
+                                value={pos}
+                                checked={(editing.logoPosition ?? 'top-left') === pos}
+                                onChange={() => setEditing({ ...editing, logoPosition: pos })}
+                                className="sr-only"
+                              />
+                              {pos.replace('-', ' ')}
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                      <div>
+                        <label className="text-[12px] font-medium text-text-secondary block mb-2">
+                          Size: {editing.logoSize ?? 60}px
+                        </label>
+                        <input
+                          type="range"
+                          min={20}
+                          max={120}
+                          value={editing.logoSize ?? 60}
+                          onChange={(e) => setEditing({ ...editing, logoSize: Number(e.target.value) })}
+                          className="w-full"
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 

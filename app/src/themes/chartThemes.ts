@@ -68,6 +68,18 @@ export interface ChartTheme {
 
   /** Custom CSS overrides scoped to the chart container */
   customCss?: string
+
+  /** URL for loading a custom font (Google Fonts CSS URL or base64 data URL) */
+  fontUrl?: string
+
+  /** Base64 data URL of an uploaded logo image */
+  logoUrl?: string
+
+  /** Corner position for the logo overlay */
+  logoPosition?: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'
+
+  /** Logo width in pixels (default 60) */
+  logoSize?: number
 }
 
 // -- Story Analytics Default Theme -------------------------------------------
