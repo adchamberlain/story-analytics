@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { useLibraryStore } from '../stores/libraryStore'
 import { useFolderStore } from '../stores/folderStore'
 import { FolderSidebar } from '../components/library/FolderSidebar'
-import type { SortField, LibraryChart } from '../stores/libraryStore'
+import type { SortField, ArchiveFilter, LibraryChart } from '../stores/libraryStore'
 
 // SVG icons for each chart type
 function BarIcon() {
@@ -211,6 +211,26 @@ export function LibraryPage() {
     }
   }
 
+  const [archivingId, setArchivingId] = useState<string | null>(null)
+
+  const handleArchive = async (chartId: string) => {
+    setArchivingId(chartId)
+    try {
+      await store.archiveChart(chartId)
+    } finally {
+      setArchivingId(null)
+    }
+  }
+
+  const handleRestore = async (chartId: string) => {
+    setArchivingId(chartId)
+    try {
+      await store.restoreChart(chartId)
+    } finally {
+      setArchivingId(null)
+    }
+  }
+
   // Move-to-folder dropdown state
   const [moveMenuId, setMoveMenuId] = useState<string | null>(null)
   const folders = useFolderStore((s) => s.folders)
@@ -219,6 +239,8 @@ export function LibraryPage() {
     await store.moveToFolder(chartId, folderId)
     setMoveMenuId(null)
   }
+
+  const isArchived = store.archiveFilter === 'archived'
 
   return (
     <div className="flex" style={{ padding: '48px 32px 48px 32px' }}>
@@ -334,6 +356,24 @@ export function LibraryPage() {
           <option value="created_at">Date created</option>
           <option value="title">Title A-Z</option>
         </select>
+
+        {/* Archive filter toggle */}
+        <div className="inline-flex rounded-xl border border-border-default overflow-hidden">
+          {(['active', 'archived'] as const).map((filter) => (
+            <button
+              key={filter}
+              onClick={() => store.setArchiveFilter(filter as ArchiveFilter)}
+              className={`text-[14px] font-medium transition-colors ${
+                store.archiveFilter === filter
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-surface-raised text-text-secondary hover:text-text-primary'
+              }`}
+              style={{ padding: '10px 16px' }}
+            >
+              {filter === 'active' ? 'Active' : 'Archived'}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Content */}
@@ -378,10 +418,14 @@ export function LibraryPage() {
               deleting={deletingId === chart.id}
               confirming={confirmingId === chart.id}
               duplicating={duplicatingId === chart.id}
+              archiving={archivingId === chart.id}
+              isArchived={isArchived}
               onRequestDelete={() => setConfirmingId(chart.id)}
               onConfirmDelete={() => handleDelete(chart.id)}
               onCancelDelete={() => setConfirmingId(null)}
               onDuplicate={() => handleDuplicate(chart.id)}
+              onArchive={() => handleArchive(chart.id)}
+              onRestore={() => handleRestore(chart.id)}
               selectMode={selectMode}
               selected={selectedIds.has(chart.id)}
               onToggleSelect={() => toggleSelect(chart.id)}
@@ -405,10 +449,14 @@ function ChartCard({
   deleting,
   confirming,
   duplicating,
+  archiving,
+  isArchived,
   onRequestDelete,
   onConfirmDelete,
   onCancelDelete,
   onDuplicate,
+  onArchive,
+  onRestore,
   selectMode,
   selected,
   onToggleSelect,
@@ -421,10 +469,14 @@ function ChartCard({
   deleting: boolean
   confirming: boolean
   duplicating: boolean
+  archiving: boolean
+  isArchived: boolean
   onRequestDelete: () => void
   onConfirmDelete: () => void
   onCancelDelete: () => void
   onDuplicate: () => void
+  onArchive: () => void
+  onRestore: () => void
   selectMode: boolean
   selected: boolean
   onToggleSelect: () => void
@@ -488,18 +540,27 @@ function ChartCard({
   return (
     <Link
       to={`/chart/${chart.id}`}
-      className="bg-surface-raised rounded-2xl border border-border-default shadow-card hover:shadow-card-hover flex flex-col transition-all hover:-translate-y-0.5 cursor-pointer"
+      className={`bg-surface-raised rounded-2xl border border-border-default shadow-card hover:shadow-card-hover flex flex-col transition-all hover:-translate-y-0.5 cursor-pointer ${
+        isArchived ? 'opacity-60' : ''
+      }`}
       style={{ padding: '28px 32px', textDecoration: 'none' }}
     >
       {/* Type badge + date */}
       <div className="flex items-center justify-between" style={{ marginBottom: '20px' }}>
-        <span
-          className="inline-flex items-center gap-1.5 text-[13px] px-3 py-1.5 rounded-full font-medium"
-          style={{ color: meta.fg, backgroundColor: meta.bg }}
-        >
-          <Icon />
-          {meta.label}
-        </span>
+        <div className="flex items-center gap-2">
+          <span
+            className="inline-flex items-center gap-1.5 text-[13px] px-3 py-1.5 rounded-full font-medium"
+            style={{ color: meta.fg, backgroundColor: meta.bg }}
+          >
+            <Icon />
+            {meta.label}
+          </span>
+          {isArchived && (
+            <span className="text-[11px] px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-600 font-medium">
+              Archived
+            </span>
+          )}
+        </div>
         <span className="text-[13px] text-text-muted">{date}</span>
       </div>
 
@@ -519,82 +580,132 @@ function ChartCard({
 
       {/* Actions */}
       <div className="flex items-center gap-3" style={{ marginTop: '24px', paddingTop: '20px', borderTop: '1px solid var(--color-border-subtle)' }}>
-        <Link
-          to={`/editor/${chart.id}`}
-          onClick={(e) => e.stopPropagation()}
-          className="text-[13px] px-4 py-2 rounded-lg border border-border-default text-text-on-surface hover:bg-surface-secondary transition-colors font-medium"
-        >
-          Edit
-        </Link>
-        {/* Move to folder */}
-        <div className="relative">
-          <button
-            onClick={(e) => { e.preventDefault(); e.stopPropagation(); onToggleMoveMenu() }}
-            className="text-[13px] px-3 py-2 rounded-lg text-text-muted hover:text-text-secondary transition-colors font-medium"
-            title="Move to folder"
-          >
-            Move
-          </button>
-          {showMoveMenu && (
-            <div
-              className="absolute left-0 top-full mt-1 z-20 bg-surface-raised border border-border-default rounded-lg shadow-lg py-1"
-              style={{ minWidth: 160 }}
-              onClick={(e) => { e.preventDefault(); e.stopPropagation() }}
+        {isArchived ? (
+          /* Archived card actions: Restore + Delete */
+          <>
+            <button
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); onRestore() }}
+              disabled={archiving}
+              className="text-[13px] px-4 py-2 rounded-lg border border-border-default text-text-on-surface hover:bg-surface-secondary transition-colors font-medium disabled:opacity-50"
             >
-              <button
-                onClick={() => onMoveToFolder(null)}
-                className={`w-full text-left text-[13px] px-3 py-1.5 hover:bg-surface-secondary transition-colors ${
-                  !chart.folder_id ? 'text-blue-500 font-medium' : 'text-text-secondary'
-                }`}
-              >
-                Unfiled
-              </button>
-              {folders.map((f) => (
+              {archiving ? 'Restoring...' : 'Restore'}
+            </button>
+            <div className="flex-1" />
+            {confirming ? (
+              <div className="flex items-center gap-2">
+                <span className="text-[13px] text-red-400 font-medium">Delete?</span>
                 <button
-                  key={f.id}
-                  onClick={() => onMoveToFolder(f.id)}
-                  className={`w-full text-left text-[13px] px-3 py-1.5 hover:bg-surface-secondary transition-colors ${
-                    chart.folder_id === f.id ? 'text-blue-500 font-medium' : 'text-text-secondary'
-                  }`}
+                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); onConfirmDelete() }}
+                  disabled={deleting}
+                  className="text-[13px] px-3 py-1.5 rounded-lg bg-red-500 text-white hover:bg-red-600 transition-colors font-medium disabled:opacity-50"
                 >
-                  {f.name}
+                  {deleting ? 'Deleting...' : 'Yes'}
                 </button>
-              ))}
-            </div>
-          )}
-        </div>
-        <button
-          onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDuplicate() }}
-          disabled={duplicating}
-          className="text-[13px] px-4 py-2 rounded-lg border border-border-default text-text-on-surface hover:bg-surface-secondary transition-colors font-medium disabled:opacity-50"
-        >
-          {duplicating ? 'Duplicating...' : 'Duplicate'}
-        </button>
-        <div className="flex-1" />
-        {confirming ? (
-          <div className="flex items-center gap-2">
-            <span className="text-[13px] text-red-400 font-medium">Delete?</span>
-            <button
-              onClick={(e) => { e.preventDefault(); e.stopPropagation(); onConfirmDelete() }}
-              disabled={deleting}
-              className="text-[13px] px-3 py-1.5 rounded-lg bg-red-500 text-white hover:bg-red-600 transition-colors font-medium disabled:opacity-50"
-            >
-              {deleting ? 'Deleting...' : 'Yes'}
-            </button>
-            <button
-              onClick={(e) => { e.preventDefault(); e.stopPropagation(); onCancelDelete() }}
-              className="text-[13px] px-3 py-1.5 rounded-lg border border-border-default text-text-secondary hover:text-text-primary transition-colors font-medium"
-            >
-              No
-            </button>
-          </div>
+                <button
+                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); onCancelDelete() }}
+                  className="text-[13px] px-3 py-1.5 rounded-lg border border-border-default text-text-secondary hover:text-text-primary transition-colors font-medium"
+                >
+                  No
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); onRequestDelete() }}
+                className="text-[13px] px-4 py-2 rounded-lg text-red-400 hover:text-red-300 transition-colors font-medium"
+              >
+                Delete
+              </button>
+            )}
+          </>
         ) : (
-          <button
-            onClick={(e) => { e.preventDefault(); e.stopPropagation(); onRequestDelete() }}
-            className="text-[13px] px-4 py-2 rounded-lg text-red-400 hover:text-red-300 transition-colors font-medium"
-          >
-            Delete
-          </button>
+          /* Active card actions: Edit, Move, Duplicate, Archive, Delete */
+          <>
+            <Link
+              to={`/editor/${chart.id}`}
+              onClick={(e) => e.stopPropagation()}
+              className="text-[13px] px-4 py-2 rounded-lg border border-border-default text-text-on-surface hover:bg-surface-secondary transition-colors font-medium"
+            >
+              Edit
+            </Link>
+            {/* Move to folder */}
+            <div className="relative">
+              <button
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); onToggleMoveMenu() }}
+                className="text-[13px] px-3 py-2 rounded-lg text-text-muted hover:text-text-secondary transition-colors font-medium"
+                title="Move to folder"
+              >
+                Move
+              </button>
+              {showMoveMenu && (
+                <div
+                  className="absolute left-0 top-full mt-1 z-20 bg-surface-raised border border-border-default rounded-lg shadow-lg py-1"
+                  style={{ minWidth: 160 }}
+                  onClick={(e) => { e.preventDefault(); e.stopPropagation() }}
+                >
+                  <button
+                    onClick={() => onMoveToFolder(null)}
+                    className={`w-full text-left text-[13px] px-3 py-1.5 hover:bg-surface-secondary transition-colors ${
+                      !chart.folder_id ? 'text-blue-500 font-medium' : 'text-text-secondary'
+                    }`}
+                  >
+                    Unfiled
+                  </button>
+                  {folders.map((f) => (
+                    <button
+                      key={f.id}
+                      onClick={() => onMoveToFolder(f.id)}
+                      className={`w-full text-left text-[13px] px-3 py-1.5 hover:bg-surface-secondary transition-colors ${
+                        chart.folder_id === f.id ? 'text-blue-500 font-medium' : 'text-text-secondary'
+                      }`}
+                    >
+                      {f.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            <button
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDuplicate() }}
+              disabled={duplicating}
+              className="text-[13px] px-4 py-2 rounded-lg border border-border-default text-text-on-surface hover:bg-surface-secondary transition-colors font-medium disabled:opacity-50"
+            >
+              {duplicating ? 'Duplicating...' : 'Duplicate'}
+            </button>
+            <button
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); onArchive() }}
+              disabled={archiving}
+              className="text-[13px] px-3 py-2 rounded-lg text-amber-500 hover:text-amber-400 transition-colors font-medium disabled:opacity-50"
+              title="Archive chart"
+            >
+              {archiving ? 'Archiving...' : 'Archive'}
+            </button>
+            <div className="flex-1" />
+            {confirming ? (
+              <div className="flex items-center gap-2">
+                <span className="text-[13px] text-red-400 font-medium">Delete?</span>
+                <button
+                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); onConfirmDelete() }}
+                  disabled={deleting}
+                  className="text-[13px] px-3 py-1.5 rounded-lg bg-red-500 text-white hover:bg-red-600 transition-colors font-medium disabled:opacity-50"
+                >
+                  {deleting ? 'Deleting...' : 'Yes'}
+                </button>
+                <button
+                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); onCancelDelete() }}
+                  className="text-[13px] px-3 py-1.5 rounded-lg border border-border-default text-text-secondary hover:text-text-primary transition-colors font-medium"
+                >
+                  No
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); onRequestDelete() }}
+                className="text-[13px] px-4 py-2 rounded-lg text-red-400 hover:text-red-300 transition-colors font-medium"
+              >
+                Delete
+              </button>
+            )}
+          </>
         )}
       </div>
     </Link>

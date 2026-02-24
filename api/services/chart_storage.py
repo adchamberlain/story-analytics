@@ -44,6 +44,7 @@ class SavedChart:
     source_table: str | None = None   # Original table name (e.g., "INVOICES")
     status: str = "draft"  # "draft" | "published"
     folder_id: str | None = None
+    archived_at: str | None = None
 
 
 def save_chart(
@@ -144,8 +145,12 @@ def load_chart(chart_id: str) -> SavedChart | None:
         return None
 
 
-def list_charts() -> list[SavedChart]:
-    """List all saved charts."""
+def list_charts(status: str = "active") -> list[SavedChart]:
+    """List saved charts, filtered by archive status.
+
+    Args:
+        status: 'active' (default, excludes archived), 'archived' (only archived), 'all' (everything).
+    """
     if not CHARTS_DIR.exists():
         return []
 
@@ -153,10 +158,17 @@ def list_charts() -> list[SavedChart]:
     for path in sorted(CHARTS_DIR.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True):
         try:
             data = json.loads(path.read_text())
-            charts.append(_safe_load_chart(data))
+            chart = _safe_load_chart(data)
         except Exception:
             logger.warning("Skipping corrupted chart file: %s", path.name)
             continue
+
+        if status == "active" and chart.archived_at is not None:
+            continue
+        if status == "archived" and chart.archived_at is None:
+            continue
+        # status == "all" — no filtering
+        charts.append(chart)
 
     return charts
 
@@ -179,7 +191,7 @@ def update_chart(chart_id: str, **fields) -> SavedChart | None:
     # Only allow updating presentation fields — protect id, source_id, sql, timestamps
     _UPDATABLE = {"chart_type", "title", "subtitle", "source", "x", "y", "series",
                   "horizontal", "sort", "reasoning", "config", "connection_id", "source_table",
-                  "status", "folder_id"}
+                  "status", "folder_id", "archived_at"}
     for key, value in fields.items():
         if key in _UPDATABLE:
             data[key] = value
