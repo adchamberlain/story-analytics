@@ -5,7 +5,7 @@ description = "AI-native dashboard creation tool"
 requires-python = ">=3.10"
 
 [tool.pytest.ini_options]
-testpaths = ["engine/tests"]
+testpaths = ["engine/tests", "api/tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
