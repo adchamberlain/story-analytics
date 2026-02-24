@@ -2,6 +2,8 @@ import { useEffect, useState, useCallback } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { FileDropzone } from '../components/data/FileDropzone'
 import { PasteDataInput } from '../components/data/PasteDataInput'
+import { GoogleSheetsInput } from '../components/data/GoogleSheetsInput'
+import { UrlSourceInput } from '../components/data/UrlSourceInput'
 import { DatabaseConnector, type SyncedInfo } from '../components/data/DatabaseConnector'
 import { DataShaper } from '../components/data/DataShaper'
 import { DataPreview } from '../components/data/DataPreview'
@@ -23,7 +25,7 @@ export function SourcePickerPage() {
   const [loading, setLoading] = useState(true)
   const [refreshKey, setRefreshKey] = useState(0)
   const [showRecent, setShowRecent] = useState(false)
-  const [inputMode, setInputMode] = useState<'upload' | 'paste'>('upload')
+  const [inputMode, setInputMode] = useState<'upload' | 'paste' | 'sheets' | 'url'>('upload')
   const [sourceName, setSourceName] = useState('')
 
   // Database wizard state
@@ -239,35 +241,32 @@ export function SourcePickerPage() {
               Choose a data source
             </h1>
             <p className="text-[15px] text-text-muted leading-relaxed" style={{ marginBottom: '40px' }}>
-              Upload a CSV file, paste data, or connect to a database.
+              Upload a CSV, paste data, import from a URL, or connect to a database.
             </p>
 
-            {/* Two primary options */}
+            {/* Primary options */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '40px' }}>
-              {/* Upload / Paste toggle */}
-              <div className="flex" style={{ gap: '4px', marginBottom: '4px' }}>
-                <button
-                  onClick={() => setInputMode('upload')}
-                  className={`text-[14px] font-medium rounded-lg transition-colors ${
-                    inputMode === 'upload'
-                      ? 'text-text-primary bg-surface-raised'
-                      : 'text-text-muted hover:text-text-secondary'
-                  }`}
-                  style={{ padding: '6px 14px' }}
-                >
-                  Upload CSV
-                </button>
-                <button
-                  onClick={() => setInputMode('paste')}
-                  className={`text-[14px] font-medium rounded-lg transition-colors ${
-                    inputMode === 'paste'
-                      ? 'text-text-primary bg-surface-raised'
-                      : 'text-text-muted hover:text-text-secondary'
-                  }`}
-                  style={{ padding: '6px 14px' }}
-                >
-                  Paste data
-                </button>
+              {/* Input mode tabs */}
+              <div className="flex flex-wrap" style={{ gap: '4px', marginBottom: '4px' }}>
+                {([
+                  ['upload', 'Upload CSV'],
+                  ['paste', 'Paste data'],
+                  ['sheets', 'Google Sheets'],
+                  ['url', 'From URL'],
+                ] as const).map(([mode, label]) => (
+                  <button
+                    key={mode}
+                    onClick={() => setInputMode(mode)}
+                    className={`text-[14px] font-medium rounded-lg transition-colors ${
+                      inputMode === mode
+                        ? 'text-text-primary bg-surface-raised'
+                        : 'text-text-muted hover:text-text-secondary'
+                    }`}
+                    style={{ padding: '6px 14px' }}
+                  >
+                    {label}
+                  </button>
+                ))}
               </div>
 
               {inputMode === 'upload' ? (
@@ -275,10 +274,20 @@ export function SourcePickerPage() {
                   onFileSelected={handleFileSelected}
                   uploading={dataStore.uploading}
                 />
-              ) : (
+              ) : inputMode === 'paste' ? (
                 <PasteDataInput
                   onSubmit={handlePasteSubmit}
                   uploading={dataStore.uploading}
+                />
+              ) : inputMode === 'sheets' ? (
+                <GoogleSheetsInput
+                  onImport={handleSelectSource}
+                  importing={dataStore.uploading}
+                />
+              ) : (
+                <UrlSourceInput
+                  onImport={handleSelectSource}
+                  importing={dataStore.uploading}
                 />
               )}
 

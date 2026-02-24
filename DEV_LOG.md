@@ -2,6 +2,39 @@
 
 ## 2026-02-24
 
+### Session: Phase 3 — Rich Tables & Data (54 new tests)
+
+Implemented all 4 Phase 3 tasks for the Datawrapper parity roadmap. Built in worktree `phase3-rich-tables-data`.
+
+**Task 9: Rich Data Tables**
+- Replaced basic DataTableChart with full-featured RichDataTable component
+- Click-to-sort headers (asc/desc/none cycle), client-side search, pagination (10/25/50/100)
+- Sticky header row, auto-detected number formatting with locale separators
+- Special column types: heatmap (min-max color gradient), inline bar, sparkline SVG
+- 27 component tests covering sort, search, pagination, formatting, edge cases
+
+**Task 10: Google Sheets Connector**
+- `google_sheets.py` connector: parse various Sheets URL formats, build CSV export URL, fetch CSV
+- `/api/data/import/google-sheets` endpoint for ingestion
+- `GoogleSheetsInput.tsx` frontend component on SourcePickerPage
+- 11 backend tests for URL parsing and validation
+
+**Task 11: External URL Data Source**
+- `/api/data/import/url` endpoint: fetch CSV/JSON from any URL with optional HTTP headers
+- JSON array-of-objects auto-converted to CSV via pandas
+- `UrlSourceInput.tsx` frontend component with collapsible headers builder
+- 5 backend tests for URL validation
+
+**Task 12: Folders & Organization**
+- `folder_storage.py` service (JSON in `data/folders/`, same pattern as chart_storage)
+- Full CRUD API router + GET `/{folder_id}/charts` endpoint
+- Added `folder_id` to SavedChart, UpdateChartRequest, SavedChartResponse
+- `folderStore.ts` Zustand store, `FolderSidebar.tsx` with create/rename/delete
+- Library page: sidebar layout, folder filtering, move-to-folder dropdown on cards
+- 11 backend tests for folder CRUD and chart-folder association
+
+**Test totals:** 251 frontend + 68 backend = 319 tests, all passing. TSC clean.
+
 ### Session: Phase 2 — Themeable & Localizable (129 new tests)
 
 Implemented all 4 Phase 2 tasks for the Datawrapper parity roadmap. Built in a worktree to avoid conflicts.

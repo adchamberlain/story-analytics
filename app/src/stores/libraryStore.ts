@@ -11,6 +11,7 @@ export interface LibraryChart {
   source: string | null
   created_at: string
   updated_at: string
+  folder_id: string | null
 }
 
 export type SortField = 'updated_at' | 'created_at' | 'title'
@@ -23,13 +24,16 @@ interface LibraryState {
   // Filters
   search: string
   typeFilter: string | null
+  folderFilter: string | null  // null = all, 'unfiled' = no folder, else folder_id
   sortBy: SortField
 
   // Actions
   loadCharts: () => Promise<void>
   deleteChart: (id: string) => Promise<void>
+  moveToFolder: (chartId: string, folderId: string | null) => Promise<void>
   setSearch: (search: string) => void
   setTypeFilter: (type: string | null) => void
+  setFolderFilter: (folderId: string | null) => void
   setSortBy: (field: SortField) => void
 
   // Computed
@@ -42,6 +46,7 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
   error: null,
   search: '',
   typeFilter: null,
+  folderFilter: null,
   sortBy: 'updated_at',
 
   loadCharts: async () => {
@@ -66,12 +71,31 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
     }
   },
 
+  moveToFolder: async (chartId, folderId) => {
+    try {
+      const res = await fetch(`/api/v2/charts/${chartId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ folder_id: folderId }),
+      })
+      if (!res.ok) throw new Error('Move failed')
+      set((state) => ({
+        charts: state.charts.map((c) =>
+          c.id === chartId ? { ...c, folder_id: folderId } : c,
+        ),
+      }))
+    } catch (e) {
+      set({ error: e instanceof Error ? e.message : String(e) })
+    }
+  },
+
   setSearch: (search) => set({ search }),
   setTypeFilter: (typeFilter) => set({ typeFilter }),
+  setFolderFilter: (folderFilter) => set({ folderFilter }),
   setSortBy: (sortBy) => set({ sortBy }),
 
   filteredCharts: () => {
-    const { charts, search, typeFilter, sortBy } = get()
+    const { charts, search, typeFilter, folderFilter, sortBy } = get()
 
     let filtered = charts
 
@@ -87,6 +111,13 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
     // Filter by chart type
     if (typeFilter) {
       filtered = filtered.filter((c) => c.chart_type === typeFilter)
+    }
+
+    // Filter by folder
+    if (folderFilter === 'unfiled') {
+      filtered = filtered.filter((c) => !c.folder_id)
+    } else if (folderFilter) {
+      filtered = filtered.filter((c) => c.folder_id === folderFilter)
     }
 
     // Sort
