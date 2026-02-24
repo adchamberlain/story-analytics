@@ -18,6 +18,10 @@ export type ChartType =
   | 'Treemap'
   | 'DataTable'
   | 'BigValue'
+  | 'DotPlot'
+  | 'RangePlot'
+  | 'BulletBar'
+  | 'SmallMultiples'
 
 // =============================================================================
 // Annotation Types
@@ -192,6 +196,22 @@ export interface ChartConfig {
 
   /** Annotations */
   annotations?: Annotations
+
+  /** Range plot: column containing min values */
+  minColumn?: string
+  /** Range plot: column containing max values */
+  maxColumn?: string
+
+  /** Bullet bar: column or static value for target marker */
+  targetColumn?: string
+
+  /** Small multiples: column to facet by */
+  facetColumn?: string
+  /** Small multiples: which mark type to repeat */
+  chartSubtype?: 'line' | 'bar' | 'area' | 'scatter'
+
+  /** Custom tooltip template (e.g. "{{ column | format }}") */
+  tooltipTemplate?: string
 
   /** Additional props */
   extraProps?: Record<string, unknown>

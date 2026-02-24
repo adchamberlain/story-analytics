@@ -37,6 +37,7 @@ class SavedDashboard:
     created_at: str
     updated_at: str
     filters: list[dict] | None = None  # list of FilterSpec as dicts
+    status: str = "draft"  # "draft" | "published"
 
 
 def save_dashboard(
@@ -144,7 +145,7 @@ def update_dashboard(dashboard_id: str, **fields) -> SavedDashboard | None:
     now = datetime.now(timezone.utc).isoformat()
 
     # Only allow updating presentation fields — protect id and timestamps
-    _UPDATABLE = {"title", "description", "charts", "filters"}
+    _UPDATABLE = {"title", "description", "charts", "filters", "status"}
     for key, value in fields.items():
         if key in _UPDATABLE:
             data[key] = value

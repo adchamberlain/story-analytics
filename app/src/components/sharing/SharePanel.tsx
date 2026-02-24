@@ -18,7 +18,8 @@ export function SharePanel({ chartId, title, source, chartRef }: SharePanelProps
   const [exportingPdf, setExportingPdf] = useState(false)
 
   const chartUrl = `${window.location.origin}/chart/${chartId}`
-  const embedCode = `<iframe src="${chartUrl}" width="100%" height="450" frameborder="0"></iframe>`
+  const embedUrl = `${window.location.origin}/embed/chart/${chartId}`
+  const embedCode = `<iframe src="${embedUrl}" width="100%" height="400" frameborder="0" style="border: none; overflow: hidden;" loading="lazy"></iframe>`
   const urlCopyTimer = useRef<ReturnType<typeof setTimeout>>()
   const embedCopyTimer = useRef<ReturnType<typeof setTimeout>>()
 
