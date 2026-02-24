@@ -653,3 +653,58 @@ async def get_public_chart(chart_id: str):
     if chart.status != "published":
         raise HTTPException(status_code=403, detail="Chart is not published")
     return _chart_to_response(chart)
+
+
+# ── Duplicate & Template ──────────────────────────────────────────────────
+
+
+@router.post("/{chart_id}/duplicate", response_model=SavedChartResponse)
+async def duplicate_chart(chart_id: str):
+    """Duplicate a chart with a new ID. Preserves config and SQL, resets status to draft."""
+    original = load_chart(chart_id)
+    if not original:
+        raise HTTPException(status_code=404, detail="Chart not found")
+
+    new_chart = save_chart(
+        source_id=original.source_id,
+        chart_type=original.chart_type,
+        title=f"{original.title} (Copy)",
+        sql=original.sql,
+        x=original.x,
+        y=original.y,
+        series=original.series,
+        horizontal=original.horizontal,
+        sort=original.sort,
+        subtitle=original.subtitle,
+        source=original.source,
+        reasoning=original.reasoning,
+        config=original.config,
+        connection_id=original.connection_id,
+        source_table=original.source_table,
+    )
+    return _chart_to_response(new_chart)
+
+
+class SaveAsTemplateRequest(BaseModel):
+    name: str
+    description: str
+
+
+@router.post("/{chart_id}/save-as-template")
+async def save_chart_as_template(chart_id: str, request: SaveAsTemplateRequest):
+    """Save a chart's config as a reusable template."""
+    from ..services.template_storage import save_template
+
+    chart = load_chart(chart_id)
+    if not chart:
+        raise HTTPException(status_code=404, detail="Chart not found")
+
+    template = save_template(
+        name=request.name,
+        description=request.description,
+        chart_type=chart.chart_type,
+        config=chart.config or {},
+    )
+
+    from .templates import _to_response
+    return _to_response(template)

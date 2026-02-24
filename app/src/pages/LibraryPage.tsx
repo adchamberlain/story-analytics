@@ -129,6 +129,7 @@ export function LibraryPage() {
   const store = useLibraryStore()
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [confirmingId, setConfirmingId] = useState<string | null>(null)
+  const [duplicatingId, setDuplicatingId] = useState<string | null>(null)
   const [selectMode, setSelectMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [bulkConfirm, setBulkConfirm] = useState(false)
@@ -167,6 +168,15 @@ export function LibraryPage() {
         for (const c of charts) next.add(c.id)
         return next
       })
+    }
+  }
+
+  const handleDuplicate = async (chartId: string) => {
+    setDuplicatingId(chartId)
+    try {
+      await store.duplicateChart(chartId)
+    } finally {
+      setDuplicatingId(null)
     }
   }
 
@@ -348,9 +358,11 @@ export function LibraryPage() {
               chart={chart}
               deleting={deletingId === chart.id}
               confirming={confirmingId === chart.id}
+              duplicating={duplicatingId === chart.id}
               onRequestDelete={() => setConfirmingId(chart.id)}
               onConfirmDelete={() => handleDelete(chart.id)}
               onCancelDelete={() => setConfirmingId(null)}
+              onDuplicate={() => handleDuplicate(chart.id)}
               selectMode={selectMode}
               selected={selectedIds.has(chart.id)}
               onToggleSelect={() => toggleSelect(chart.id)}
@@ -368,9 +380,11 @@ function ChartCard({
   chart,
   deleting,
   confirming,
+  duplicating,
   onRequestDelete,
   onConfirmDelete,
   onCancelDelete,
+  onDuplicate,
   selectMode,
   selected,
   onToggleSelect,
@@ -378,9 +392,11 @@ function ChartCard({
   chart: LibraryChart
   deleting: boolean
   confirming: boolean
+  duplicating: boolean
   onRequestDelete: () => void
   onConfirmDelete: () => void
   onCancelDelete: () => void
+  onDuplicate: () => void
   selectMode: boolean
   selected: boolean
   onToggleSelect: () => void
@@ -478,6 +494,13 @@ function ChartCard({
         >
           Edit
         </Link>
+        <button
+          onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDuplicate() }}
+          disabled={duplicating}
+          className="text-[13px] px-4 py-2 rounded-lg border border-border-default text-text-on-surface hover:bg-surface-secondary transition-colors font-medium disabled:opacity-50"
+        >
+          {duplicating ? 'Duplicating...' : 'Duplicate'}
+        </button>
         <div className="flex-1" />
         {confirming ? (
           <div className="flex items-center gap-2">

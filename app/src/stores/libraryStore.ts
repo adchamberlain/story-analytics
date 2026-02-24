@@ -28,6 +28,7 @@ interface LibraryState {
   // Actions
   loadCharts: () => Promise<void>
   deleteChart: (id: string) => Promise<void>
+  duplicateChart: (id: string) => Promise<string | null>
   setSearch: (search: string) => void
   setTypeFilter: (type: string | null) => void
   setSortBy: (field: SortField) => void
@@ -63,6 +64,19 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
       set((state) => ({ charts: state.charts.filter((c) => c.id !== id) }))
     } catch (e) {
       set({ error: e instanceof Error ? e.message : String(e) })
+    }
+  },
+
+  duplicateChart: async (id: string) => {
+    try {
+      const res = await fetch(`/api/v2/charts/${id}/duplicate`, { method: 'POST' })
+      if (!res.ok) throw new Error(`Duplicate failed: ${res.statusText}`)
+      const newChart: LibraryChart = await res.json()
+      set((state) => ({ charts: [newChart, ...state.charts] }))
+      return newChart.id
+    } catch (e) {
+      set({ error: e instanceof Error ? e.message : String(e) })
+      return null
     }
   },
 
