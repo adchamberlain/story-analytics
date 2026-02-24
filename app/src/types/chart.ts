@@ -247,6 +247,9 @@ export interface ChartConfig {
   geoColorScale?: string      // 'sequential' | 'diverging'
   geoProjection?: string      // D3 projection name
 
+  /** Per-chart locale override (empty string = use global locale) */
+  locale?: string
+
   /** Data mode (used by editor) */
   dataMode?: 'table' | 'sql'
 

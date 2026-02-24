@@ -8,6 +8,8 @@ import { MultiColumnSelect } from './MultiColumnSelect'
 import { AnnotationEditor } from './AnnotationEditor'
 import type { ChartType } from '../../types/chart'
 import type { PaletteKey } from '../../themes/plotTheme'
+import { loadCustomGeoJSON } from '../../utils/geoUtils'
+import { SUPPORTED_LOCALES } from '../../stores/localeStore'
 import type { AggregationType, TimeGrain, DataMode, EditorConfig, TableInfoItem } from '../../stores/editorStore'
 
 function isDateColumn(type: string | undefined): boolean {
@@ -343,7 +345,25 @@ export function Toolbox() {
                         <option value="us-states">US States</option>
                         <option value="us-counties">US Counties</option>
                         <option value="europe">Europe</option>
+                        <option value="custom">Custom upload...</option>
                       </select>
+                      {config.basemap === 'custom' && (
+                        <input
+                          type="file"
+                          accept=".json,.geojson,.topojson"
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0]
+                            if (!file) return
+                            try {
+                              const fc = await loadCustomGeoJSON(file)
+                              useEditorStore.setState({ customGeoData: fc })
+                            } catch (err) {
+                              useEditorStore.setState({ error: err instanceof Error ? err.message : 'Invalid file' })
+                            }
+                          }}
+                          className="mt-1.5 w-full text-xs text-text-secondary file:mr-2 file:py-1 file:px-2 file:rounded-md file:border-0 file:text-xs file:font-medium file:bg-surface-secondary file:text-text-primary hover:file:bg-surface-inset"
+                        />
+                      )}
                     </div>
                     <ColumnDropdown
                       label="Geography Column"
@@ -484,6 +504,22 @@ export function Toolbox() {
             onChange={(yAxisTitle) => updateConfig({ yAxisTitle })}
           />
         </div>
+      </Section>
+
+      {/* Locale Override */}
+      <Section title="Locale">
+        <select
+          value={config.locale}
+          onChange={(e) => updateConfig({ locale: e.target.value })}
+          className="w-full px-2 py-1.5 text-sm border border-border-default rounded-md bg-surface text-text-primary focus:outline-none focus:border-blue-400"
+        >
+          <option value="">Global default</option>
+          {SUPPORTED_LOCALES.map((loc) => (
+            <option key={loc.code} value={loc.code}>
+              {loc.label}
+            </option>
+          ))}
+        </select>
       </Section>
 
       {/* Tooltip Template */}

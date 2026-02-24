@@ -65,6 +65,9 @@ export interface ChartTheme {
     barHeight: number
     tag: { width: number; height: number }
   }
+
+  /** Custom CSS overrides scoped to the chart container */
+  customCss?: string
 }
 
 // -- Story Analytics Default Theme -------------------------------------------

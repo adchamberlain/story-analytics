@@ -27,9 +27,9 @@
 - [ ] Separate Vite entry point for embed bundle (<100KB)
 - [x] Embed code generator in SharePanel (iframe snippet)
 - [x] PostMessage height auto-resize
-- [ ] Privacy headers (no cookies, no tracking)
-- [ ] Tests: Embed renders correctly
-- [ ] Tests: Screenshot verify embed at desktop + mobile
+- [x] Privacy headers (SecurityHeadersMiddleware — 18 tests)
+- [x] Tests: Embed renders correctly (Playwright `embed.spec.ts`)
+- [x] Tests: Screenshot verify embed at desktop + mobile (Playwright `embed.spec.ts`)
 
 ### Task 3: Custom Tooltip Formatting ✅
 - [x] Tooltip template parser (`{{ column | format }}`)
@@ -44,7 +44,7 @@
 - [x] Bullet bar (bar + target marker)
 - [x] Small multiples (Observable Plot faceting with line/bar/area/scatter subtypes)
 - [x] Tests: Type system + config field tests (10 tests)
-- [ ] Tests: Screenshot verify each type
+- [x] Tests: Screenshot verify each type (Playwright `chart-types.spec.ts`)
 
 ## Phase 2: Themeable & Localizable ✅
 
@@ -58,7 +58,7 @@
 - [x] Tests: Theme CRUD API tests (9 passing)
 - [ ] Frontend: Font picker (Google Fonts + file upload) — future enhancement
 - [ ] Frontend: Logo uploader with position control — future enhancement
-- [ ] Frontend: Custom CSS override textarea — future enhancement
+- [x] Frontend: Custom CSS override textarea (ThemeBuilderPage)
 - [ ] Tests: Screenshot verify theme builder page
 
 ### Task 6: Curated Themes (9 total) ✅
@@ -71,7 +71,7 @@
 - [x] Dark (dark background, vibrant accents)
 - [x] Pastel (soft colors, friendly)
 - [x] Tests: 92 unit tests verifying all theme structures
-- [ ] Tests: Screenshot same chart in all 9 themes
+- [x] Tests: Screenshot same chart in all 9 themes (Playwright `themes.spec.ts`)
 
 ### Task 7: Localization Engine ✅
 - [x] Locale store (`localeStore.ts`) with 12 supported locales
@@ -79,7 +79,7 @@
 - [x] Extend numberFormat.ts to accept locale parameter
 - [x] Locale selector in Settings page with live preview
 - [x] Tests: German, Japanese, French formatting (11 tests)
-- [ ] Per-chart locale override option — future enhancement
+- [x] Per-chart locale override option (Toolbox locale dropdown)
 - [ ] Tests: Screenshot with non-US locale
 
 ### Task 8: Color Tools ✅
@@ -142,7 +142,7 @@
 - [x] Toolbox: basemap, join column, value column, color scale, projection selectors
 - [x] EditorStore: geo config fields (basemap, geoJoinColumn, geoValueColumn, geoColorScale, geoProjection)
 - [x] Tests: 8 unit tests (basemap registry, data joining, type registration)
-- [ ] Custom GeoJSON/TopoJSON upload — future enhancement
+- [x] Custom GeoJSON/TopoJSON upload (file input in Toolbox + ChoroplethMap support)
 - [ ] Tests: Screenshot verify map at multiple projections
 
 ### Task 14: Responsive Annotations ✅

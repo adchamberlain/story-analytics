@@ -10,6 +10,8 @@ load_dotenv(Path(__file__).parent.parent / ".env")
 
 from fastapi import FastAPI  # noqa: E402
 from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
+from starlette.middleware.base import BaseHTTPMiddleware  # noqa: E402
+from starlette.requests import Request  # noqa: E402
 
 from .config import get_settings  # noqa: E402
 from .database import create_tables  # noqa: E402
@@ -40,6 +42,31 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# Security headers middleware
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        # All routes
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        # Embed/public routes get additional headers
+        path = request.url.path
+        if "/embed/" in path or "/public/" in path:
+            response.headers["Permissions-Policy"] = (
+                "camera=(), microphone=(), geolocation=()"
+            )
+            response.headers["Content-Security-Policy"] = (
+                "default-src 'self'; style-src 'self' 'unsafe-inline'; "
+                "img-src 'self' data:; script-src 'self' 'unsafe-inline'; "
+                "frame-ancestors *"
+            )
+            response.headers["X-Frame-Options"] = "ALLOWALL"
+        return response
+
+
+app.add_middleware(SecurityHeadersMiddleware)
 
 # Include routers
 app.include_router(auth_router, prefix="/api")

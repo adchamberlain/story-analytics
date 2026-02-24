@@ -14,6 +14,7 @@ import {
   type BasemapId,
 } from '../../utils/geoUtils'
 import type { FeatureCollection } from 'geojson'
+import { useEditorStore } from '../../stores/editorStore'
 
 interface ChoroplethMapProps {
   data: Record<string, unknown>[]
@@ -29,8 +30,9 @@ export function ChoroplethMap({ data, config, height = 400, autoHeight = false }
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [tooltip, setTooltip] = useState<{ x: number; y: number; label: string; value: string } | null>(null)
+  const customGeoData = useEditorStore((s) => s.customGeoData)
 
-  const basemapId = (config.basemap as BasemapId) || 'world'
+  const basemapId = (config.basemap as BasemapId | 'custom') || 'world'
   const joinColumn = config.geoJoinColumn || config.x
   const valueColumn = config.geoValueColumn || config.y as string || config.value
   const colorScaleType = (config.geoColorScale as 'sequential' | 'diverging') || 'sequential'
@@ -38,6 +40,17 @@ export function ChoroplethMap({ data, config, height = 400, autoHeight = false }
 
   // Load basemap
   useEffect(() => {
+    if (basemapId === 'custom') {
+      if (customGeoData) {
+        setGeoData(customGeoData)
+        setLoading(false)
+        setError(null)
+      } else {
+        setLoading(false)
+        setError('Upload a GeoJSON or TopoJSON file')
+      }
+      return
+    }
     setLoading(true)
     setError(null)
     loadBasemap(basemapId)
@@ -49,7 +62,7 @@ export function ChoroplethMap({ data, config, height = 400, autoHeight = false }
         setError(err.message)
         setLoading(false)
       })
-  }, [basemapId])
+  }, [basemapId, customGeoData])
 
   // ResizeObserver
   useEffect(() => {
@@ -73,7 +86,14 @@ export function ChoroplethMap({ data, config, height = 400, autoHeight = false }
     const h = autoHeight ? Math.max(width * 0.55, 200) : height
 
     // Join data to features
-    const joined = joinDataToFeatures(geoData, data, joinColumn || '', valueColumn || '', basemapId)
+    const joined = basemapId === 'custom'
+      ? geoData.features.map((f) => {
+          const featureId = String(f.properties?.id ?? f.id ?? f.properties?.name ?? '')
+          const featureName = String(f.properties?.name ?? f.properties?.NAME ?? featureId)
+          const val = Number(data.find((row) => String(row[joinColumn || '']) === featureId || String(row[joinColumn || '']) === featureName)?.[valueColumn || ''])
+          return { feature: f, value: isFinite(val) ? val : null, label: featureName }
+        })
+      : joinDataToFeatures(geoData, data, joinColumn || '', valueColumn || '', basemapId)
     const values = joined.map((j) => j.value).filter((v): v is number => v !== null)
     const [minVal, maxVal] = values.length > 0 ? [d3.min(values)!, d3.max(values)!] : [0, 1]
 
