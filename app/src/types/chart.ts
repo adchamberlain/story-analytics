@@ -116,6 +116,27 @@ export interface FilterState {
 }
 
 // =============================================================================
+// Table Column Configuration
+// =============================================================================
+
+export type TableColumnType = 'text' | 'number' | 'heatmap' | 'bar' | 'sparkline'
+
+export interface TableColumnConfig {
+  /** Display type for this column */
+  type?: TableColumnType
+  /** Number format: 'currency' | 'percent' | 'compact' | 'number' */
+  format?: string
+  /** Text alignment override */
+  align?: 'left' | 'center' | 'right'
+  /** Heatmap color range [low, high] */
+  heatmapColors?: [string, string]
+  /** Bar fill color */
+  barColor?: string
+  /** Whether to apply conditional coloring (green positive / red negative) */
+  conditional?: boolean
+}
+
+// =============================================================================
 // Chart Configuration
 // =============================================================================
 
@@ -212,6 +233,9 @@ export interface ChartConfig {
 
   /** Custom tooltip template (e.g. "{{ column | format }}") */
   tooltipTemplate?: string
+
+  /** Rich Data Table: per-column configuration */
+  tableColumns?: Record<string, TableColumnConfig>
 
   /** Additional props */
   extraProps?: Record<string, unknown>
