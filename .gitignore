@@ -25,6 +25,7 @@ docs/plans/
 # Test artifacts
 test_results/
 qa_screenshots/
+tasks/screenshots/
 test_data/
 output/
 
