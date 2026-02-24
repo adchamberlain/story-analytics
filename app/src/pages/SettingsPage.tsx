@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useChartThemeStore } from '../stores/chartThemeStore'
 import { CHART_THEMES } from '../themes/chartThemes'
+import { useLocaleStore, SUPPORTED_LOCALES } from '../stores/localeStore'
 
 const PROVIDERS = [
   { id: 'anthropic', label: 'Anthropic', sublabel: 'Claude', keyField: 'anthropic_api_key' as const },
@@ -210,6 +211,9 @@ export function SettingsPage() {
         {/* ── Chart Theme ──────────────────────────────────────────── */}
         <ChartThemeSelector />
 
+        {/* ── Locale ───────────────────────────────────────────────── */}
+        <LocaleSelector />
+
         {/* ── Data Sources ─────────────────────────────────────────── */}
         <section className="bg-surface-raised rounded-2xl shadow-card border border-border-default p-7">
           <div className="flex items-center justify-between mb-5">
@@ -352,6 +356,53 @@ function ChartThemeSelector() {
                     <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                   </svg>
                 </div>
+              )}
+            </button>
+          )
+        })}
+      </div>
+    </section>
+  )
+}
+
+// ── Locale Selector ─────────────────────────────────────────────────────────
+
+function LocaleSelector() {
+  const { locale, setLocale } = useLocaleStore()
+
+  // Format preview for current locale
+  const preview = new Intl.NumberFormat(locale, {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(1234567.89)
+
+  return (
+    <section className="bg-surface-raised rounded-2xl shadow-card border border-border-default p-7">
+      <h2 className="text-[17px] font-semibold text-text-primary mb-1.5">Number Locale</h2>
+      <p className="text-[14px] text-text-muted mb-5">
+        Controls number, currency, and date formatting on charts. Preview: <span className="font-mono text-text-secondary">{preview}</span>
+      </p>
+
+      <div className="grid grid-cols-3 gap-2">
+        {SUPPORTED_LOCALES.map((loc) => {
+          const active = loc.code === locale
+          return (
+            <button
+              key={loc.code}
+              onClick={() => setLocale(loc.code)}
+              className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl border-2 transition-all cursor-pointer text-left ${
+                active
+                  ? 'border-blue-500 bg-blue-500/10'
+                  : 'border-border-default hover:border-border-strong'
+              }`}
+            >
+              <span className="text-[14px] font-medium text-text-primary">{loc.label}</span>
+              {active && (
+                <svg className="w-4 h-4 text-blue-500 ml-auto shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                </svg>
               )}
             </button>
           )
