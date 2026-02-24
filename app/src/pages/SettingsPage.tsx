@@ -288,7 +288,7 @@ function ChartThemeSelector() {
       <h2 className="text-[17px] font-semibold text-text-primary mb-1.5">Chart Theme</h2>
       <p className="text-[14px] text-text-muted mb-5">Choose a visual style for all charts.</p>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-3 gap-3">
         {themes.map((t) => {
           const active = t.id === themeId
           return (
