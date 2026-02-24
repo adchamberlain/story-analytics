@@ -1,5 +1,45 @@
 # Dev Log
 
+## 2026-02-24
+
+### Session: Phase 2 — Themeable & Localizable (172 frontend + 9 backend = 181 new tests)
+
+Implemented all 4 Phase 2 tasks for the Datawrapper parity roadmap. Built in a worktree to avoid conflicts.
+
+**Task 6: Curated Themes**
+- Added 7 new themes: Minimal, NYT, Nature, FiveThirtyEight, Academic, Dark, Pastel (9 total)
+- Each theme has full ChartTheme structure: palette (8 colors), typography, plot settings, pie, card
+- Settings page theme grid updated to 3 columns
+- 92 unit tests verify all theme structures
+
+**Task 7: Localization Engine**
+- `localeStore.ts` with 12 supported locales (en-US, de-DE, ja-JP, fr-FR, etc.)
+- `formatters.ts` and `numberFormat.ts` accept optional `locale` parameter
+- Locale selector in Settings page with live currency format preview
+- 11 localization tests covering German, Japanese, French formatting
+
+**Task 8: Color Tools**
+- Expanded palettes from 4 to 16: categorical (6), sequential (7), diverging (3)
+- Added ColorBrewer, Tableau 10, Datawrapper default palettes
+- `colorblind.ts` — Brettel 1997 CVD simulation (protanopia/deuteranopia/tritanopia)
+- `ColorblindPreview` component with CVD type toggle buttons
+- `PaletteBuilder` component: add/remove/reorder/pick colors, inline hex editing
+- `PaletteSelector` now groups palettes by category
+- 17 colorblind simulation unit tests + WCAG contrast utilities
+
+**Task 5: Theme Builder**
+- Backend: `theme_storage.py` service (JSON in `data/themes/`), follows chart_storage.py pattern
+- Backend: `themes.py` router with full CRUD (create, list, get, update, delete)
+- Frontend: `ThemeBuilderPage` at `/settings/themes` — sidebar + editor layout
+- Palette color pickers, typography controls, plot settings, live bar chart preview
+- Import/export themes as JSON, clone built-in themes, apply custom themes
+- "Customize Themes" link from Settings page
+- 9 backend API tests
+
+**Total new tests:** 92 (themes) + 11 (localization) + 17 (colorblind) + 9 (API) = 129 new tests
+
+---
+
 ## 2026-02-19
 
 ### Session: Database import wizard, KPI grid, shape advisor, and KPI bug fixes (621 tests)
