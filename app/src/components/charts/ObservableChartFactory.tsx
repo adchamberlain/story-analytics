@@ -10,6 +10,7 @@ import { getXValues, getYForX, resolveResponsiveOffset, computeRatios, smartOffs
 import type { ChartConfig, ChartType, Annotations, PointAnnotation, HighlightRange } from '../../types/chart'
 import type { ChartTheme } from '../../themes/chartThemes'
 import { shouldShowGrid, formatBigValue, computePctDelta, formatDelta } from './bigValueHelpers'
+import { ChoroplethMap } from './ChoroplethMap'
 
 /** Minimal type for the Observable Plot element with scale access. */
 interface PlotElement extends HTMLElement {
@@ -235,6 +236,10 @@ export function ObservableChartFactory({
 
   if (chartType === 'Treemap') {
     return <TreemapComponent data={data} config={config} height={height} autoHeight={autoHeight} />
+  }
+
+  if (chartType === 'ChoroplethMap') {
+    return <ChoroplethMap data={data} config={config} height={height} autoHeight={autoHeight} />
   }
 
   // Auto-height: flex layout fills available space. Fixed: explicit pixel height.

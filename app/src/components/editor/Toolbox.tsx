@@ -330,6 +330,64 @@ export function Toolbox() {
                     </div>
                   </>
                 )}
+                {config.chartType === 'ChoroplethMap' && (
+                  <>
+                    <div>
+                      <label className="block text-xs font-medium text-text-secondary mb-1">Basemap</label>
+                      <select
+                        value={config.basemap ?? 'world'}
+                        onChange={(e) => updateConfig({ basemap: e.target.value })}
+                        className="w-full px-2 py-1.5 text-sm border border-border-default rounded-md bg-surface text-text-primary focus:outline-none focus:border-blue-400"
+                      >
+                        <option value="world">World Countries</option>
+                        <option value="us-states">US States</option>
+                        <option value="us-counties">US Counties</option>
+                        <option value="europe">Europe</option>
+                      </select>
+                    </div>
+                    <ColumnDropdown
+                      label="Geography Column"
+                      value={config.geoJoinColumn ?? null}
+                      columns={isSqlMode ? sqlResultColumns : columns}
+                      columnTypes={columnTypes}
+                      allowNone
+                      onChange={(geoJoinColumn) => updateConfig({ geoJoinColumn })}
+                    />
+                    <ColumnDropdown
+                      label="Value Column"
+                      value={config.geoValueColumn ?? null}
+                      columns={isSqlMode ? sqlResultColumns : columns}
+                      columnTypes={columnTypes}
+                      allowNone
+                      onChange={(geoValueColumn) => updateConfig({ geoValueColumn })}
+                    />
+                    <div>
+                      <label className="block text-xs font-medium text-text-secondary mb-1">Color Scale</label>
+                      <select
+                        value={config.geoColorScale ?? 'sequential'}
+                        onChange={(e) => updateConfig({ geoColorScale: e.target.value })}
+                        className="w-full px-2 py-1.5 text-sm border border-border-default rounded-md bg-surface text-text-primary focus:outline-none focus:border-blue-400"
+                      >
+                        <option value="sequential">Sequential</option>
+                        <option value="diverging">Diverging</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-text-secondary mb-1">Projection</label>
+                      <select
+                        value={config.geoProjection ?? 'geoEqualEarth'}
+                        onChange={(e) => updateConfig({ geoProjection: e.target.value })}
+                        className="w-full px-2 py-1.5 text-sm border border-border-default rounded-md bg-surface text-text-primary focus:outline-none focus:border-blue-400"
+                      >
+                        <option value="geoEqualEarth">Equal Earth</option>
+                        <option value="geoMercator">Mercator</option>
+                        <option value="geoAlbersUsa">Albers USA</option>
+                        <option value="geoOrthographic">Orthographic</option>
+                        <option value="geoNaturalEarth1">Natural Earth</option>
+                      </select>
+                    </div>
+                  </>
+                )}
               </>
             )}
           </div>

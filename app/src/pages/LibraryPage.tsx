@@ -120,6 +120,7 @@ const CHART_TYPE_META: Record<string, { label: string; Icon: () => JSX.Element; 
   BoxPlot:     { label: 'BoxPlot',   Icon: BarIcon,       fg: '#14b8a6', bg: 'rgba(20,184,166,0.12)' },
   PieChart:    { label: 'Pie',       Icon: PieIcon,       fg: '#ec4899', bg: 'rgba(236,72,153,0.12)' },
   Treemap:     { label: 'Treemap',   Icon: HeatMapIcon,   fg: '#84cc16', bg: 'rgba(132,204,22,0.12)' },
+  ChoroplethMap: { label: 'Map',    Icon: DefaultIcon,   fg: '#0ea5e9', bg: 'rgba(14,165,233,0.12)' },
 }
 
 /**
