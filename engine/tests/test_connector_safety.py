@@ -2171,7 +2171,7 @@ class TestDashboardPutFiltersSerialization:
         import re
         source = Path("api/routers/dashboards_v2.py").read_text()
         # Find the update function body
-        m = re.search(r'async def update\(dashboard_id.*?return DashboardResponse', source, re.DOTALL)
+        m = re.search(r'async def update\(dashboard_id.*?return (?:DashboardResponse|_dashboard_to_response)', source, re.DOTALL)
         assert m, "update function not found"
         body = m.group(0)
         # Should NOT contain exclude_none re-serialization on request.filters
