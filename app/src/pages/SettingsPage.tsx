@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { useChartThemeStore } from '../stores/chartThemeStore'
 import { CHART_THEMES } from '../themes/chartThemes'
 import { useLocaleStore, SUPPORTED_LOCALES } from '../stores/localeStore'
@@ -289,8 +289,18 @@ function ChartThemeSelector() {
 
   return (
     <section className="bg-surface-raised rounded-2xl shadow-card border border-border-default p-7">
-      <h2 className="text-[17px] font-semibold text-text-primary mb-1.5">Chart Theme</h2>
-      <p className="text-[14px] text-text-muted mb-5">Choose a visual style for all charts.</p>
+      <div className="flex items-center justify-between mb-5">
+        <div>
+          <h2 className="text-[17px] font-semibold text-text-primary mb-1">Chart Theme</h2>
+          <p className="text-[14px] text-text-muted">Choose a visual style for all charts.</p>
+        </div>
+        <Link
+          to="/settings/themes"
+          className="px-4 py-2.5 text-[14px] font-medium rounded-xl border border-border-default text-text-secondary hover:bg-surface-input transition-colors"
+        >
+          Customize Themes
+        </Link>
+      </div>
 
       <div className="grid grid-cols-3 gap-3">
         {themes.map((t) => {
