@@ -515,10 +515,14 @@ function DraggableChartCard(props: {
   deleting: boolean
   confirming: boolean
   duplicating: boolean
+  archiving: boolean
+  isArchived: boolean
   onRequestDelete: () => void
   onConfirmDelete: () => void
   onCancelDelete: () => void
   onDuplicate: () => void
+  onArchive: () => void
+  onRestore: () => void
   selectMode: boolean
   selected: boolean
   onToggleSelect: () => void
@@ -546,10 +550,14 @@ function DraggableChartCard(props: {
         deleting={props.deleting}
         confirming={props.confirming}
         duplicating={props.duplicating}
+        archiving={props.archiving}
+        isArchived={props.isArchived}
         onRequestDelete={props.onRequestDelete}
         onConfirmDelete={props.onConfirmDelete}
         onCancelDelete={props.onCancelDelete}
         onDuplicate={props.onDuplicate}
+        onArchive={props.onArchive}
+        onRestore={props.onRestore}
         selectMode={props.selectMode}
         selected={props.selected}
         onToggleSelect={props.onToggleSelect}
