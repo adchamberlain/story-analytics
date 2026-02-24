@@ -8,7 +8,9 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "test": "vitest run --config vitest.config.ts"
+    "test": "vitest run --config vitest.config.ts",
+    "screenshot": "npx tsx e2e/screenshot.ts",
+    "e2e": "npx playwright test --config e2e/playwright.config.ts"
   },
   "dependencies": {
     "@observablehq/plot": "^0.6.17",
@@ -25,6 +27,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.15.0",
+    "@playwright/test": "^1.58.2",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@types/react": "^18.3.12",
