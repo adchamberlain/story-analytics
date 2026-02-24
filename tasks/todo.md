@@ -3,7 +3,7 @@
 > **Design doc:** `docs/plans/2026-02-24-datawrapper-parity-design.md`
 > **Implementation plan:** `docs/plans/2026-02-24-datawrapper-parity-plan.md`
 
-## Current Phase: 4 — Maps
+## Current Phase: 5 — Parity Gaps (COMPLETE)
 
 ### Task 0: Development Loop Setup ✅
 - [x] Screenshot verification (Playwright)
@@ -24,7 +24,7 @@
 
 ### Task 2: Embed System ✅
 - [x] Embed page route and component (`EmbedChartPage`)
-- [ ] Separate Vite entry point for embed bundle (<100KB)
+- [x] Separate Vite entry point for embed bundle (2.62KB gzipped)
 - [x] Embed code generator in SharePanel (iframe snippet)
 - [x] PostMessage height auto-resize
 - [x] Privacy headers (SecurityHeadersMiddleware — 18 tests)
@@ -56,8 +56,8 @@
 - [x] Frontend: Live preview (sample chart re-renders as theme changes)
 - [x] Frontend: Import/export theme as JSON
 - [x] Tests: Theme CRUD API tests (9 passing)
-- [ ] Frontend: Font picker (Google Fonts + file upload) — future enhancement
-- [ ] Frontend: Logo uploader with position control — future enhancement
+- [x] Frontend: Font picker (Google Fonts + file upload) — 50 curated fonts, searchable, upload .woff2/.ttf
+- [x] Frontend: Logo uploader with position control — 4-corner positioning, size slider
 - [x] Frontend: Custom CSS override textarea (ThemeBuilderPage)
 - [ ] Tests: Screenshot verify theme builder page
 
@@ -108,15 +108,15 @@
 ### Task 10: Google Sheets Connector ✅
 - [x] Backend: Parse Sheets URL → extract sheet ID
 - [x] Backend: Fetch via public CSV export URL
-- [ ] Backend: Configurable polling interval — future enhancement
+- [x] Backend: Configurable polling interval (30s, 1m, 5m, 15m)
 - [x] Frontend: GoogleSheetsInput component
 - [x] Tests: URL parsing, CSV fetch (11 tests)
-- [ ] Tests: Auto-refresh on embed load — future enhancement
+- [x] Frontend: Auto-refresh on embed load with configurable interval
 
 ### Task 11: External URL Data Source ✅
 - [x] Backend: Fetch CSV/JSON from any URL
 - [x] Backend: Optional HTTP headers for auth
-- [ ] Backend: Cache with staleness indicator — future enhancement
+- [x] Backend: Cache with staleness indicator (file-based TTL cache, X-Data-Staleness header)
 - [x] Frontend: UrlSourceInput component
 - [x] Tests: URL fetch, validation (5 tests)
 
@@ -127,7 +127,7 @@
 - [x] Frontend: Move-to-folder dropdown on chart cards
 - [x] Frontend: Search across all items
 - [x] Tests: Folder CRUD, chart-folder association (11 tests)
-- [ ] Frontend: Drag-and-drop charts into folders — future enhancement
+- [x] Frontend: Drag-and-drop charts into folders (@dnd-kit)
 
 ## Phase 4: Maps ✅
 
@@ -143,6 +143,7 @@
 - [x] EditorStore: geo config fields (basemap, geoJoinColumn, geoValueColumn, geoColorScale, geoProjection)
 - [x] Tests: 8 unit tests (basemap registry, data joining, type registration)
 - [x] Custom GeoJSON/TopoJSON upload (file input in Toolbox + ChoroplethMap support)
+- [x] Map zoom & pan (d3-zoom, +/-/Reset controls, touch support)
 - [ ] Tests: Screenshot verify map at multiple projections
 
 ### Task 14: Responsive Annotations ✅
@@ -160,4 +161,83 @@
 - [x] Frontend: Duplicate action in library (Duplicate button on ChartCard)
 - [x] Frontend: Save as template (Template button in EditorPage header)
 - [x] Tests: 14 backend tests (duplication, template CRUD, save-as-template)
-- [ ] Frontend: Template gallery in chart creation — future enhancement
+- [x] Frontend: Template gallery in chart creation (TemplateGallery modal, editor query param)
+
+## Phase 5: Parity Gaps ✅
+
+### Task 5.1: Separate Vite Embed Entry Point ✅
+- [x] embed.html + embed-entry.tsx + EmbedApp.tsx
+- [x] Multi-page Vite build (index.html + embed.html)
+- [x] Tree-shaken: no router, no Zustand, no AI chat
+- [x] Embed entry: 2.62 KB (1.19 KB gzipped)
+
+### Task 5.2: Archive/Soft-Delete with Restore ✅
+- [x] Backend: archived_at field, archive/restore endpoints
+- [x] Backend: ?status=active|archived|all query param
+- [x] Frontend: Active/Archived toggle, archive/restore buttons
+- [x] Tests: 11 pytest tests
+
+### Task 5.3: Static Fallback PNG for Embeds ✅
+- [x] Backend: Snapshot upload/serve endpoints (data/snapshots/)
+- [x] Frontend: <noscript> fallback + og:image meta tag
+- [x] Auto-generate PNG on publish
+- [x] Tests: 5 pytest tests
+
+### Task 5.4: Dashboard Embed ✅
+- [x] Backend: GET /v2/dashboards/{id}/public endpoint
+- [x] Frontend: EmbedDashboardPage with PostMessage resize
+- [x] Route: /embed/dashboard/:dashboardId
+- [x] Embed code generator in ShareModal
+- [x] Tests: 5 pytest tests
+
+### Task 5.5: Font Picker ✅
+- [x] FontPicker component: 50 Google Fonts, searchable, upload .woff2/.ttf
+- [x] fontUrl field on ChartTheme
+- [x] Font injection via <link>/<style> tags
+- [x] Tests: 9 vitest tests
+
+### Task 5.6: Logo Uploader ✅
+- [x] logoUrl, logoPosition, logoSize on ChartTheme
+- [x] ThemeBuilderPage: upload, position radio, size slider
+- [x] ChartWrapper: absolutely positioned logo image
+- [x] Tests: 9 vitest tests
+
+### Task 5.7: Configurable Polling Interval ✅
+- [x] refreshInterval in chart config
+- [x] Auto-refresh dropdown in Toolbox (off, 30s, 1m, 5m, 15m)
+- [x] EmbedChartPage: setInterval re-fetch with cleanup
+- [x] Tests: 14 vitest tests (refresh + staleness)
+
+### Task 5.8: Cache with Staleness Indicator ✅
+- [x] data_cache.py: file-based cache with TTL
+- [x] URL and Google Sheets imports use cache
+- [x] X-Data-Staleness response header
+- [x] Staleness indicator in embed footer
+- [x] Tests: 9 pytest tests
+
+### Task 5.9: Map Zoom & Pan ✅
+- [x] d3-zoom behavior on ChoroplethMap SVG
+- [x] +/-/Reset zoom controls (top-right)
+- [x] Touch support (pinch-to-zoom)
+- [x] Tests: 4 vitest tests
+
+### Task 5.10: Template Gallery ✅
+- [x] TemplateGallery component with search
+- [x] "From Template" button in LibraryPage (modal)
+- [x] EditorPage loads template config from query param
+- [x] Tests: 5 vitest tests
+
+### Task 5.11: Drag-and-Drop Folders ✅
+- [x] @dnd-kit/core: DraggableChartCard + DroppableFolderItem
+- [x] Visual feedback: highlight on hover, ghost drag preview
+- [x] Tests: 5 vitest tests
+
+---
+
+## Test Summary (Phase 5 Complete)
+
+| Suite | Count |
+|-------|-------|
+| Backend (pytest) | 130 |
+| Frontend (vitest) | 405 |
+| **Total** | **535** |
