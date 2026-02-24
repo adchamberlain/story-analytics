@@ -1,11 +1,14 @@
 /**
  * ChoroplethMap — D3-geo choropleth map component.
  * Renders as a non-Plot chart (like PieChart/Treemap), using D3 directly.
+ * Supports zoom & pan via d3-zoom (mouse wheel, drag, pinch-to-zoom).
  */
 
-import { useRef, useEffect, useState } from 'react'
+import { useRef, useEffect, useState, useCallback } from 'react'
 import * as d3 from 'd3'
 import * as d3Geo from 'd3-geo'
+import { zoom as d3Zoom, zoomIdentity } from 'd3-zoom'
+import type { ZoomBehavior } from 'd3-zoom'
 import type { ChartConfig } from '../../types/chart'
 import {
   loadBasemap,
@@ -23,8 +26,27 @@ interface ChoroplethMapProps {
   autoHeight?: boolean
 }
 
+const zoomBtnStyle: React.CSSProperties = {
+  width: 28,
+  height: 28,
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  fontSize: 16,
+  fontWeight: 600,
+  lineHeight: 1,
+  border: '1px solid var(--color-border-default, #e2e8f0)',
+  borderRadius: 6,
+  background: 'var(--color-surface-raised, rgba(255,255,255,0.9))',
+  color: 'var(--color-text-secondary, #64748b)',
+  cursor: 'pointer',
+  userSelect: 'none' as const,
+}
+
 export function ChoroplethMap({ data, config, height = 400, autoHeight = false }: ChoroplethMapProps) {
   const containerRef = useRef<HTMLDivElement>(null)
+  const svgRef = useRef<SVGSVGElement | null>(null)
+  const zoomBehaviorRef = useRef<ZoomBehavior<SVGSVGElement, unknown> | null>(null)
   const [containerWidth, setContainerWidth] = useState(0)
   const [geoData, setGeoData] = useState<FeatureCollection | null>(null)
   const [loading, setLoading] = useState(true)
@@ -133,7 +155,7 @@ export function ChoroplethMap({ data, config, height = 400, autoHeight = false }
     const path = d3Geo.geoPath(projection)
 
     // Clear previous render
-    d3.select(el).selectAll('*').remove()
+    d3.select(el).selectAll('svg').remove()
 
     const svg = d3.select(el)
       .append('svg')
@@ -141,10 +163,16 @@ export function ChoroplethMap({ data, config, height = 400, autoHeight = false }
       .attr('height', h)
       .attr('viewBox', `0 0 ${width} ${h}`)
       .style('max-width', '100%')
+      .style('touch-action', 'none')
 
-    // Draw features
-    svg.append('g')
-      .selectAll('path')
+    // Store ref for zoom controls
+    svgRef.current = svg.node()
+
+    // Create a <g> wrapper that receives the zoom transform
+    const mapGroup = svg.append('g').attr('class', 'map-group')
+
+    // Draw features inside the zoomable group
+    mapGroup.selectAll('path')
       .data(joined)
       .join('path')
       .attr('d', (d) => path(d.feature) || '')
@@ -171,7 +199,7 @@ export function ChoroplethMap({ data, config, height = 400, autoHeight = false }
         setTooltip(null)
       })
 
-    // Gradient legend
+    // Gradient legend (outside the zoomable group so it stays fixed)
     const legendWidth = Math.min(200, width * 0.4)
     const legendHeight = 10
     const legendX = width - legendWidth - 16
@@ -211,7 +239,39 @@ export function ChoroplethMap({ data, config, height = 400, autoHeight = false }
       .attr('font-size', 10)
       .attr('fill', 'var(--color-text-secondary, #666)')
       .text(d3.format(',.2~s')(maxVal))
+
+    // Attach d3-zoom behavior
+    const zoomBehavior = d3Zoom<SVGSVGElement, unknown>()
+      .scaleExtent([1, 8])
+      .on('zoom', (event) => {
+        mapGroup.attr('transform', event.transform)
+      })
+
+    svg.call(zoomBehavior)
+    zoomBehaviorRef.current = zoomBehavior
   }, [geoData, data, containerWidth, height, autoHeight, basemapId, joinColumn, valueColumn, colorScaleType, projectionId, config.colorRange, config.color])
+
+  // Zoom control handlers
+  const handleZoomIn = useCallback(() => {
+    const svgEl = svgRef.current
+    const zb = zoomBehaviorRef.current
+    if (!svgEl || !zb) return
+    d3.select(svgEl).transition().duration(300).call(zb.scaleBy, 1.5)
+  }, [])
+
+  const handleZoomOut = useCallback(() => {
+    const svgEl = svgRef.current
+    const zb = zoomBehaviorRef.current
+    if (!svgEl || !zb) return
+    d3.select(svgEl).transition().duration(300).call(zb.scaleBy, 1 / 1.5)
+  }, [])
+
+  const handleReset = useCallback(() => {
+    const svgEl = svgRef.current
+    const zb = zoomBehaviorRef.current
+    if (!svgEl || !zb) return
+    d3.select(svgEl).transition().duration(300).call(zb.transform, zoomIdentity)
+  }, [])
 
   if (loading) {
     return (
@@ -231,6 +291,16 @@ export function ChoroplethMap({ data, config, height = 400, autoHeight = false }
 
   return (
     <div ref={containerRef} style={{ width: '100%', height: autoHeight ? '100%' : height, position: 'relative' }}>
+      {/* Zoom controls */}
+      <div
+        data-testid="zoom-controls"
+        style={{ position: 'absolute', top: 8, right: 8, display: 'flex', flexDirection: 'column', gap: 2, zIndex: 5 }}
+      >
+        <button onClick={handleZoomIn} style={zoomBtnStyle} aria-label="Zoom in">+</button>
+        <button onClick={handleZoomOut} style={zoomBtnStyle} aria-label="Zoom out">-</button>
+        <button onClick={handleReset} style={{ ...zoomBtnStyle, fontSize: 10 }} aria-label="Reset zoom">Reset</button>
+      </div>
+
       {tooltip && (
         <div
           style={{
