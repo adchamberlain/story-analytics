@@ -43,6 +43,7 @@ class SavedChart:
     connection_id: str | None = None  # Database connection this data came from
     source_table: str | None = None   # Original table name (e.g., "INVOICES")
     status: str = "draft"  # "draft" | "published"
+    folder_id: str | None = None
 
 
 def save_chart(
@@ -178,7 +179,7 @@ def update_chart(chart_id: str, **fields) -> SavedChart | None:
     # Only allow updating presentation fields — protect id, source_id, sql, timestamps
     _UPDATABLE = {"chart_type", "title", "subtitle", "source", "x", "y", "series",
                   "horizontal", "sort", "reasoning", "config", "connection_id", "source_table",
-                  "status"}
+                  "status", "folder_id"}
     for key, value in fields.items():
         if key in _UPDATABLE:
             data[key] = value
