@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useRef } from 'react'
+import { useEffect, useCallback, useRef, useState } from 'react'
 import { useParams, useNavigate, useSearchParams, useLocation } from 'react-router-dom'
 import { useEditorStore } from '../stores/editorStore'
 import { useDataStore } from '../stores/dataStore'
@@ -80,6 +80,26 @@ export function EditorPage() {
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
   }, [handleSave])
+
+  const [savingTemplate, setSavingTemplate] = useState(false)
+
+  const handleSaveAsTemplate = useCallback(async () => {
+    if (!store.chartId || isNew) return
+    setSavingTemplate(true)
+    try {
+      const res = await fetch(`/api/v2/charts/${store.chartId}/save-as-template`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: store.config.title || 'Untitled Template',
+          description: `Template from "${store.config.title || 'Untitled'}"`,
+        }),
+      })
+      if (!res.ok) throw new Error('Failed to save template')
+    } finally {
+      setSavingTemplate(false)
+    }
+  }, [store.chartId, store.config.title, isNew])
 
   const isDirty = store.isDirty()
 
@@ -229,6 +249,16 @@ export function EditorPage() {
               }`}
             >
               {store.status === 'published' ? 'Published' : 'Publish'}
+            </button>
+          )}
+          {store.chartId && !isNew && (
+            <button
+              onClick={handleSaveAsTemplate}
+              disabled={savingTemplate}
+              className="px-3 py-2 text-xs rounded-lg border border-border-default text-text-on-surface hover:bg-surface-secondary transition-colors font-medium disabled:opacity-50"
+              title="Save chart config as a reusable template"
+            >
+              {savingTemplate ? 'Saving...' : 'Template'}
             </button>
           )}
         </div>
