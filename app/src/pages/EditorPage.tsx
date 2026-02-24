@@ -113,6 +113,11 @@ export function EditorPage() {
     positiveIsGood: store.config.positiveIsGood,
     metricLabel: store.config.metricLabel ?? undefined,
     tooltipTemplate: store.config.tooltipTemplate || undefined,
+    minColumn: store.config.minColumn ?? undefined,
+    maxColumn: store.config.maxColumn ?? undefined,
+    targetColumn: store.config.targetColumn ?? undefined,
+    facetColumn: store.config.facetColumn ?? undefined,
+    chartSubtype: store.config.chartSubtype !== 'line' ? store.config.chartSubtype : undefined,
   }
 
   // Apply palette colors
