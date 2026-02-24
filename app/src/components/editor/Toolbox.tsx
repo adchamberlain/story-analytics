@@ -490,6 +490,27 @@ export function Toolbox() {
         </div>
       </Section>
 
+      {/* Auto-refresh (embed) */}
+      <Section title="Auto-refresh">
+        <div>
+          <label className="block text-xs font-medium text-text-secondary mb-1">Refresh interval (embed)</label>
+          <select
+            value={config.refreshInterval ?? 0}
+            onChange={(e) => updateConfig({ refreshInterval: Number(e.target.value) })}
+            className="w-full px-2 py-1.5 text-sm border border-border-default rounded-md bg-surface text-text-primary focus:outline-none focus:border-blue-400"
+          >
+            <option value={0}>Off</option>
+            <option value={30}>30 seconds</option>
+            <option value={60}>1 minute</option>
+            <option value={300}>5 minutes</option>
+            <option value={900}>15 minutes</option>
+          </select>
+          <p className="text-[10px] text-text-muted mt-1">
+            Automatically re-fetches chart data in the embedded view.
+          </p>
+        </div>
+      </Section>
+
       {/* Axis Labels */}
       <Section title="Axis Labels">
         <div className="space-y-2">
