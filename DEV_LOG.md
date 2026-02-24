@@ -2,6 +2,18 @@
 
 ## 2026-02-24
 
+### Session: Visual QA Pass & Bug Fixes
+
+Ran full visual QA pass using Playwright screenshots across all pages, chart types, and viewports. Found and fixed 3 issues:
+
+1. **Editor mobile layout** (`EditorPage.tsx`): Toolbox + AI Chat sidebars overflowed at 375px. Fixed with `hidden lg:block` — only chart preview shows on mobile.
+2. **X-axis label overlap** (`ObservableChartFactory.tsx`): Wired `config.tickAngle` → Plot's `tickRotate`. Added auto-rotation (-45°) when container < 500px with extra bottom margin.
+3. **Pie chart label clipping** (`ObservableChartFactory.tsx`): Left-side external labels clipped by SVG viewBox. Expanded viewBox with negative X origin to accommodate label overflow.
+
+Also fixed `e2e/screenshot.ts`: ESM `__dirname` resolution and CLI arg parsing (separating positional args from `--flags`).
+
+All 359 frontend tests passing, TypeScript clean.
+
 ### Session: Phase 4 — Maps, Responsive Annotations, Templates (29 new tests)
 
 Implemented all 3 Phase 4 tasks for the Datawrapper parity roadmap. Built in worktree `phase4-maps`.
