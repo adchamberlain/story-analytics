@@ -39,6 +39,15 @@ export interface EditorConfig {
   positiveIsGood: boolean
   metricLabel: string | null
   unitColumn: string | null
+  tooltipTemplate: string
+  // Range plot
+  minColumn: string | null
+  maxColumn: string | null
+  // Bullet bar
+  targetColumn: string | null
+  // Small multiples
+  facetColumn: string | null
+  chartSubtype: 'line' | 'bar' | 'area' | 'scatter'
 }
 
 const DEFAULT_CONFIG: EditorConfig = {
@@ -70,6 +79,12 @@ const DEFAULT_CONFIG: EditorConfig = {
   positiveIsGood: true,
   metricLabel: null,
   unitColumn: null,
+  tooltipTemplate: '',
+  minColumn: null,
+  maxColumn: null,
+  targetColumn: null,
+  facetColumn: null,
+  chartSubtype: 'line',
 }
 
 export interface TableInfoItem {
@@ -95,6 +110,7 @@ interface EditorState {
   // Chart data
   chartId: string | null
   sourceId: string | null
+  status: 'draft' | 'published'
   data: Record<string, unknown>[]
   columns: string[]
   sql: string | null
@@ -148,6 +164,8 @@ interface EditorState {
   save: () => Promise<void>
   discard: () => void
   sendChatMessage: (message: string) => Promise<void>
+  publishChart: () => Promise<void>
+  unpublishChart: () => Promise<void>
   reset: () => void
 }
 
@@ -166,6 +184,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   // Initial state
   chartId: null,
   sourceId: null,
+  status: 'draft',
   data: [],
   columns: [],
   sql: null,
@@ -238,6 +257,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         positiveIsGood: chart.config?.positiveIsGood ?? true,
         metricLabel: chart.config?.metricLabel ?? null,
         unitColumn: chart.config?.unitColumn ?? null,
+        tooltipTemplate: chart.config?.tooltipTemplate ?? '',
+        minColumn: chart.config?.minColumn ?? null,
+        maxColumn: chart.config?.maxColumn ?? null,
+        targetColumn: chart.config?.targetColumn ?? null,
+        facetColumn: chart.config?.facetColumn ?? null,
+        chartSubtype: chart.config?.chartSubtype ?? 'line',
       }
 
       const loadedDataMode = config.dataMode
@@ -259,6 +284,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       set({
         loading: false,
         sourceId: chart.source_id,
+        status: chart.status ?? 'draft',
         data: result.data ?? [],
         columns: result.columns ?? [],
         columnTypes,
@@ -435,6 +461,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
             positiveIsGood: config.positiveIsGood,
             metricLabel: config.metricLabel,
             unitColumn: config.unitColumn,
+            tooltipTemplate: config.tooltipTemplate || undefined,
+            minColumn: config.minColumn ?? undefined,
+            maxColumn: config.maxColumn ?? undefined,
+            targetColumn: config.targetColumn ?? undefined,
+            facetColumn: config.facetColumn ?? undefined,
+            chartSubtype: config.chartSubtype !== 'line' ? config.chartSubtype : undefined,
           },
         }),
       })
@@ -683,6 +715,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
             positiveIsGood: config.positiveIsGood,
             metricLabel: config.metricLabel,
             unitColumn: config.unitColumn,
+            tooltipTemplate: config.tooltipTemplate || undefined,
+            minColumn: config.minColumn ?? undefined,
+            maxColumn: config.maxColumn ?? undefined,
+            targetColumn: config.targetColumn ?? undefined,
+            facetColumn: config.facetColumn ?? undefined,
+            chartSubtype: config.chartSubtype !== 'line' ? config.chartSubtype : undefined,
           },
         }),
       })
@@ -837,11 +875,38 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }
   },
 
+  publishChart: async () => {
+    const { chartId } = get()
+    if (!chartId) return
+    try {
+      const res = await fetch(`/api/v2/charts/${chartId}/publish`, { method: 'PUT' })
+      if (res.ok) {
+        set({ status: 'published' })
+      }
+    } catch {
+      // Non-critical
+    }
+  },
+
+  unpublishChart: async () => {
+    const { chartId } = get()
+    if (!chartId) return
+    try {
+      const res = await fetch(`/api/v2/charts/${chartId}/unpublish`, { method: 'PUT' })
+      if (res.ok) {
+        set({ status: 'draft' })
+      }
+    } catch {
+      // Non-critical
+    }
+  },
+
   reset: () => {
     clearTimeout(_buildQueryTimer)
     set({
       chartId: null,
       sourceId: null,
+      status: 'draft',
       data: [],
       columns: [],
       sql: null,

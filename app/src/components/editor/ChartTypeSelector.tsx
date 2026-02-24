@@ -121,6 +121,67 @@ const CHART_TYPES: { type: ChartType; label: string; icon: ReactNode }[] = [
       </svg>
     ),
   },
+  {
+    type: 'DotPlot',
+    label: 'Dot Plot',
+    icon: (
+      <svg viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5">
+        <line x1="3" y1="6" x2="15" y2="6" stroke="currentColor" strokeWidth="1" opacity="0.3" />
+        <circle cx="15" cy="6" r="2.5" />
+        <line x1="3" y1="12" x2="19" y2="12" stroke="currentColor" strokeWidth="1" opacity="0.3" />
+        <circle cx="19" cy="12" r="2.5" />
+        <line x1="3" y1="18" x2="11" y2="18" stroke="currentColor" strokeWidth="1" opacity="0.3" />
+        <circle cx="11" cy="18" r="2.5" />
+      </svg>
+    ),
+  },
+  {
+    type: 'RangePlot',
+    label: 'Range',
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-5 w-5">
+        <line x1="6" y1="5" x2="18" y2="5" />
+        <circle cx="6" cy="5" r="2" fill="currentColor" />
+        <circle cx="18" cy="5" r="2" fill="currentColor" />
+        <line x1="4" y1="12" x2="20" y2="12" />
+        <circle cx="4" cy="12" r="2" fill="currentColor" />
+        <circle cx="20" cy="12" r="2" fill="currentColor" />
+        <line x1="8" y1="19" x2="16" y2="19" />
+        <circle cx="8" cy="19" r="2" fill="currentColor" />
+        <circle cx="16" cy="19" r="2" fill="currentColor" />
+      </svg>
+    ),
+  },
+  {
+    type: 'BulletBar',
+    label: 'Bullet',
+    icon: (
+      <svg viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5">
+        <rect x="2" y="3" width="20" height="6" rx="1" opacity="0.15" />
+        <rect x="2" y="4" width="14" height="4" rx="1" opacity="0.7" />
+        <line x1="17" y1="2" x2="17" y2="10" stroke="currentColor" strokeWidth="2" />
+        <rect x="2" y="15" width="20" height="6" rx="1" opacity="0.15" />
+        <rect x="2" y="16" width="18" height="4" rx="1" opacity="0.7" />
+        <line x1="15" y1="14" x2="15" y2="22" stroke="currentColor" strokeWidth="2" />
+      </svg>
+    ),
+  },
+  {
+    type: 'SmallMultiples',
+    label: 'Facets',
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-5 w-5">
+        <rect x="2" y="2" width="9" height="9" rx="1" />
+        <polyline points="3,9 5,5 7,7 10,3" />
+        <rect x="13" y="2" width="9" height="9" rx="1" />
+        <polyline points="14,9 16,4 18,6 21,3" />
+        <rect x="2" y="13" width="9" height="9" rx="1" />
+        <polyline points="3,20 5,16 7,18 10,14" />
+        <rect x="13" y="13" width="9" height="9" rx="1" />
+        <polyline points="14,20 16,15 18,17 21,14" />
+      </svg>
+    ),
+  },
 ]
 
 interface ChartTypeSelectorProps {

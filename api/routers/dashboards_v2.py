@@ -82,6 +82,7 @@ class DashboardResponse(BaseModel):
     filters: list[dict] = []
     created_at: str
     updated_at: str
+    status: str = "draft"
 
 
 class ChartWithData(BaseModel):
@@ -251,6 +252,20 @@ _health_cache: dict[str, HealthCheckResponse] = {}
 _health_cache_lock = threading.Lock()
 
 
+def _dashboard_to_response(d) -> DashboardResponse:
+    """Convert a SavedDashboard to a DashboardResponse."""
+    return DashboardResponse(
+        id=d.id,
+        title=d.title,
+        description=d.description,
+        charts=d.charts,
+        filters=d.filters or [],
+        created_at=d.created_at,
+        updated_at=d.updated_at,
+        status=d.status,
+    )
+
+
 # ── Endpoints ────────────────────────────────────────────────────────────────
 
 @router.post("/", response_model=DashboardResponse)
@@ -264,33 +279,14 @@ async def create(request: CreateDashboardRequest):
         charts=charts_dicts,
         filters=filters_dicts or None,
     )
-    return DashboardResponse(
-        id=dashboard.id,
-        title=dashboard.title,
-        description=dashboard.description,
-        charts=dashboard.charts,
-        filters=dashboard.filters or [],
-        created_at=dashboard.created_at,
-        updated_at=dashboard.updated_at,
-    )
+    return _dashboard_to_response(dashboard)
 
 
 @router.get("/", response_model=list[DashboardResponse])
 async def list_all():
     """List all dashboards."""
     dashboards = list_dashboards()
-    return [
-        DashboardResponse(
-            id=d.id,
-            title=d.title,
-            description=d.description,
-            charts=d.charts,
-            filters=d.filters or [],
-            created_at=d.created_at,
-            updated_at=d.updated_at,
-        )
-        for d in dashboards
-    ]
+    return [_dashboard_to_response(d) for d in dashboards]
 
 
 @router.get("/{dashboard_id}", response_model=DashboardWithDataResponse)
@@ -484,15 +480,7 @@ async def update(dashboard_id: str, request: UpdateDashboardRequest):
     if not dashboard:
         raise HTTPException(status_code=404, detail="Dashboard not found")
 
-    return DashboardResponse(
-        id=dashboard.id,
-        title=dashboard.title,
-        description=dashboard.description,
-        charts=dashboard.charts,
-        filters=dashboard.filters or [],
-        created_at=dashboard.created_at,
-        updated_at=dashboard.updated_at,
-    )
+    return _dashboard_to_response(dashboard)
 
 
 @router.get("/{dashboard_id}/export/html")
@@ -549,6 +537,26 @@ async def remove_dashboard(dashboard_id: str):
     with _health_cache_lock:
         _health_cache.pop(dashboard_id, None)
     return {"deleted": True}
+
+
+# ── Publish / Unpublish ──────────────────────────────────────────────────────
+
+@router.put("/{dashboard_id}/publish", response_model=DashboardResponse)
+async def publish_dashboard(dashboard_id: str):
+    """Publish a dashboard."""
+    dashboard = update_dashboard(dashboard_id, status="published")
+    if not dashboard:
+        raise HTTPException(status_code=404, detail="Dashboard not found")
+    return _dashboard_to_response(dashboard)
+
+
+@router.put("/{dashboard_id}/unpublish", response_model=DashboardResponse)
+async def unpublish_dashboard(dashboard_id: str):
+    """Unpublish a dashboard, reverting it to draft status."""
+    dashboard = update_dashboard(dashboard_id, status="draft")
+    if not dashboard:
+        raise HTTPException(status_code=404, detail="Dashboard not found")
+    return _dashboard_to_response(dashboard)
 
 
 # ── Sharing Endpoints ────────────────────────────────────────────────────────

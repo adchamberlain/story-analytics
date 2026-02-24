@@ -2,7 +2,7 @@
 
 ## 2026-02-24
 
-### Session: Phase 2 — Themeable & Localizable (172 frontend + 9 backend = 181 new tests)
+### Session: Phase 2 — Themeable & Localizable (129 new tests)
 
 Implemented all 4 Phase 2 tasks for the Datawrapper parity roadmap. Built in a worktree to avoid conflicts.
 
@@ -36,9 +36,25 @@ Implemented all 4 Phase 2 tasks for the Datawrapper parity roadmap. Built in a w
 - "Customize Themes" link from Settings page
 - 9 backend API tests
 
-**Total new tests:** 92 (themes) + 11 (localization) + 17 (colorblind) + 9 (API) = 129 new tests
-
 ---
+
+### Session: Datawrapper Parity — Phase 0 + Phase 1 (136 new tests)
+
+Completed all Phase 0 infrastructure and Phase 1 features on the `worktree-datawrapper-parity` branch.
+
+**Phase 0: Autonomous Loop Infrastructure**
+- Playwright screenshot utility (`app/e2e/screenshot.ts`)
+- Backend stress test suite (22 edge-case tests for chart/dashboard storage, ID validation)
+- Frontend test harness: created missing `vitest.config.ts`, 41 formatter unit tests
+
+**Phase 1: Embeddable & Publishable**
+
+1. **Publish Workflow** — `status: draft|published` field on charts/dashboards, publish/unpublish API endpoints, public chart endpoint, PublicChartPage, Publish button in editor (10 publish tests)
+2. **Embed System** — EmbedChartPage with PostMessage height auto-resize via ResizeObserver, embed URL in SharePanel
+3. **Custom Tooltip Formatting** — `{{ column | format }}` template engine supporting currency/percent/compact/number, tooltip editor in Toolbox with column chips (10 template tests)
+4. **Chart Type Expansion (11 → 15)** — DotPlot (Cleveland style), RangePlot (min-max with endpoints), BulletBar (bar + target tick), SmallMultiples (Observable Plot `fy` faceting with line/bar/area/scatter subtypes). Type-specific Toolbox controls for minColumn, maxColumn, targetColumn, facetColumn, chartSubtype (10 type tests)
+
+**Test totals:** 104 frontend (vitest) + 32 backend (pytest) = 136 tests, all passing.
 
 ## 2026-02-19
 

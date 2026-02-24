@@ -42,6 +42,7 @@ class SavedChart:
     config: dict | None = None  # Visual config blob (palette, toggles, axis labels)
     connection_id: str | None = None  # Database connection this data came from
     source_table: str | None = None   # Original table name (e.g., "INVOICES")
+    status: str = "draft"  # "draft" | "published"
 
 
 def save_chart(
@@ -176,7 +177,8 @@ def update_chart(chart_id: str, **fields) -> SavedChart | None:
 
     # Only allow updating presentation fields — protect id, source_id, sql, timestamps
     _UPDATABLE = {"chart_type", "title", "subtitle", "source", "x", "y", "series",
-                  "horizontal", "sort", "reasoning", "config", "connection_id", "source_table"}
+                  "horizontal", "sort", "reasoning", "config", "connection_id", "source_table",
+                  "status"}
     for key, value in fields.items():
         if key in _UPDATABLE:
             data[key] = value

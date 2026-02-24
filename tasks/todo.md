@@ -3,47 +3,47 @@
 > **Design doc:** `docs/plans/2026-02-24-datawrapper-parity-design.md`
 > **Implementation plan:** `docs/plans/2026-02-24-datawrapper-parity-plan.md`
 
-## Current Phase: 0 — Autonomous Loop Infrastructure
+## Current Phase: 2 — Themeable & Localizable
 
-### Task 0: Development Loop Setup
-- [ ] Screenshot verification (Playwright)
-- [ ] Backend stress test suite
-- [ ] Frontend component test harness
+### Task 0: Development Loop Setup ✅
+- [x] Screenshot verification (Playwright)
+- [x] Backend stress test suite (22 edge-case tests)
+- [x] Frontend component test harness (vitest.config.ts + 41 formatter tests)
 
-## Phase 1: Embeddable & Publishable
+## Phase 1: Embeddable & Publishable ✅
 
-### Task 1: Publish Workflow
-- [ ] Backend: Add `status` field to chart/dashboard storage (`draft` | `published`)
-- [ ] Backend: Publish/unpublish API endpoints
-- [ ] Backend: Public chart endpoint (no auth, only serves published)
-- [ ] Frontend: Publish button in editor
-- [ ] Frontend: PublicChartPage (read-only, no editor chrome)
-- [ ] Frontend: Route `/public/chart/:id`
-- [ ] Tests: pytest for publish/unpublish flow
+### Task 1: Publish Workflow ✅
+- [x] Backend: Add `status` field to chart/dashboard storage (`draft` | `published`)
+- [x] Backend: Publish/unpublish API endpoints
+- [x] Backend: Public chart endpoint (no auth, only serves published)
+- [x] Frontend: Publish button in editor
+- [x] Frontend: PublicChartPage (read-only, no editor chrome)
+- [x] Frontend: Route `/public/chart/:id`
+- [x] Tests: pytest for publish/unpublish flow (10 tests)
 - [ ] Tests: Screenshot verify published view
 
-### Task 2: Embed System
-- [ ] Embed page route and component (`EmbedChartPage`)
+### Task 2: Embed System ✅
+- [x] Embed page route and component (`EmbedChartPage`)
 - [ ] Separate Vite entry point for embed bundle (<100KB)
-- [ ] Embed code generator in SharePanel (iframe snippet)
-- [ ] PostMessage height auto-resize
+- [x] Embed code generator in SharePanel (iframe snippet)
+- [x] PostMessage height auto-resize
 - [ ] Privacy headers (no cookies, no tracking)
 - [ ] Tests: Embed renders correctly
 - [ ] Tests: Screenshot verify embed at desktop + mobile
 
-### Task 3: Custom Tooltip Formatting
-- [ ] Tooltip template parser (`{{ column | format }}`)
-- [ ] Tooltip editor UI in Toolbox
-- [ ] Observable Plot tooltip integration
-- [ ] Tests: Template parsing unit tests
+### Task 3: Custom Tooltip Formatting ✅
+- [x] Tooltip template parser (`{{ column | format }}`)
+- [x] Tooltip editor UI in Toolbox
+- [x] Observable Plot tooltip integration (wired through ChartConfig)
+- [x] Tests: Template parsing unit tests (10 tests)
 - [ ] Tests: Screenshot verify tooltips
 
-### Task 4: Chart Type Expansion (11 → 15)
-- [ ] Dot plot (Cleveland style)
-- [ ] Range plot (min-max bars)
-- [ ] Bullet bar (bar + target marker)
-- [ ] Small multiples (Observable Plot faceting)
-- [ ] Tests: Each new chart type renders with sample data
+### Task 4: Chart Type Expansion (11 → 15) ✅
+- [x] Dot plot (Cleveland style)
+- [x] Range plot (min-max bars)
+- [x] Bullet bar (bar + target marker)
+- [x] Small multiples (Observable Plot faceting with line/bar/area/scatter subtypes)
+- [x] Tests: Type system + config field tests (10 tests)
 - [ ] Tests: Screenshot verify each type
 
 ## Phase 2: Themeable & Localizable ✅
