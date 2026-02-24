@@ -7,7 +7,9 @@ from __future__ import annotations
 
 import traceback
 
-from fastapi import APIRouter, HTTPException
+from datetime import datetime, timezone
+
+from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
 from ..services.duckdb_service import get_duckdb_service, q
@@ -148,6 +150,7 @@ class SavedChartResponse(BaseModel):
     source_table: str | None = None
     status: str = "draft"
     folder_id: str | None = None
+    archived_at: str | None = None
 
 
 class ChartDataResponse(BaseModel):
@@ -222,6 +225,7 @@ def _chart_to_response(chart) -> SavedChartResponse:
         source_table=chart.source_table,
         status=chart.status,
         folder_id=chart.folder_id,
+        archived_at=chart.archived_at,
     )
 
 
@@ -549,9 +553,14 @@ async def save(request: SaveRequest):
 
 
 @router.get("/", response_model=list[SavedChartResponse])
-async def list_all():
-    """List all saved charts."""
-    charts = list_charts()
+async def list_all(status: str = Query("active", pattern="^(active|archived|all)$")):
+    """List saved charts, filtered by archive status.
+
+    - `active` (default): excludes archived charts
+    - `archived`: only archived charts
+    - `all`: everything
+    """
+    charts = list_charts(status=status)
     return [_chart_to_response(c) for c in charts]
 
 
@@ -642,6 +651,47 @@ async def publish_chart(chart_id: str):
 async def unpublish_chart(chart_id: str):
     """Unpublish a chart, reverting it to draft status."""
     chart = update_chart(chart_id, status="draft")
+    if not chart:
+        raise HTTPException(status_code=404, detail="Chart not found")
+    return _chart_to_response(chart)
+
+
+# ── Archive / Restore ─────────────────────────────────────────────────────
+
+@router.put("/{chart_id}/archive", response_model=SavedChartResponse)
+async def archive_chart(chart_id: str):
+    """Archive a chart (soft-delete). Idempotent — re-archiving is a no-op."""
+    from ..services.chart_storage import load_chart as _load
+
+    existing = _load(chart_id)
+    if not existing:
+        raise HTTPException(status_code=404, detail="Chart not found")
+
+    # If already archived, return as-is (idempotent)
+    if existing.archived_at is not None:
+        return _chart_to_response(existing)
+
+    now = datetime.now(timezone.utc).isoformat()
+    chart = update_chart(chart_id, archived_at=now)
+    if not chart:
+        raise HTTPException(status_code=404, detail="Chart not found")
+    return _chart_to_response(chart)
+
+
+@router.put("/{chart_id}/restore", response_model=SavedChartResponse)
+async def restore_chart(chart_id: str):
+    """Restore an archived chart. Idempotent — restoring a non-archived chart is a no-op."""
+    from ..services.chart_storage import load_chart as _load
+
+    existing = _load(chart_id)
+    if not existing:
+        raise HTTPException(status_code=404, detail="Chart not found")
+
+    # If not archived, return as-is (idempotent)
+    if existing.archived_at is None:
+        return _chart_to_response(existing)
+
+    chart = update_chart(chart_id, archived_at=None)
     if not chart:
         raise HTTPException(status_code=404, detail="Chart not found")
     return _chart_to_response(chart)

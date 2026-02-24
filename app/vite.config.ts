@@ -20,4 +20,12 @@ export default defineConfig({
       },
     },
   },
+  build: {
+    rollupOptions: {
+      input: {
+        main: path.resolve(__dirname, 'index.html'),
+        embed: path.resolve(__dirname, 'embed.html'),
+      },
+    },
+  },
 })
