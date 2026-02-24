@@ -22,6 +22,14 @@ interface ChartData {
   columns: string[]
 }
 
+/** Format staleness age into a human-readable string. */
+function formatAge(seconds: number): string {
+  if (seconds < 60) return `${seconds}s ago`
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`
+  return `${Math.floor(seconds / 86400)}d ago`
+}
+
 /**
  * Minimal embed view for charts. No navigation, no header, no footer.
  * Just the chart with optional title/source. Sends PostMessage to parent
@@ -31,6 +39,8 @@ export function EmbedChartPage() {
   const { chartId } = useParams<{ chartId: string }>()
   const [chartData, setChartData] = useState<ChartData | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [lastRefreshed, setLastRefreshed] = useState<number | null>(null)
+  const [displayAge, setDisplayAge] = useState<string | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
 
   // Fetch chart data
@@ -41,9 +51,45 @@ export function EmbedChartPage() {
         if (!res.ok) throw new Error('Chart not found')
         return res.json()
       })
-      .then(setChartData)
+      .then((data) => {
+        setChartData(data)
+        setLastRefreshed(Date.now())
+      })
       .catch((e) => setError(e.message))
   }, [chartId])
+
+  // Auto-refresh polling: re-fetch chart data at configured interval
+  useEffect(() => {
+    if (!chartData) return
+    const interval = chartData.chart.config?.refreshInterval as number
+    if (!interval || interval <= 0) return
+
+    const timer = setInterval(() => {
+      fetch(`/api/v2/charts/${chartId}`)
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => {
+          if (data) {
+            setChartData(data)
+            setLastRefreshed(Date.now())
+          }
+        })
+        .catch(() => {}) // silent retry on next interval
+    }, interval * 1000)
+
+    return () => clearInterval(timer)
+  }, [chartData?.chart.config?.refreshInterval, chartId])
+
+  // Update displayed staleness age every 10s
+  useEffect(() => {
+    if (!lastRefreshed) return
+    const tick = () => {
+      const age = Math.floor((Date.now() - lastRefreshed) / 1000)
+      setDisplayAge(formatAge(age))
+    }
+    tick()
+    const timer = setInterval(tick, 10_000)
+    return () => clearInterval(timer)
+  }, [lastRefreshed])
 
   // PostMessage height to parent for iframe auto-resize
   useEffect(() => {
@@ -129,6 +175,11 @@ export function EmbedChartPage() {
       {chart.source && (
         <p style={{ margin: '8px 0 0', fontSize: 11, color: '#999' }}>
           Source: {chart.source}
+        </p>
+      )}
+      {displayAge != null && Number(chart.config?.refreshInterval) > 0 && (
+        <p data-testid="staleness-indicator" style={{ margin: '4px 0 0', fontSize: 10, color: '#bbb' }}>
+          Updated {displayAge}
         </p>
       )}
     </div>

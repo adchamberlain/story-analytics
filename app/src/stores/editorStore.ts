@@ -56,6 +56,8 @@ export interface EditorConfig {
   geoProjection: string
   // Locale override
   locale: string
+  // Auto-refresh interval (seconds) for embed view — 0/undefined = off
+  refreshInterval: number
 }
 
 const DEFAULT_CONFIG: EditorConfig = {
@@ -99,6 +101,7 @@ const DEFAULT_CONFIG: EditorConfig = {
   geoColorScale: 'sequential',
   geoProjection: 'geoEqualEarth',
   locale: '',
+  refreshInterval: 0,
 }
 
 export interface TableInfoItem {
@@ -287,6 +290,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         geoColorScale: chart.config?.geoColorScale ?? 'sequential',
         geoProjection: chart.config?.geoProjection ?? 'geoEqualEarth',
         locale: chart.config?.locale ?? '',
+        refreshInterval: (chart.config?.refreshInterval as number) ?? 0,
       }
 
       const loadedDataMode = config.dataMode
@@ -497,6 +501,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
             geoColorScale: config.geoColorScale !== 'sequential' ? config.geoColorScale : undefined,
             geoProjection: config.geoProjection !== 'geoEqualEarth' ? config.geoProjection : undefined,
             locale: config.locale || undefined,
+            refreshInterval: config.refreshInterval || undefined,
           },
         }),
       })
@@ -757,6 +762,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
             geoColorScale: config.geoColorScale !== 'sequential' ? config.geoColorScale : undefined,
             geoProjection: config.geoProjection !== 'geoEqualEarth' ? config.geoProjection : undefined,
             locale: config.locale || undefined,
+            refreshInterval: config.refreshInterval || undefined,
           },
         }),
       })
