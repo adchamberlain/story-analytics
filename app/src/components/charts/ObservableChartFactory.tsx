@@ -1257,12 +1257,19 @@ function buildPlotOptions(
 
   // Axis labels — suppress Observable Plot's default column-name labels
   // (they overlap tick marks). Only show when user explicitly sets a title.
+  // Determine tick rotation: explicit config, or auto-rotate for narrow widths
+  const tickRotate = config.tickAngle ?? (width < 500 ? -45 : 0)
   overrides.x = {
     ...(overrides.x as Record<string, unknown> ?? {}),
     ...getBaseAxis(),
     label: config.xAxisTitle || null,
     // Center the label below the tick marks instead of inline at the right edge
     ...(config.xAxisTitle ? { labelAnchor: 'center', labelOffset: 36, labelArrow: false } : {}),
+    ...(tickRotate ? { tickRotate, textAnchor: 'end' } : {}),
+  }
+  // Extra bottom margin for rotated labels
+  if (tickRotate) {
+    overrides.marginBottom = Math.max((overrides.marginBottom as number | undefined) ?? 30, 60)
   }
   // Never let Observable Plot render the y-axis label — we render it manually
   // after plot creation (see appendYAxisLabel) to avoid overlap with tick values.
@@ -1524,10 +1531,14 @@ function PieChartComponent({ data, config, height, autoHeight }: { data: Record<
       .innerRadius(innerR)
       .outerRadius(radius)
 
+    // Expand viewBox to prevent left-side label clipping — labels at
+    // radius*1.25 plus text can exceed the centered group's left boundary.
+    const labelOverflow = isExternal ? hLabelSpace + 20 : 0
+    const svgWidth = width + labelOverflow * 2
     const svg = d3.select(el).append('svg')
       .attr('width', width)
       .attr('height', effectiveHeight)
-      .attr('viewBox', `0 0 ${width} ${effectiveHeight}`)
+      .attr('viewBox', `${-labelOverflow} 0 ${svgWidth} ${effectiveHeight}`)
 
     const g = svg.append('g')
       .attr('transform', `translate(${width / 2},${effectiveHeight / 2})`)

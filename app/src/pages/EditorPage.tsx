@@ -271,15 +271,15 @@ export function EditorPage() {
         </div>
       )}
 
-      {/* Three-pane layout */}
-      <div className="flex flex-1 min-h-0 overflow-hidden">
-        {/* Left: Toolbox */}
-        <aside className="w-[280px] border-r border-border-default bg-surface overflow-y-auto shrink-0">
+      {/* Three-pane layout — stacks vertically on mobile */}
+      <div className="flex flex-col lg:flex-row flex-1 min-h-0 overflow-hidden">
+        {/* Left: Toolbox — hidden on mobile, visible on lg+ */}
+        <aside className="hidden lg:block w-[280px] border-r border-border-default bg-surface overflow-y-auto shrink-0">
           <Toolbox />
         </aside>
 
         {/* Center: Chart Preview */}
-        <main className="flex-1 p-6 overflow-y-auto flex items-start justify-center">
+        <main className="flex-1 p-4 lg:p-6 overflow-y-auto flex items-start justify-center">
           <div className="w-full max-w-3xl">
             {showEmptyState ? (
               <div className="flex items-center justify-center h-80 border-2 border-dashed border-border-default rounded-xl">
@@ -310,8 +310,8 @@ export function EditorPage() {
           </div>
         </main>
 
-        {/* Right: AI Chat */}
-        <aside className="w-[320px] border-l border-border-default bg-surface shrink-0">
+        {/* Right: AI Chat — hidden on mobile, visible on lg+ */}
+        <aside className="hidden lg:block w-[320px] border-l border-border-default bg-surface shrink-0">
           <AIChat />
         </aside>
       </div>

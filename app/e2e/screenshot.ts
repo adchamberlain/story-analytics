@@ -5,7 +5,10 @@
 import { chromium } from '@playwright/test'
 import path from 'path'
 import fs from 'fs'
+import { fileURLToPath } from 'url'
 
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
 const SCREENSHOT_DIR = path.resolve(__dirname, '../../tasks/screenshots')
 
 interface CaptureOptions {
@@ -52,9 +55,10 @@ async function capture(options: CaptureOptions): Promise<string> {
 
 // CLI interface
 const args = process.argv.slice(2)
-const name = args[0] || `screenshot-${Date.now()}`
-const url = args[1] || 'http://localhost:3001'
-const selector = args[2] || undefined
+const positional = args.filter((a) => !a.startsWith('--'))
+const name = positional[0] || `screenshot-${Date.now()}`
+const url = positional[1] || 'http://localhost:3001'
+const selector = positional[2] || undefined
 
 // Parse --viewport=WIDTHxHEIGHT
 const viewportArg = args.find((a) => a.startsWith('--viewport='))
