@@ -40,6 +40,14 @@ export interface EditorConfig {
   metricLabel: string | null
   unitColumn: string | null
   tooltipTemplate: string
+  // Range plot
+  minColumn: string | null
+  maxColumn: string | null
+  // Bullet bar
+  targetColumn: string | null
+  // Small multiples
+  facetColumn: string | null
+  chartSubtype: 'line' | 'bar' | 'area' | 'scatter'
 }
 
 const DEFAULT_CONFIG: EditorConfig = {
@@ -72,6 +80,11 @@ const DEFAULT_CONFIG: EditorConfig = {
   metricLabel: null,
   unitColumn: null,
   tooltipTemplate: '',
+  minColumn: null,
+  maxColumn: null,
+  targetColumn: null,
+  facetColumn: null,
+  chartSubtype: 'line',
 }
 
 export interface TableInfoItem {
@@ -245,6 +258,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         metricLabel: chart.config?.metricLabel ?? null,
         unitColumn: chart.config?.unitColumn ?? null,
         tooltipTemplate: chart.config?.tooltipTemplate ?? '',
+        minColumn: chart.config?.minColumn ?? null,
+        maxColumn: chart.config?.maxColumn ?? null,
+        targetColumn: chart.config?.targetColumn ?? null,
+        facetColumn: chart.config?.facetColumn ?? null,
+        chartSubtype: chart.config?.chartSubtype ?? 'line',
       }
 
       const loadedDataMode = config.dataMode
@@ -444,6 +462,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
             metricLabel: config.metricLabel,
             unitColumn: config.unitColumn,
             tooltipTemplate: config.tooltipTemplate || undefined,
+            minColumn: config.minColumn ?? undefined,
+            maxColumn: config.maxColumn ?? undefined,
+            targetColumn: config.targetColumn ?? undefined,
+            facetColumn: config.facetColumn ?? undefined,
+            chartSubtype: config.chartSubtype !== 'line' ? config.chartSubtype : undefined,
           },
         }),
       })
@@ -693,6 +716,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
             metricLabel: config.metricLabel,
             unitColumn: config.unitColumn,
             tooltipTemplate: config.tooltipTemplate || undefined,
+            minColumn: config.minColumn ?? undefined,
+            maxColumn: config.maxColumn ?? undefined,
+            targetColumn: config.targetColumn ?? undefined,
+            facetColumn: config.facetColumn ?? undefined,
+            chartSubtype: config.chartSubtype !== 'line' ? config.chartSubtype : undefined,
           },
         }),
       })

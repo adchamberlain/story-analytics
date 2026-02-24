@@ -54,7 +54,7 @@ export function Toolbox() {
 
   const isBar = config.chartType === 'BarChart'
   const isBigValue = config.chartType === 'BigValue'
-  const hasSeriesOption = ['BarChart', 'LineChart', 'AreaChart', 'ScatterPlot'].includes(config.chartType)
+  const hasSeriesOption = ['BarChart', 'LineChart', 'AreaChart', 'ScatterPlot', 'DotPlot', 'SmallMultiples'].includes(config.chartType)
   const isSqlMode = config.dataMode === 'sql'
   const sqlHasResults = isSqlMode && data.length > 0
   // Derive actual result columns from data keys — the store's `columns` may still
@@ -274,6 +274,61 @@ export function Toolbox() {
                       <option value="year">Yearly</option>
                     </select>
                   </div>
+                )}
+                {config.chartType === 'RangePlot' && (
+                  <>
+                    <ColumnDropdown
+                      label="Min Column"
+                      value={config.minColumn ?? null}
+                      columns={isSqlMode ? sqlResultColumns : columns}
+                      columnTypes={columnTypes}
+                      allowNone
+                      onChange={(minColumn) => updateConfig({ minColumn })}
+                    />
+                    <ColumnDropdown
+                      label="Max Column"
+                      value={config.maxColumn ?? null}
+                      columns={isSqlMode ? sqlResultColumns : columns}
+                      columnTypes={columnTypes}
+                      allowNone
+                      onChange={(maxColumn) => updateConfig({ maxColumn })}
+                    />
+                  </>
+                )}
+                {config.chartType === 'BulletBar' && (
+                  <ColumnDropdown
+                    label="Target Column"
+                    value={config.targetColumn ?? null}
+                    columns={isSqlMode ? sqlResultColumns : columns}
+                    columnTypes={columnTypes}
+                    allowNone
+                    onChange={(targetColumn) => updateConfig({ targetColumn })}
+                  />
+                )}
+                {config.chartType === 'SmallMultiples' && (
+                  <>
+                    <ColumnDropdown
+                      label="Facet By"
+                      value={config.facetColumn ?? null}
+                      columns={isSqlMode ? sqlResultColumns : columns}
+                      columnTypes={columnTypes}
+                      allowNone
+                      onChange={(facetColumn) => updateConfig({ facetColumn })}
+                    />
+                    <div>
+                      <label className="block text-xs font-medium text-text-secondary mb-1">Mark Type</label>
+                      <select
+                        value={config.chartSubtype ?? 'line'}
+                        onChange={(e) => updateConfig({ chartSubtype: e.target.value as 'line' | 'bar' | 'area' | 'scatter' })}
+                        className="w-full px-2 py-1.5 text-sm border border-border-default rounded-md bg-surface text-text-primary focus:outline-none focus:border-blue-400"
+                      >
+                        <option value="line">Line</option>
+                        <option value="bar">Bar</option>
+                        <option value="area">Area</option>
+                        <option value="scatter">Scatter</option>
+                      </select>
+                    </div>
+                  </>
                 )}
               </>
             )}

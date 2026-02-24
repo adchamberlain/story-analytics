@@ -293,6 +293,14 @@ function buildMarks(
       return buildHeatMapMarks(data, x, y, series, colors)
     case 'BoxPlot':
       return buildBoxPlotMarks(data, x, y, colors)
+    case 'DotPlot':
+      return buildDotPlotMarks(data, x, y, series, config, colors)
+    case 'RangePlot':
+      return buildRangePlotMarks(data, x, y, config, colors)
+    case 'BulletBar':
+      return buildBulletBarMarks(data, x, y, config, colors)
+    case 'SmallMultiples':
+      return buildSmallMultiplesMarks(data, x, y, series, config, colors)
     default:
       // Fallback: render as bar chart
       return buildBarMarks(data, x, y, series, config, colors)
@@ -516,6 +524,169 @@ function buildBoxPlotMarks(
   return [
     Plot.boxY(data, { x, y, fill: colors[0] }),
   ]
+}
+
+function buildDotPlotMarks(
+  data: Record<string, unknown>[],
+  x: string | undefined,
+  y: string | undefined,
+  series: string | undefined,
+  config: ChartConfig,
+  colors: readonly string[] | string[]
+): Plot.Markish[] {
+  if (!x || !y) return []
+
+  const r = config.markerSize ?? 5
+  const marks: Plot.Markish[] = []
+
+  // Cleveland dot plot: horizontal, category on y-axis, value on x-axis
+  // Draw faint rule from 0 to each dot
+  marks.push(
+    Plot.ruleX([0], { strokeOpacity: 0.2 }),
+  )
+
+  if (series) {
+    marks.push(
+      Plot.dot(data, { x: y, y: x, fill: series, r, fillOpacity: 0.85 }),
+      Plot.tip(data, Plot.pointer({ x: y, y: x, fill: series })),
+    )
+  } else {
+    marks.push(
+      Plot.ruleY(data, { y: x, x1: 0, x2: y, strokeOpacity: 0.2, stroke: colors[0] }),
+      Plot.dot(data, { x: y, y: x, fill: colors[0], r, fillOpacity: 0.85 }),
+      Plot.tip(data, Plot.pointer({ x: y, y: x })),
+    )
+  }
+
+  return marks
+}
+
+function buildRangePlotMarks(
+  data: Record<string, unknown>[],
+  x: string | undefined,
+  y: string | undefined,
+  config: ChartConfig,
+  colors: readonly string[] | string[]
+): Plot.Markish[] {
+  // Range plot: x = category, y = midpoint (optional), minColumn/maxColumn required
+  const minCol = config.minColumn
+  const maxCol = config.maxColumn
+  const cat = x
+
+  if (!cat || !minCol || !maxCol) {
+    // Fall back to showing dots if min/max columns not set
+    if (x && y) {
+      return [
+        Plot.dot(data, { x, y, fill: colors[0], r: 5, fillOpacity: 0.85 }),
+        Plot.tip(data, Plot.pointer({ x, y })),
+      ]
+    }
+    return []
+  }
+
+  const marks: Plot.Markish[] = []
+
+  // Horizontal range bars: category on y-axis, range on x-axis
+  marks.push(
+    Plot.ruleY(data, { y: cat, x1: minCol, x2: maxCol, stroke: colors[0], strokeWidth: 3 }),
+    Plot.dot(data, { x: minCol, y: cat, fill: colors[0], r: 5 }),
+    Plot.dot(data, { x: maxCol, y: cat, fill: colors[0], r: 5 }),
+    Plot.tip(data, Plot.pointer({ x: minCol, y: cat })),
+  )
+
+  return marks
+}
+
+function buildBulletBarMarks(
+  data: Record<string, unknown>[],
+  x: string | undefined,
+  y: string | undefined,
+  config: ChartConfig,
+  colors: readonly string[] | string[]
+): Plot.Markish[] {
+  // Bullet chart: x = category, y = actual value, targetColumn = target
+  const cat = x
+  const actual = y
+  const targetCol = config.targetColumn
+
+  if (!cat || !actual) return []
+
+  const marks: Plot.Markish[] = []
+
+  // Thin background bar to max value for context (light gray)
+  marks.push(
+    Plot.barX(data, { y: cat, x: actual, fill: colors[0], fillOpacity: 0.7 }),
+  )
+
+  // Target marker as a vertical rule
+  if (targetCol) {
+    marks.push(
+      Plot.ruleX(data, { x: targetCol, y1: (d: Record<string, unknown>) => d[cat!], y2: (d: Record<string, unknown>) => d[cat!], stroke: '#333', strokeWidth: 2.5 }),
+    )
+    // Use tick marks for target instead (more visible)
+    marks.push(
+      Plot.tickX(data, { x: targetCol, y: cat, stroke: '#333', strokeWidth: 2.5 }),
+    )
+  }
+
+  marks.push(
+    Plot.tip(data, Plot.pointer({ x: actual, y: cat })),
+  )
+
+  return marks
+}
+
+function buildSmallMultiplesMarks(
+  data: Record<string, unknown>[],
+  x: string | undefined,
+  y: string | undefined,
+  series: string | undefined,
+  config: ChartConfig,
+  colors: readonly string[] | string[]
+): Plot.Markish[] {
+  if (!x || !y) return []
+
+  const facet = config.facetColumn ?? series
+  if (!facet) {
+    // No facet column: fall back to line chart
+    return [
+      Plot.lineY(maybeParseDates(data, x), { x, y, stroke: colors[0], strokeWidth: 2 }),
+      Plot.tip(data, Plot.pointerX({ x, y })),
+    ]
+  }
+
+  const subtype = config.chartSubtype ?? 'line'
+  const lineData = subtype === 'line' || subtype === 'area' ? maybeParseDates(data, x) : data
+  const marks: Plot.Markish[] = []
+
+  switch (subtype) {
+    case 'bar':
+      marks.push(
+        Plot.barY(lineData, { x, y, fill: colors[0], fy: facet }),
+        Plot.tip(lineData, Plot.pointerX({ x, y, fy: facet })),
+      )
+      break
+    case 'area':
+      marks.push(
+        Plot.areaY(lineData, { x, y, fill: colors[0], fillOpacity: 0.3, fy: facet }),
+        Plot.lineY(lineData, { x, y, stroke: colors[0], strokeWidth: 2, fy: facet }),
+        Plot.tip(lineData, Plot.pointerX({ x, y, fy: facet })),
+      )
+      break
+    case 'scatter':
+      marks.push(
+        Plot.dot(lineData, { x, y, fill: colors[0], r: 4, fy: facet }),
+        Plot.tip(lineData, Plot.pointer({ x, y, fy: facet })),
+      )
+      break
+    default: // 'line'
+      marks.push(
+        Plot.lineY(lineData, { x, y, stroke: colors[0], strokeWidth: 2, fy: facet }),
+        Plot.tip(lineData, Plot.pointerX({ x, y, fy: facet })),
+      )
+  }
+
+  return marks
 }
 
 // ── Annotation Mark Builders ────────────────────────────────────────────────
@@ -1063,7 +1234,7 @@ function buildPlotOptions(
     grid: true,
   }
   // Horizontal bars need wider left margin for categorical labels
-  if (config.horizontal) {
+  if (config.horizontal || chartType === 'DotPlot' || chartType === 'RangePlot' || chartType === 'BulletBar') {
     overrides.marginLeft = 100
   }
 
@@ -1117,6 +1288,14 @@ function buildPlotOptions(
     const yOpts = (overrides.y as Record<string, unknown>) ?? { ...getBaseAxis() }
     yOpts.grid = false
     overrides.y = yOpts
+  }
+
+  // Small multiples: add facet y-axis configuration
+  if (chartType === 'SmallMultiples') {
+    const facet = config.facetColumn ?? config.series
+    if (facet) {
+      overrides.fy = { label: null }
+    }
   }
 
   // Color range — legend is always suppressed here; we render a custom React legend instead.
