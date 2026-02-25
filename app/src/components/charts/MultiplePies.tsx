@@ -19,6 +19,7 @@ interface MultiplePiesProps {
 export function MultiplePies({ data, config, height, autoHeight }: MultiplePiesProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [containerWidth, setContainerWidth] = useState(0)
+  const [tooltip, setTooltip] = useState<{ x: number; y: number; text: string } | null>(null)
   const resolved = useThemeStore((s) => s.resolved)
   const chartTheme = useChartThemeStore((s) => s.theme)
 
@@ -70,7 +71,7 @@ export function MultiplePies({ data, config, height, autoHeight }: MultiplePiesP
     // Reserve space for legend within effective height
     const availableForPies = effectiveHeight - legendHeight - 8
     const actualCellHeight = Math.min(cellHeight, availableForPies / rows)
-    const chartRadius = Math.max(15, Math.min(cellWidth, actualCellHeight - titleHeight) / 2 - 6)
+    const chartRadius = Math.max(15, Math.min(cellWidth, actualCellHeight - titleHeight) / 2 - 2)
 
     const isDonut = config.pieVariant === 'donut'
     const innerRadius = isDonut ? chartRadius * 0.5 : 0
@@ -85,6 +86,7 @@ export function MultiplePies({ data, config, height, autoHeight }: MultiplePiesP
     const svg = d3.select(el).append('svg')
       .attr('width', width)
       .attr('height', svgHeight)
+      .style('overflow', 'hidden')
 
     const pie = d3.pie<{ label: string; value: number }>().value((d) => d.value).sort(null)
     const arc = d3.arc<d3.PieArcDatum<{ label: string; value: number }>>()
@@ -122,6 +124,8 @@ export function MultiplePies({ data, config, height, autoHeight }: MultiplePiesP
 
       const arcs = pie(pieData)
 
+      const total = d3.sum(pieData, (d) => d.value)
+
       g.selectAll('path')
         .data(arcs)
         .join('path')
@@ -129,31 +133,25 @@ export function MultiplePies({ data, config, height, autoHeight }: MultiplePiesP
         .attr('fill', (d) => colorScale(d.data.label))
         .attr('stroke', sliceStroke)
         .attr('stroke-width', 1)
-
-      // Internal percentage labels (only if large enough)
-      const labelArc = d3.arc<d3.PieArcDatum<{ label: string; value: number }>>()
-        .innerRadius(chartRadius * 0.6)
-        .outerRadius(chartRadius * 0.6)
-
-      const total = d3.sum(pieData, (d) => d.value)
-
-      if (chartRadius >= 30) {
-        g.selectAll('text.label')
-          .data(arcs)
-          .join('text')
-          .attr('class', 'label')
-          .attr('transform', (d) => `translate(${labelArc.centroid(d)})`)
-          .attr('text-anchor', 'middle')
-          .attr('dominant-baseline', 'central')
-          .attr('font-size', 12)
-          .attr('font-weight', 500)
-          .attr('font-family', chartTheme.font.family)
-          .attr('fill', textColor)
-          .text((d) => {
-            const pct = (d.data.value / total) * 100
-            return pct >= 5 ? `${pct.toFixed(0)}%` : ''
+        .style('cursor', 'pointer')
+        .on('mouseenter', function (event, d) {
+          d3.select(this).attr('opacity', 0.8)
+          const pct = ((d.data.value / total) * 100).toFixed(0)
+          const rect = el.getBoundingClientRect()
+          setTooltip({
+            x: event.clientX - rect.left,
+            y: event.clientY - rect.top,
+            text: `${d.data.label}: ${pct}%`,
           })
-      }
+        })
+        .on('mousemove', function (event) {
+          const rect = el.getBoundingClientRect()
+          setTooltip((prev) => prev ? { ...prev, x: event.clientX - rect.left, y: event.clientY - rect.top } : null)
+        })
+        .on('mouseleave', function () {
+          d3.select(this).attr('opacity', 1)
+          setTooltip(null)
+        })
     })
 
     // Color legend at bottom — collect unique labels in order
@@ -180,5 +178,32 @@ export function MultiplePies({ data, config, height, autoHeight }: MultiplePiesP
   }, [data, config, height, autoHeight, resolved, chartTheme, containerWidth])
 
   if (data.length === 0) return <p className="text-sm text-text-muted">No data</p>
-  return <div ref={containerRef} style={{ width: '100%', ...(autoHeight ? { height: '100%' } : { height }) }} />
+  return (
+    <div style={{ width: '100%', position: 'relative', ...(autoHeight ? { height: '100%' } : { height }) }}>
+      <div ref={containerRef} style={{ width: '100%', height: '100%' }} />
+      {tooltip && (
+        <div
+          style={{
+            position: 'absolute',
+            ...(tooltip.x > containerWidth * 0.6
+              ? { right: containerWidth - tooltip.x + 12 }
+              : { left: tooltip.x + 12 }),
+            top: tooltip.y - 30,
+            background: 'var(--color-surface-raised, #1e293b)',
+            color: 'var(--color-text-primary, #e2e8f0)',
+            border: '1px solid var(--color-border-default, #334155)',
+            borderRadius: 6,
+            padding: '6px 10px',
+            fontSize: 12,
+            pointerEvents: 'none',
+            zIndex: 10,
+            whiteSpace: 'nowrap',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+          }}
+        >
+          {tooltip.text}
+        </div>
+      )}
+    </div>
+  )
 }
