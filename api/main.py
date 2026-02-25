@@ -28,6 +28,7 @@ from .routers.api_keys import router as api_keys_router  # noqa: E402
 from .routers.comments import router as comments_router  # noqa: E402
 from .routers.teams import router as teams_router  # noqa: E402
 from .routers.notifications import router as notifications_router  # noqa: E402
+from .routers.transforms import router as transforms_router  # noqa: E402
 
 settings = get_settings()
 
@@ -117,6 +118,7 @@ app.include_router(api_keys_router, prefix="/api")
 app.include_router(comments_router, prefix="/api")
 app.include_router(teams_router, prefix="/api")
 app.include_router(notifications_router, prefix="/api")
+app.include_router(transforms_router, prefix="/api")
 
 
 @app.on_event("startup")

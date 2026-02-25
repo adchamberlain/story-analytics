@@ -348,3 +348,26 @@
 | Backend (pytest) | 163 |
 | Frontend (vitest) | 542 |
 | **Total** | **705** |
+
+---
+
+## Phase 8, Session N: Data Transforms
+
+### Task N.1: Backend Transform Endpoints
+- [ ] Create `api/routers/transforms.py` with 8 transform endpoints
+- [ ] Create `api/tests/test_transforms.py` with ~15 tests
+- [ ] Register transforms router in `api/main.py`
+- [ ] All backend tests pass
+
+### Task N.2: Frontend Transform Store
+- [ ] Add 8 transform API methods to `app/src/stores/dataStore.ts`
+
+### Task N.3: DataTransformGrid Component
+- [ ] Create `app/src/components/editor/DataTransformGrid.tsx`
+- [ ] Create `app/src/tests/data-transforms.test.tsx` with ~5 tests
+- [ ] All frontend tests pass
+
+### Task N.4: Editor Integration
+- [ ] Add chart/transform view toggle to EditorPage
+- [ ] Wire onTransform callbacks to dataStore methods
+- [ ] All tests pass
