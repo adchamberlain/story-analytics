@@ -6,21 +6,28 @@ Publication-ready dashboards from any data source.
 
 ## What is Story Analytics?
 
-Story Analytics is an open-source dashboarding tool that produces publication-ready charts from any SQL database or CSV file. You build charts with a visual editor and built-in SQL workbench, arrange them on drag-and-drop dashboards, and export to SVG, PNG, or PDF.
+Story Analytics is an open-source dashboarding tool that produces publication-ready charts from any SQL database or CSV file. You build charts with a visual editor and built-in SQL workbench, arrange them on drag-and-drop dashboards, and export to SVG, PNG, PDF, or PowerPoint (PPTX).
 
 An AI assistant (Claude, GPT, or Gemini) is available to help write SQL, add calculated fields, and refine chart styling — but you're always in control.
 
 ## Features
 
-- **11 chart types** — Bar, line, area, scatter, histogram, heatmap, box plot, pie, treemap, KPI, and data table
+- **25 chart types** — Classic (bar, line, area, scatter, histogram, heatmap, box plot, pie, treemap, data table), Analytical (dot plot, range, bullet bar, small multiples, stacked/grouped column, split bars, arrow plot), Maps (choropleth, symbol, locator, spike), Specialty (KPI cards, election donut, multiple pies)
+- **Geographic maps** — 4 map types with basemap selection, zoom/pan, and label collision avoidance
 - **Observable Plot rendering** — Clean SVG output with publication-ready defaults
 - **Visual chart editor** — Pick chart types, map columns, adjust colors and labels with instant live preview
 - **SQL workbench** — Write custom queries, see results in a data table, map columns to chart axes
 - **Drag-and-drop dashboards** — Responsive grid layout, drag to reposition, resize to adjust
-- **Any data source** — Snowflake, PostgreSQL, BigQuery, or CSV upload
+- **Any data source** — Snowflake, PostgreSQL, BigQuery, Google Sheets, or CSV upload
 - **AI assistant** — Claude, GPT, or Gemini helps with SQL, derived metrics, and chart refinement
-- **Export** — SVG, PNG, and PDF for individual charts and full dashboards
-- **Annotations** — Reference lines, text labels, and highlighted ranges
+- **Export** — SVG, PNG, PDF, PowerPoint (PPTX), and CSV data download
+- **Data transforms** — Transpose, rename, delete, reorder, round, prepend/append, edit cells, cast types
+- **Version history** — Auto-save snapshots with one-click restore
+- **Annotations** — Reference lines, text labels, and highlighted ranges with responsive scaling
+- **Embedding** — Iframe embed with configurable flags (plain, static, transparent, logo, search)
+- **Collaboration** — Threaded comments, team management, and notifications
+- **API** — RESTful endpoints with key-based authentication
+- **Custom themes** — 9 built-in themes, custom CSS, 50+ Google Fonts, and logo upload
 - **KPI cards** — Single-number displays with comparison values, trend indicators, and color-coded deltas
 - **Color palettes** — Curated publication-ready palettes with professionally designed defaults
 - **Dark mode** — Full light/dark theme support
@@ -53,7 +60,7 @@ Open **http://localhost:3001** to start building.
 
 2. **Build your charts** — Use the visual editor to pick a chart type, map columns, and style your output. Switch to SQL mode for custom queries. The AI assistant can help write SQL and refine formatting.
 
-3. **Assemble dashboards** — Drag charts onto a responsive grid, arrange the layout, and save. Share via link or export as PDF.
+3. **Assemble dashboards** — Drag charts onto a responsive grid, arrange the layout, and save. Embed anywhere, share via link, or export as SVG, PNG, PDF, or PowerPoint.
 
 ## AI Providers
 
