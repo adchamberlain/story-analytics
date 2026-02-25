@@ -178,26 +178,28 @@ export function GeoPointMap({ data, config, height = 400, autoHeight = false, ma
         })
 
     } else if (mapVariant === 'spike') {
-      // Spike map: vertical lines from point, height proportional to value
+      // Spike map: tapered triangular spikes, height proportional to value
       const sizeValues = points.map((p) => p.sizeVal).filter((v): v is number => v !== null)
       const sizeExtent = sizeValues.length > 0 ? [d3.min(sizeValues)!, d3.max(sizeValues)!] : [0, 1]
       const maxSpikeHeight = Math.min(effectiveHeight * 0.3, 80)
-      const heightScale = d3.scaleLinear().domain(sizeExtent).range([4, maxSpikeHeight])
+      const heightScale = d3.scaleLinear().domain(sizeExtent).range([6, maxSpikeHeight])
 
-      mapGroupSel.selectAll('line.spike')
+      mapGroupSel.selectAll('path.spike')
         .data(points)
-        .join('line')
+        .join('path')
         .attr('class', 'spike')
-        .attr('x1', (d) => d.x)
-        .attr('y1', (d) => d.y)
-        .attr('x2', (d) => d.x)
-        .attr('y2', (d) => d.y - (d.sizeVal !== null ? heightScale(d.sizeVal) : 4))
+        .attr('d', (d) => {
+          const h = d.sizeVal !== null ? heightScale(d.sizeVal) : 6
+          const w = Math.max(1.5, h * 0.12)
+          return `M${d.x},${d.y} L${d.x - w},${d.y} L${d.x},${d.y - h} L${d.x + w},${d.y} Z`
+        })
+        .attr('fill', color)
+        .attr('fill-opacity', 0.7)
         .attr('stroke', color)
-        .attr('stroke-width', 2)
-        .attr('stroke-linecap', 'round')
+        .attr('stroke-width', 0.5)
         .style('cursor', 'pointer')
         .on('mouseenter', function (event, d) {
-          d3.select(this).attr('stroke-width', 3)
+          d3.select(this).attr('fill-opacity', 1).attr('stroke-width', 1.5)
           const rect = el!.getBoundingClientRect()
           setTooltip({
             x: event.clientX - rect.left,
@@ -211,7 +213,7 @@ export function GeoPointMap({ data, config, height = 400, autoHeight = false, ma
           setTooltip((prev) => prev ? { ...prev, x: event.clientX - rect.left, y: event.clientY - rect.top } : null)
         })
         .on('mouseleave', function () {
-          d3.select(this).attr('stroke-width', 2)
+          d3.select(this).attr('fill-opacity', 0.7).attr('stroke-width', 0.5)
           setTooltip(null)
         })
     }

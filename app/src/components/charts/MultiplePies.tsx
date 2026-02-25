@@ -63,9 +63,14 @@ export function MultiplePies({ data, config, height, autoHeight }: MultiplePiesP
     const rows = Math.ceil(numGroups / cols)
 
     const cellWidth = width / cols
-    const titleHeight = 20
+    const titleHeight = 24
     const cellHeight = Math.min((effectiveHeight - 10) / rows, cellWidth)
-    const chartRadius = Math.max(15, Math.min(cellWidth, cellHeight - titleHeight) / 2 - 10)
+
+    const legendHeight = 24
+    // Reserve space for legend within effective height
+    const availableForPies = effectiveHeight - legendHeight - 8
+    const actualCellHeight = Math.min(cellHeight, availableForPies / rows)
+    const chartRadius = Math.max(15, Math.min(cellWidth, actualCellHeight - titleHeight) / 2 - 6)
 
     const isDonut = config.pieVariant === 'donut'
     const innerRadius = isDonut ? chartRadius * 0.5 : 0
@@ -76,10 +81,10 @@ export function MultiplePies({ data, config, height, autoHeight }: MultiplePiesP
     const textColor = resolved === 'dark' ? '#e2e8f0' : '#374151'
     const sliceStroke = resolved === 'dark' ? '#1e293b' : '#ffffff'
 
-    const svgHeight = rows * cellHeight + 10
+    const svgHeight = effectiveHeight
     const svg = d3.select(el).append('svg')
       .attr('width', width)
-      .attr('height', Math.min(effectiveHeight, svgHeight))
+      .attr('height', svgHeight)
 
     const pie = d3.pie<{ label: string; value: number }>().value((d) => d.value).sort(null)
     const arc = d3.arc<d3.PieArcDatum<{ label: string; value: number }>>()
@@ -91,7 +96,7 @@ export function MultiplePies({ data, config, height, autoHeight }: MultiplePiesP
       const row = Math.floor(i / cols)
 
       const cx = col * cellWidth + cellWidth / 2
-      const cy = row * cellHeight + titleHeight + chartRadius
+      const cy = row * actualCellHeight + titleHeight + chartRadius
 
       const groupData = groups.get(groupKey) ?? []
       const pieData = groupData.map((d) => ({
@@ -104,9 +109,9 @@ export function MultiplePies({ data, config, height, autoHeight }: MultiplePiesP
       // Group title
       svg.append('text')
         .attr('x', cx)
-        .attr('y', row * cellHeight + 14)
+        .attr('y', row * actualCellHeight + 16)
         .attr('text-anchor', 'middle')
-        .attr('font-size', 11)
+        .attr('font-size', 14)
         .attr('font-weight', 600)
         .attr('font-family', chartTheme.font.family)
         .attr('fill', textColor)
@@ -140,7 +145,8 @@ export function MultiplePies({ data, config, height, autoHeight }: MultiplePiesP
           .attr('transform', (d) => `translate(${labelArc.centroid(d)})`)
           .attr('text-anchor', 'middle')
           .attr('dominant-baseline', 'central')
-          .attr('font-size', 9)
+          .attr('font-size', 12)
+          .attr('font-weight', 500)
           .attr('font-family', chartTheme.font.family)
           .attr('fill', textColor)
           .text((d) => {
@@ -148,6 +154,27 @@ export function MultiplePies({ data, config, height, autoHeight }: MultiplePiesP
             return pct >= 5 ? `${pct.toFixed(0)}%` : ''
           })
       }
+    })
+
+    // Color legend at bottom — collect unique labels in order
+    const allLabels: string[] = []
+    const labelSeen = new Set<string>()
+    for (const row of data) {
+      const lbl = String(row[labelField] ?? '')
+      if (lbl && !labelSeen.has(lbl)) { labelSeen.add(lbl); allLabels.push(lbl) }
+    }
+    const legendItemWidths = allLabels.map((l) => l.length * 7.5 + 28)
+    const totalLw = legendItemWidths.reduce((a, b) => a + b, 0)
+    const legendY = rows * actualCellHeight + 6
+    const legendGrp = svg.append('g')
+      .attr('transform', `translate(${(width - totalLw) / 2},${legendY})`)
+    let lx = 0
+    allLabels.forEach((label, idx) => {
+      const lg = legendGrp.append('g').attr('transform', `translate(${lx},0)`)
+      lg.append('rect').attr('width', 10).attr('height', 10).attr('rx', 2).attr('fill', colorScale(label))
+      lg.append('text').attr('x', 14).attr('y', 10).attr('font-size', 13)
+        .attr('font-family', chartTheme.font.family).attr('fill', textColor).text(label)
+      lx += legendItemWidths[idx]
     })
 
   }, [data, config, height, autoHeight, resolved, chartTheme, containerWidth])

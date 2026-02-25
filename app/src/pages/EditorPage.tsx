@@ -216,6 +216,11 @@ export function EditorPage() {
     targetColumn: store.config.targetColumn ?? undefined,
     facetColumn: store.config.facetColumn ?? undefined,
     chartSubtype: store.config.chartSubtype !== 'line' ? store.config.chartSubtype : undefined,
+    leftColumn: store.config.leftColumn ?? undefined,
+    rightColumn: store.config.rightColumn ?? undefined,
+    startColumn: store.config.startColumn ?? undefined,
+    endColumn: store.config.endColumn ?? undefined,
+    pieVariant: store.config.pieVariant !== 'pie' ? store.config.pieVariant : undefined,
     // Choropleth/map fields
     basemap: store.config.basemap || undefined,
     geoJoinColumn: store.config.geoJoinColumn ?? undefined,

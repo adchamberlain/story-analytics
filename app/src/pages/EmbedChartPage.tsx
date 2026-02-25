@@ -1,10 +1,9 @@
 import { useEffect, useState, useRef } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
 import { ObservableChartFactory } from '../components/charts/ObservableChartFactory'
-import { PALETTES } from '../themes/plotTheme'
 import { parseEmbedFlags } from '../utils/embedFlags'
+import { buildChartConfig } from '../utils/buildChartConfig'
 import type { ChartConfig, ChartType } from '../types/chart'
-import type { PaletteKey } from '../themes/plotTheme'
 
 interface ChartData {
   chart: {
@@ -191,33 +190,7 @@ export function EmbedChartPage() {
   }
 
   const { chart, data } = chartData
-  const isMultiY = Array.isArray(chart.y) && chart.y.length > 1
-  const chartConfig: ChartConfig = {
-    x: chart.x ?? undefined,
-    y: isMultiY ? 'metric_value' : (Array.isArray(chart.y) ? chart.y[0] : chart.y) ?? undefined,
-    series: isMultiY ? 'metric_name' : chart.series ?? undefined,
-    horizontal: chart.horizontal,
-    sort: chart.sort,
-    stacked: (chart.config?.stacked as boolean) ?? false,
-    showGrid: (chart.config?.showGrid as boolean) ?? true,
-    showLegend: (chart.config?.showLegend as boolean) ?? true,
-    showValues: (chart.config?.showValues as boolean) ?? false,
-    xAxisTitle: (chart.config?.xAxisTitle as string) || undefined,
-    yAxisTitle: (chart.config?.yAxisTitle as string) || undefined,
-    annotations: (chart.config?.annotations as ChartConfig['annotations']) ?? undefined,
-    value: (chart.config?.value as string) ?? undefined,
-    comparisonValue: (chart.config?.comparisonValue as string) ?? undefined,
-    comparisonLabel: (chart.config?.comparisonLabel as string) || undefined,
-    valueFormat: (chart.config?.valueFormat as ChartConfig['valueFormat']) || undefined,
-    positiveIsGood: (chart.config?.positiveIsGood as boolean) ?? true,
-    metricLabel: (chart.config?.metricLabel as string) ?? undefined,
-  }
-
-  const paletteKey = (chart.config?.palette as PaletteKey) ?? 'default'
-  const paletteColors = PALETTES[paletteKey] ?? PALETTES.default
-  if (paletteKey !== 'default') {
-    chartConfig.colorRange = paletteColors
-  }
+  const chartConfig = buildChartConfig(chart)
 
   // Build effective config with embed flag overrides
   const effectiveConfig: ChartConfig = {

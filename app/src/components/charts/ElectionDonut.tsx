@@ -19,6 +19,7 @@ interface ElectionDonutProps {
 export function ElectionDonut({ data, config, height, autoHeight }: ElectionDonutProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [containerWidth, setContainerWidth] = useState(0)
+  const [tooltip, setTooltip] = useState<{ x: number; y: number; text: string } | null>(null)
   const resolved = useThemeStore((s) => s.resolved)
   const chartTheme = useChartThemeStore((s) => s.theme)
 
@@ -38,7 +39,7 @@ export function ElectionDonut({ data, config, height, autoHeight }: ElectionDonu
     const el = containerRef.current
     if (!el) return
 
-    el.innerHTML = ''
+    d3.select(el).selectAll('svg').remove()
 
     if (data.length === 0) return
 
@@ -66,7 +67,17 @@ export function ElectionDonut({ data, config, height, autoHeight }: ElectionDonu
     // Arrange seats in semicircular rows
     const seats = layoutHemicycle(parties, totalSeats)
 
-    const radius = Math.min(width / 2 - 20, effectiveHeight - 40)
+    // Pre-calculate legend row count for sizing
+    const preItemWidths = parties.map((p) =>
+      Math.max(70, p.label.length * 7.5 + 34 + String(p.seats).length * 7.5)
+    )
+    let preRows = 1; let preRowW = 0
+    preItemWidths.forEach((w, i) => {
+      const gap = i > 0 ? 10 : 0
+      if (preRowW + w + gap > width && i > 0) { preRows++; preRowW = w } else { preRowW += w + gap }
+    })
+    const legendHeight = preRows * 18 + 8
+    const radius = Math.min(width / 2 - 20, effectiveHeight - legendHeight - 22)
     if (radius <= 0) return
 
     const svg = d3.select(el).append('svg')
@@ -74,9 +85,13 @@ export function ElectionDonut({ data, config, height, autoHeight }: ElectionDonu
       .attr('height', effectiveHeight)
 
     const g = svg.append('g')
-      .attr('transform', `translate(${width / 2},${effectiveHeight - 10})`)
+      .attr('transform', `translate(${width / 2},${effectiveHeight - legendHeight - 14})`)
 
     const textColor = resolved === 'dark' ? '#e2e8f0' : '#374151'
+
+    // Build seat count by party for tooltips
+    const seatsByParty = new Map<string, number>()
+    for (const p of parties) seatsByParty.set(p.label, p.seats)
 
     // Draw seat dots
     g.selectAll('circle.seat')
@@ -87,33 +102,78 @@ export function ElectionDonut({ data, config, height, autoHeight }: ElectionDonu
       .attr('cy', (d) => d.y * radius)
       .attr('r', Math.max(2, Math.min(8, radius / (Math.sqrt(totalSeats) * 1.2))))
       .attr('fill', (d) => colorScale(d.party))
+      .style('cursor', 'pointer')
+      .on('mouseenter', function (event, d) {
+        d3.select(this).attr('stroke', '#000').attr('stroke-width', 1.5)
+        const rect = el.getBoundingClientRect()
+        setTooltip({
+          x: event.clientX - rect.left,
+          y: event.clientY - rect.top - 28,
+          text: `${d.party}: ${seatsByParty.get(d.party) ?? 0} seats`,
+        })
+      })
+      .on('mousemove', function (event) {
+        const rect = el.getBoundingClientRect()
+        setTooltip((prev) => prev ? { ...prev, x: event.clientX - rect.left, y: event.clientY - rect.top - 28 } : null)
+      })
+      .on('mouseleave', function () {
+        d3.select(this).attr('stroke', null).attr('stroke-width', null)
+        setTooltip(null)
+      })
 
-    // Legend below
-    const legendG = svg.append('g')
-      .attr('transform', `translate(${width / 2},${effectiveHeight - 4})`)
+    // Legend below — wrap into rows if needed
+    const legendFontSize = 13
+    const itemGap = 10
+    const itemWidths = parties.map((p) =>
+      Math.max(70, p.label.length * 7.5 + 34 + String(p.seats).length * 7.5)
+    )
 
-    let legendX = -(parties.length * 60) / 2
+    // Split into rows that fit within the available width
+    const legendRows: { indices: number[]; widths: number[] }[] = []
+    let curRow: number[] = []
+    let curWidths: number[] = []
+    let curRowWidth = 0
+    parties.forEach((_, i) => {
+      const w = itemWidths[i] + (curRow.length > 0 ? itemGap : 0)
+      if (curRowWidth + w > width && curRow.length > 0) {
+        legendRows.push({ indices: curRow, widths: curWidths })
+        curRow = [i]; curWidths = [itemWidths[i]]; curRowWidth = itemWidths[i]
+      } else {
+        curRow.push(i); curWidths.push(itemWidths[i])
+        curRowWidth += curRow.length > 1 ? itemWidths[i] + itemGap : itemWidths[i]
+      }
+    })
+    if (curRow.length > 0) legendRows.push({ indices: curRow, widths: curWidths })
 
-    parties.forEach((p, i) => {
-      const lg = legendG.append('g')
-        .attr('transform', `translate(${legendX},0)`)
+    const rowLineHeight = 18
+    const totalLegendH = legendRows.length * rowLineHeight
+    const legendStartY = effectiveHeight - totalLegendH - 2
 
-      lg.append('rect')
-        .attr('width', 10)
-        .attr('height', 10)
-        .attr('rx', 2)
-        .attr('fill', colorScale(p.label))
+    legendRows.forEach((row, rowIdx) => {
+      const totalRowW = row.widths.reduce((a, b) => a + b, 0) + (row.indices.length - 1) * itemGap
+      let lx = (width - totalRowW) / 2
+      const ly = legendStartY + rowIdx * rowLineHeight
 
-      lg.append('text')
-        .attr('x', 14)
-        .attr('y', 9)
-        .attr('font-size', 10)
-        .attr('font-family', chartTheme.font.family)
-        .attr('fill', textColor)
-        .text(`${p.label} (${p.seats})`)
+      row.indices.forEach((pi, j) => {
+        const p = parties[pi]
+        const lg = svg.append('g').attr('transform', `translate(${lx},${ly})`)
 
-      legendX += Math.max(60, p.label.length * 7 + 40 + String(p.seats).length * 6)
-      void i
+        lg.append('rect')
+          .attr('width', 10)
+          .attr('height', 10)
+          .attr('rx', 2)
+          .attr('fill', colorScale(p.label))
+
+        lg.append('text')
+          .attr('x', 14)
+          .attr('y', 10)
+          .attr('font-size', legendFontSize)
+          .attr('font-family', chartTheme.font.family)
+          .attr('fill', textColor)
+          .text(`${p.label} (${p.seats})`)
+
+        lx += row.widths[j] + itemGap
+      })
     })
 
     // Total seats label at the center bottom
@@ -130,7 +190,31 @@ export function ElectionDonut({ data, config, height, autoHeight }: ElectionDonu
   }, [data, config, height, autoHeight, resolved, chartTheme, containerWidth])
 
   if (data.length === 0) return <p className="text-sm text-text-muted">No data</p>
-  return <div ref={containerRef} style={{ width: '100%', ...(autoHeight ? { height: '100%' } : { height }) }} />
+  return (
+    <div ref={containerRef} style={{ width: '100%', position: 'relative', ...(autoHeight ? { height: '100%' } : { height }) }}>
+      {tooltip && (
+        <div style={{
+          position: 'absolute',
+          left: tooltip.x,
+          top: tooltip.y,
+          transform: 'translateX(-50%)',
+          background: resolved === 'dark' ? '#1e293b' : '#fff',
+          color: resolved === 'dark' ? '#e2e8f0' : '#374151',
+          border: `1px solid ${resolved === 'dark' ? '#475569' : '#d1d5db'}`,
+          borderRadius: 6,
+          padding: '4px 8px',
+          fontSize: 12,
+          fontFamily: chartTheme.font.family,
+          pointerEvents: 'none',
+          whiteSpace: 'nowrap',
+          zIndex: 10,
+          boxShadow: '0 2px 4px rgba(0,0,0,0.15)',
+        }}>
+          {tooltip.text}
+        </div>
+      )}
+    </div>
+  )
 }
 
 interface SeatPosition {
