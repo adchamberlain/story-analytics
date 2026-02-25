@@ -24,7 +24,6 @@ An AI assistant (Claude, GPT, or Gemini) is available to help write SQL, add cal
 - **Data transforms** — Transpose, rename, delete, reorder, round, prepend/append, edit cells, cast types
 - **Version history** — Auto-save snapshots with one-click restore
 - **Annotations** — Reference lines, text labels, and highlighted ranges with responsive scaling
-- **Embedding** — Iframe embed with configurable flags (plain, static, transparent, logo, search)
 - **Collaboration** — Threaded comments, team management, and notifications
 - **API** — RESTful endpoints with key-based authentication
 - **Custom themes** — 9 built-in themes, custom CSS, 50+ Google Fonts, and logo upload
@@ -60,7 +59,7 @@ Open **http://localhost:3001** to start building.
 
 2. **Build your charts** — Use the visual editor to pick a chart type, map columns, and style your output. Switch to SQL mode for custom queries. The AI assistant can help write SQL and refine formatting.
 
-3. **Assemble dashboards** — Drag charts onto a responsive grid, arrange the layout, and save. Embed anywhere, share via link, or export as SVG, PNG, PDF, or PowerPoint.
+3. **Assemble dashboards** — Drag charts onto a responsive grid, arrange the layout, and save. Share via link or export as SVG, PNG, PDF, or PowerPoint.
 
 ## AI Providers
 
