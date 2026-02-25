@@ -53,11 +53,14 @@ export function ObservableChartFactory({
       ? [config.color]
       : [...chartTheme.palette.colors]
 
+  // HeatMap: auto-bin numeric axes with >20 distinct values into ~10 clean ranges
+  const effectiveData = chartType === 'HeatMap' ? preprocessHeatmapData(data, config) : data
+
   // Build custom legend data — unique series values mapped to palette colors.
   // We never rely on Observable Plot's built-in legend (unreliable for stroke marks).
   const showLegend = config.showLegend !== false && !!config.series && chartType !== 'HeatMap'
   const legendItems = showLegend
-    ? getUniqueSeries(data, config.series!, config).map((label, i) => ({
+    ? getUniqueSeries(effectiveData, config.series!, config).map((label, i) => ({
         label,
         color: colors[i % colors.length],
       }))
@@ -67,7 +70,9 @@ export function ObservableChartFactory({
   const heatmapLegend = chartType === 'HeatMap' && config.showLegend !== false && config.y ? (() => {
     const yCol = Array.isArray(config.y) ? config.y[0] : config.y
     if (!yCol) return null
-    const vals = data.map((d) => Number(d[yCol])).filter((v) => isFinite(v))
+    // Use __heatFill for the numeric range when y was binned into labels
+    const fillCol = effectiveData.length > 0 && HEAT_FILL in effectiveData[0] ? HEAT_FILL : yCol
+    const vals = effectiveData.map((d) => Number(d[fillCol])).filter((v) => isFinite(v))
     if (vals.length === 0) return null
     const lo = Math.min(...vals)
     const hi = Math.max(...vals)
@@ -90,11 +95,13 @@ export function ObservableChartFactory({
       setChartWidth(width)
       const collapsed = shouldCollapseAnnotations(width)
 
-      const marks = buildMarks(chartType, data, config, colors, chartTheme)
-      const bgColor = getComputedStyle(document.documentElement).getPropertyValue('--color-surface-raised').trim() || '#1e293b'
-      const textColor = getComputedStyle(document.documentElement).getPropertyValue('--color-text-primary').trim() || '#e2e8f0'
+      const marks = buildMarks(chartType, effectiveData, config, colors, chartTheme)
+      // Use CSS var() references so annotations automatically adapt to theme changes
+      // without depending on getComputedStyle timing.
+      const bgColor = 'var(--color-surface-raised, #1e293b)'
+      const textColor = 'var(--color-text-primary, #e2e8f0)'
       const annotationMarks = buildAnnotationMarks(config.annotations, bgColor, textColor, chartTheme)
-      const plotOptions = buildPlotOptions(chartType, data, config, colors, width, plotHeight, chartTheme)
+      const plotOptions = buildPlotOptions(chartType, effectiveData, config, colors, width, plotHeight, chartTheme)
       const plot = Plot.plot({ ...plotOptions, marks: [...marks, ...annotationMarks] })
 
       // Store plot ref for scale inversion in click handler
@@ -405,7 +412,12 @@ function fmtTipValue(v: unknown): string {
   if (v == null) return ''
   if (v instanceof Date) return d3.timeFormat('%b %Y')(v)
   const n = Number(v)
-  if (isFinite(n) && String(v) === String(n)) return d3.format(',.4~g')(n)
+  if (isFinite(n) && String(v) === String(n)) {
+    // Use locale string for clean comma-separated formatting (avoids scientific notation)
+    if (Number.isInteger(n)) return n.toLocaleString('en-US')
+    // For decimals, keep up to 2 decimal places
+    return n.toLocaleString('en-US', { maximumFractionDigits: 2 })
+  }
   // Check if string looks like an ISO date
   if (typeof v === 'string' && /^\d{4}-\d{2}/.test(v)) {
     const d = new Date(v)
@@ -746,6 +758,168 @@ function buildHistogramMarks(
   ]
 }
 
+/**
+ * If a heatmap axis column has >20 distinct numeric values, bin into ~10 clean
+ * buckets using d3.ticks and aggregate fill values with mean.
+ */
+function binHeatmapAxis(
+  data: Record<string, unknown>[],
+  axisCol: string,
+  fillCol: string,
+  groupCol: string | undefined,
+): { data: Record<string, unknown>[]; binned: boolean; bucketOrder: string[]; edges?: number[] } {
+  const distinct = new Set(data.map((d) => d[axisCol]))
+  const allNumeric = [...distinct].every((v) => typeof v === 'number' || (typeof v === 'string' && v !== '' && isFinite(Number(v))))
+  if (distinct.size <= 20 || !allNumeric) return { data, binned: false, bucketOrder: [] }
+
+  const nums = [...distinct].map(Number).sort((a, b) => a - b)
+  const lo = nums[0]
+  const hi = nums[nums.length - 1]
+  const ticks = d3.ticks(lo, hi, 10)
+  // Build bin edges: [lo, tick1, tick2, …, hi]
+  const edges = [lo, ...ticks.filter((t) => t > lo && t < hi), hi]
+
+  function bucketLabel(low: number, high: number) {
+    return `${low}–${high}`
+  }
+
+  function findBucket(v: number): string {
+    for (let i = 0; i < edges.length - 1; i++) {
+      if (v < edges[i + 1] || i === edges.length - 2) return bucketLabel(edges[i], edges[i + 1])
+    }
+    return bucketLabel(edges[edges.length - 2], edges[edges.length - 1])
+  }
+
+  // Group rows by (bucket, groupCol) and average the fill
+  const groups = new Map<string, { sum: number; count: number; row: Record<string, unknown> }>()
+  for (const row of data) {
+    const bucket = findBucket(Number(row[axisCol]))
+    const groupKey = groupCol ? String(row[groupCol] ?? '') : '__all__'
+    const key = `${bucket}|||${groupKey}`
+    const existing = groups.get(key)
+    const fv = Number(row[fillCol])
+    if (existing) {
+      existing.sum += isFinite(fv) ? fv : 0
+      existing.count += isFinite(fv) ? 1 : 0
+    } else {
+      groups.set(key, { sum: isFinite(fv) ? fv : 0, count: isFinite(fv) ? 1 : 0, row: { ...row, [axisCol]: bucket } })
+    }
+  }
+
+  // Build ordered output preserving bucket order
+  const bucketOrder = edges.slice(0, -1).map((e, i) => bucketLabel(e, edges[i + 1]))
+  const result: Record<string, unknown>[] = []
+  for (const bk of bucketOrder) {
+    for (const [key, g] of groups) {
+      if (key.startsWith(bk + '|||')) {
+        result.push({ ...g.row, [fillCol]: g.count > 0 ? g.sum / g.count : 0 })
+      }
+    }
+  }
+
+  return { data: result, binned: true, bucketOrder, edges }
+}
+
+/** Sentinel column name used when y doubles as both y-axis and fill in a binned heatmap. */
+const HEAT_FILL = '__heatFill'
+/** Attached to preprocessed data so buildPlotOptions can set explicit domains. */
+const HEAT_X_DOMAIN = '__heatXDomain'
+const HEAT_Y_DOMAIN = '__heatYDomain'
+
+/**
+ * Pre-process heatmap data: bin x-axis and/or y-axis when they have
+ * too many distinct numeric values for readable cells.
+ *
+ * Returns data with explicit `__heatXDomain` / `__heatYDomain` arrays
+ * on the first row so `buildPlotOptions` can set ordered domains without
+ * relying on data-row order (which is fragile for binned range labels).
+ *
+ * When no `series` is set, `y` serves dual duty as both y-axis position
+ * and fill color.  In that case we store binned range labels in `y` (for
+ * the categorical axis) and keep the numeric mean in a synthetic
+ * `__heatFill` column (for the color scale).
+ */
+function preprocessHeatmapData(
+  data: Record<string, unknown>[],
+  config: ChartConfig,
+): Record<string, unknown>[] {
+  const x = config.x
+  const y = config.y as string | undefined
+  const series = config.series
+  if (!x || !y) return data
+
+  // ── Bin x-axis ──────────────────────────────────────────────
+  const groupForX = series ?? y
+  const xResult = binHeatmapAxis(data, x, y, groupForX !== x ? groupForX : undefined)
+  let processed = xResult.data
+  // Capture x-bin order from edges (numeric order, not data order)
+  const xDomain: string[] | null = xResult.binned ? xResult.bucketOrder : null
+
+  // ── Bin y-axis ──────────────────────────────────────────────
+  let yDomain: string[] | null = null
+
+  if (series) {
+    const yResult = binHeatmapAxis(processed, series, y, x)
+    processed = yResult.data
+    if (yResult.binned) yDomain = yResult.bucketOrder
+  } else {
+    // No series: y doubles as y-axis AND fill.
+    // We need to bin y into range labels for the axis while preserving
+    // a numeric value for the color scale in __heatFill.
+    const yBin = binHeatmapAxis(processed, y, y, x)
+    if (yBin.binned) {
+      yDomain = yBin.bucketOrder
+      // binHeatmapAxis averaged y into itself — but y now holds a range
+      // label string.  Recompute: group by (xVal, yBucket) and store
+      // the numeric mean in __heatFill.
+      const edges = yBin.edges!
+      const bucketLabel = (low: number, high: number) => `${low}–${high}`
+      const findBucket = (v: number): string => {
+        for (let i = 0; i < edges.length - 1; i++) {
+          if (v < edges[i + 1] || i === edges.length - 2) return bucketLabel(edges[i], edges[i + 1])
+        }
+        return bucketLabel(edges[edges.length - 2], edges[edges.length - 1])
+      }
+      const groups = new Map<string, { sum: number; count: number; row: Record<string, unknown> }>()
+      // Use xResult.data (pre-y-binning) so original y values are still numeric
+      for (const row of xResult.data) {
+        const origY = Number(row[y])
+        const bucket = isFinite(origY) ? findBucket(origY) : String(row[y])
+        const xKey = String(row[x] ?? '')
+        const key = `${xKey}|||${bucket}`
+        const existing = groups.get(key)
+        if (existing) {
+          existing.sum += isFinite(origY) ? origY : 0
+          existing.count += isFinite(origY) ? 1 : 0
+        } else {
+          groups.set(key, { sum: isFinite(origY) ? origY : 0, count: isFinite(origY) ? 1 : 0, row: { ...row } })
+        }
+      }
+      // Build output in x-first order so x domain extraction from data order is correct
+      const xLabels = xDomain ?? [...new Set(xResult.data.map((r) => String(r[x])))]
+      const result: Record<string, unknown>[] = []
+      for (const xLabel of xLabels) {
+        for (const yLabel of yDomain) {
+          const key = `${xLabel}|||${yLabel}`
+          const g = groups.get(key)
+          if (g) {
+            const mean = g.count > 0 ? g.sum / g.count : 0
+            result.push({ ...g.row, [y]: yLabel, [HEAT_FILL]: mean })
+          }
+        }
+      }
+      processed = result
+    }
+  }
+
+  // Stash domain order on the first row for buildPlotOptions
+  if (processed.length > 0 && (xDomain || yDomain)) {
+    processed[0] = { ...processed[0], ...(xDomain ? { [HEAT_X_DOMAIN]: xDomain } : {}), ...(yDomain ? { [HEAT_Y_DOMAIN]: yDomain } : {}) }
+  }
+
+  return processed
+}
+
 function buildHeatMapMarks(
   data: Record<string, unknown>[],
   x: string | undefined,
@@ -757,15 +931,17 @@ function buildHeatMapMarks(
   // HeatMap: x is one categorical axis, fill encodes the numeric heat value (always y).
   // When series is provided, it becomes the y-axis (second categorical dimension).
   // When no series, y doubles as both the y-axis and the fill.
+  // After preprocessing, binned no-series heatmaps use __heatFill for the color scale.
   const yAxis = series ?? y
-  const fill = y
+  const hasSyntheticFill = data.length > 0 && HEAT_FILL in data[0]
+  const fill = hasSyntheticFill ? HEAT_FILL : y
   return [
     Plot.cell(data, { x, y: yAxis, fill }),
     Plot.tip(data, Plot.pointer({
       x, y: yAxis,
       title: (d: Record<string, unknown>) => {
         const fVal = d[fill] != null ? fmtTipValue(d[fill]) : ''
-        return `${titleCase(x)}: ${fmtTipValue(d[x])}\n${titleCase(yAxis)}: ${fmtTipValue(d[yAxis])}${fVal ? `\n${titleCase(fill)}: ${fVal}` : ''}`
+        return `${titleCase(x)}: ${fmtTipValue(d[x])}\n${titleCase(yAxis)}: ${fmtTipValue(d[yAxis])}${fVal ? `\n${titleCase(y)}: ${fVal}` : ''}`
       },
     })),
   ]
@@ -1745,36 +1921,53 @@ function buildPlotOptions(
     }
   }
 
-  // HeatMap: also preserve data ordering for the y-axis (series column used as rows).
-  // Observable Plot sorts the y domain alphabetically which breaks day-of-week ordering etc.
-  if (chartType === 'HeatMap' && config.series && data.length > 0) {
-    const seen = new Set<string>()
-    const yDomain: string[] = []
-    for (const row of data) {
-      const v = row[config.series] as string
-      if (v != null && !seen.has(v)) { seen.add(v); yDomain.push(v) }
+  // HeatMap: preserve axis ordering.  Binned heatmaps stash explicit domain
+  // arrays on the first row; categorical heatmaps extract from data order.
+  if (chartType === 'HeatMap' && data.length > 0) {
+    // X-axis domain — prefer explicit bin order from preprocessing
+    const explicitXDomain = data[0][HEAT_X_DOMAIN] as string[] | undefined
+    if (explicitXDomain) {
+      overrides.x = { ...getBaseAxis(), domain: explicitXDomain }
     }
-    overrides.y = { ...getBaseAxis(), domain: sortOrdinalDomain(yDomain, config) }
+    // Y-axis domain — prefer explicit bin order, fall back to data order
+    const explicitYDomain = data[0][HEAT_Y_DOMAIN] as string[] | undefined
+    const yCol = config.series ?? (config.y as string | undefined)
+    if (explicitYDomain) {
+      overrides.y = { ...getBaseAxis(), domain: explicitYDomain }
+    } else if (yCol) {
+      const seen = new Set<string>()
+      const yDomain: string[] = []
+      for (const row of data) {
+        const v = row[yCol] as string
+        if (v != null && !seen.has(v)) { seen.add(v); yDomain.push(v) }
+      }
+      overrides.y = { ...getBaseAxis(), domain: sortOrdinalDomain(yDomain, config) }
+    }
   }
 
   // Axis labels — suppress Observable Plot's default column-name labels
   // (they overlap tick marks). Only show when user explicitly sets a title.
-  // Determine tick rotation: explicit config, or auto-rotate for narrow widths
-  const tickRotate = config.tickAngle ?? (width < 500 ? -45 : 0)
+  // Determine tick rotation: explicit config, auto-rotate for narrow widths,
+  // or auto-rotate when there are too many x-axis ticks to fit horizontally.
+  const xDomainLen = ((overrides.x as Record<string, unknown> | undefined)?.domain as unknown[] | undefined)?.length ?? 0
+  const labelsOverflow = xDomainLen > 0 && (width / xDomainLen) < 60
+  const tickRotate = config.tickAngle ?? (width < 500 || labelsOverflow ? -45 : 0)
   overrides.x = {
     ...(overrides.x as Record<string, unknown> ?? {}),
     ...getBaseAxis(),
     label: config.xAxisTitle || null,
     // Center the label below the tick marks instead of inline at the right edge
-    ...(config.xAxisTitle ? { labelAnchor: 'center', labelOffset: 42, labelArrow: false } : {}),
+    ...(config.xAxisTitle ? { labelAnchor: 'center', labelOffset: tickRotate ? 68 : 42, labelArrow: false } : {}),
     ...(tickRotate ? { tickRotate, textAnchor: 'end' } : {}),
   }
-  // Extra bottom margin for rotated labels or x-axis title
-  if (tickRotate) {
-    overrides.marginBottom = Math.max((overrides.marginBottom as number | undefined) ?? 30, 60)
-  }
-  if (config.xAxisTitle) {
-    overrides.marginBottom = Math.max((overrides.marginBottom as number | undefined) ?? 30, 52)
+  // Extra bottom margin for rotated labels and/or x-axis title
+  {
+    let mb = (overrides.marginBottom as number | undefined) ?? 30
+    if (tickRotate) mb = Math.max(mb, 60)
+    if (config.xAxisTitle) mb = Math.max(mb, 52)
+    // When BOTH rotated ticks and a title are present, stack the offsets
+    if (tickRotate && config.xAxisTitle) mb = Math.max(mb, 85)
+    overrides.marginBottom = mb
   }
   // Extra top margin when x-axis reference lines have labels (rendered above the plot area)
   if (config.annotations?.lines?.some((l) => l.axis === 'x' && l.label)) {
@@ -1950,7 +2143,7 @@ function BigValueChart({ data, config }: { data: Record<string, unknown>[]; conf
   if (shouldShowGrid(data.length, config.metricLabel)) {
     return (
       <div
-        className="grid gap-4 w-full py-4"
+        className="grid gap-4 w-full h-full content-center py-2"
         style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}
       >
         {data.map((row, i) => {

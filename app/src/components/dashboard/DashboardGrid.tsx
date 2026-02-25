@@ -58,6 +58,14 @@ interface DashboardGridProps {
  * - w=2 (full-width, spans both columns)
  * Items are placed left-to-right, top-to-bottom.
  */
+/** Grid height for BigValue charts based on metric count (2 per row in KPI grid). */
+function bigValueHeight(dataLength: number): number {
+  if (dataLength <= 2) return 5   // 1 row  → 300px
+  if (dataLength <= 4) return 6   // 2 rows → 360px
+  if (dataLength <= 6) return 7   // 3 rows → 420px
+  return 8                        // 4 rows → 480px
+}
+
 function generateLayout(charts: ChartWithData[]): Layout {
   const items: LayoutItem[] = []
   let x = 0
@@ -67,13 +75,14 @@ function generateLayout(charts: ChartWithData[]): Layout {
     // If the chart has a persisted layout, use it (but clamp w to 1 or 2)
     if (chart.layout) {
       const w = chart.layout.w >= 2 ? 2 : 1
-      const itemBottom = chart.layout.y + chart.layout.h
+      const h = chart.layout.h
+      const itemBottom = chart.layout.y + h
       items.push({
         i: chart.chart_id,
         x: chart.layout.x >= 1 && w === 1 ? 1 : 0,
         y: chart.layout.y,
         w,
-        h: chart.layout.h,
+        h,
         minW: 1,
         maxW: 2,
         minH: 3,
@@ -93,7 +102,7 @@ function generateLayout(charts: ChartWithData[]): Layout {
     const isTable = chart.chart_type === 'DataTable'
     const isMap = ['ChoroplethMap', 'SymbolMap', 'LocatorMap', 'SpikeMap'].includes(chart.chart_type)
     const isPie = ['PieChart', 'MultiplePies', 'ElectionDonut'].includes(chart.chart_type)
-    const h = isBigValue ? 7 : isTable ? 8 : isMap ? 9 : isPie ? 9 : 7
+    const h = isBigValue ? bigValueHeight(chart.data?.length ?? 0) : isTable ? 8 : isMap ? 9 : isPie ? 9 : 7
 
     // If this item won't fit on the current row, wrap
     if (x + w > 2) {
