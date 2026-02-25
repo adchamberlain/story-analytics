@@ -366,8 +366,8 @@ Resources:
                 Value: !Sub "postgresql://storyanalytics:${DBPassword}@${RDSInstance.Endpoint.Address}:${RDSInstance.Endpoint.Port}/storyanalytics"
               - Name: AUTH_ENABLED
                 Value: "true"
-              - Name: SECRET_KEY
-                Value: "CHANGE-ME-replace-with-a-real-secret-key"
+              - Name: JWT_SECRET
+                Value: !Sub "${DBPassword}-jwt-${AWS::StackName}"
       InstanceConfiguration:
         Cpu: !Ref AppRunnerCpu
         Memory: !Ref AppRunnerMemory

@@ -112,7 +112,7 @@ def build_and_push_image(region: str, repo_uri: str) -> None:
 
     # 1. Build
     print("\n  Building Docker image...")
-    _run(["docker", "build", "-f", "Dockerfile.prod", "-t", "story-analytics:latest", "."])
+    _run(["docker", "build", "--platform", "linux/amd64", "-f", "Dockerfile.prod", "-t", "story-analytics:latest", "."])
 
     # 2. ECR login (piped: get-login-password | docker login --password-stdin)
     print("  Logging in to ECR...")
@@ -199,7 +199,7 @@ def deploy_stack(
                 TemplateBody=template_body,
                 Parameters=params,
                 Capabilities=["CAPABILITY_NAMED_IAM"],
-                OnFailure="DELETE",
+                OnFailure="DO_NOTHING",
             )
             waiter_name = "stack_create_complete"
         else:

@@ -14,7 +14,7 @@ from starlette.middleware.base import BaseHTTPMiddleware  # noqa: E402
 from starlette.requests import Request  # noqa: E402
 
 from .config import get_settings  # noqa: E402
-from .database import create_tables  # noqa: E402
+# Legacy SQLAlchemy create_tables skipped — metadata_db._ensure_tables() handles schema
 from .routers import auth_router  # noqa: E402
 from .routers.data import router as data_router  # noqa: E402
 from .routers.charts_v2 import router as charts_v2_router  # noqa: E402
@@ -152,18 +152,39 @@ def _seed_data_if_empty():
 
 @app.on_event("startup")
 async def startup():
-    """Create database tables on startup."""
-    create_tables()
-    # Ensure default user exists so sharing/metadata FK constraints are satisfied
-    from .services.metadata_db import ensure_default_user
-    ensure_default_user()
-    # Seed example dashboard on first run
-    _seed_data_if_empty()
+    """Initialize database tables on startup with retry for cloud deployments."""
+    import time
+    import logging
+    logger = logging.getLogger(__name__)
+
+    max_retries = 5
+    for attempt in range(1, max_retries + 1):
+        try:
+            # metadata_db._ensure_tables() creates all needed tables
+            from .services.metadata_db import ensure_default_user
+            ensure_default_user()
+            # Seed example dashboard on first run
+            _seed_data_if_empty()
+            return
+        except Exception as e:
+            if attempt < max_retries:
+                wait = attempt * 2
+                logger.warning(f"Startup attempt {attempt}/{max_retries} failed: {e}. Retrying in {wait}s...")
+                time.sleep(wait)
+            else:
+                logger.error(f"Startup failed after {max_retries} attempts: {e}")
+                raise
 
 
 @app.get("/")
 async def root():
-    """Root endpoint."""
+    """Root endpoint — serves SPA in production, API info otherwise."""
+    _static_index = os.path.join(
+        os.path.dirname(__file__), "..", "static", "index.html"
+    )
+    if os.path.isfile(_static_index):
+        from fastapi.responses import FileResponse
+        return FileResponse(_static_index)
     return {
         "name": "Story Analytics API",
         "version": "0.2.0",
