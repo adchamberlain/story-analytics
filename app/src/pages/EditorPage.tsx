@@ -6,6 +6,7 @@ import { ChartWrapper } from '../components/charts/ChartWrapper'
 import { ObservableChartFactory } from '../components/charts/ObservableChartFactory'
 import { Toolbox } from '../components/editor/Toolbox'
 import { AIChat } from '../components/editor/AIChat'
+import { CommentSidebar } from '../components/comments/CommentSidebar'
 import { PALETTES } from '../themes/plotTheme'
 import type { ChartConfig } from '../types/chart'
 
@@ -113,6 +114,7 @@ export function EditorPage() {
     return () => window.removeEventListener('keydown', handler)
   }, [handleSave])
 
+  const [rightTab, setRightTab] = useState<'chat' | 'comments'>('chat')
   const [savingTemplate, setSavingTemplate] = useState(false)
 
   const handleSaveAsTemplate = useCallback(async () => {
@@ -342,9 +344,30 @@ export function EditorPage() {
           </div>
         </main>
 
-        {/* Right: AI Chat — hidden on mobile, visible on lg+ */}
-        <aside className="hidden lg:block w-[320px] border-l border-border-default bg-surface shrink-0">
-          <AIChat />
+        {/* Right: AI Chat / Comments — hidden on mobile, visible on lg+ */}
+        <aside className="hidden lg:flex lg:flex-col w-[320px] border-l border-border-default bg-surface shrink-0">
+          {/* Tab switcher */}
+          <div className="flex border-b border-border-default shrink-0">
+            <button
+              onClick={() => setRightTab('chat')}
+              className={`flex-1 py-2.5 text-xs font-medium transition-colors ${
+                rightTab === 'chat' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-text-muted hover:text-text-secondary'
+              }`}
+            >
+              AI Chat
+            </button>
+            <button
+              onClick={() => setRightTab('comments')}
+              className={`flex-1 py-2.5 text-xs font-medium transition-colors ${
+                rightTab === 'comments' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-text-muted hover:text-text-secondary'
+              }`}
+            >
+              Comments
+            </button>
+          </div>
+          <div className="flex-1 min-h-0">
+            {rightTab === 'chat' ? <AIChat /> : <CommentSidebar chartId={store.chartId} />}
+          </div>
         </aside>
       </div>
     </div>

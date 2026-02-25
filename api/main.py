@@ -24,6 +24,9 @@ from .routers.settings import router as settings_router
 from .routers.themes import router as themes_router  # noqa: E402
 from .routers.folders import router as folders_router  # noqa: E402
 from .routers.templates import router as templates_router  # noqa: E402
+from .routers.comments import router as comments_router  # noqa: E402
+from .routers.teams import router as teams_router  # noqa: E402
+from .routers.notifications import router as notifications_router  # noqa: E402
 
 settings = get_settings()
 
@@ -78,6 +81,9 @@ app.include_router(settings_router, prefix="/api")
 app.include_router(themes_router, prefix="/api")
 app.include_router(folders_router, prefix="/api")
 app.include_router(templates_router, prefix="/api")
+app.include_router(comments_router, prefix="/api")
+app.include_router(teams_router, prefix="/api")
+app.include_router(notifications_router, prefix="/api")
 
 
 @app.on_event("startup")
