@@ -20,7 +20,7 @@ from .routers.data import router as data_router  # noqa: E402
 from .routers.charts_v2 import router as charts_v2_router  # noqa: E402
 from .routers.dashboards_v2 import router as dashboards_v2_router  # noqa: E402
 from .routers.connections import router as connections_router  # noqa: E402
-from .routers.settings import router as settings_router
+from .routers.settings import router as settings_router  # noqa: E402
 from .routers.themes import router as themes_router  # noqa: E402
 from .routers.folders import router as folders_router  # noqa: E402
 from .routers.templates import router as templates_router  # noqa: E402

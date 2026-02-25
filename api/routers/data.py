@@ -12,7 +12,7 @@ from pydantic import BaseModel, Field
 
 from ..services.duckdb_service import get_duckdb_service, _SAFE_SOURCE_ID_RE
 from ..services.connectors.google_sheets import parse_sheets_url, build_export_url, fetch_sheet_csv
-from ..services.data_cache import get_cached, set_cached, get_staleness
+from ..services.data_cache import get_cached, set_cached
 
 
 router = APIRouter(prefix="/data", tags=["data"])

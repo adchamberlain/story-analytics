@@ -1,7 +1,6 @@
 """
 Tests for notification system.
 """
-import pytest
 from api.services.metadata_db import (
     create_notification, list_notifications, get_unread_count,
     mark_notification_read, mark_all_notifications_read,

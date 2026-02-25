@@ -1,9 +1,7 @@
 """Tests for the file-based data cache with TTL and staleness tracking."""
 
 import json
-import time
 from datetime import datetime, timezone, timedelta
-from pathlib import Path
 
 import pytest
 
@@ -12,7 +10,6 @@ from api.services.data_cache import (
     get_cached,
     set_cached,
     get_staleness,
-    CACHE_DIR,
 )
 
 

@@ -6,8 +6,6 @@ Stores cached data source responses in data/cache/ with metadata.
 import hashlib
 import json
 import logging
-import os
-import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 

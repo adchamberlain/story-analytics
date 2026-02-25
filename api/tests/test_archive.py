@@ -2,7 +2,6 @@
 Tests for archive/soft-delete and restore workflow.
 Charts have an archived_at field: null (active) or ISO timestamp (archived).
 """
-import pytest
 from fastapi.testclient import TestClient
 from api.main import app
 

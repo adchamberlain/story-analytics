@@ -2,7 +2,6 @@
 Tests for dashboard embed / public endpoint.
 GET /v2/dashboards/{id}/public — serves published dashboard with chart data.
 """
-import pytest
 from fastapi.testclient import TestClient
 from api.main import app
 
