@@ -5,17 +5,16 @@ Follows the same pattern as chart_storage.py and theme_storage.py.
 
 import json
 import logging
-import os
 import re
-import tempfile
 import uuid
 from datetime import datetime, timezone
-from pathlib import Path
 from dataclasses import dataclass, asdict, fields as dc_fields
+
+from api.services.storage import get_storage
 
 logger = logging.getLogger(__name__)
 
-TEMPLATES_DIR = Path(__file__).parent.parent.parent / "data" / "templates"
+_storage = get_storage()
 
 _SAFE_ID_RE = re.compile(r"^[a-f0-9]{1,32}$")
 
@@ -40,8 +39,6 @@ def save_template(
     template_id: str | None = None,
 ) -> SavedTemplate:
     """Save a template to disk."""
-    TEMPLATES_DIR.mkdir(parents=True, exist_ok=True)
-
     tid = template_id or uuid.uuid4().hex[:12]
     now = datetime.now(timezone.utc).isoformat()
 
@@ -55,31 +52,8 @@ def save_template(
         updated_at=now,
     )
 
-    path = TEMPLATES_DIR / f"{tid}.json"
-    _atomic_write(path, json.dumps(asdict(template), indent=2))
+    _storage.write_text(f"templates/{tid}.json", json.dumps(asdict(template), indent=2))
     return template
-
-
-def _atomic_write(path: Path, content: str) -> None:
-    """Write content atomically via temp file + rename."""
-    fd, tmp_name = tempfile.mkstemp(dir=path.parent, suffix=".tmp")
-    fd_closed = False
-    try:
-        os.write(fd, content.encode())
-        os.close(fd)
-        fd_closed = True
-        os.replace(tmp_name, str(path))
-    except BaseException:
-        if not fd_closed:
-            try:
-                os.close(fd)
-            except OSError:
-                pass
-        try:
-            os.unlink(tmp_name)
-        except OSError:
-            pass
-        raise
 
 
 def _safe_load_template(data: dict) -> SavedTemplate:
@@ -96,11 +70,11 @@ def load_template(template_id: str) -> SavedTemplate | None:
     """Load a template from disk."""
     if not _validate_id(template_id):
         return None
-    path = TEMPLATES_DIR / f"{template_id}.json"
-    if not path.exists():
+    key = f"templates/{template_id}.json"
+    if not _storage.exists(key):
         return None
     try:
-        data = json.loads(path.read_text())
+        data = json.loads(_storage.read_text(key))
         return _safe_load_template(data)
     except Exception:
         logger.warning("Failed to load template %s", template_id)
@@ -109,16 +83,16 @@ def load_template(template_id: str) -> SavedTemplate | None:
 
 def list_templates() -> list[SavedTemplate]:
     """List all saved templates, newest first."""
-    if not TEMPLATES_DIR.exists():
-        return []
-
     templates = []
-    for path in sorted(TEMPLATES_DIR.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True):
+    for key in _storage.list("templates/"):
+        if not key.endswith(".json"):
+            continue
         try:
-            data = json.loads(path.read_text())
+            data = json.loads(_storage.read_text(key))
             templates.append(_safe_load_template(data))
         except Exception:
-            logger.warning("Skipping corrupted template file: %s", path.name)
+            logger.warning("Skipping corrupted template file: %s", key)
+    templates.sort(key=lambda t: t.updated_at, reverse=True)
     return templates
 
 
@@ -126,22 +100,22 @@ def update_template(template_id: str, **fields) -> SavedTemplate | None:
     """Update a template on disk."""
     if not _validate_id(template_id):
         return None
-    path = TEMPLATES_DIR / f"{template_id}.json"
-    if not path.exists():
+    key = f"templates/{template_id}.json"
+    if not _storage.exists(key):
         return None
 
     try:
-        data = json.loads(path.read_text())
+        data = json.loads(_storage.read_text(key))
     except (json.JSONDecodeError, OSError):
         return None
 
     _UPDATABLE = {"name", "description", "chart_type", "config"}
-    for key, value in fields.items():
-        if key in _UPDATABLE:
-            data[key] = value
+    for key_name, value in fields.items():
+        if key_name in _UPDATABLE:
+            data[key_name] = value
 
     data["updated_at"] = datetime.now(timezone.utc).isoformat()
-    _atomic_write(path, json.dumps(data, indent=2))
+    _storage.write_text(key, json.dumps(data, indent=2))
     try:
         return _safe_load_template(data)
     except Exception:
@@ -152,8 +126,8 @@ def delete_template(template_id: str) -> bool:
     """Delete a template."""
     if not _validate_id(template_id):
         return False
-    path = TEMPLATES_DIR / f"{template_id}.json"
-    if path.exists():
-        path.unlink()
+    key = f"templates/{template_id}.json"
+    if _storage.exists(key):
+        _storage.delete(key)
         return True
     return False

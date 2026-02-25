@@ -11,15 +11,16 @@ from api.services.data_cache import (
     set_cached,
     get_staleness,
 )
+from api.services.storage import LocalStorageBackend
 
 
 @pytest.fixture(autouse=True)
 def clean_cache(tmp_path, monkeypatch):
     """Use a temp directory for cache and clean up after each test."""
-    test_cache = tmp_path / "cache"
-    test_cache.mkdir()
-    monkeypatch.setattr("api.services.data_cache.CACHE_DIR", test_cache)
-    yield test_cache
+    backend = LocalStorageBackend(str(tmp_path))
+    monkeypatch.setattr("api.services.data_cache._storage", backend)
+    cache_dir = tmp_path / "cache"
+    yield cache_dir
 
 
 class TestCacheMiss:
