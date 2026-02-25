@@ -58,6 +58,19 @@ class StorageBackend(ABC):
     def delete_tree(self, prefix: str) -> None:
         """Delete all files under a prefix (like rm -rf). No-op if prefix doesn't exist."""
 
+    # ── Local-only helpers (non-abstract, override in subclasses) ───
+
+    def get_local_path(self, path: str):
+        """Return a local filesystem path. Only available on local backends.
+
+        Raises:
+            NotImplementedError: If the backend does not support local paths.
+        """
+        raise NotImplementedError(
+            f"{type(self).__name__} does not support local file paths. "
+            "Use read() to get file contents."
+        )
+
     # ── Convenience helpers (non-abstract) ──────────────────────────
 
     def read_text(self, path: str) -> str:

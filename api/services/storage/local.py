@@ -21,7 +21,11 @@ class LocalStorageBackend(StorageBackend):
 
     def _resolve(self, path: str) -> Path:
         """Resolve a relative path against the base directory."""
-        return Path(self._base_dir) / path
+        resolved = (Path(self._base_dir) / path).resolve()
+        base = Path(self._base_dir).resolve()
+        if not (str(resolved) + os.sep).startswith(str(base) + os.sep) and resolved != base:
+            raise ValueError(f"Path escapes base directory: {path!r}")
+        return resolved
 
     # ── Public API ──────────────────────────────────────────────────
 
