@@ -7,9 +7,7 @@ placeholders are automatically converted to %s before execution.
 from __future__ import annotations
 
 import os
-import re
 import sqlite3
-from typing import Any
 
 
 class DatabaseConnection:

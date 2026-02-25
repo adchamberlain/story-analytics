@@ -5,8 +5,6 @@ All tests use SQLite in-memory (no Postgres dependency needed).
 """
 from __future__ import annotations
 
-import pytest
-
 from api.services.db.connection import DatabaseConnection
 
 
