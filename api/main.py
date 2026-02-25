@@ -16,6 +16,7 @@ from starlette.requests import Request  # noqa: E402
 from .config import get_settings  # noqa: E402
 # Legacy SQLAlchemy create_tables skipped — metadata_db._ensure_tables() handles schema
 from .routers import auth_router  # noqa: E402
+from .auth_simple import router as auth_simple_router  # noqa: E402
 from .routers.data import router as data_router  # noqa: E402
 from .routers.charts_v2 import router as charts_v2_router  # noqa: E402
 from .routers.dashboards_v2 import router as dashboards_v2_router  # noqa: E402
@@ -107,6 +108,7 @@ app.add_middleware(SecurityHeadersMiddleware)
 
 # Include routers
 app.include_router(auth_router, prefix="/api")
+app.include_router(auth_simple_router, prefix="/api")
 app.include_router(data_router, prefix="/api")
 app.include_router(charts_v2_router, prefix="/api")
 app.include_router(dashboards_v2_router, prefix="/api")
