@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
 import { DashboardGrid } from '../components/dashboard/DashboardGrid'
+import { parseEmbedFlags } from '../utils/embedFlags'
 
 interface ChartWithData {
   chart_id: string
@@ -45,6 +46,7 @@ interface DashboardData {
 export function EmbedDashboardPage() {
   const { dashboardId } = useParams<{ dashboardId: string }>()
   const [searchParams] = useSearchParams()
+  const flags = parseEmbedFlags(searchParams)
   const [dashboard, setDashboard] = useState<DashboardData | null>(null)
   const [error, setError] = useState<string | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -130,24 +132,28 @@ export function EmbedDashboardPage() {
     <div
       ref={containerRef}
       style={{
-        padding: '16px 24px',
+        padding: flags.plain ? '0' : '16px 24px',
         fontFamily: 'system-ui',
-        backgroundColor: isDark ? '#0f172a' : undefined,
+        backgroundColor: flags.transparent
+          ? 'transparent'
+          : isDark ? '#0f172a' : undefined,
         color: isDark ? '#e2e8f0' : undefined,
       }}
       data-theme={isDark ? 'dark' : 'light'}
     >
-      {dashboard.title && (
+      {!flags.plain && dashboard.title && (
         <h1 style={{ margin: '0 0 4px', fontSize: 20, fontWeight: 700, color: isDark ? '#f1f5f9' : '#1a1a1a' }}>
           {dashboard.title}
         </h1>
       )}
-      {dashboard.description && (
+      {!flags.plain && dashboard.description && (
         <p style={{ margin: '0 0 12px', fontSize: 14, color: isDark ? '#94a3b8' : '#666' }}>
           {dashboard.description}
         </p>
       )}
-      <DashboardGrid charts={dashboard.charts} />
+      <div style={flags.static ? { pointerEvents: 'none' } : undefined}>
+        <DashboardGrid charts={dashboard.charts} embedFlags={flags} />
+      </div>
     </div>
   )
 }

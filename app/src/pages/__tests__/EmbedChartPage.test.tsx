@@ -144,7 +144,8 @@ describe('EmbedDashboardPage dark mode', () => {
   })
 
   it('applies dark background and text colors', () => {
-    expect(source).toContain("backgroundColor: isDark ? '#0f172a' : undefined")
+    // Dark mode background (with transparent flag check)
+    expect(source).toContain("isDark ? '#0f172a' : undefined")
     expect(source).toContain("isDark ? '#f1f5f9' : '#1a1a1a'")
     expect(source).toContain("isDark ? '#94a3b8' : '#666'")
   })
@@ -155,5 +156,110 @@ describe('EmbedDashboardPage dark mode', () => {
 
   it('sets data-theme attribute on container', () => {
     expect(source).toContain("data-theme={isDark ? 'dark' : 'light'}")
+  })
+})
+
+describe('EmbedDashboardPage embed flags', () => {
+  let source: string
+
+  beforeEach(async () => {
+    const fs = await import('fs')
+    source = fs.readFileSync(
+      resolve(__dirname, '../EmbedDashboardPage.tsx'),
+      'utf-8',
+    )
+  })
+
+  it('imports parseEmbedFlags utility', () => {
+    expect(source).toContain("import { parseEmbedFlags } from '../utils/embedFlags'")
+  })
+
+  it('calls parseEmbedFlags with searchParams', () => {
+    expect(source).toContain('parseEmbedFlags(searchParams)')
+  })
+
+  it('plain flag: hides title when flags.plain is true', () => {
+    expect(source).toContain('!flags.plain && dashboard.title')
+  })
+
+  it('plain flag: hides description when flags.plain is true', () => {
+    expect(source).toContain('!flags.plain && dashboard.description')
+  })
+
+  it('plain flag: removes padding when plain=true', () => {
+    expect(source).toContain("padding: flags.plain ? '0' : '16px 24px'")
+  })
+
+  it('transparent flag: sets background to transparent', () => {
+    expect(source).toContain('flags.transparent')
+    expect(source).toContain("? 'transparent'")
+  })
+
+  it('static flag: wraps DashboardGrid in pointer-events:none div', () => {
+    expect(source).toContain("flags.static ? { pointerEvents: 'none' } : undefined")
+  })
+
+  it('passes embedFlags to DashboardGrid', () => {
+    expect(source).toContain('embedFlags={flags}')
+  })
+})
+
+describe('DashboardGrid embed flags', () => {
+  let source: string
+
+  beforeEach(async () => {
+    const fs = await import('fs')
+    source = fs.readFileSync(
+      resolve(__dirname, '../../components/dashboard/DashboardGrid.tsx'),
+      'utf-8',
+    )
+  })
+
+  it('accepts embedFlags prop', () => {
+    expect(source).toContain('embedFlags?: EmbedFlags')
+  })
+
+  it('passes embedFlags to DashboardChartCell', () => {
+    expect(source).toContain('embedFlags={embedFlags}')
+  })
+
+  it('plain flag: hides title in ChartWrapper when plain is true', () => {
+    expect(source).toContain('embedFlags?.plain ? undefined : (chart.title')
+  })
+
+  it('plain flag: hides subtitle in ChartWrapper when plain is true', () => {
+    expect(source).toContain('embedFlags?.plain ? undefined : (chart.subtitle')
+  })
+
+  it('plain flag: hides source in ChartWrapper when plain is true', () => {
+    expect(source).toContain('embedFlags?.plain ? undefined : (chart.source')
+  })
+
+  it('logo flag: passes hideLogo to ChartWrapper', () => {
+    expect(source).toContain('hideLogo={showLogo === false}')
+  })
+
+  it('search flag: passes initialSearch via extraProps', () => {
+    expect(source).toContain('initialSearch: embedFlags.search')
+  })
+})
+
+describe('ChartWrapper hideLogo prop', () => {
+  let source: string
+
+  beforeEach(async () => {
+    const fs = await import('fs')
+    source = fs.readFileSync(
+      resolve(__dirname, '../../components/charts/ChartWrapper.tsx'),
+      'utf-8',
+    )
+  })
+
+  it('accepts hideLogo prop', () => {
+    expect(source).toContain('hideLogo?: boolean')
+  })
+
+  it('hides logo when hideLogo is true', () => {
+    expect(source).toContain('!hideLogo')
   })
 })
