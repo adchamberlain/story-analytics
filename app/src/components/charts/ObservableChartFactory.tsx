@@ -10,6 +10,7 @@ import { getXValues, getYForX, resolveResponsiveOffset, computeRatios, smartOffs
 import type { ChartConfig, ChartType, Annotations, PointAnnotation, HighlightRange } from '../../types/chart'
 import type { ChartTheme } from '../../themes/chartThemes'
 import { shouldShowGrid, formatBigValue, computePctDelta, formatDelta } from './bigValueHelpers'
+import { renderTooltip } from '../../utils/tooltipTemplate'
 import { RichDataTable } from './table/RichDataTable'
 import { ChoroplethMap } from './ChoroplethMap'
 import { GeoPointMap } from './GeoPointMap'
@@ -508,6 +509,11 @@ function tipTitle(
   xCol?: string, yCol?: string, seriesCol?: string,
   config?: ChartConfig,
 ): string {
+  // Use custom tooltip template if provided
+  if (config?.tooltipTemplate) {
+    return renderTooltip(config.tooltipTemplate, d)
+  }
+
   const unit = detectValueUnit(config, yCol)
   const cat = xCol && d[xCol] != null ? fmtTipValue(d[xCol]) : ''
   const ser = seriesCol && d[seriesCol] != null ? fmtTipValue(d[seriesCol]) : ''

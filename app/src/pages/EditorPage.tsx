@@ -135,33 +135,40 @@ export function EditorPage() {
   const handleTransform = useCallback(async (action: string, params: Record<string, unknown>) => {
     if (!editorSourceId) return
     const ds = useDataStore.getState()
-    switch (action) {
-      case 'transpose':
-        await ds.transformTranspose(editorSourceId)
-        break
-      case 'rename-column':
-        await ds.transformRenameColumn(editorSourceId, params.old as string, params.new as string)
-        break
-      case 'delete-column':
-        await ds.transformDeleteColumn(editorSourceId, params.column as string)
-        break
-      case 'reorder-columns':
-        await ds.transformReorderColumns(editorSourceId, params.columns as string[])
-        break
-      case 'round':
-        await ds.transformRound(editorSourceId, params.column as string, params.decimals as number)
-        break
-      case 'prepend-append':
-        await ds.transformPrependAppend(editorSourceId, params.column as string, params.prepend as string, params.append as string)
-        break
-      case 'edit-cell':
-        await ds.transformEditCell(editorSourceId, params.row as number, params.column as string, params.value as string)
-        break
-      case 'cast-type':
-        await ds.transformCastType(editorSourceId, params.column as string, params.type as string)
-        break
+    try {
+      switch (action) {
+        case 'transpose':
+          await ds.transformTranspose(editorSourceId)
+          break
+        case 'rename-column':
+          await ds.transformRenameColumn(editorSourceId, params.old as string, params.new as string)
+          break
+        case 'delete-column':
+          await ds.transformDeleteColumn(editorSourceId, params.column as string)
+          break
+        case 'reorder-columns':
+          await ds.transformReorderColumns(editorSourceId, params.columns as string[])
+          break
+        case 'round':
+          await ds.transformRound(editorSourceId, params.column as string, params.decimals as number)
+          break
+        case 'prepend-append':
+          await ds.transformPrependAppend(editorSourceId, params.column as string, params.prepend as string, params.append as string)
+          break
+        case 'edit-cell':
+          await ds.transformEditCell(editorSourceId, params.row as number, params.column as string, params.value as string)
+          break
+        case 'cast-type':
+          await ds.transformCastType(editorSourceId, params.column as string, params.type as string)
+          break
+      }
+      // Refresh the chart data so the chart tab shows updated data
+      store.buildQuery()
+    } catch (e) {
+      // Error is already stored in dataStore.error by the transform method
+      console.error(`[EditorPage] Transform "${action}" failed:`, e)
     }
-  }, [editorSourceId])
+  }, [editorSourceId, store])
 
   const handleSaveAsTemplate = useCallback(async () => {
     if (!store.chartId || isNew) return
@@ -351,22 +358,13 @@ export function EditorPage() {
             {store.saving ? 'Saving...' : 'Save'}
           </button>
           {store.chartId && !isNew && (
-            <>
-              <button
-                onClick={() => store.saveVersion()}
-                className="px-3 py-2 text-xs rounded-lg border border-border-default text-text-on-surface hover:bg-surface-secondary transition-colors font-medium"
-                title="Save a named version snapshot"
-              >
-                Save Version
-              </button>
-              <button
-                onClick={() => store.setVersionHistoryOpen(true)}
-                className="px-3 py-2 text-xs rounded-lg border border-border-default text-text-on-surface hover:bg-surface-secondary transition-colors font-medium"
-                title="View version history"
-              >
-                History
-              </button>
-            </>
+            <button
+              onClick={() => store.setVersionHistoryOpen(true)}
+              className="px-3 py-2 text-xs rounded-lg border border-border-default text-text-on-surface hover:bg-surface-secondary transition-colors font-medium"
+              title="View version history"
+            >
+              History
+            </button>
           )}
           {store.chartId && !isNew && (
             <button
@@ -440,12 +438,19 @@ export function EditorPage() {
             <div className="w-full max-w-3xl">
               {centerView === 'transform' && editorSourceId ? (
                 dataStore.preview ? (
-                  <DataTransformGrid
-                    data={dataStore.preview}
-                    sourceId={editorSourceId}
-                    onTransform={handleTransform}
-                    transforming={dataStore.transforming}
-                  />
+                  <>
+                    {dataStore.error && (
+                      <div className="mb-3 px-3 py-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-sm text-red-700 dark:text-red-400">
+                        {dataStore.error}
+                      </div>
+                    )}
+                    <DataTransformGrid
+                      data={dataStore.preview}
+                      sourceId={editorSourceId}
+                      onTransform={handleTransform}
+                      transforming={dataStore.transforming}
+                    />
+                  </>
                 ) : dataStore.loadingPreview ? (
                   <div className="flex items-center justify-center h-40 text-sm text-text-muted">
                     Loading data...

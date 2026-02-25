@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState } from 'react'
 import { useParams, useSearchParams, Link } from 'react-router-dom'
 import { authFetch } from '../utils/authFetch'
 import { ChartWrapper } from '../components/charts/ChartWrapper'
@@ -21,6 +21,7 @@ interface ChartData {
     horizontal: boolean
     sort: boolean
     config: Record<string, unknown> | null
+    status: string
   }
   data: Record<string, unknown>[]
   columns: string[]
@@ -37,7 +38,6 @@ export function ChartViewPage() {
   const [chartData, setChartData] = useState<ChartData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const chartRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (!chartId) return
@@ -127,7 +127,7 @@ export function ChartViewPage() {
 
       {/* Chart */}
       <main className="max-w-4xl mx-auto px-6 py-8">
-        <div ref={chartRef}>
+        <div>
           <ChartWrapper
             title={chart.title ?? undefined}
             subtitle={chart.subtitle ?? undefined}
@@ -149,10 +149,7 @@ export function ChartViewPage() {
         <div className="mt-4 flex justify-end">
           <SharePanel
             chartId={chart.id}
-            title={chart.title ?? undefined}
-            subtitle={chart.subtitle ?? undefined}
-            source={chart.source ?? undefined}
-            chartRef={chartRef}
+            published={chart.status === 'published'}
           />
         </div>
       </main>

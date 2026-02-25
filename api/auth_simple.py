@@ -21,7 +21,7 @@ import bcrypt as _bcrypt
 from .services.api_key_service import verify_api_key
 from .services.metadata_db import (
     create_user, get_user_by_email, get_user_by_id,
-    ensure_default_user,
+    ensure_default_user, update_user_password,
     get_api_key_by_prefix, update_api_key_last_used,
 )
 
@@ -200,3 +200,31 @@ async def login(request: LoginRequest):
     safe_user = {k: v for k, v in user.items() if k != "password_hash"}
 
     return AuthResponse(token=token, user=safe_user)
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
+
+
+@router.post("/change-password")
+async def change_password(
+    request: ChangePasswordRequest,
+    user: dict = Depends(get_current_user),
+):
+    """Change the current user's password. Requires current password for verification."""
+    if not AUTH_ENABLED:
+        raise HTTPException(status_code=400, detail="Auth is disabled")
+
+    # Fetch full user record (with password_hash)
+    full_user = get_user_by_email(user["email"])
+    if not full_user or not _verify_password(request.current_password, full_user["password_hash"]):
+        raise HTTPException(status_code=401, detail="Current password is incorrect")
+
+    if len(request.new_password) < 6:
+        raise HTTPException(status_code=400, detail="New password must be at least 6 characters")
+
+    new_hash = _hash_password(request.new_password)
+    update_user_password(user["id"], new_hash)
+
+    return {"message": "Password changed successfully"}

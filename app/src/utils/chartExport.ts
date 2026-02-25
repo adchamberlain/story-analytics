@@ -4,7 +4,7 @@
  */
 
 /** Download an SVG element as a .svg file */
-export function exportSVG(svgElement: SVGSVGElement, filename: string): void {
+export async function exportSVG(svgElement: SVGSVGElement, filename: string): Promise<void> {
   const clone = svgElement.cloneNode(true) as SVGSVGElement
 
   // Compute content bounds including overflow (annotations, labels)
@@ -16,6 +16,10 @@ export function exportSVG(svgElement: SVGSVGElement, filename: string): void {
 
   // Add XML namespace for standalone SVG
   clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg')
+
+  // Inline computed fonts and embed web font data for standalone rendering
+  inlineComputedFonts(svgElement, clone)
+  await embedFontsInSvg(clone)
 
   const serializer = new XMLSerializer()
   const svgString = serializer.serializeToString(clone)
@@ -183,25 +187,33 @@ export async function exportPPTX(
 
 /** Convert an SVG element to a canvas at a given scale.
  *  Detects overflow content (Observable Plot sets overflow:visible on SVGs)
- *  by measuring each child element's bounds in SVG coordinate space. */
-export function svgToCanvas(svgElement: SVGSVGElement, scale = 2): Promise<HTMLCanvasElement> {
+ *  by measuring each child element's bounds in SVG coordinate space.
+ *  Embeds web fonts so annotation text renders correctly in the exported image. */
+export async function svgToCanvas(svgElement: SVGSVGElement, scale = 2): Promise<HTMLCanvasElement> {
+  const { viewX, viewY, viewW, viewH } = getSvgContentBounds(svgElement)
+
+  const width = Math.round(viewW * scale)
+  const height = Math.round(viewH * scale)
+
+  const clone = svgElement.cloneNode(true) as SVGSVGElement
+  clone.setAttribute('width', String(viewW))
+  clone.setAttribute('height', String(viewH))
+  clone.setAttribute('viewBox', `${viewX} ${viewY} ${viewW} ${viewH}`)
+  clone.style.overflow = 'hidden' // viewBox handles bounds now
+  clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg')
+
+  // Inline computed font-family on text elements that inherit from page CSS
+  // (the clone is detached from the DOM and can't inherit those styles)
+  inlineComputedFonts(svgElement, clone)
+
+  // Embed web font data so text renders correctly in the serialized SVG image
+  await embedFontsInSvg(clone)
+
+  const serializer = new XMLSerializer()
+  const svgString = serializer.serializeToString(clone)
+  const svgDataUrl = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svgString)}`
+
   return new Promise((resolve, reject) => {
-    const { viewX, viewY, viewW, viewH } = getSvgContentBounds(svgElement)
-
-    const width = Math.round(viewW * scale)
-    const height = Math.round(viewH * scale)
-
-    const clone = svgElement.cloneNode(true) as SVGSVGElement
-    clone.setAttribute('width', String(viewW))
-    clone.setAttribute('height', String(viewH))
-    clone.setAttribute('viewBox', `${viewX} ${viewY} ${viewW} ${viewH}`)
-    clone.style.overflow = 'hidden' // viewBox handles bounds now
-    clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg')
-
-    const serializer = new XMLSerializer()
-    const svgString = serializer.serializeToString(clone)
-    const svgDataUrl = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svgString)}`
-
     const img = new Image()
     img.onload = () => {
       const canvas = document.createElement('canvas')
@@ -287,6 +299,144 @@ function addTextToCanvas(
   }
 
   return canvas
+}
+
+// ── Font Embedding ──────────────────────────────────────────────────────────
+
+const GENERIC_FAMILIES = new Set([
+  'serif', 'sans-serif', 'monospace', 'cursive', 'fantasy',
+  'system-ui', 'ui-sans-serif', 'ui-serif', 'ui-monospace', 'ui-rounded',
+  'math', 'emoji', 'fangsong',
+])
+
+/** Copy computed font-family from the live SVG onto clone text elements
+ *  that don't have an explicit font-family attribute (they'd inherit from
+ *  page CSS, which the detached clone can't access). */
+function inlineComputedFonts(liveSvg: SVGSVGElement, clone: SVGSVGElement): void {
+  const liveTexts = liveSvg.querySelectorAll('text')
+  const cloneTexts = clone.querySelectorAll('text')
+  for (let i = 0; i < liveTexts.length && i < cloneTexts.length; i++) {
+    if (!cloneTexts[i].getAttribute('font-family')) {
+      const computed = getComputedStyle(liveTexts[i]).fontFamily
+      if (computed) cloneTexts[i].setAttribute('font-family', computed)
+    }
+  }
+}
+
+/** Parse a CSS font-family string and add non-generic family names to the set. */
+function parseFontFamilies(familyString: string, set: Set<string>): void {
+  for (const f of familyString.split(',')) {
+    const name = f.trim().replace(/['"]/g, '')
+    if (name && !GENERIC_FAMILIES.has(name.toLowerCase())) set.add(name)
+  }
+}
+
+/** Collect all @font-face CSS rules from the document's stylesheets.
+ *  Handles both same-origin sheets (reads cssRules directly) and cross-origin
+ *  sheets like Google Fonts (fetches the CSS text). */
+async function collectFontFaceRules(): Promise<string[]> {
+  const rules: string[] = []
+  for (const sheet of Array.from(document.styleSheets)) {
+    try {
+      for (const rule of Array.from(sheet.cssRules)) {
+        if (rule instanceof CSSFontFaceRule) {
+          rules.push(rule.cssText)
+        }
+      }
+    } catch {
+      // Cross-origin stylesheet — fetch CSS text
+      if (sheet.href) {
+        try {
+          const resp = await fetch(sheet.href)
+          const css = await resp.text()
+          const matches = css.match(/@font-face\s*\{[^}]+\}/g)
+          if (matches) rules.push(...matches)
+        } catch {
+          // Skip unreachable stylesheets
+        }
+      }
+    }
+  }
+  return rules
+}
+
+/** Convert a Blob to a base64 data URL. */
+function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(reader.result as string)
+    reader.onerror = reject
+    reader.readAsDataURL(blob)
+  })
+}
+
+/** Replace external url() references in a @font-face rule with inline base64 data URLs. */
+async function inlineFontUrls(rule: string): Promise<string> {
+  let result = rule
+  const urlMatches = [...rule.matchAll(/url\(["']?([^"')]+)["']?\)/g)]
+  for (const m of urlMatches) {
+    const url = m[1]
+    if (url.startsWith('data:')) continue // already inline
+    try {
+      const resp = await fetch(url)
+      const blob = await resp.blob()
+      const dataUrl = await blobToDataUrl(blob)
+      result = result.replace(m[0], `url("${dataUrl}")`)
+    } catch {
+      // Skip fonts that can't be fetched
+    }
+  }
+  return result
+}
+
+/** Embed web fonts used by text elements as inline @font-face rules in the SVG.
+ *  This makes the SVG self-contained so fonts render correctly when serialized
+ *  to a data URL for canvas/PNG export or downloaded as a standalone file. */
+async function embedFontsInSvg(svgClone: SVGSVGElement): Promise<void> {
+  // 1. Collect unique font families used in the SVG
+  const usedFamilies = new Set<string>()
+
+  // From text element attributes and inline styles
+  for (const el of svgClone.querySelectorAll('text, [font-family]')) {
+    const attr = el.getAttribute('font-family')
+    const style = (el as HTMLElement).style?.fontFamily
+    if (attr) parseFontFamilies(attr, usedFamilies)
+    if (style) parseFontFamilies(style, usedFamilies)
+  }
+
+  // From embedded <style> elements (Observable Plot may set font-family there)
+  for (const styleEl of svgClone.querySelectorAll('style')) {
+    const css = styleEl.textContent ?? ''
+    for (const m of css.matchAll(/font-family:\s*([^;}"]+)/g)) {
+      parseFontFamilies(m[1], usedFamilies)
+    }
+  }
+
+  if (usedFamilies.size === 0) return
+
+  // 2. Collect @font-face rules from document stylesheets
+  const allRules = await collectFontFaceRules()
+  if (allRules.length === 0) return
+
+  // 3. Filter to rules whose font-family matches a used family
+  const relevant = allRules.filter((rule) => {
+    const familyMatch = rule.match(/font-family:\s*['"]?([^'";,}]+)['"]?/)
+    if (!familyMatch) return false
+    const ruleFamily = familyMatch[1].trim()
+    for (const used of usedFamilies) {
+      if (ruleFamily.toLowerCase() === used.toLowerCase()) return true
+    }
+    return false
+  })
+  if (relevant.length === 0) return
+
+  // 4. Inline external font URLs as base64 data URLs (parallel fetch)
+  const inlined = await Promise.all(relevant.map(inlineFontUrls))
+
+  // 5. Insert <style> with @font-face rules into SVG
+  const styleEl = document.createElementNS('http://www.w3.org/2000/svg', 'style')
+  styleEl.textContent = inlined.join('\n')
+  svgClone.insertBefore(styleEl, svgClone.firstChild)
 }
 
 /** Compute the full content bounds of an SVG, including overflow from annotations/labels.
