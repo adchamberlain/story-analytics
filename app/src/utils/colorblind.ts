@@ -122,3 +122,61 @@ export const CVD_TYPES: { type: CVDType; label: string }[] = [
   { type: 'deuteranopia', label: 'Deuteranopia (no green)' },
   { type: 'tritanopia', label: 'Tritanopia (no blue)' },
 ]
+
+// ── Palette Accessibility Check ─────────────────────────────────────────────
+
+export interface PaletteWarning {
+  /** Which CVD type causes the confusion */
+  cvdType: CVDType
+  /** Pairs of color indices that become indistinguishable */
+  pairs: [number, number][]
+  /** Human-readable warning message */
+  message: string
+}
+
+export interface PaletteAccessibility {
+  /** True if palette is safe for all CVD types */
+  safe: boolean
+  /** Warnings per CVD type (empty if safe) */
+  warnings: PaletteWarning[]
+}
+
+/**
+ * Check if a color palette is accessible for colorblind users.
+ *
+ * For each CVD type, simulates the palette and checks all pairwise contrast
+ * ratios. Pairs with contrast ratio below `minContrast` (default 3.0) are
+ * flagged as potentially confusing.
+ *
+ * @param colors - Array of hex color strings
+ * @param minContrast - Minimum contrast ratio between simulated pairs (default 3.0)
+ */
+export function checkPaletteAccessibility(colors: string[], minContrast = 3.0): PaletteAccessibility {
+  if (colors.length < 2) return { safe: true, warnings: [] }
+
+  const warnings: PaletteWarning[] = []
+
+  for (const { type, label } of CVD_TYPES) {
+    const simulated = simulatePalette(colors, type)
+    const badPairs: [number, number][] = []
+
+    for (let i = 0; i < simulated.length; i++) {
+      for (let j = i + 1; j < simulated.length; j++) {
+        const cr = contrastRatio(simulated[i], simulated[j])
+        if (cr < minContrast) {
+          badPairs.push([i, j])
+        }
+      }
+    }
+
+    if (badPairs.length > 0) {
+      warnings.push({
+        cvdType: type,
+        pairs: badPairs,
+        message: `${label}: ${badPairs.length} color pair${badPairs.length > 1 ? 's' : ''} may be hard to distinguish`,
+      })
+    }
+  }
+
+  return { safe: warnings.length === 0, warnings }
+}
