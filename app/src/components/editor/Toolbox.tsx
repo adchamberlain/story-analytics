@@ -727,6 +727,15 @@ export function Toolbox() {
         </CollapsibleSection>
       )}
 
+      {/* Sharing */}
+      <Section title="Sharing">
+        <Toggle
+          label="Allow data download (CSV)"
+          checked={config.allowDataDownload}
+          onChange={(v) => updateConfig({ allowDataDownload: v })}
+        />
+      </Section>
+
       {/* Annotations */}
       <CollapsibleSection
         title="Annotations"

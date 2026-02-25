@@ -75,6 +75,8 @@ export interface EditorConfig {
   locale: string
   // Auto-refresh interval (seconds) for embed view — 0/undefined = off
   refreshInterval: number
+  // Allow users to download chart data as CSV
+  allowDataDownload: boolean
 }
 
 const DEFAULT_CONFIG: EditorConfig = {
@@ -131,6 +133,7 @@ const DEFAULT_CONFIG: EditorConfig = {
   altText: '',
   locale: '',
   refreshInterval: 0,
+  allowDataDownload: true,
 }
 
 export interface TableInfoItem {
@@ -332,6 +335,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         altText: chart.config?.altText ?? '',
         locale: chart.config?.locale ?? '',
         refreshInterval: (chart.config?.refreshInterval as number) ?? 0,
+        allowDataDownload: (chart.config?.allowDataDownload as boolean) ?? true,
       }
 
       const loadedDataMode = config.dataMode
@@ -555,6 +559,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
             altText: config.altText || undefined,
             locale: config.locale || undefined,
             refreshInterval: config.refreshInterval || undefined,
+            allowDataDownload: config.allowDataDownload === false ? false : undefined,
           },
         }),
       })
@@ -828,6 +833,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
             altText: config.altText || undefined,
             locale: config.locale || undefined,
             refreshInterval: config.refreshInterval || undefined,
+            allowDataDownload: config.allowDataDownload === false ? false : undefined,
           },
         }),
       })
