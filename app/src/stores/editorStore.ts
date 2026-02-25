@@ -77,6 +77,8 @@ export interface EditorConfig {
   refreshInterval: number
   // Allow users to download chart data as CSV
   allowDataDownload: boolean
+  // Week start day for ordinal day-of-week sorting
+  weekStartDay: 'Mon' | 'Sun'
 }
 
 const DEFAULT_CONFIG: EditorConfig = {
@@ -134,6 +136,7 @@ const DEFAULT_CONFIG: EditorConfig = {
   locale: '',
   refreshInterval: 0,
   allowDataDownload: true,
+  weekStartDay: 'Mon',
 }
 
 export interface TableInfoItem {
@@ -354,6 +357,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         locale: chart.config?.locale ?? '',
         refreshInterval: (chart.config?.refreshInterval as number) ?? 0,
         allowDataDownload: (chart.config?.allowDataDownload as boolean) ?? true,
+        weekStartDay: (chart.config?.weekStartDay as 'Mon' | 'Sun') ?? 'Mon',
       }
 
       const loadedDataMode = config.dataMode
@@ -578,6 +582,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
             locale: config.locale || undefined,
             refreshInterval: config.refreshInterval || undefined,
             allowDataDownload: config.allowDataDownload === false ? false : undefined,
+            weekStartDay: config.weekStartDay !== 'Mon' ? config.weekStartDay : undefined,
           },
         }),
       })
@@ -868,6 +873,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
             locale: config.locale || undefined,
             refreshInterval: config.refreshInterval || undefined,
             allowDataDownload: config.allowDataDownload === false ? false : undefined,
+            weekStartDay: config.weekStartDay !== 'Mon' ? config.weekStartDay : undefined,
           },
         }),
       })

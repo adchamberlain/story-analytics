@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import type { ChartType } from '../../types/chart'
 import type { ReactNode } from 'react'
 
@@ -75,20 +76,6 @@ const CHART_TYPES: { type: ChartType; label: string; icon: ReactNode }[] = [
     ),
   },
   {
-    type: 'BoxPlot',
-    label: 'Box Plot',
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-5 w-5">
-        <line x1="12" y1="2" x2="12" y2="7" />
-        <rect x="7" y="7" width="10" height="10" rx="1" fill="currentColor" fillOpacity="0.15" />
-        <line x1="7" y1="12" x2="17" y2="12" />
-        <line x1="12" y1="17" x2="12" y2="22" />
-        <line x1="9" y1="2" x2="15" y2="2" />
-        <line x1="9" y1="22" x2="15" y2="22" />
-      </svg>
-    ),
-  },
-  {
     type: 'PieChart',
     label: 'Pie',
     icon: (
@@ -105,6 +92,32 @@ const CHART_TYPES: { type: ChartType; label: string; icon: ReactNode }[] = [
     icon: (
       <svg viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5">
         <text x="12" y="16" textAnchor="middle" fontSize="14" fontWeight="bold" fontFamily="system-ui">#</text>
+      </svg>
+    ),
+  },
+  {
+    type: 'ChoroplethMap',
+    label: 'Map',
+    icon: (
+      <svg viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5">
+        <path d="M3,6 L9,3 L15,6 L21,3 L21,18 L15,21 L9,18 L3,21 Z" fillOpacity="0.25" stroke="currentColor" strokeWidth="1.5" fill="none" />
+        <line x1="9" y1="3" x2="9" y2="18" stroke="currentColor" strokeWidth="1" opacity="0.5" />
+        <line x1="15" y1="6" x2="15" y2="21" stroke="currentColor" strokeWidth="1" opacity="0.5" />
+      </svg>
+    ),
+  },
+  // ── Extended types (hidden behind "More") ──
+  {
+    type: 'BoxPlot',
+    label: 'Box Plot',
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-5 w-5">
+        <line x1="12" y1="2" x2="12" y2="7" />
+        <rect x="7" y="7" width="10" height="10" rx="1" fill="currentColor" fillOpacity="0.15" />
+        <line x1="7" y1="12" x2="17" y2="12" />
+        <line x1="12" y1="17" x2="12" y2="22" />
+        <line x1="9" y1="2" x2="15" y2="2" />
+        <line x1="9" y1="22" x2="15" y2="22" />
       </svg>
     ),
   },
@@ -179,17 +192,6 @@ const CHART_TYPES: { type: ChartType; label: string; icon: ReactNode }[] = [
         <polyline points="3,20 5,16 7,18 10,14" />
         <rect x="13" y="13" width="9" height="9" rx="1" />
         <polyline points="14,20 16,15 18,17 21,14" />
-      </svg>
-    ),
-  },
-  {
-    type: 'ChoroplethMap',
-    label: 'Map',
-    icon: (
-      <svg viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5">
-        <path d="M3,6 L9,3 L15,6 L21,3 L21,18 L15,21 L9,18 L3,21 Z" fillOpacity="0.25" stroke="currentColor" strokeWidth="1.5" fill="none" />
-        <line x1="9" y1="3" x2="9" y2="18" stroke="currentColor" strokeWidth="1" opacity="0.5" />
-        <line x1="15" y1="6" x2="15" y2="21" stroke="currentColor" strokeWidth="1" opacity="0.5" />
       </svg>
     ),
   },
@@ -318,30 +320,58 @@ const CHART_TYPES: { type: ChartType; label: string; icon: ReactNode }[] = [
   },
 ]
 
+/** Number of chart types visible before expanding */
+const PRIMARY_COUNT = 9
+
 interface ChartTypeSelectorProps {
   value: ChartType
   onChange: (type: ChartType) => void
 }
 
 export function ChartTypeSelector({ value, onChange }: ChartTypeSelectorProps) {
+  // Auto-expand if the selected type is in the "more" section
+  const selectedInMore = CHART_TYPES.findIndex((ct) => ct.type === value) >= PRIMARY_COUNT
+  const [expanded, setExpanded] = useState(selectedInMore)
+
+  const visible = expanded ? CHART_TYPES : CHART_TYPES.slice(0, PRIMARY_COUNT)
+  const hiddenCount = CHART_TYPES.length - PRIMARY_COUNT
+
   return (
-    <div className="grid grid-cols-3 gap-1.5">
-      {CHART_TYPES.map(({ type, label, icon }) => (
+    <div>
+      <div className="grid grid-cols-3 gap-1.5">
+        {visible.map(({ type, label, icon }) => (
+          <button
+            key={type}
+            onClick={() => onChange(type)}
+            className={`
+              flex flex-col items-center gap-1.5 px-2 py-3 rounded-lg text-xs transition-colors border
+              ${value === type
+                ? 'bg-blue-50 border-blue-300 text-blue-700'
+                : 'bg-surface border-border-default text-text-on-surface hover:bg-surface-secondary'
+              }
+            `}
+          >
+            {icon}
+            <span>{label}</span>
+          </button>
+        ))}
+      </div>
+      {!expanded && (
         <button
-          key={type}
-          onClick={() => onChange(type)}
-          className={`
-            flex flex-col items-center gap-1.5 px-2 py-3 rounded-lg text-xs transition-colors border
-            ${value === type
-              ? 'bg-blue-50 border-blue-300 text-blue-700'
-              : 'bg-surface border-border-default text-text-on-surface hover:bg-surface-secondary'
-            }
-          `}
+          onClick={() => setExpanded(true)}
+          className="mt-1.5 w-full text-xs text-text-muted hover:text-text-secondary py-1.5 transition-colors"
         >
-          {icon}
-          <span>{label}</span>
+          + {hiddenCount} more chart types
         </button>
-      ))}
+      )}
+      {expanded && (
+        <button
+          onClick={() => setExpanded(false)}
+          className="mt-1.5 w-full text-xs text-text-muted hover:text-text-secondary py-1.5 transition-colors"
+        >
+          Show less
+        </button>
+      )}
     </div>
   )
 }

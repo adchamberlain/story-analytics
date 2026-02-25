@@ -67,6 +67,20 @@ export function Toolbox() {
   const isMultiY = Array.isArray(config.y) && config.y.length > 1
   const hasY = Array.isArray(config.y) ? config.y.length > 0 : !!config.y
 
+  // Show "Week starts on" only when data contains day-of-week values
+  const hasDayOfWeekData = useMemo(() => {
+    if (data.length === 0) return false
+    const DAY_NAMES = new Set(['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun',
+      'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'])
+    // Check x-axis column and series column (HeatMap y-axis)
+    const fieldsToCheck = [config.x, config.series].filter(Boolean) as string[]
+    for (const field of fieldsToCheck) {
+      const sample = data[0][field]
+      if (typeof sample === 'string' && DAY_NAMES.has(sample.toLowerCase())) return true
+    }
+    return false
+  }, [data, config.x, config.series])
+
   const shapeAdvice = useMemo(
     () => data.length > 0
       ? analyzeDataShape(data, columns, columnTypes, config.chartType, config as unknown as Record<string, unknown>)
@@ -638,6 +652,19 @@ export function Toolbox() {
               checked={config.showLegend}
               onChange={(showLegend) => updateConfig({ showLegend })}
             />
+          )}
+          {hasDayOfWeekData && (
+            <div>
+              <label className="block text-xs font-medium text-text-secondary mb-1">Week starts on</label>
+              <select
+                value={config.weekStartDay ?? 'Mon'}
+                onChange={(e) => updateConfig({ weekStartDay: e.target.value as 'Mon' | 'Sun' })}
+                className="w-full px-2 py-1.5 text-sm border border-border-default rounded-md bg-surface text-text-primary focus:outline-none focus:border-blue-400"
+              >
+                <option value="Mon">Monday</option>
+                <option value="Sun">Sunday</option>
+              </select>
+            </div>
           )}
         </div>
       </Section>

@@ -286,6 +286,9 @@ export interface ChartConfig {
   /** Per-chart locale override (empty string = use global locale) */
   locale?: string
 
+  /** Which day starts the week for day-of-week ordinal sorting ('Mon' or 'Sun', default: 'Mon') */
+  weekStartDay?: 'Mon' | 'Sun'
+
   /** Allow users to download the chart's underlying data as CSV (default: true) */
   allowDataDownload?: boolean
 
