@@ -3,7 +3,7 @@
 > **Design doc:** `docs/plans/2026-02-24-datawrapper-parity-design.md`
 > **Implementation plan:** `docs/plans/2026-02-24-datawrapper-parity-plan.md`
 
-## Current Phase: 7 — Embed Flags, Chart Types, Accessibility (COMPLETE)
+## Current Phase: 8 — Data Transforms, Edit History, CSV Download (COMPLETE)
 
 ### Task 0: Development Loop Setup ✅
 - [x] Screenshot verification (Playwright)
@@ -341,33 +341,39 @@
 
 ---
 
-## Test Summary (Phase 7 Complete)
+## Phase 8: Data Transforms, Edit History, CSV Download ✅
 
-| Suite | Count |
-|-------|-------|
-| Backend (pytest) | 163 |
-| Frontend (vitest) | 542 |
-| **Total** | **705** |
+### Task N: Data Transforms (Session N) ✅
+- [x] Backend: 8 transform endpoints in `api/routers/transforms.py` (transpose, rename, delete, reorder, round, prepend/append, edit-cell, cast-type)
+- [x] Backend: 17 pytest tests (`api/tests/test_transforms.py`)
+- [x] Frontend: 8 transform methods in `dataStore.ts`
+- [x] Frontend: `DataTransformGrid.tsx` — editable grid with column header dropdowns, inline cell editing, transpose button
+- [x] Frontend: Chart/Transform Data view toggle in EditorPage
+- [x] Frontend: 10 vitest tests (`data-transforms.test.tsx`)
+
+### Task O: Edit History / Versioning (Session O) ✅
+- [x] Backend: `version_storage.py` — snapshot storage with auto-prune at 50 versions
+- [x] Backend: `versions.py` router — 5 CRUD endpoints (create, list, get, restore, delete)
+- [x] Backend: 14 pytest tests (`test_versions.py`)
+- [x] Frontend: `VersionHistoryPanel.tsx` — version list with trigger badges, restore with confirmation
+- [x] Frontend: Auto-save logic in `editorStore.ts` (30-save count, 60s idle timer, publish trigger, manual save)
+- [x] Frontend: Save Version + History buttons, Republish label in EditorPage
+- [x] Frontend: 8 vitest tests (`version-history.test.tsx`)
+
+### Task P: CSV Download (Session P) ✅
+- [x] Backend: `GET /api/v2/charts/{chart_id}/data.csv` endpoint (streams query result as CSV, respects allowDataDownload flag)
+- [x] Backend: 6 pytest tests (`test_csv_download.py`)
+- [x] Frontend: `allowDataDownload` toggle in Toolbox + `ChartConfig` type
+- [x] Frontend: "Get the data" link in EmbedChartPage + PublicChartPage footer
+- [x] Frontend: CSV button in ChartWrapper export row
+- [x] Frontend: 6 vitest tests (`csv-download.test.tsx`)
 
 ---
 
-## Phase 8, Session N: Data Transforms
+## Test Summary (Phase 8 Complete)
 
-### Task N.1: Backend Transform Endpoints
-- [x] Create `api/routers/transforms.py` with 8 transform endpoints
-- [x] Create `api/tests/test_transforms.py` with 17 tests
-- [x] Register transforms router in `api/main.py`
-- [x] All backend tests pass (17/17)
-
-### Task N.2: Frontend Transform Store
-- [x] Add 8 transform API methods to `app/src/stores/dataStore.ts`
-
-### Task N.3: DataTransformGrid Component
-- [x] Create `app/src/components/editor/DataTransformGrid.tsx`
-- [x] Create `app/src/tests/data-transforms.test.tsx` with 10 tests
-- [x] All frontend tests pass (464/464)
-
-### Task N.4: Editor Integration
-- [x] Add chart/transform view toggle to EditorPage
-- [x] Wire onTransform callbacks to dataStore methods
-- [x] All tests pass (180 backend + 464 frontend = 644 total)
+| Suite | Count |
+|-------|-------|
+| Backend (pytest) | 200 |
+| Frontend (vitest) | 571 |
+| **Total** | **771** |
