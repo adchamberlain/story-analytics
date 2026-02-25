@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
 import { ObservableChartFactory } from '../components/charts/ObservableChartFactory'
 import { PALETTES } from '../themes/plotTheme'
+import { parseEmbedFlags } from '../utils/embedFlags'
 import type { ChartConfig, ChartType } from '../types/chart'
 import type { PaletteKey } from '../themes/plotTheme'
 
@@ -38,6 +39,7 @@ function formatAge(seconds: number): string {
 export function EmbedChartPage() {
   const { chartId } = useParams<{ chartId: string }>()
   const [searchParams] = useSearchParams()
+  const flags = parseEmbedFlags(searchParams)
   const [chartData, setChartData] = useState<ChartData | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [lastRefreshed, setLastRefreshed] = useState<number | null>(null)
@@ -201,34 +203,45 @@ export function EmbedChartPage() {
     chartConfig.colorRange = paletteColors
   }
 
+  // Build effective config with embed flag overrides
+  const effectiveConfig: ChartConfig = {
+    ...chartConfig,
+    // Pass initialSearch for DataTable via extraProps
+    ...(flags.search ? { extraProps: { ...chartConfig.extraProps, initialSearch: flags.search } } : {}),
+  }
+
   return (
     <div
       ref={containerRef}
       style={{
-        padding: '12px 16px',
+        padding: flags.plain ? '0' : '12px 16px',
         fontFamily: 'system-ui',
-        backgroundColor: isDark ? '#0f172a' : undefined,
+        backgroundColor: flags.transparent
+          ? 'transparent'
+          : isDark ? '#0f172a' : undefined,
         color: isDark ? '#e2e8f0' : undefined,
       }}
       data-theme={isDark ? 'dark' : 'light'}
     >
-      {chart.title && (
+      {!flags.plain && chart.title && (
         <h2 style={{ margin: '0 0 4px', fontSize: 16, fontWeight: 600, color: isDark ? '#f1f5f9' : '#1a1a1a' }}>
           {chart.title}
         </h2>
       )}
-      {chart.subtitle && (
+      {!flags.plain && chart.subtitle && (
         <p style={{ margin: '0 0 8px', fontSize: 13, color: isDark ? '#94a3b8' : '#666' }}>
           {chart.subtitle}
         </p>
       )}
-      <ObservableChartFactory
-        data={data}
-        config={chartConfig}
-        chartType={chart.chart_type as ChartType}
-        height={360}
-      />
-      {chart.source && (
+      <div style={flags.static ? { pointerEvents: 'none' } : undefined}>
+        <ObservableChartFactory
+          data={data}
+          config={effectiveConfig}
+          chartType={chart.chart_type as ChartType}
+          height={360}
+        />
+      </div>
+      {!flags.plain && chart.source && (
         <p style={{ margin: '8px 0 0', fontSize: 11, color: isDark ? '#64748b' : '#999' }}>
           Source: {chart.source}
         </p>
@@ -240,7 +253,7 @@ export function EmbedChartPage() {
           style={{ maxWidth: '100%' }}
         />
       </noscript>
-      {displayAge != null && Number(chart.config?.refreshInterval) > 0 && (
+      {!flags.plain && displayAge != null && Number(chart.config?.refreshInterval) > 0 && (
         <p data-testid="staleness-indicator" style={{ margin: '4px 0 0', fontSize: 10, color: isDark ? '#475569' : '#bbb' }}>
           Updated {displayAge}
         </p>
