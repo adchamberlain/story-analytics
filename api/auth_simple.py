@@ -16,7 +16,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
 from jose import JWTError, jwt
-from passlib.context import CryptContext
+import bcrypt as _bcrypt
 
 from .services.api_key_service import verify_api_key
 from .services.metadata_db import (
@@ -33,7 +33,11 @@ JWT_SECRET = os.environ.get("JWT_SECRET", "story-analytics-dev-secret-change-in-
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRE_HOURS = 72
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+def _hash_password(password: str) -> str:
+    return _bcrypt.hashpw(password.encode(), _bcrypt.gensalt()).decode()
+
+def _verify_password(password: str, hashed: str) -> bool:
+    return _bcrypt.checkpw(password.encode(), hashed.encode())
 security = HTTPBearer(auto_error=False)
 
 
@@ -174,7 +178,7 @@ async def register(request: RegisterRequest):
     if existing:
         raise HTTPException(status_code=409, detail="Email already registered")
 
-    password_hash = pwd_context.hash(request.password)
+    password_hash = _hash_password(request.password)
     user = create_user(request.email, password_hash, request.display_name)
     token = _create_token(user["id"])
 
@@ -188,7 +192,7 @@ async def login(request: LoginRequest):
         raise HTTPException(status_code=400, detail="Auth is disabled. Set AUTH_ENABLED=true to enable.")
 
     user = get_user_by_email(request.email)
-    if not user or not pwd_context.verify(request.password, user["password_hash"]):
+    if not user or not _verify_password(request.password, user["password_hash"]):
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
     token = _create_token(user["id"])
