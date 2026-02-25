@@ -332,6 +332,69 @@ export function Toolbox() {
                     </div>
                   </>
                 )}
+                {config.chartType === 'SplitBars' && (
+                  <>
+                    <ColumnDropdown
+                      label="Left Column"
+                      value={config.leftColumn ?? null}
+                      columns={isSqlMode ? sqlResultColumns : columns}
+                      columnTypes={columnTypes}
+                      allowNone
+                      onChange={(leftColumn) => updateConfig({ leftColumn })}
+                    />
+                    <ColumnDropdown
+                      label="Right Column"
+                      value={config.rightColumn ?? null}
+                      columns={isSqlMode ? sqlResultColumns : columns}
+                      columnTypes={columnTypes}
+                      allowNone
+                      onChange={(rightColumn) => updateConfig({ rightColumn })}
+                    />
+                  </>
+                )}
+                {config.chartType === 'ArrowPlot' && (
+                  <>
+                    <ColumnDropdown
+                      label="Start Column"
+                      value={config.startColumn ?? null}
+                      columns={isSqlMode ? sqlResultColumns : columns}
+                      columnTypes={columnTypes}
+                      allowNone
+                      onChange={(startColumn) => updateConfig({ startColumn })}
+                    />
+                    <ColumnDropdown
+                      label="End Column"
+                      value={config.endColumn ?? null}
+                      columns={isSqlMode ? sqlResultColumns : columns}
+                      columnTypes={columnTypes}
+                      allowNone
+                      onChange={(endColumn) => updateConfig({ endColumn })}
+                    />
+                  </>
+                )}
+                {config.chartType === 'MultiplePies' && (
+                  <>
+                    <ColumnDropdown
+                      label="Facet By"
+                      value={config.facetColumn ?? null}
+                      columns={isSqlMode ? sqlResultColumns : columns}
+                      columnTypes={columnTypes}
+                      allowNone
+                      onChange={(facetColumn) => updateConfig({ facetColumn })}
+                    />
+                    <div>
+                      <label className="block text-xs font-medium text-text-secondary mb-1">Pie Variant</label>
+                      <select
+                        value={config.pieVariant ?? 'pie'}
+                        onChange={(e) => updateConfig({ pieVariant: e.target.value as 'pie' | 'donut' })}
+                        className="w-full px-2 py-1.5 text-sm border border-border-default rounded-md bg-surface text-text-primary focus:outline-none focus:border-blue-400"
+                      >
+                        <option value="pie">Pie</option>
+                        <option value="donut">Donut</option>
+                      </select>
+                    </div>
+                  </>
+                )}
                 {config.chartType === 'ChoroplethMap' && (
                   <>
                     <div>

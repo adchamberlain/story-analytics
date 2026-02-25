@@ -26,6 +26,12 @@ export type ChartType =
   | 'SymbolMap'
   | 'LocatorMap'
   | 'SpikeMap'
+  | 'StackedColumn'
+  | 'GroupedColumn'
+  | 'SplitBars'
+  | 'ArrowPlot'
+  | 'ElectionDonut'
+  | 'MultiplePies'
 
 // =============================================================================
 // Annotation Types
@@ -236,6 +242,17 @@ export interface ChartConfig {
   facetColumn?: string
   /** Small multiples: which mark type to repeat */
   chartSubtype?: 'line' | 'bar' | 'area' | 'scatter'
+
+  /** Split bars: column for left-side values */
+  leftColumn?: string
+  /** Split bars: column for right-side values */
+  rightColumn?: string
+  /** Arrow plot: column for start values */
+  startColumn?: string
+  /** Arrow plot: column for end values */
+  endColumn?: string
+  /** Multiple pies: 'pie' or 'donut' variant */
+  pieVariant?: 'pie' | 'donut'
 
   /** Custom tooltip template (e.g. "{{ column | format }}") */
   tooltipTemplate?: string

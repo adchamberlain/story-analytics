@@ -48,6 +48,14 @@ export interface EditorConfig {
   // Small multiples
   facetColumn: string | null
   chartSubtype: 'line' | 'bar' | 'area' | 'scatter'
+  // Split bars
+  leftColumn: string | null
+  rightColumn: string | null
+  // Arrow plot
+  startColumn: string | null
+  endColumn: string | null
+  // Multiple pies
+  pieVariant: 'pie' | 'donut'
   // Choropleth map
   basemap: string
   geoJoinColumn: string | null
@@ -102,6 +110,11 @@ const DEFAULT_CONFIG: EditorConfig = {
   targetColumn: null,
   facetColumn: null,
   chartSubtype: 'line',
+  leftColumn: null,
+  rightColumn: null,
+  startColumn: null,
+  endColumn: null,
+  pieVariant: 'pie',
   basemap: 'world',
   geoJoinColumn: null,
   geoValueColumn: null,
@@ -297,6 +310,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         targetColumn: chart.config?.targetColumn ?? null,
         facetColumn: chart.config?.facetColumn ?? null,
         chartSubtype: chart.config?.chartSubtype ?? 'line',
+        leftColumn: chart.config?.leftColumn ?? null,
+        rightColumn: chart.config?.rightColumn ?? null,
+        startColumn: chart.config?.startColumn ?? null,
+        endColumn: chart.config?.endColumn ?? null,
+        pieVariant: chart.config?.pieVariant ?? 'pie',
         basemap: chart.config?.basemap ?? 'world',
         geoJoinColumn: chart.config?.geoJoinColumn ?? null,
         geoValueColumn: chart.config?.geoValueColumn ?? null,
@@ -514,6 +532,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
             targetColumn: config.targetColumn ?? undefined,
             facetColumn: config.facetColumn ?? undefined,
             chartSubtype: config.chartSubtype !== 'line' ? config.chartSubtype : undefined,
+            leftColumn: config.leftColumn ?? undefined,
+            rightColumn: config.rightColumn ?? undefined,
+            startColumn: config.startColumn ?? undefined,
+            endColumn: config.endColumn ?? undefined,
+            pieVariant: config.pieVariant !== 'pie' ? config.pieVariant : undefined,
             basemap: config.basemap !== 'world' ? config.basemap : undefined,
             geoJoinColumn: config.geoJoinColumn ?? undefined,
             geoValueColumn: config.geoValueColumn ?? undefined,
@@ -781,6 +804,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
             targetColumn: config.targetColumn ?? undefined,
             facetColumn: config.facetColumn ?? undefined,
             chartSubtype: config.chartSubtype !== 'line' ? config.chartSubtype : undefined,
+            leftColumn: config.leftColumn ?? undefined,
+            rightColumn: config.rightColumn ?? undefined,
+            startColumn: config.startColumn ?? undefined,
+            endColumn: config.endColumn ?? undefined,
+            pieVariant: config.pieVariant !== 'pie' ? config.pieVariant : undefined,
             basemap: config.basemap !== 'world' ? config.basemap : undefined,
             geoJoinColumn: config.geoJoinColumn ?? undefined,
             geoValueColumn: config.geoValueColumn ?? undefined,
