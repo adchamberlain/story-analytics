@@ -228,6 +228,94 @@ const CHART_TYPES: { type: ChartType; label: string; icon: ReactNode }[] = [
       </svg>
     ),
   },
+  {
+    type: 'StackedColumn',
+    label: 'Stacked Col',
+    icon: (
+      <svg viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5">
+        <rect x="3" y="10" width="5" height="5" opacity="0.5" />
+        <rect x="3" y="15" width="5" height="6" opacity="0.8" />
+        <rect x="10" y="4" width="5" height="8" opacity="0.5" />
+        <rect x="10" y="12" width="5" height="9" opacity="0.8" />
+        <rect x="17" y="7" width="5" height="6" opacity="0.5" />
+        <rect x="17" y="13" width="5" height="8" opacity="0.8" />
+      </svg>
+    ),
+  },
+  {
+    type: 'GroupedColumn',
+    label: 'Grouped Col',
+    icon: (
+      <svg viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5">
+        <rect x="2" y="10" width="3" height="11" opacity="0.6" />
+        <rect x="5.5" y="6" width="3" height="15" opacity="0.9" />
+        <rect x="10" y="12" width="3" height="9" opacity="0.6" />
+        <rect x="13.5" y="8" width="3" height="13" opacity="0.9" />
+        <rect x="18" y="14" width="3" height="7" opacity="0.6" />
+        <rect x="21" y="5" width="3" height="16" opacity="0.9" />
+      </svg>
+    ),
+  },
+  {
+    type: 'SplitBars',
+    label: 'Split Bars',
+    icon: (
+      <svg viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5">
+        <rect x="2" y="3" width="9" height="4" rx="1" opacity="0.6" />
+        <rect x="13" y="3" width="7" height="4" rx="1" opacity="0.8" />
+        <rect x="4" y="10" width="7" height="4" rx="1" opacity="0.6" />
+        <rect x="13" y="10" width="9" height="4" rx="1" opacity="0.8" />
+        <rect x="5" y="17" width="6" height="4" rx="1" opacity="0.6" />
+        <rect x="13" y="17" width="5" height="4" rx="1" opacity="0.8" />
+        <line x1="12" y1="1" x2="12" y2="23" stroke="currentColor" strokeWidth="1" opacity="0.3" />
+      </svg>
+    ),
+  },
+  {
+    type: 'ArrowPlot',
+    label: 'Arrow',
+    icon: (
+      <svg viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5">
+        <circle cx="6" cy="6" r="2" opacity="0.4" />
+        <line x1="8" y1="6" x2="16" y2="6" stroke="currentColor" strokeWidth="1.5" />
+        <circle cx="18" cy="6" r="2" />
+        <circle cx="10" cy="13" r="2" opacity="0.4" />
+        <line x1="12" y1="13" x2="18" y2="13" stroke="currentColor" strokeWidth="1.5" />
+        <circle cx="20" cy="13" r="2" />
+        <circle cx="14" cy="20" r="2" opacity="0.4" />
+        <line x1="12" y1="20" x2="6" y2="20" stroke="currentColor" strokeWidth="1.5" />
+        <circle cx="4" cy="20" r="2" />
+      </svg>
+    ),
+  },
+  {
+    type: 'ElectionDonut',
+    label: 'Hemicycle',
+    icon: (
+      <svg viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5">
+        <path d="M4,16 A8,8 0 0,1 12,8" opacity="0.5" />
+        <path d="M12,8 A8,8 0 0,1 20,16" opacity="0.8" />
+        <path d="M6,16 A6,6 0 0,1 18,16" fill="none" stroke="currentColor" strokeWidth="0.5" opacity="0.3" />
+        <line x1="4" y1="16" x2="20" y2="16" stroke="currentColor" strokeWidth="1" opacity="0.3" />
+      </svg>
+    ),
+  },
+  {
+    type: 'MultiplePies',
+    label: 'Multi Pie',
+    icon: (
+      <svg viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5">
+        <path d="M7,3 A4,4 0 0,1 11,7 L7,7 Z" opacity="0.6" />
+        <path d="M11,7 A4,4 0 0,1 3,7 L7,7 Z" opacity="0.4" />
+        <path d="M17,3 A4,4 0 0,1 21,7 L17,7 Z" opacity="0.6" />
+        <path d="M21,7 A4,4 0 0,1 13,7 L17,7 Z" opacity="0.4" />
+        <path d="M7,13 A4,4 0 0,1 11,17 L7,17 Z" opacity="0.6" />
+        <path d="M11,17 A4,4 0 0,1 3,17 L7,17 Z" opacity="0.4" />
+        <path d="M17,13 A4,4 0 0,1 21,17 L17,17 Z" opacity="0.6" />
+        <path d="M21,17 A4,4 0 0,1 13,17 L17,17 Z" opacity="0.4" />
+      </svg>
+    ),
+  },
 ]
 
 interface ChartTypeSelectorProps {
