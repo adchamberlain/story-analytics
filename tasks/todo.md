@@ -3,7 +3,7 @@
 > **Design doc:** `docs/plans/2026-02-24-datawrapper-parity-design.md`
 > **Implementation plan:** `docs/plans/2026-02-24-datawrapper-parity-plan.md`
 
-## Current Phase: 5 — Parity Gaps (COMPLETE)
+## Current Phase: 7 — Embed Flags, Chart Types, Accessibility (COMPLETE)
 
 ### Task 0: Development Loop Setup ✅
 - [x] Screenshot verification (Playwright)
@@ -307,12 +307,44 @@
 - [x] TopNav: NotificationBell integration
 - [x] Tests: 6 pytest + 4 vitest tests
 
+## Phase 7: Embed Flags, Chart Types, Accessibility ✅
+
+### Task 7.1: Embed Render Flags (Session K) ✅
+- [x] parseEmbedFlags utility (5 query params)
+- [x] EmbedChartPage: plain, static, transparent, logo, search
+- [x] EmbedDashboardPage: same flags + DashboardGrid passthrough
+- [x] RichDataTable: initialSearch via extraProps
+- [x] ChartWrapper: hideLogo prop
+- [x] Tests: 33 vitest tests (12 parser + 17 embed + 4 table)
+
+### Task 7.2: Chart Types — 19 → 25 (Session L) ✅
+- [x] StackedColumn (barY with fill stacking)
+- [x] GroupedColumn (barY with fx faceting)
+- [x] SplitBars (diverging barX, leftColumn/rightColumn)
+- [x] ArrowPlot (dot + link marks, startColumn/endColumn)
+- [x] ElectionDonut (custom D3 hemicycle component)
+- [x] MultiplePies (small-multiples grid, pie/donut variant)
+- [x] ChartTypeSelector entries with SVG icons
+- [x] Toolbox conditional fields for new types
+- [x] Tests: 23 vitest tests
+
+### Task 7.3: Accessibility — WCAG AA Essentials (Session M) ✅
+- [x] altText field in ChartConfig + editor Toolbox textarea
+- [x] ARIA attributes on SVG charts (role=img, aria-label, aria-describedby)
+- [x] Auto-generated screen reader summary
+- [x] Keyboard focus indicators (tabIndex, focus ring)
+- [x] Keyboard sort on table headers (Enter/Space)
+- [x] checkPaletteAccessibility utility (contrast ratio warnings)
+- [x] ColorblindPreview: Safe/Warning badges, problematic swatch highlighting
+- [x] EmbedChartPage: meta description from altText
+- [x] Tests: 26 vitest tests
+
 ---
 
-## Test Summary (Phase 6 Complete)
+## Test Summary (Phase 7 Complete)
 
 | Suite | Count |
 |-------|-------|
 | Backend (pytest) | 163 |
-| Frontend (vitest) | 450 |
-| **Total** | **613** |
+| Frontend (vitest) | 542 |
+| **Total** | **705** |
