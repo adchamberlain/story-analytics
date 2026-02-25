@@ -753,6 +753,9 @@ export function Toolbox() {
       {!isBigValue && config.chartType !== 'DataTable' && (
         <CollapsibleSection title="Tooltip">
           <div className="space-y-2">
+            <p className="text-[10px] text-text-muted">
+              Customize the hover tooltip. Use {'{{ column }}'} to insert a value, or {'{{ column | format }}'} to format it. Leave empty for the default tooltip.
+            </p>
             <textarea
               value={config.tooltipTemplate ?? ''}
               onChange={(e) => updateConfig({ tooltipTemplate: e.target.value || undefined })}
@@ -760,7 +763,8 @@ export function Toolbox() {
               rows={3}
               className="w-full rounded-md border border-border-default bg-surface px-2 py-1.5 text-xs text-text-on-surface placeholder:text-text-muted focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono"
             />
-            <div className="flex flex-wrap gap-1">
+            <div className="flex flex-wrap gap-1 items-center">
+              <span className="text-[10px] text-text-muted mr-0.5">Insert:</span>
               {columns.map((col) => (
                 <button
                   key={col}
@@ -775,7 +779,7 @@ export function Toolbox() {
               ))}
             </div>
             <p className="text-[10px] text-text-muted">
-              Formats: currency, percent, compact, number
+              Formats: {'{{ col | currency }}'}, {'{{ col | percent }}'}, {'{{ col | compact }}'}, {'{{ col | number }}'}
             </p>
           </div>
         </CollapsibleSection>

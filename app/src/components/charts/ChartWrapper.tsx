@@ -88,9 +88,15 @@ export function ChartWrapper({ title, subtitle, source, sourceUrl, chartUrl, chi
     return svg
   }, [title])
 
-  const handleExportSVG = useCallback(() => {
+  const handleExportSVG = useCallback(async () => {
     const svg = findSvg()
-    if (svg) exportSVG(svg, title ?? 'chart')
+    if (svg) {
+      try {
+        await exportSVG(svg, title ?? 'chart')
+      } catch (err) {
+        console.error('[ChartWrapper] SVG export failed:', err)
+      }
+    }
   }, [title, findSvg])
 
   const handleExportPNG = useCallback(() => {

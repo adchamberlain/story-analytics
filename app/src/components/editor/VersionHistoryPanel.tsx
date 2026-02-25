@@ -125,7 +125,7 @@ export function VersionHistoryPanel() {
           <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
             <div className="text-text-muted text-sm mb-2">No versions yet</div>
             <p className="text-text-muted text-xs max-w-[200px]">
-              Versions are created automatically as you edit and publish, or manually via "Save Version".
+              Versions are created automatically as you edit and publish.
             </p>
           </div>
         ) : (

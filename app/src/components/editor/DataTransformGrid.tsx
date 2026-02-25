@@ -116,6 +116,9 @@ export function DataTransformGrid({ data, onTransform, transforming }: DataTrans
         >
           Transpose
         </button>
+        <span className="text-xs text-text-muted">
+          Click ▾ on any column header to rename, round, cast, or delete.
+        </span>
         <span className="text-xs text-text-muted ml-auto">
           {data.row_count} row{data.row_count !== 1 ? 's' : ''} | {data.columns.length} column{data.columns.length !== 1 ? 's' : ''}
         </span>
