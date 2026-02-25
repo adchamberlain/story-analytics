@@ -170,6 +170,19 @@ export function EditorPage() {
     targetColumn: store.config.targetColumn ?? undefined,
     facetColumn: store.config.facetColumn ?? undefined,
     chartSubtype: store.config.chartSubtype !== 'line' ? store.config.chartSubtype : undefined,
+    // Choropleth/map fields
+    basemap: store.config.basemap || undefined,
+    geoJoinColumn: store.config.geoJoinColumn ?? undefined,
+    geoValueColumn: store.config.geoValueColumn ?? undefined,
+    geoColorScale: store.config.geoColorScale || undefined,
+    geoProjection: store.config.geoProjection || undefined,
+    // Point map fields
+    geoLatColumn: store.config.geoLatColumn ?? undefined,
+    geoLonColumn: store.config.geoLonColumn ?? undefined,
+    geoLabelColumn: store.config.geoLabelColumn ?? undefined,
+    geoSizeColumn: store.config.geoSizeColumn ?? undefined,
+    geoSymbolShape: store.config.geoSymbolShape !== 'circle' ? store.config.geoSymbolShape : undefined,
+    geoSizeRange: store.config.geoSizeRange,
   }
 
   // Apply palette colors
