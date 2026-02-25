@@ -95,6 +95,71 @@ export async function exportPDF(
   doc.save(`${sanitizeFilename(filename)}.pdf`)
 }
 
+/** Export chart as a PowerPoint (.pptx) slide */
+export async function exportPPTX(
+  svgElement: SVGSVGElement,
+  filename: string,
+  metadata?: { title?: string; subtitle?: string; source?: string },
+): Promise<void> {
+  const pptxgenjs = await import('pptxgenjs')
+  const PptxGenJS = pptxgenjs.default
+  const pres = new PptxGenJS()
+
+  const slide = pres.addSlide()
+
+  // Title
+  if (metadata?.title) {
+    slide.addText(metadata.title, {
+      x: 0.5,
+      y: 0.3,
+      w: 9,
+      h: 0.5,
+      fontSize: 24,
+      bold: true,
+      color: '1e293b',
+    })
+  }
+
+  // Subtitle
+  if (metadata?.subtitle) {
+    slide.addText(metadata.subtitle, {
+      x: 0.5,
+      y: 0.8,
+      w: 9,
+      h: 0.4,
+      fontSize: 14,
+      color: '64748b',
+    })
+  }
+
+  // Chart image (centered, 80% width)
+  const canvas = await svgToCanvas(svgElement, 2)
+  const imgData = canvas.toDataURL('image/png')
+  const yPos = metadata?.title ? (metadata?.subtitle ? 1.3 : 1.0) : 0.5
+  slide.addImage({
+    data: imgData,
+    x: 0.75,
+    y: yPos,
+    w: 8.5,
+    h: 4.5,
+    sizing: { type: 'contain', w: 8.5, h: 4.5 },
+  })
+
+  // Source
+  if (metadata?.source) {
+    slide.addText(`Source: ${metadata.source}`, {
+      x: 0.5,
+      y: 6.8,
+      w: 9,
+      h: 0.3,
+      fontSize: 9,
+      color: '94a3b8',
+    })
+  }
+
+  await pres.writeFile({ fileName: `${sanitizeFilename(filename)}.pptx` })
+}
+
 // ── Shared Helpers ──────────────────────────────────────────────────────────
 
 /** Convert an SVG element to a canvas at a given scale */
