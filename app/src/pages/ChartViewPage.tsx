@@ -149,6 +149,7 @@ export function ChartViewPage() {
           <SharePanel
             chartId={chart.id}
             title={chart.title ?? undefined}
+            subtitle={chart.subtitle ?? undefined}
             source={chart.source ?? undefined}
             chartRef={chartRef}
           />

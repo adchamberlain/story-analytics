@@ -4,6 +4,7 @@ import { exportSVG, exportPNG, exportPDF } from '../../utils/chartExport'
 interface SharePanelProps {
   chartId: string
   title?: string
+  subtitle?: string
   source?: string
   /** Ref to the container holding the SVG */
   chartRef: React.RefObject<HTMLDivElement | null>
@@ -12,7 +13,7 @@ interface SharePanelProps {
 /**
  * Sharing controls: copy URL, embed code, SVG/PNG/PDF export.
  */
-export function SharePanel({ chartId, title, source, chartRef }: SharePanelProps) {
+export function SharePanel({ chartId, title, subtitle, source, chartRef }: SharePanelProps) {
   const [copiedUrl, setCopiedUrl] = useState(false)
   const [copiedEmbed, setCopiedEmbed] = useState(false)
   const [exportingPdf, setExportingPdf] = useState(false)
@@ -63,19 +64,19 @@ export function SharePanel({ chartId, title, source, chartRef }: SharePanelProps
 
   const handleExportPNG = useCallback(() => {
     const svg = getSvg()
-    if (svg) exportPNG(svg, title ?? 'chart', 2, { title, source })
-  }, [getSvg, title, source])
+    if (svg) exportPNG(svg, title ?? 'chart', 2, { title, subtitle, source })
+  }, [getSvg, title, subtitle, source])
 
   const handleExportPDF = useCallback(async () => {
     const svg = getSvg()
     if (!svg) return
     setExportingPdf(true)
     try {
-      await exportPDF(svg, title ?? 'chart', { title, source })
+      await exportPDF(svg, title ?? 'chart', { title, subtitle, source })
     } finally {
       setExportingPdf(false)
     }
-  }, [getSvg, title, source])
+  }, [getSvg, title, subtitle, source])
 
   const btnClass = 'text-xs px-3 py-1.5 rounded border border-border-default text-text-on-surface hover:bg-surface-secondary transition-colors'
   const successBtnClass = 'text-xs px-3 py-1.5 rounded border border-green-300 text-green-700 bg-green-50'

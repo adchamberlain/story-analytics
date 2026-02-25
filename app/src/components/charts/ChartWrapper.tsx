@@ -102,12 +102,12 @@ export function ChartWrapper({ title, subtitle, source, sourceUrl, chartUrl, chi
     const svg = findSvg()
     if (svg) {
       try {
-        await exportPDF(svg, title ?? 'chart', { title, source })
+        await exportPDF(svg, title ?? 'chart', { title, subtitle, source })
       } catch (err) {
         console.error('[ChartWrapper] PDF export failed:', err)
       }
     }
-  }, [title, source, findSvg])
+  }, [title, subtitle, source, findSvg])
 
   const handleExportPPTX = useCallback(async () => {
     const svg = findSvg()
@@ -141,6 +141,23 @@ export function ChartWrapper({ title, subtitle, source, sourceUrl, chartUrl, chi
   const logoPosition = theme.logoPosition ?? 'top-left'
   const logoSize = theme.logoSize ?? 60
 
+  // When a theme specifies explicit colors, override CSS custom properties so
+  // children (table headers, SVG annotations, etc.) get theme-appropriate colors
+  // instead of dark-mode defaults.
+  const cssVarOverrides: Record<string, string> = {}
+  if (cardBg) {
+    cssVarOverrides['--color-surface'] = cardBg
+    cssVarOverrides['--color-surface-raised'] = cardBg
+    cssVarOverrides['--color-surface-secondary'] = theme.plot.background || cardBg
+    if (theme.font.title.color) cssVarOverrides['--color-text-primary'] = theme.font.title.color
+    if (theme.card.textSecondary) cssVarOverrides['--color-text-muted'] = theme.card.textSecondary
+    if (theme.font.subtitle.color) cssVarOverrides['--color-text-secondary'] = theme.font.subtitle.color
+    if (theme.card.borderColor) {
+      cssVarOverrides['--color-border-default'] = theme.card.borderColor
+      cssVarOverrides['--color-border-subtle'] = theme.card.borderColor
+    }
+  }
+
   return (
     <div
       className={`rounded-2xl border shadow-card flex flex-col overflow-hidden ${compact ? 'group' : ''} ${!cardBg ? 'bg-surface-raised' : ''} ${!cardBorder ? 'border-border-default' : ''} ${className}`}
@@ -149,7 +166,8 @@ export function ChartWrapper({ title, subtitle, source, sourceUrl, chartUrl, chi
         fontFamily: theme.font.family || undefined,
         ...(cardBg ? { backgroundColor: cardBg } : {}),
         ...(cardBorder ? { borderColor: cardBorder } : {}),
-      }}
+        ...cssVarOverrides,
+      } as React.CSSProperties}
     >
       {/* Theme logo overlay (hidden when hideLogo flag is set via embed ?logo=off) */}
       {logoUrl && !hideLogo && (

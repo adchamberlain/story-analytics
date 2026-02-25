@@ -7,12 +7,12 @@
 export function exportSVG(svgElement: SVGSVGElement, filename: string): void {
   const clone = svgElement.cloneNode(true) as SVGSVGElement
 
-  // Ensure the SVG has explicit dimensions for standalone viewing
-  if (!clone.getAttribute('width')) {
-    const bbox = svgElement.getBoundingClientRect()
-    clone.setAttribute('width', String(bbox.width))
-    clone.setAttribute('height', String(bbox.height))
-  }
+  // Compute content bounds including overflow (annotations, labels)
+  const bounds = getSvgContentBounds(svgElement)
+  clone.setAttribute('width', String(bounds.viewW))
+  clone.setAttribute('height', String(bounds.viewH))
+  clone.setAttribute('viewBox', `${bounds.viewX} ${bounds.viewY} ${bounds.viewW} ${bounds.viewH}`)
+  clone.style.overflow = 'hidden'
 
   // Add XML namespace for standalone SVG
   clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg')
@@ -52,37 +52,53 @@ export function exportPNG(
 export async function exportPDF(
   svgElement: SVGSVGElement,
   filename: string,
-  metadata?: { title?: string; source?: string }
+  metadata?: { title?: string; subtitle?: string; source?: string }
 ): Promise<void> {
   const { jsPDF } = await import('jspdf')
   const canvas = await svgToCanvas(svgElement, 2)
 
-  // Size page to chart aspect ratio using A4 dimensions
-  const imgWidth = canvas.width || 1  // Guard against zero-width canvas
+  // Size page to chart aspect ratio — always landscape (charts are wider than tall)
+  const imgWidth = canvas.width || 1
   const imgHeight = canvas.height || 1
-  const isLandscape = imgWidth > imgHeight
-  const pdfWidth = isLandscape ? 297 : 210  // A4 landscape vs portrait width in mm
+  const pdfWidth = 297 // A4 landscape width in mm
   const pdfHeight = (imgHeight / imgWidth) * pdfWidth
+
+  // Calculate header/footer heights dynamically
+  let headerH = 5 // top margin
+  if (metadata?.title) headerH += 8
+  if (metadata?.subtitle) headerH += 6
+  let footerH = 3 // bottom margin
+  if (metadata?.source) footerH += 6
 
   const doc = new jsPDF({
     unit: 'mm',
-    format: [pdfWidth, pdfHeight + 30], // Extra space for title/source
+    format: [pdfWidth, pdfHeight + headerH + footerH],
   })
 
-  let yOffset = 10
+  let yOffset = 5
 
   // Title
   if (metadata?.title) {
     doc.setFontSize(16)
     doc.setFont('helvetica', 'bold')
-    doc.text(metadata.title, 10, yOffset)
-    yOffset += 10
+    doc.text(metadata.title, 10, yOffset + 5)
+    yOffset += 8
+  }
+
+  // Subtitle
+  if (metadata?.subtitle) {
+    doc.setFontSize(11)
+    doc.setFont('helvetica', 'normal')
+    doc.setTextColor(100)
+    doc.text(metadata.subtitle, 10, yOffset + 3)
+    yOffset += 6
+    doc.setTextColor(0) // reset
   }
 
   // Chart image
   const imgData = canvas.toDataURL('image/png')
   doc.addImage(imgData, 'PNG', 0, yOffset, pdfWidth, pdfHeight)
-  yOffset += pdfHeight + 5
+  yOffset += pdfHeight + 3
 
   // Source note
   if (metadata?.source) {
@@ -107,13 +123,15 @@ export async function exportPPTX(
 
   const slide = pres.addSlide()
 
+  // Slide is 10" x 5.625" (16:9 default). All y-positions must stay within 5.625".
+
   // Title
   if (metadata?.title) {
     slide.addText(metadata.title, {
       x: 0.5,
-      y: 0.3,
+      y: 0.2,
       w: 9,
-      h: 0.5,
+      h: 0.45,
       fontSize: 24,
       bold: true,
       color: '1e293b',
@@ -124,32 +142,33 @@ export async function exportPPTX(
   if (metadata?.subtitle) {
     slide.addText(metadata.subtitle, {
       x: 0.5,
-      y: 0.8,
+      y: 0.65,
       w: 9,
-      h: 0.4,
+      h: 0.35,
       fontSize: 14,
       color: '64748b',
     })
   }
 
-  // Chart image (centered, 80% width)
+  // Chart image — sized to fit within slide bounds
   const canvas = await svgToCanvas(svgElement, 2)
   const imgData = canvas.toDataURL('image/png')
-  const yPos = metadata?.title ? (metadata?.subtitle ? 1.3 : 1.0) : 0.5
+  const chartY = metadata?.title ? (metadata?.subtitle ? 1.1 : 0.8) : 0.3
+  const chartH = metadata?.source ? 5.625 - chartY - 0.55 : 5.625 - chartY - 0.15
   slide.addImage({
     data: imgData,
     x: 0.75,
-    y: yPos,
+    y: chartY,
     w: 8.5,
-    h: 4.5,
-    sizing: { type: 'contain', w: 8.5, h: 4.5 },
+    h: chartH,
+    sizing: { type: 'contain', w: 8.5, h: chartH },
   })
 
-  // Source
+  // Source — positioned above slide bottom (5.625")
   if (metadata?.source) {
     slide.addText(`Source: ${metadata.source}`, {
       x: 0.5,
-      y: 6.8,
+      y: 5.25,
       w: 9,
       h: 0.3,
       fontSize: 9,
@@ -162,16 +181,21 @@ export async function exportPPTX(
 
 // ── Shared Helpers ──────────────────────────────────────────────────────────
 
-/** Convert an SVG element to a canvas at a given scale */
+/** Convert an SVG element to a canvas at a given scale.
+ *  Detects overflow content (Observable Plot sets overflow:visible on SVGs)
+ *  by measuring each child element's bounds in SVG coordinate space. */
 export function svgToCanvas(svgElement: SVGSVGElement, scale = 2): Promise<HTMLCanvasElement> {
   return new Promise((resolve, reject) => {
-    const bbox = svgElement.getBoundingClientRect()
-    const width = bbox.width * scale
-    const height = bbox.height * scale
+    const { viewX, viewY, viewW, viewH } = getSvgContentBounds(svgElement)
+
+    const width = Math.round(viewW * scale)
+    const height = Math.round(viewH * scale)
 
     const clone = svgElement.cloneNode(true) as SVGSVGElement
-    clone.setAttribute('width', String(bbox.width))
-    clone.setAttribute('height', String(bbox.height))
+    clone.setAttribute('width', String(viewW))
+    clone.setAttribute('height', String(viewH))
+    clone.setAttribute('viewBox', `${viewX} ${viewY} ${viewW} ${viewH}`)
+    clone.style.overflow = 'hidden' // viewBox handles bounds now
     clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg')
 
     const serializer = new XMLSerializer()
@@ -263,6 +287,42 @@ function addTextToCanvas(
   }
 
   return canvas
+}
+
+/** Compute the full content bounds of an SVG, including overflow from annotations/labels.
+ *  Iterates direct children's getBBox() to detect content extending past the SVG viewport.
+ *  Returns viewBox parameters that encompass all visible content. */
+function getSvgContentBounds(svgElement: SVGSVGElement) {
+  const vb = svgElement.viewBox.baseVal
+  const svgWidth = svgElement.width.baseVal.value
+    || (vb.width > 0 ? vb.width : svgElement.getBoundingClientRect().width)
+  const svgHeight = svgElement.height.baseVal.value
+    || (vb.height > 0 ? vb.height : svgElement.getBoundingClientRect().height)
+
+  let minX = 0, minY = 0, maxX = svgWidth, maxY = svgHeight
+  for (const child of Array.from(svgElement.children)) {
+    if (child instanceof SVGGraphicsElement) {
+      try {
+        const bb = child.getBBox()
+        if (bb.width > 0 || bb.height > 0) {
+          minX = Math.min(minX, bb.x)
+          minY = Math.min(minY, bb.y)
+          maxX = Math.max(maxX, bb.x + bb.width)
+          maxY = Math.max(maxY, bb.y + bb.height)
+        }
+      } catch {
+        // <style>, <defs>, etc. don't support getBBox — skip
+      }
+    }
+  }
+
+  const pad = 4
+  return {
+    viewX: minX - pad,
+    viewY: minY - pad,
+    viewW: maxX - minX + pad * 2,
+    viewH: maxY - minY + pad * 2,
+  }
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
