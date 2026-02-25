@@ -2,6 +2,31 @@
 
 ## 2026-02-25
 
+### Session 3: Heatmap Auto-Binning, BigValue Height, Tooltip Formatting, Annotation Theming
+
+**Heatmap auto-binning for numeric axes:**
+- Numeric columns with >20 distinct values (e.g., "Count of actions" 1–110) created unreadable 100+ row heatmaps
+- Added `binHeatmapAxis()` helper: bins into ~10 clean ranges via `d3.ticks()`, aggregates fill values with mean
+- Handles both x-axis and y-axis binning, including the tricky no-series case where y doubles as position and fill (uses synthetic `__heatFill` column)
+- Explicit domain arrays (`__heatXDomain`, `__heatYDomain`) stashed on data to prevent alphabetical sorting of range labels like "10–20" before "2–4"
+- Auto-rotates x-axis labels when bins overflow available width (`width/domainLen < 60px`)
+- Fixed bottom margin stacking: rotated labels + axis title now get 85px margin and 68px label offset
+
+**BigValue dashboard card height:**
+- KPI grid now uses `h-full content-center` to vertically center metrics within any container size
+- Dynamic auto-generated height formula: h=5 (1–2 metrics), h=6 (3–4), h=7 (5–6), h=8 (7–8)
+- Persisted layouts respected as-is — no forced overrides
+
+**Tooltip number formatting (all chart types):**
+- `fmtTipValue()` was using `d3.format(',.4~g')` which produced scientific notation for large numbers (23,800 → "2.38e+4")
+- Replaced with `toLocaleString('en-US')` — always produces human-readable comma-separated numbers globally across all tooltips
+
+**Annotation theme reactivity:**
+- Annotation colors (point notes, reference lines) used `getComputedStyle()` at render time, baking hex values into SVG — failed to update on dark/light theme toggle
+- Replaced with CSS `var()` references (`var(--color-surface-raised)`, `var(--color-text-primary)`) so SVG attributes resolve at paint time, always matching the current theme
+
+---
+
 ### Session 2: DataTable Default Sort, Area Chart Fix, Library UX, Dashboard Copy
 
 **DataTable default sort column:**
