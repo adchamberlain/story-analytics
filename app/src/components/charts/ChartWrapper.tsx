@@ -48,13 +48,15 @@ interface ChartWrapperProps {
   children: React.ReactNode
   className?: string
   compact?: boolean
+  /** When true, hides the theme logo overlay (used by embed ?logo=off flag) */
+  hideLogo?: boolean
 }
 
 /**
  * Publication-ready chart wrapper with title, subtitle, source note, and export buttons.
  * Replaces the PoC ChartCard — no library badge, adds export functionality.
  */
-export function ChartWrapper({ title, subtitle, source, sourceUrl, chartUrl, children, className = '', compact = false }: ChartWrapperProps) {
+export function ChartWrapper({ title, subtitle, source, sourceUrl, chartUrl, children, className = '', compact = false, hideLogo = false }: ChartWrapperProps) {
   const chartAreaRef = useRef<HTMLDivElement>(null)
   const theme = useChartThemeStore((s) => s.theme)
 
@@ -103,8 +105,8 @@ export function ChartWrapper({ title, subtitle, source, sourceUrl, chartUrl, chi
         ...(cardBorder ? { borderColor: cardBorder } : {}),
       }}
     >
-      {/* Theme logo overlay */}
-      {logoUrl && (
+      {/* Theme logo overlay (hidden when hideLogo flag is set via embed ?logo=off) */}
+      {logoUrl && !hideLogo && (
         <img
           src={logoUrl}
           alt="Chart logo"

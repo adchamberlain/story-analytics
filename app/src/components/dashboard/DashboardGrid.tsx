@@ -12,6 +12,7 @@ import { PALETTES } from '../../themes/plotTheme'
 import type { ChartConfig, ChartType } from '../../types/chart'
 import type { PaletteKey } from '../../themes/plotTheme'
 import type { GridLayout as GridLayoutPos } from '../../stores/dashboardBuilderStore'
+import type { EmbedFlags } from '../../utils/embedFlags'
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -45,6 +46,8 @@ interface DashboardGridProps {
   dashboardId?: string
   editable?: boolean
   onLayoutChange?: (items: LayoutItem[]) => void
+  /** Embed render flags passed from embed page (controls plain/logo/search) */
+  embedFlags?: EmbedFlags
 }
 
 // ── Strict 2-Column Layout Generator ────────────────────────────────────────
@@ -111,7 +114,7 @@ function generateLayout(charts: ChartWithData[]): Layout {
  * Items are either 1-column or 2-column wide. No intermediate positions.
  * Supports drag-to-reorder and resize (height only in view, width snaps to 1 or 2 cols).
  */
-export function DashboardGrid({ charts, dashboardId, editable = false, onLayoutChange }: DashboardGridProps) {
+export function DashboardGrid({ charts, dashboardId, editable = false, onLayoutChange, embedFlags }: DashboardGridProps) {
   const { width, containerRef, mounted } = useContainerWidth()
   const layout = useMemo(() => generateLayout(charts), [charts])
 
@@ -155,7 +158,7 @@ export function DashboardGrid({ charts, dashboardId, editable = false, onLayoutC
         >
           {charts.map((chart) => (
             <div key={chart.chart_id} className="overflow-hidden">
-              <DashboardChartCell chart={chart} dashboardId={dashboardId} editable={editable} />
+              <DashboardChartCell chart={chart} dashboardId={dashboardId} editable={editable} embedFlags={embedFlags} />
             </div>
           ))}
         </GridLayout>
@@ -186,10 +189,12 @@ function DashboardChartCell({
   chart,
   dashboardId,
   editable,
+  embedFlags,
 }: {
   chart: ChartWithData
   dashboardId?: string
   editable: boolean
+  embedFlags?: EmbedFlags
 }) {
   if (chart.error) {
     if (chart.error_type === 'schema_change') {
@@ -269,6 +274,14 @@ function DashboardChartCell({
     chartConfig.colorRange = paletteColors
   }
 
+  // Apply embed search flag via extraProps for DataTable initialSearch
+  if (embedFlags?.search) {
+    chartConfig.extraProps = { ...chartConfig.extraProps, initialSearch: embedFlags.search }
+  }
+
+  // Apply embed logo flag to ChartWrapper
+  const showLogo = embedFlags?.logo !== null ? embedFlags?.logo : undefined
+
   return (
     <div className="group relative h-full">
       {editable && (
@@ -282,13 +295,14 @@ function DashboardChartCell({
       )}
       <StatusDot status={chart.health_status} issues={chart.health_issues} />
       <ChartWrapper
-        title={chart.title ?? undefined}
-        subtitle={chart.subtitle ?? undefined}
-        source={chart.source ?? undefined}
-        sourceUrl={(chart.config?.sourceUrl as string) ?? undefined}
+        title={embedFlags?.plain ? undefined : (chart.title ?? undefined)}
+        subtitle={embedFlags?.plain ? undefined : (chart.subtitle ?? undefined)}
+        source={embedFlags?.plain ? undefined : (chart.source ?? undefined)}
+        sourceUrl={embedFlags?.plain ? undefined : ((chart.config?.sourceUrl as string) ?? undefined)}
         chartUrl={`/chart/${chart.chart_id}`}
         className="h-full"
         compact
+        hideLogo={showLogo === false}
       >
         <ObservableChartFactory
           data={chart.data}
