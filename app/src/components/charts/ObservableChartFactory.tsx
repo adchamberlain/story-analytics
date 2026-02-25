@@ -409,6 +409,23 @@ function parseUnitFromTitle(title: string): { prefix: string; suffix: string } |
   return { prefix: '', suffix: unit }
 }
 
+/** Detect scale/currency hints from natural language in titles and subtitles.
+ *  e.g. "in billions of dollars" → { prefix: '$', suffix: 'B' } */
+function detectScaleFromText(text: string): { prefix: string; suffix: string } | null {
+  if (!text) return null
+  const t = text.toLowerCase()
+  // Detect currency
+  const hasDollar = /\bdollars?\b|\busd\b|\$/.test(t)
+  const prefix = hasDollar ? '$' : ''
+  // Detect scale
+  if (/\btrillions?\b|\btn\b/.test(t)) return { prefix, suffix: 'T' }
+  if (/\bbillions?\b|\bbn\b/.test(t)) return { prefix, suffix: 'B' }
+  if (/\bmillions?\b|\bmm\b/.test(t)) return { prefix, suffix: 'M' }
+  if (/\bthousands?\b/.test(t)) return { prefix, suffix: 'K' }
+  if (hasDollar) return { prefix: '$', suffix: '' }
+  return null
+}
+
 function detectValueUnit(config?: ChartConfig, yCol?: string): { prefix: string; suffix: string } {
   const none = { prefix: '', suffix: '' }
   if (!config && !yCol) return none
@@ -418,11 +435,22 @@ function detectValueUnit(config?: ChartConfig, yCol?: string): { prefix: string;
   const xTitle = config?.xAxisTitle ?? ''
   if (/[%]|percent/i.test(yTitle) || /[%]|percent/i.test(xTitle)) return { prefix: '', suffix: '%' }
   if (yCol && /percent|pct/i.test(yCol)) return { prefix: '', suffix: '%' }
-  // Try y-axis title first, then x-axis title
+  // Try y-axis title first, then x-axis title (parenthesized units)
   const fromY = parseUnitFromTitle(yTitle)
   if (fromY) return fromY
   const fromX = parseUnitFromTitle(xTitle)
   if (fromX) return fromX
+  // Fall back to natural-language detection in axis titles, chart title, and subtitle
+  const fromYScale = detectScaleFromText(yTitle)
+  if (fromYScale) return fromYScale
+  const fromXScale = detectScaleFromText(xTitle)
+  if (fromXScale) return fromXScale
+  const fromTitle = detectScaleFromText(config?.title ?? '')
+  if (fromTitle) return fromTitle
+  // Check extraProps for subtitle (set by ChartWrapper)
+  const subtitle = (config?.extraProps?.subtitle as string) ?? ''
+  const fromSubtitle = detectScaleFromText(subtitle)
+  if (fromSubtitle) return fromSubtitle
   return none
 }
 
@@ -431,9 +459,18 @@ function fmtWithUnit(rawVal: string, unit: { prefix: string; suffix: string }): 
   return `${unit.prefix}${rawVal}${unit.suffix}`
 }
 
-/** Title-case a column name: "hour of day" → "Hour Of Day", "visitors" → "Visitors" */
+/** Humanize a SQL column name into a clean tooltip label.
+ *  "metric_name" → "Metric Name", "totalRevenue" → "Total Revenue",
+ *  "hour_of_day" → "Hour Of Day", "visitors" → "Visitors" */
 function titleCase(s: string): string {
-  return s.replace(/\b\w/g, (c) => c.toUpperCase())
+  return s
+    // Insert space before camelCase capitals: "totalRevenue" → "total Revenue"
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    // Replace underscores and hyphens with spaces
+    .replace(/[_-]+/g, ' ')
+    // Capitalize first letter of each word
+    .replace(/\b\w/g, (c) => c.toUpperCase())
+    .trim()
 }
 
 function tipTitle(
@@ -445,9 +482,9 @@ function tipTitle(
   const cat = xCol && d[xCol] != null ? fmtTipValue(d[xCol]) : ''
   const ser = seriesCol && d[seriesCol] != null ? fmtTipValue(d[seriesCol]) : ''
   const val = yCol && d[yCol] != null ? fmtWithUnit(fmtTipValue(d[yCol]), unit) : ''
-  if (cat && ser && val) return `${titleCase(xCol!)}: ${cat} · ${titleCase(seriesCol!)}: ${ser} · ${titleCase(yCol!)}: ${val}`
-  if (cat && val) return `${titleCase(xCol!)}: ${cat} · ${titleCase(yCol!)}: ${val}`
-  if (ser && val) return `${titleCase(seriesCol!)}: ${ser} · ${titleCase(yCol!)}: ${val}`
+  if (cat && ser && val) return `${titleCase(xCol!)}: ${cat}\n${titleCase(seriesCol!)}: ${ser}\n${titleCase(yCol!)}: ${val}`
+  if (cat && val) return `${titleCase(xCol!)}: ${cat}\n${titleCase(yCol!)}: ${val}`
+  if (ser && val) return `${titleCase(seriesCol!)}: ${ser}\n${titleCase(yCol!)}: ${val}`
   if (cat) return `${titleCase(xCol!)}: ${cat}`
   return val
 }
@@ -472,7 +509,7 @@ function buildLineMarks(
         stroke: series,
         strokeWidth: config.lineWidth ?? 2.5,
       }),
-      Plot.tip(lineData, Plot.pointerX({ x, y, stroke: series, title: (d: Record<string, unknown>) => tipTitle(d, x, y, series, config) })),
+      Plot.tip(lineData, Plot.pointer({ x, y, stroke: series, title: (d: Record<string, unknown>) => tipTitle(d, x, y, series, config) })),
     )
   } else {
     marks.push(
@@ -596,13 +633,13 @@ function buildAreaMarks(
       marks.push(
         Plot.areaY(areaData, Plot.stackY({ x, y, fill: series, fillOpacity: areaFillOpacity, order: 'value' })),
         Plot.lineY(areaData, Plot.stackY2({ x, y, stroke: series, strokeWidth: config.lineWidth ?? 2.5, order: 'value' })),
-        Plot.tip(areaData, Plot.pointerX(Plot.stackY({ x, y, stroke: series, title: (d: Record<string, unknown>) => tipTitle(d, x, y, series, config) }))),
+        Plot.tip(areaData, Plot.pointerX(Plot.stackY({ x, y, stroke: series, order: 'value', title: (d: Record<string, unknown>) => tipTitle(d, x, y, series, config) }))),
       )
     } else {
       marks.push(
         Plot.areaY(areaData, { x, y, fill: series, fillOpacity: areaFillOpacity }),
         Plot.lineY(areaData, { x, y, stroke: series, strokeWidth: config.lineWidth ?? 2.5 }),
-        Plot.tip(areaData, Plot.pointerX({ x, y, stroke: series, title: (d: Record<string, unknown>) => tipTitle(d, x, y, series, config) })),
+        Plot.tip(areaData, Plot.pointer({ x, y, stroke: series, title: (d: Record<string, unknown>) => tipTitle(d, x, y, series, config) })),
       )
     }
   } else {
@@ -634,7 +671,11 @@ function buildScatterMarks(
     const yUnit = detectValueUnit(config, y)
     const yv = fmtWithUnit(fmtTipValue(d[y]), yUnit)
     const ser = series && d[series] != null ? String(d[series]) : ''
-    return ser ? `${ser}: (${xv}, ${yv})` : `(${xv}, ${yv})`
+    const lines = []
+    if (ser) lines.push(`${titleCase(series!)}: ${ser}`)
+    lines.push(`${titleCase(x)}: ${xv}`)
+    lines.push(`${titleCase(y)}: ${yv}`)
+    return lines.join('\n')
   }
 
   if (series) {
@@ -655,7 +696,7 @@ function buildScatterMarks(
 function buildHistogramMarks(
   data: Record<string, unknown>[],
   x: string | undefined,
-  _config: ChartConfig,
+  config: ChartConfig,
   colors: readonly string[] | string[]
 ): Plot.Markish[] {
   if (!x) return []
@@ -679,7 +720,8 @@ function buildHistogramMarks(
           binLo = thresholds[i]; binHi = thresholds[i + 1]; break
         }
       }
-      return `${fmt(binLo)}–${fmt(binHi)}: ${bins.length}`
+      const rangeLabel = config?.xAxisTitle || titleCase(x!)
+      return `${rangeLabel}: ${fmt(binLo)}–${fmt(binHi)}\nFrequency: ${bins.length.toLocaleString()}`
     } }, { x, thresholds }))),
   ]
 }
@@ -703,7 +745,7 @@ function buildHeatMapMarks(
       x, y: yAxis,
       title: (d: Record<string, unknown>) => {
         const fVal = d[fill] != null ? fmtTipValue(d[fill]) : ''
-        return `${titleCase(x)}: ${fmtTipValue(d[x])} · ${titleCase(yAxis)}: ${fmtTipValue(d[yAxis])}${fVal ? ` · ${titleCase(fill)}: ${fVal}` : ''}`
+        return `${titleCase(x)}: ${fmtTipValue(d[x])}\n${titleCase(yAxis)}: ${fmtTipValue(d[yAxis])}${fVal ? `\n${titleCase(fill)}: ${fVal}` : ''}`
       },
     })),
   ]
@@ -737,10 +779,15 @@ function buildDotPlotMarks(
   const marks: Plot.Markish[] = []
 
   // Cleveland dot plot: horizontal, category on y-axis, value on x-axis
-  // Draw faint rule from 0 to each dot
-  marks.push(
-    Plot.ruleX([0], { strokeOpacity: 0.2 }),
-  )
+  // Check if zero is within the visible range (domain may be tightened)
+  const nums = data.map((d) => Number(d[y])).filter((v) => isFinite(v))
+  const dMin = nums.length > 0 ? nums.reduce((a, b) => (a < b ? a : b), nums[0]) : 0
+  const dMax = nums.length > 0 ? nums.reduce((a, b) => (a > b ? a : b), nums[0]) : 0
+  const zeroVisible = dMin <= 0 || dMin <= dMax * 0.4
+
+  if (zeroVisible) {
+    marks.push(Plot.ruleX([0], { strokeOpacity: 0.2 }))
+  }
 
   if (series) {
     marks.push(
@@ -748,8 +795,10 @@ function buildDotPlotMarks(
       Plot.tip(data, Plot.pointer({ x: y, y: x, fill: series, maxRadius: 30, title: (d: Record<string, unknown>) => tipTitle(d, x, y, series, config) })),
     )
   } else {
+    if (zeroVisible) {
+      marks.push(Plot.ruleY(data, { y: x, x1: 0, x2: y, strokeOpacity: 0.2, stroke: colors[0] }))
+    }
     marks.push(
-      Plot.ruleY(data, { y: x, x1: 0, x2: y, strokeOpacity: 0.2, stroke: colors[0] }),
       Plot.dot(data, { x: y, y: x, fill: colors[0], r, fillOpacity: 0.85 }),
       Plot.tip(data, Plot.pointer({ x: y, y: x, maxRadius: 30, title: (d: Record<string, unknown>) => tipTitle(d, x, y, undefined, config) })),
     )
@@ -791,7 +840,7 @@ function buildRangePlotMarks(
     Plot.tip(data, Plot.pointer({ x: minCol, y: cat, title: (d: Record<string, unknown>) => {
       const unit = detectValueUnit(config, y)
       const fmt = (v: unknown) => { const n = Number(v); return isFinite(n) ? fmtWithUnit(d3.format(',.4~g')(n), unit) : String(v ?? '') }
-      return `${d[cat!] ?? ''}: ${fmt(d[minCol!])} – ${fmt(d[maxCol!])}`
+      return `${titleCase(cat!)}: ${d[cat!] ?? ''}\nRange: ${fmt(d[minCol!])} – ${fmt(d[maxCol!])}`
     } })),
   )
 
@@ -937,7 +986,7 @@ function buildGroupedColumnMarks(
       const group = d[x] != null ? String(d[x]) : ''
       const ser = d[series] != null ? String(d[series]) : ''
       const val = d[y] != null ? fmtWithUnit(fmtTipValue(d[y]), unit) : ''
-      return group ? `${group}, ${ser}: ${val}` : `${ser}: ${val}`
+      return group ? `${titleCase(x)}: ${group}\n${titleCase(series)}: ${ser}\n${titleCase(y)}: ${val}` : `${titleCase(series)}: ${ser}\n${titleCase(y)}: ${val}`
     } })),
     Plot.ruleY([0]),
   )
@@ -985,7 +1034,7 @@ function buildSplitBarMarks(
       title: (d: Record<string, unknown>) => {
         const unit = detectValueUnit(config)
         const fmt = (v: unknown) => { const n = Number(v); return isFinite(n) ? fmtWithUnit(d3.format(',.4~g')(n), unit) : String(v ?? '') }
-        return `${d[cat!] ?? ''}: ${fmt(d[leftCol!])} / ${fmt(d[rightCol!])}`
+        return `${titleCase(cat!)}: ${d[cat!] ?? ''}\nLeft: ${fmt(d[leftCol!])}\nRight: ${fmt(d[rightCol!])}`
       },
     })),
   )
@@ -1049,7 +1098,7 @@ function buildArrowPlotMarks(
   const tipFn = (d: Record<string, unknown>) => {
     const unit = detectValueUnit(config)
     const fmt = (v: unknown) => { const n = Number(v); return isFinite(n) ? fmtWithUnit(d3.format(',.4~g')(n), unit) : String(v ?? '') }
-    return `${d[cat!] ?? ''}: ${fmt(d[startCol!])} → ${fmt(d[endCol!])}`
+    return `${titleCase(cat!)}: ${d[cat!] ?? ''}\nStart: ${fmt(d[startCol!])}\nEnd: ${fmt(d[endCol!])}`
   }
   marks.push(
     Plot.tip(data, Plot.pointerY({
@@ -1724,6 +1773,28 @@ function buildPlotOptions(
     overrides.marginLeft = 100
   }
 
+  // DotPlot: auto-set x-axis domain to avoid large empty space when all values are far from zero
+  if (chartType === 'DotPlot' && config.yAxisMin === undefined && config.yAxisMax === undefined) {
+    const numCol = config.y as string | undefined
+    if (numCol && data.length > 0) {
+      const nums = data.map((d) => Number(d[numCol])).filter((v) => isFinite(v))
+      if (nums.length > 0) {
+        const dMin = nums.reduce((a, b) => (a < b ? a : b), nums[0])
+        const dMax = nums.reduce((a, b) => (a > b ? a : b), nums[0])
+        const range = dMax - dMin || 1
+        // Only tighten domain when the min is far from zero (> 40% of max)
+        if (dMin > 0 && dMin > dMax * 0.4) {
+          const pad = range * 0.15
+          const niceMin = Math.max(0, Math.floor((dMin - pad) * 2) / 2) // round down to nearest 0.5
+          const niceMax = Math.ceil((dMax + pad) * 2) / 2 // round up to nearest 0.5
+          const xOpts = (overrides.x as Record<string, unknown>) ?? { ...getBaseAxis() }
+          xOpts.domain = [niceMin, niceMax]
+          overrides.x = xOpts
+        }
+      }
+    }
+  }
+
   // Add extra left margin for the manually-rendered rotated y-axis label
   // (must run after horizontal-bar default so the +24 is additive, not overwritten)
   if (config.yAxisTitle) {
@@ -1886,7 +1957,10 @@ function BigValueChart({ data, config }: { data: Record<string, unknown>[]; conf
                 >
                   {formatDelta(pctDelta)}
                   {config.comparisonLabel && (
-                    <span className="text-text-muted ml-1 font-normal">{config.comparisonLabel}</span>
+                    <span className="text-text-muted ml-1 font-normal">
+                      {config.comparisonLabel}
+                      {compValue != null && ` of ${formatBigValue(compValue, config.valueFormat, unit, value)}`}
+                    </span>
                   )}
                 </div>
               )}
@@ -1917,7 +1991,10 @@ function BigValueChart({ data, config }: { data: Record<string, unknown>[]; conf
         >
           {formatDelta(pctDelta)}
           {config.comparisonLabel && (
-            <span className="text-text-muted ml-1 font-normal">{config.comparisonLabel}</span>
+            <span className="text-text-muted ml-1 font-normal">
+              {config.comparisonLabel}
+              {compValue != null && ` of ${formatBigValue(compValue, config.valueFormat, unit, value)}`}
+            </span>
           )}
         </div>
       )}
@@ -2017,10 +2094,11 @@ function PieChartComponent({ data, config, height, autoHeight }: { data: Record<
         d3.select(this).attr('opacity', 0.8)
         const rect = el.getBoundingClientRect()
         const pct = ((d.data.value / total) * 100).toFixed(1)
+        const unit = detectValueUnit(config)
         setTooltip({
           x: event.clientX - rect.left,
           y: event.clientY - rect.top - 28,
-          text: `${d.data.label}: ${d3.format(',.4~g')(d.data.value)} (${pct}%)`,
+          text: `${d.data.label}: ${fmtWithUnit(d3.format(',.4~g')(d.data.value), unit)} (${pct}%)`,
         })
       })
       .on('mousemove', function (event) {
@@ -2232,11 +2310,12 @@ function TreemapComponent({ data, config, height, autoHeight }: { data: Record<s
         d3.select(this).attr('opacity', 0.85)
         const rect = el.getBoundingClientRect()
         const pct = ((d.data.value / totalValue) * 100).toFixed(1)
+        const unit = detectValueUnit(config)
         setTooltip({
           x: event.clientX - rect.left,
           y: event.clientY - rect.top,
           name: d.data.name,
-          value: `${d3.format(',.0f')(d.data.value)} (${pct}%)`,
+          value: `${fmtWithUnit(d3.format(',.0f')(d.data.value), unit)} (${pct}%)`,
         })
       })
       .on('mousemove', function (event) {

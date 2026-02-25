@@ -92,7 +92,8 @@ function generateLayout(charts: ChartWithData[]): Layout {
     const isBigValue = chart.chart_type === 'BigValue'
     const isTable = chart.chart_type === 'DataTable'
     const isMap = ['ChoroplethMap', 'SymbolMap', 'LocatorMap', 'SpikeMap'].includes(chart.chart_type)
-    const h = isBigValue ? 7 : isTable ? 8 : isMap ? 9 : 7
+    const isPie = ['PieChart', 'MultiplePies', 'ElectionDonut'].includes(chart.chart_type)
+    const h = isBigValue ? 7 : isTable ? 8 : isMap ? 9 : isPie ? 9 : 7
 
     // If this item won't fit on the current row, wrap
     if (x + w > 2) {
@@ -262,7 +263,7 @@ function DashboardChartCell({
         subtitle={embedFlags?.plain ? undefined : (chart.subtitle ?? undefined)}
         source={embedFlags?.plain ? undefined : (chart.source ?? undefined)}
         sourceUrl={embedFlags?.plain ? undefined : ((chart.config?.sourceUrl as string) ?? undefined)}
-        chartUrl={`/chart/${chart.chart_id}`}
+        chartUrl={dashboardId ? `/chart/${chart.chart_id}?dashboard=${dashboardId}` : `/chart/${chart.chart_id}`}
         chartId={chart.chart_id}
         allowDataDownload={(chart.config?.allowDataDownload as boolean) !== false}
         className="h-full"

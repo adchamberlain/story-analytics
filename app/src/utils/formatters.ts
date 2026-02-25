@@ -284,3 +284,43 @@ export function getHoverTemplate(
 
   return `<b>${xLabel}:</b> %{x}<br><b>${yLabel}:</b> %{y:${yFormatSpec}}<extra></extra>`
 }
+
+/**
+ * Detect scale/currency hints from natural language in titles and subtitles.
+ * e.g. "in billions of dollars" → { prefix: '$', suffix: 'B' }
+ */
+export function detectScaleFromText(text: string): { prefix: string; suffix: string } | null {
+  if (!text) return null
+  const t = text.toLowerCase()
+  const hasDollar = /\bdollars?\b|\busd\b|\$/.test(t)
+  const prefix = hasDollar ? '$' : ''
+  if (/\btrillions?\b|\btn\b/.test(t)) return { prefix, suffix: 'T' }
+  if (/\bbillions?\b|\bbn\b/.test(t)) return { prefix, suffix: 'B' }
+  if (/\bmillions?\b|\bmm\b/.test(t)) return { prefix, suffix: 'M' }
+  if (/\bthousands?\b/.test(t)) return { prefix, suffix: 'K' }
+  if (hasDollar) return { prefix: '$', suffix: '' }
+  return null
+}
+
+/** Wrap a formatted value string with prefix/suffix from unit detection. */
+export function fmtWithUnit(rawVal: string, unit: { prefix: string; suffix: string }): string {
+  if (!rawVal) return ''
+  return `${unit.prefix}${rawVal}${unit.suffix}`
+}
+
+/**
+ * Detect units from chart title and subtitle text.
+ * Returns { prefix, suffix } for formatting tooltip values.
+ */
+export function detectUnitFromTitleSubtitle(title?: string, subtitle?: string): { prefix: string; suffix: string } {
+  const none = { prefix: '', suffix: '' }
+  if (subtitle) {
+    const fromSub = detectScaleFromText(subtitle)
+    if (fromSub) return fromSub
+  }
+  if (title) {
+    const fromTitle = detectScaleFromText(title)
+    if (fromTitle) return fromTitle
+  }
+  return none
+}
