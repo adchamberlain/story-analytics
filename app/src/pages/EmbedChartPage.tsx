@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, useSearchParams } from 'react-router-dom'
 import { ObservableChartFactory } from '../components/charts/ObservableChartFactory'
 import { PALETTES } from '../themes/plotTheme'
 import type { ChartConfig, ChartType } from '../types/chart'
@@ -37,11 +37,42 @@ function formatAge(seconds: number): string {
  */
 export function EmbedChartPage() {
   const { chartId } = useParams<{ chartId: string }>()
+  const [searchParams] = useSearchParams()
   const [chartData, setChartData] = useState<ChartData | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [lastRefreshed, setLastRefreshed] = useState<number | null>(null)
   const [displayAge, setDisplayAge] = useState<string | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
+
+  // Dark mode: ?theme=dark|light|auto (default: auto)
+  const themeParam = searchParams.get('theme') || 'auto'
+  const [isDark, setIsDark] = useState(() => {
+    if (themeParam === 'dark') return true
+    if (themeParam === 'light') return false
+    return window.matchMedia('(prefers-color-scheme: dark)').matches
+  })
+
+  // Listen for system theme changes when in auto mode
+  useEffect(() => {
+    if (themeParam !== 'auto') return
+    const mq = window.matchMedia('(prefers-color-scheme: dark)')
+    const handler = (e: MediaQueryListEvent) => setIsDark(e.matches)
+    mq.addEventListener('change', handler)
+    return () => mq.removeEventListener('change', handler)
+  }, [themeParam])
+
+  // Listen for parent PostMessage theme override
+  useEffect(() => {
+    const handler = (event: MessageEvent) => {
+      if (event.data?.type === 'sa-theme') {
+        const theme = event.data.theme
+        if (theme === 'dark') setIsDark(true)
+        else if (theme === 'light') setIsDark(false)
+      }
+    }
+    window.addEventListener('message', handler)
+    return () => window.removeEventListener('message', handler)
+  }, [])
 
   // Fetch chart data
   useEffect(() => {
@@ -171,14 +202,23 @@ export function EmbedChartPage() {
   }
 
   return (
-    <div ref={containerRef} style={{ padding: '12px 16px', fontFamily: 'system-ui' }}>
+    <div
+      ref={containerRef}
+      style={{
+        padding: '12px 16px',
+        fontFamily: 'system-ui',
+        backgroundColor: isDark ? '#0f172a' : undefined,
+        color: isDark ? '#e2e8f0' : undefined,
+      }}
+      data-theme={isDark ? 'dark' : 'light'}
+    >
       {chart.title && (
-        <h2 style={{ margin: '0 0 4px', fontSize: 16, fontWeight: 600, color: '#1a1a1a' }}>
+        <h2 style={{ margin: '0 0 4px', fontSize: 16, fontWeight: 600, color: isDark ? '#f1f5f9' : '#1a1a1a' }}>
           {chart.title}
         </h2>
       )}
       {chart.subtitle && (
-        <p style={{ margin: '0 0 8px', fontSize: 13, color: '#666' }}>
+        <p style={{ margin: '0 0 8px', fontSize: 13, color: isDark ? '#94a3b8' : '#666' }}>
           {chart.subtitle}
         </p>
       )}
@@ -189,7 +229,7 @@ export function EmbedChartPage() {
         height={360}
       />
       {chart.source && (
-        <p style={{ margin: '8px 0 0', fontSize: 11, color: '#999' }}>
+        <p style={{ margin: '8px 0 0', fontSize: 11, color: isDark ? '#64748b' : '#999' }}>
           Source: {chart.source}
         </p>
       )}
@@ -201,7 +241,7 @@ export function EmbedChartPage() {
         />
       </noscript>
       {displayAge != null && Number(chart.config?.refreshInterval) > 0 && (
-        <p data-testid="staleness-indicator" style={{ margin: '4px 0 0', fontSize: 10, color: '#bbb' }}>
+        <p data-testid="staleness-indicator" style={{ margin: '4px 0 0', fontSize: 10, color: isDark ? '#475569' : '#bbb' }}>
           Updated {displayAge}
         </p>
       )}

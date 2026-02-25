@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
-import { exportSVG, exportPNG, exportPDF } from '../../utils/chartExport'
+import { exportSVG, exportPNG, exportPDF, exportPPTX } from '../../utils/chartExport'
 import { useChartThemeStore } from '../../stores/chartThemeStore'
 
 // -- Font injection helper ---------------------------------------------------
@@ -72,6 +72,11 @@ export function ChartWrapper({ title, subtitle, source, sourceUrl, chartUrl, chi
     const svg = chartAreaRef.current?.querySelector('svg')
     if (svg) await exportPDF(svg, title ?? 'chart', { title, source })
   }, [title, source])
+
+  const handleExportPPTX = useCallback(async () => {
+    const svg = chartAreaRef.current?.querySelector('svg')
+    if (svg) await exportPPTX(svg, title ?? 'chart', { title, subtitle, source })
+  }, [title, subtitle, source])
 
   // Inject theme font on mount / theme change
   useEffect(() => {
@@ -205,10 +210,10 @@ export function ChartWrapper({ title, subtitle, source, sourceUrl, chartUrl, chi
             </p>
           ) : <div />}
           <div className={`flex gap-2 ${compact ? 'opacity-0 group-hover:opacity-100 transition-opacity' : ''}`}>
-            {['SVG', 'PNG', 'PDF'].map((fmt) => (
+            {['SVG', 'PNG', 'PDF', 'PPTX'].map((fmt) => (
               <button
                 key={fmt}
-                onClick={fmt === 'SVG' ? handleExportSVG : fmt === 'PNG' ? handleExportPNG : handleExportPDF}
+                onClick={fmt === 'SVG' ? handleExportSVG : fmt === 'PNG' ? handleExportPNG : fmt === 'PDF' ? handleExportPDF : handleExportPPTX}
                 className={`text-[12px] px-2.5 py-1 rounded-lg border transition-colors ${
                   btnColor
                     ? 'hover:opacity-80'
