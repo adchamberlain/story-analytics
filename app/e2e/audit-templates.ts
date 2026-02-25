@@ -128,6 +128,8 @@ const CHART_SPECS: ChartSpec[] = [
   },
 ]
 
+const allSourceIds: string[] = []
+
 async function uploadCsv(csv: string, label: string): Promise<string> {
   const filename = `audit-${label}-${Date.now()}.csv`
   const formData = new FormData()
@@ -138,7 +140,9 @@ async function uploadCsv(csv: string, label: string): Promise<string> {
     body: formData,
   })
   const result = await res.json()
-  return result.source_id ?? result.detail?.existing_source_id
+  const sourceId = result.source_id ?? result.detail?.existing_source_id
+  if (sourceId) allSourceIds.push(sourceId)
+  return sourceId
 }
 
 async function createChart(spec: ChartSpec, sourceId: string): Promise<string> {
@@ -231,6 +235,12 @@ async function main() {
   console.log('Cleaning up charts...')
   for (const id of Object.values(chartIds)) {
     await deleteChart(id).catch(() => {})
+  }
+
+  // Cleanup data sources
+  console.log('Cleaning up data sources...')
+  for (const id of allSourceIds) {
+    await fetch(`${API_BASE}/api/data/sources/${id}`, { method: 'DELETE' }).catch(() => {})
   }
   console.log('Cleanup complete.')
 }

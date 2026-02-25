@@ -1,11 +1,11 @@
 {
   "id": "8398f10fea34",
-  "source_id": "4b736d2ec25f",
+  "source_id": "d5c2bf08216d",
   "chart_type": "HeatMap",
   "title": "When the Internet Wakes Up",
   "subtitle": "Peak hours that justify the CDN bill",
   "source": "Internal data",
-  "sql": "SELECT day, hour, visitors FROM src_4b736d2ec25f ORDER BY day_sort, hour_sort LIMIT 5000",
+  "sql": "SELECT day, hour, visitors FROM src_d5c2bf08216d LIMIT 5000",
   "x": "hour",
   "y": "visitors",
   "series": "day",

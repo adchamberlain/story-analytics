@@ -29,6 +29,16 @@ def save_chart(chart_id: str, chart: dict):
     print(f"  Saved {chart_id}.json")
 
 
+def delete_source(source_id: str):
+    """Delete a data source to clean up old uploads."""
+    try:
+        r = requests.delete(f"{BASE}/api/data/sources/{source_id}")
+        if r.ok:
+            print(f"  Deleted old source {source_id}")
+    except Exception:
+        pass
+
+
 def upload_csv(filename: str, rows: list[dict]) -> str:
     """Upload CSV data and return source_id."""
     buf = io.StringIO()
@@ -86,9 +96,9 @@ def fix_stacked_column():
             row[cat] = base[cat] + growth[cat] * q_idx + random.randint(-15, 15)
         wide_rows.append(row)
 
-    sid = upload_csv("stacked_column_v2", wide_rows)
-
     chart = load_chart(chart_id)
+    old_source = chart.get("source_id")
+    sid = upload_csv("stacked_column_v2", wide_rows)
     chart["source_id"] = sid
     chart["sql"] = (
         f'SELECT quarter, metric_name, metric_value '
@@ -97,6 +107,8 @@ def fix_stacked_column():
         f'ORDER BY quarter LIMIT 5000'
     )
     save_chart(chart_id, chart)
+    if old_source and old_source != sid:
+        delete_source(old_source)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -117,9 +129,10 @@ def fix_grouped_column():
             "H2 2025": random.randint(70, 98),
         })
 
+    chart = load_chart(chart_id)
+    old_source = chart.get("source_id")
     sid = upload_csv("grouped_column_v2", wide_rows)
 
-    chart = load_chart(chart_id)
     chart["source_id"] = sid
     chart["sql"] = (
         f'SELECT team, metric_name, metric_value '
@@ -130,6 +143,8 @@ def fix_grouped_column():
     chart["title"] = "Team Performance: H1 vs H2"
     chart["subtitle"] = "Completion rate (%) by team and half-year"
     save_chart(chart_id, chart)
+    if old_source and old_source != sid:
+        delete_source(old_source)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -158,15 +173,18 @@ def fix_heatmap():
                 val = 40 + random.randint(0, 30)
             rows.append({"day": day, "hour": hour, "visitors": val})
 
+    chart = load_chart(chart_id)
+    old_source = chart.get("source_id")
     sid = upload_csv("heatmap_v2", rows)
 
-    chart = load_chart(chart_id)
     chart["source_id"] = sid
     chart["sql"] = f'SELECT day, hour, visitors FROM src_{sid} LIMIT 5000'
     chart["x"] = "hour"
     chart["y"] = "visitors"
     chart["series"] = "day"
     save_chart(chart_id, chart)
+    if old_source and old_source != sid:
+        delete_source(old_source)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -189,14 +207,17 @@ def fix_bullet_bar():
         for name, a, t in raw
     ]
 
+    chart = load_chart(chart_id)
+    old_source = chart.get("source_id")
     sid = upload_csv("bullet_bar_v2", rows)
 
-    chart = load_chart(chart_id)
     chart["source_id"] = sid
     chart["sql"] = f'SELECT metric, actual, target FROM src_{sid} LIMIT 5000'
     chart["subtitle"] = "All key metrics exceeded their targets"
     chart.setdefault("config", {})["xAxisTitle"] = "% of Target"
     save_chart(chart_id, chart)
+    if old_source and old_source != sid:
+        delete_source(old_source)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -215,12 +236,15 @@ def fix_arrow_plot():
         {"metric": "MTTR", "before": 4, "after": 6},
     ]
 
+    chart = load_chart(chart_id)
+    old_source = chart.get("source_id")
     sid = upload_csv("arrow_plot_v2", rows)
 
-    chart = load_chart(chart_id)
     chart["source_id"] = sid
     chart["sql"] = f'SELECT metric, "before", "after" FROM src_{sid} LIMIT 5000'
     save_chart(chart_id, chart)
+    if old_source and old_source != sid:
+        delete_source(old_source)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -239,12 +263,15 @@ def fix_split_bars():
         {"topic": "Benefits", "male_pct": 72, "female_pct": 80},
     ]
 
+    chart = load_chart(chart_id)
+    old_source = chart.get("source_id")
     sid = upload_csv("split_bars_v2", rows)
 
-    chart = load_chart(chart_id)
     chart["source_id"] = sid
     chart["sql"] = f'SELECT topic, male_pct, female_pct FROM src_{sid} LIMIT 5000'
     save_chart(chart_id, chart)
+    if old_source and old_source != sid:
+        delete_source(old_source)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -266,12 +293,15 @@ def fix_small_multiples():
             val = base[region] + growth[region] * i + random.randint(-3, 3)
             rows.append({"month": month, "region": region, "revenue": val})
 
+    chart = load_chart(chart_id)
+    old_source = chart.get("source_id")
     sid = upload_csv("small_multiples_v2", rows)
 
-    chart = load_chart(chart_id)
     chart["source_id"] = sid
     chart["sql"] = f'SELECT month, region, revenue FROM src_{sid} ORDER BY region, month LIMIT 5000'
     save_chart(chart_id, chart)
+    if old_source and old_source != sid:
+        delete_source(old_source)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -281,29 +311,33 @@ def fix_data_table():
     print("\n9. DataTable — readable column headers")
     chart_id = "11ae3e27f8b7"
 
-    # Get existing data via API
-    r = requests.get(f"{BASE}/api/v2/charts/{chart_id}")
-    data = r.json()["data"]
+    chart = load_chart(chart_id)
+    old_source = chart.get("source_id")
 
-    rows = []
-    for d in data:
-        rows.append({
-            "Country": d.get("country", ""),
-            "Population (M)": d.get("population_m", ""),
-            "GDP ($T)": d.get("gdp_t", ""),
-            "Life Expectancy": d.get("life_expectancy", ""),
-            "Credit Rating": d.get("credit_rating", ""),
-        })
+    # Hardcoded fallback data (in case existing source is missing)
+    rows = [
+        {"Country": "United States", "Population (M)": "331", "GDP ($T)": "25.5", "Life Expectancy": "78.9", "Credit Rating": "A+"},
+        {"Country": "China", "Population (M)": "1412", "GDP ($T)": "17.9", "Life Expectancy": "77.3", "Credit Rating": "A"},
+        {"Country": "Japan", "Population (M)": "125", "GDP ($T)": "4.2", "Life Expectancy": "84.6", "Credit Rating": "A+"},
+        {"Country": "Germany", "Population (M)": "83", "GDP ($T)": "4.1", "Life Expectancy": "81.3", "Credit Rating": "A+"},
+        {"Country": "India", "Population (M)": "1408", "GDP ($T)": "3.5", "Life Expectancy": "70.4", "Credit Rating": "B+"},
+        {"Country": "United Kingdom", "Population (M)": "67", "GDP ($T)": "3.1", "Life Expectancy": "81.2", "Credit Rating": "A"},
+        {"Country": "France", "Population (M)": "68", "GDP ($T)": "2.8", "Life Expectancy": "82.5", "Credit Rating": "A"},
+        {"Country": "Canada", "Population (M)": "39", "GDP ($T)": "2.1", "Life Expectancy": "82.4", "Credit Rating": "A+"},
+        {"Country": "Brazil", "Population (M)": "214", "GDP ($T)": "1.9", "Life Expectancy": "75.9", "Credit Rating": "B"},
+        {"Country": "Australia", "Population (M)": "26", "GDP ($T)": "1.7", "Life Expectancy": "83.5", "Credit Rating": "A+"},
+    ]
 
     sid = upload_csv("data_table_v2", rows)
 
-    chart = load_chart(chart_id)
     chart["source_id"] = sid
     chart["sql"] = (
         f'SELECT "Country", "Population (M)", "GDP ($T)", '
-        f'"Life Expectancy", "Credit Rating" FROM src_{sid} LIMIT 5000'
+        f'"Life Expectancy", "Credit Rating" FROM src_{sid} ORDER BY "GDP ($T)" DESC LIMIT 5000'
     )
     save_chart(chart_id, chart)
+    if old_source and old_source != sid:
+        delete_source(old_source)
 
 
 # ─────────────────────────────────────────────────────────────────────────────

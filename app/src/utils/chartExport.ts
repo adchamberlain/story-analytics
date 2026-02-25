@@ -74,9 +74,11 @@ export async function exportPDF(
   let footerH = 3 // bottom margin
   if (metadata?.source) footerH += 6
 
+  const pageH = pdfHeight + headerH + footerH
   const doc = new jsPDF({
     unit: 'mm',
-    format: [pdfWidth, pdfHeight + headerH + footerH],
+    format: [pdfWidth, pageH],
+    orientation: pdfWidth > pageH ? 'landscape' : 'portrait',
   })
 
   let yOffset = 5

@@ -15,11 +15,23 @@ def upload_csv(name: str, content: str) -> str:
     # Handle duplicate filename
     return d.get("source_id") or d.get("detail", {}).get("existing_source_id", "")
 
+
+def delete_source(source_id: str):
+    """Delete a data source to clean up old uploads."""
+    try:
+        r = requests.delete(f"{BASE}/api/data/sources/{source_id}")
+        if r.ok:
+            print(f"  Deleted old source {source_id}")
+    except Exception:
+        pass
+
+
 def update_chart(chart_id: str, updates: dict):
-    """Update chart config via API."""
+    """Update chart config via API. Deletes old source if source_id is replaced."""
     resp = requests.get(f"{BASE}/api/v2/charts/{chart_id}")
     resp.raise_for_status()
     chart = resp.json()["chart"]
+    old_source = chart.get("source_id")
 
     # Merge updates
     for k, v in updates.items():
@@ -32,6 +44,11 @@ def update_chart(chart_id: str, updates: dict):
     resp = requests.post(f"{BASE}/api/v2/charts/save", json=chart)
     resp.raise_for_status()
     print(f"  Updated chart {chart_id}")
+
+    # Clean up old source if it was replaced
+    new_source = updates.get("source_id")
+    if new_source and old_source and old_source != new_source:
+        delete_source(old_source)
 
 # ─── 1. Fix AreaChart: smooth subscriber growth data ──────────────────────────
 print("1. Fixing AreaChart (smooth subscriber growth)...")

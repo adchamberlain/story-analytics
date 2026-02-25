@@ -1,18 +1,14 @@
 {
   "id": "ce8d6fbd5d12",
-  "source_id": "2bce20d6e929",
+  "source_id": "aea6e9294a47",
   "chart_type": "StackedColumn",
   "title": "Follow the Money",
   "subtitle": "Software margins doing the heavy lifting since 2023",
   "source": "Internal data",
-  "sql": "SELECT quarter, metric_name, metric_value FROM (SELECT quarter, \"Hardware\", \"Software\", \"Services\" FROM src_2bce20d6e929) UNPIVOT (metric_value FOR metric_name IN (\"Hardware\", \"Software\", \"Services\")) ORDER BY quarter LIMIT 5000",
+  "sql": "SELECT quarter, metric_name, metric_value FROM (SELECT quarter, \"Hardware\", \"Software\", \"Services\" FROM src_aea6e9294a47) UNPIVOT (metric_value FOR metric_name IN (\"Hardware\", \"Software\", \"Services\")) ORDER BY quarter LIMIT 5000",
   "x": "quarter",
-  "y": [
-    "Hardware",
-    "Software",
-    "Services"
-  ],
-  "series": null,
+  "y": "metric_value",
+  "series": "metric_name",
   "horizontal": false,
   "sort": false,
   "created_at": "2026-02-25T04:41:16.996166+00:00",

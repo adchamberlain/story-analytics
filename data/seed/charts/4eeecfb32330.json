@@ -1,11 +1,11 @@
 {
   "id": "4eeecfb32330",
-  "source_id": "b8974ccdf164",
+  "source_id": "cc9064f0decc",
   "chart_type": "SpikeMap",
   "title": "When the Ground Moves",
   "subtitle": "Magnitude 5+ events \u2014 California dominates, unsurprisingly",
   "source": "U.S. Geological Survey",
-  "sql": "SELECT city, lat, lon, magnitude FROM src_b8974ccdf164 LIMIT 5000",
+  "sql": "SELECT city, lat, lon, magnitude FROM src_cc9064f0decc LIMIT 5000",
   "x": null,
   "y": null,
   "series": null,
