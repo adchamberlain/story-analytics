@@ -12,15 +12,17 @@ from __future__ import annotations
 import os
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 
+from .services.api_key_service import verify_api_key
 from .services.metadata_db import (
     create_user, get_user_by_email, get_user_by_id,
     ensure_default_user,
+    get_api_key_by_prefix, update_api_key_last_used,
 )
 
 
@@ -53,16 +55,37 @@ def _decode_token(token: str) -> str | None:
 # ── Dependency: Get Current User ─────────────────────────────────────────────
 
 async def get_current_user(
+    request: Request,
     credentials: HTTPAuthorizationCredentials | None = Depends(security),
 ) -> dict:
-    """
-    Get the current user. When AUTH_ENABLED=false, returns default user.
-    When AUTH_ENABLED=true, validates JWT and returns user dict.
+    """Get the current user from JWT token or API key.
+
+    When AUTH_ENABLED=false, returns default user.
+    When AUTH_ENABLED=true, checks API key first (X-API-Key header or api_key query param),
+    then falls back to JWT Bearer token.
     """
     if not AUTH_ENABLED:
         user_id = ensure_default_user()
         return {"id": user_id, "email": "default@local", "role": "admin"}
 
+    # Check for API key (header or query param)
+    api_key = request.headers.get("X-API-Key") or request.query_params.get("api_key")
+    if api_key:
+        if api_key.startswith("sa_live_") and len(api_key) > 16:
+            prefix = f"sa_live_{api_key[8:16]}"
+            key_record = get_api_key_by_prefix(prefix)
+            if key_record and verify_api_key(api_key, key_record["key_hash"]):
+                # Check expiry
+                if key_record.get("expires_at"):
+                    if datetime.fromisoformat(key_record["expires_at"]) < datetime.now(timezone.utc):
+                        raise HTTPException(status_code=401, detail="API key expired")
+                update_api_key_last_used(key_record["id"])
+                user = get_user_by_id(key_record["user_id"])
+                if user:
+                    return user
+        raise HTTPException(status_code=401, detail="Invalid API key")
+
+    # Fall through to JWT auth
     if not credentials:
         raise HTTPException(status_code=401, detail="Not authenticated")
 
@@ -78,12 +101,23 @@ async def get_current_user(
 
 
 async def get_optional_user(
+    request: Request,
     credentials: HTTPAuthorizationCredentials | None = Depends(security),
 ) -> dict | None:
     """Get current user if authenticated, None otherwise. For public endpoints."""
     if not AUTH_ENABLED:
         user_id = ensure_default_user()
         return {"id": user_id, "email": "default@local", "role": "admin"}
+
+    # Check for API key
+    api_key = request.headers.get("X-API-Key") or request.query_params.get("api_key")
+    if api_key and api_key.startswith("sa_live_") and len(api_key) > 16:
+        prefix = f"sa_live_{api_key[8:16]}"
+        key_record = get_api_key_by_prefix(prefix)
+        if key_record and verify_api_key(api_key, key_record["key_hash"]):
+            update_api_key_last_used(key_record["id"])
+            return get_user_by_id(key_record["user_id"])
+        return None
 
     if not credentials:
         return None

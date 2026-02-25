@@ -3,7 +3,7 @@ Theme CRUD API endpoints.
 """
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from ..services.theme_storage import (
     save_theme, load_theme, list_themes, update_theme, delete_theme,
@@ -13,9 +13,9 @@ router = APIRouter(prefix="/themes", tags=["themes"])
 
 
 class ThemeSaveRequest(BaseModel):
-    name: str
-    description: str = ""
-    theme_data: dict
+    name: str = Field(..., examples=["Corporate Blue"], description="Theme name")
+    description: str = Field("", examples=["Professional blue color scheme"], description="Theme description")
+    theme_data: dict = Field(..., description="Theme configuration (colors, fonts, etc.)")
 
 
 class ThemeUpdateRequest(BaseModel):

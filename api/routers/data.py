@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Response
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from ..services.duckdb_service import get_duckdb_service, _SAFE_SOURCE_ID_RE
 from ..services.connectors.google_sheets import parse_sheets_url, build_export_url, fetch_sheet_csv
@@ -32,15 +32,15 @@ class ColumnInfoResponse(BaseModel):
 
 
 class UploadResponse(BaseModel):
-    source_id: str
-    filename: str
-    row_count: int
-    columns: list[ColumnInfoResponse]
+    source_id: str = Field(..., examples=["abc123def456"], description="Unique source identifier")
+    filename: str = Field(..., examples=["sales_data.csv"], description="Original filename")
+    row_count: int = Field(..., examples=[1500], description="Number of rows in the dataset")
+    columns: list[ColumnInfoResponse] = Field(..., description="Column schema information")
 
 
 class QueryRequest(BaseModel):
-    source_id: str
-    sql: str
+    source_id: str = Field(..., examples=["abc123def456"], description="Source to query against")
+    sql: str = Field(..., examples=["SELECT name, revenue FROM {{source}} ORDER BY revenue DESC"], description="SQL query (use {{source}} as table placeholder)")
 
 
 class QueryResponse(BaseModel):

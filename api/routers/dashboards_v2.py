@@ -12,7 +12,7 @@ import traceback
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from fastapi.responses import HTMLResponse
 
@@ -28,7 +28,7 @@ from ..services.metadata_db import (
 )
 
 
-router = APIRouter(prefix="/v2/dashboards", tags=["dashboards-v2"])
+router = APIRouter(prefix="/v2/dashboards", tags=["dashboards"])
 
 
 # ── Request / Response Schemas ───────────────────────────────────────────────
@@ -56,10 +56,10 @@ class FilterSpecSchema(BaseModel):
 
 
 class CreateDashboardRequest(BaseModel):
-    title: str
-    description: str | None = None
-    charts: list[ChartRefSchema] = []
-    filters: list[FilterSpecSchema] = []
+    title: str = Field(..., examples=["Q1 Sales Dashboard"], description="Dashboard title")
+    description: str | None = Field(None, examples=["Quarterly sales metrics and KPIs"], description="Dashboard description")
+    charts: list[ChartRefSchema] = Field(default_factory=list, description="Chart references to include")
+    filters: list[FilterSpecSchema] = Field(default_factory=list, description="Interactive filter definitions")
 
 
 class UpdateDashboardRequest(BaseModel):

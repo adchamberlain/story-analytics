@@ -24,14 +24,46 @@ from .routers.settings import router as settings_router
 from .routers.themes import router as themes_router  # noqa: E402
 from .routers.folders import router as folders_router  # noqa: E402
 from .routers.templates import router as templates_router  # noqa: E402
+from .routers.api_keys import router as api_keys_router  # noqa: E402
 
 settings = get_settings()
 
 # Create FastAPI app
 app = FastAPI(
     title="Story Analytics API",
-    description="API for creating data dashboards through natural language conversation",
-    version="0.1.0",
+    description="""
+## Story Analytics API
+
+Create data-driven dashboards and charts through AI-powered natural language conversation.
+
+### Authentication
+
+By default, authentication is disabled (`AUTH_ENABLED=false`). When enabled:
+- Register/login via `/api/auth/register` and `/api/auth/login` to get a JWT token
+- Pass JWT token in `Authorization: Bearer <token>` header
+- Or use API keys via `X-API-Key` header or `?api_key=` query parameter
+
+### Quick Start
+
+1. Upload data: `POST /api/data/upload` with a CSV file
+2. Create chart: `POST /api/v2/charts/save` with chart configuration
+3. View chart: `GET /api/v2/charts/{chartId}`
+4. Publish: `PUT /api/v2/charts/{chartId}/publish`
+5. Embed: Use the embed URL at `/embed/chart/{chartId}`
+""",
+    version="0.2.0",
+    openapi_tags=[
+        {"name": "auth", "description": "Authentication and user management"},
+        {"name": "charts", "description": "Chart CRUD, AI proposals, publishing, and export"},
+        {"name": "dashboards", "description": "Dashboard CRUD, layout, filters, and publishing"},
+        {"name": "data", "description": "Data source upload, query, and schema inspection"},
+        {"name": "connections", "description": "External database connections (BigQuery, Postgres, etc.)"},
+        {"name": "settings", "description": "Application settings and AI provider configuration"},
+        {"name": "themes", "description": "Chart theme management and customization"},
+        {"name": "folders", "description": "Chart and dashboard folder organization"},
+        {"name": "templates", "description": "Chart template gallery and management"},
+        {"name": "api-keys", "description": "API key management for programmatic access"},
+    ],
 )
 
 # Add CORS middleware
@@ -78,6 +110,7 @@ app.include_router(settings_router, prefix="/api")
 app.include_router(themes_router, prefix="/api")
 app.include_router(folders_router, prefix="/api")
 app.include_router(templates_router, prefix="/api")
+app.include_router(api_keys_router, prefix="/api")
 
 
 @app.on_event("startup")
@@ -94,7 +127,7 @@ async def root():
     """Root endpoint."""
     return {
         "name": "Story Analytics API",
-        "version": "0.1.0",
+        "version": "0.2.0",
         "docs": "/docs",
     }
 
