@@ -42,6 +42,9 @@ interface DataState {
   /** Pending duplicate conflict awaiting user confirmation */
   duplicateConflict: DuplicateConflict | null
 
+  /** Whether a transform is in progress */
+  transforming: boolean
+
   /** Actions */
   uploadCSV: (file: File, replace?: boolean) => Promise<void>
   confirmReplace: () => Promise<void>
@@ -49,6 +52,16 @@ interface DataState {
   pasteData: (text: string, name?: string) => Promise<void>
   loadPreview: (sourceId: string) => Promise<void>
   reset: () => void
+
+  /** Data transform actions — each calls backend, updates preview */
+  transformTranspose: (sourceId: string) => Promise<PreviewData>
+  transformRenameColumn: (sourceId: string, oldName: string, newName: string) => Promise<PreviewData>
+  transformDeleteColumn: (sourceId: string, column: string) => Promise<PreviewData>
+  transformReorderColumns: (sourceId: string, columns: string[]) => Promise<PreviewData>
+  transformRound: (sourceId: string, column: string, decimals?: number) => Promise<PreviewData>
+  transformPrependAppend: (sourceId: string, column: string, prepend?: string, append?: string) => Promise<PreviewData>
+  transformEditCell: (sourceId: string, row: number, column: string, value: string | number | null) => Promise<PreviewData>
+  transformCastType: (sourceId: string, column: string, type: string) => Promise<PreviewData>
 }
 
 const API_BASE = '/api/data'
@@ -56,11 +69,30 @@ const API_BASE = '/api/data'
 /** Monotonically increasing counter to guard against stale preview responses. */
 let previewRequestId = 0
 
+/** Helper: POST a transform endpoint, return updated preview. */
+async function _postTransform(
+  sourceId: string,
+  action: string,
+  body?: Record<string, unknown>,
+): Promise<PreviewData> {
+  const res = await fetch(`${API_BASE}/${sourceId}/transform/${action}`, {
+    method: 'POST',
+    headers: body ? { 'Content-Type': 'application/json' } : undefined,
+    body: body ? JSON.stringify(body) : undefined,
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }))
+    throw new Error(err.detail ?? `Transform failed: ${res.status}`)
+  }
+  return await res.json()
+}
+
 export const useDataStore = create<DataState>((set, get) => ({
   source: null,
   preview: null,
   uploading: false,
   loadingPreview: false,
+  transforming: false,
   error: null,
   duplicateConflict: null,
 
@@ -168,6 +200,104 @@ export const useDataStore = create<DataState>((set, get) => ({
   },
 
   reset: () => {
-    set({ source: null, preview: null, uploading: false, loadingPreview: false, error: null, duplicateConflict: null })
+    set({ source: null, preview: null, uploading: false, loadingPreview: false, transforming: false, error: null, duplicateConflict: null })
+  },
+
+  // -- Data Transform methods -------------------------------------------------
+
+  transformTranspose: async (sourceId: string) => {
+    set({ transforming: true, error: null })
+    try {
+      const data = await _postTransform(sourceId, 'transpose')
+      set({ preview: data, transforming: false })
+      return data
+    } catch (e) {
+      set({ transforming: false, error: e instanceof Error ? e.message : String(e) })
+      throw e
+    }
+  },
+
+  transformRenameColumn: async (sourceId: string, oldName: string, newName: string) => {
+    set({ transforming: true, error: null })
+    try {
+      const data = await _postTransform(sourceId, 'rename-column', { old: oldName, new: newName })
+      set({ preview: data, transforming: false })
+      return data
+    } catch (e) {
+      set({ transforming: false, error: e instanceof Error ? e.message : String(e) })
+      throw e
+    }
+  },
+
+  transformDeleteColumn: async (sourceId: string, column: string) => {
+    set({ transforming: true, error: null })
+    try {
+      const data = await _postTransform(sourceId, 'delete-column', { column })
+      set({ preview: data, transforming: false })
+      return data
+    } catch (e) {
+      set({ transforming: false, error: e instanceof Error ? e.message : String(e) })
+      throw e
+    }
+  },
+
+  transformReorderColumns: async (sourceId: string, columns: string[]) => {
+    set({ transforming: true, error: null })
+    try {
+      const data = await _postTransform(sourceId, 'reorder-columns', { columns })
+      set({ preview: data, transforming: false })
+      return data
+    } catch (e) {
+      set({ transforming: false, error: e instanceof Error ? e.message : String(e) })
+      throw e
+    }
+  },
+
+  transformRound: async (sourceId: string, column: string, decimals = 2) => {
+    set({ transforming: true, error: null })
+    try {
+      const data = await _postTransform(sourceId, 'round', { column, decimals })
+      set({ preview: data, transforming: false })
+      return data
+    } catch (e) {
+      set({ transforming: false, error: e instanceof Error ? e.message : String(e) })
+      throw e
+    }
+  },
+
+  transformPrependAppend: async (sourceId: string, column: string, prepend = '', append = '') => {
+    set({ transforming: true, error: null })
+    try {
+      const data = await _postTransform(sourceId, 'prepend-append', { column, prepend, append })
+      set({ preview: data, transforming: false })
+      return data
+    } catch (e) {
+      set({ transforming: false, error: e instanceof Error ? e.message : String(e) })
+      throw e
+    }
+  },
+
+  transformEditCell: async (sourceId: string, row: number, column: string, value: string | number | null) => {
+    set({ transforming: true, error: null })
+    try {
+      const data = await _postTransform(sourceId, 'edit-cell', { row, column, value })
+      set({ preview: data, transforming: false })
+      return data
+    } catch (e) {
+      set({ transforming: false, error: e instanceof Error ? e.message : String(e) })
+      throw e
+    }
+  },
+
+  transformCastType: async (sourceId: string, column: string, type: string) => {
+    set({ transforming: true, error: null })
+    try {
+      const data = await _postTransform(sourceId, 'cast-type', { column, type })
+      set({ preview: data, transforming: false })
+      return data
+    } catch (e) {
+      set({ transforming: false, error: e instanceof Error ? e.message : String(e) })
+      throw e
+    }
   },
 }))
