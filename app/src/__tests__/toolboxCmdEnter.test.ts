@@ -9,16 +9,16 @@
  */
 
 import { describe, it, expect } from 'vitest'
-// @ts-expect-error -- Node built-ins available in vitest runtime
+
 import { resolve, dirname } from 'path'
-// @ts-expect-error -- Node built-ins available in vitest runtime
+
 import { fileURLToPath } from 'url'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
 describe('Toolbox Cmd+Enter guard', () => {
   it('should guard keyboard shortcut with sqlExecuting check', async () => {
-    // @ts-expect-error -- Node built-ins available in vitest runtime
+    
     const fs = await import('fs')
     const source = fs.readFileSync(
       resolve(__dirname, '../components/editor/Toolbox.tsx'),

@@ -7,9 +7,9 @@
  */
 import { describe, it, expect, beforeEach } from 'vitest'
 
-// @ts-expect-error -- Node built-ins available in vitest runtime
+
 import { resolve, dirname } from 'path'
-// @ts-expect-error -- Node built-ins available in vitest runtime
+
 import { fileURLToPath } from 'url'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -18,7 +18,7 @@ describe('EmbedChartPage auto-refresh', () => {
   let source: string
 
   beforeEach(async () => {
-    // @ts-expect-error -- Node built-ins available in vitest runtime
+    
     const fs = await import('fs')
     source = fs.readFileSync(
       resolve(__dirname, '../pages/EmbedChartPage.tsx'),
@@ -69,7 +69,7 @@ describe('EmbedChartPage staleness indicator', () => {
   let source: string
 
   beforeEach(async () => {
-    // @ts-expect-error -- Node built-ins available in vitest runtime
+    
     const fs = await import('fs')
     source = fs.readFileSync(
       resolve(__dirname, '../pages/EmbedChartPage.tsx'),
