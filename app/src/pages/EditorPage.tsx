@@ -8,6 +8,7 @@ import { Toolbox } from '../components/editor/Toolbox'
 import { AIChat } from '../components/editor/AIChat'
 import { CommentSidebar } from '../components/comments/CommentSidebar'
 import { VersionHistoryPanel } from '../components/editor/VersionHistoryPanel'
+import { DataTransformGrid } from '../components/editor/DataTransformGrid'
 import { PALETTES } from '../themes/plotTheme'
 import type { ChartConfig } from '../types/chart'
 
@@ -116,7 +117,49 @@ export function EditorPage() {
   }, [handleSave])
 
   const [rightTab, setRightTab] = useState<'chat' | 'comments'>('chat')
+  const [centerView, setCenterView] = useState<'chart' | 'transform'>('chart')
   const [savingTemplate, setSavingTemplate] = useState(false)
+  const dataStore = useDataStore()
+
+  // Load full preview for the transform grid when switching to transform view
+  const editorSourceId = store.sourceId
+  useEffect(() => {
+    if (centerView === 'transform' && editorSourceId) {
+      dataStore.loadPreview(editorSourceId)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [centerView, editorSourceId])
+
+  const handleTransform = useCallback(async (action: string, params: Record<string, unknown>) => {
+    if (!editorSourceId) return
+    const ds = useDataStore.getState()
+    switch (action) {
+      case 'transpose':
+        await ds.transformTranspose(editorSourceId)
+        break
+      case 'rename-column':
+        await ds.transformRenameColumn(editorSourceId, params.old as string, params.new as string)
+        break
+      case 'delete-column':
+        await ds.transformDeleteColumn(editorSourceId, params.column as string)
+        break
+      case 'reorder-columns':
+        await ds.transformReorderColumns(editorSourceId, params.columns as string[])
+        break
+      case 'round':
+        await ds.transformRound(editorSourceId, params.column as string, params.decimals as number)
+        break
+      case 'prepend-append':
+        await ds.transformPrependAppend(editorSourceId, params.column as string, params.prepend as string, params.append as string)
+        break
+      case 'edit-cell':
+        await ds.transformEditCell(editorSourceId, params.row as number, params.column as string, params.value as string)
+        break
+      case 'cast-type':
+        await ds.transformCastType(editorSourceId, params.column as string, params.type as string)
+        break
+    }
+  }, [editorSourceId])
 
   const handleSaveAsTemplate = useCallback(async () => {
     if (!store.chartId || isNew) return
@@ -344,42 +387,88 @@ export function EditorPage() {
           <Toolbox />
         </aside>
 
-        {/* Center: Chart Preview */}
-        <main className="flex-1 p-4 lg:p-6 overflow-y-auto flex items-start justify-center">
-          <div className="w-full max-w-3xl">
-            {showEmptyState ? (
-              <div className="flex items-center justify-center h-80 border-2 border-dashed border-border-default rounded-xl">
-                <div className="text-center">
-                  <p className="text-sm text-text-muted">
-                    {store.config.dataMode === 'sql'
-                      ? 'Write a SQL query and click Run to see your data.'
-                      : 'Pick a chart type and map your columns in the toolbox to get started.'}
-                  </p>
-                </div>
-              </div>
-            ) : (
-              <ChartWrapper
-                title={store.config.title || undefined}
-                subtitle={store.config.subtitle || undefined}
-                source={store.config.source || undefined}
-                sourceUrl={store.config.sourceUrl || undefined}
-                altText={store.config.altText || undefined}
-                chartType={store.config.chartType}
-                xColumn={store.config.x || undefined}
-                yColumn={Array.isArray(store.config.y) ? store.config.y[0] || undefined : store.config.y || undefined}
-                dataLength={store.data.length}
-                chartId={store.chartId || undefined}
-                allowDataDownload={store.config.allowDataDownload}
+        {/* Center: Chart Preview or Transform Grid */}
+        <main className="flex-1 flex flex-col overflow-hidden">
+          {/* View toggle */}
+          {editorSourceId && (
+            <div className="flex items-center gap-1 px-4 pt-3 lg:px-6 shrink-0">
+              <button
+                onClick={() => setCenterView('chart')}
+                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                  centerView === 'chart'
+                    ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+                    : 'text-text-muted hover:text-text-secondary hover:bg-surface-tertiary'
+                }`}
               >
-                <ObservableChartFactory
-                  data={store.data}
-                  config={chartConfig}
+                Chart
+              </button>
+              <button
+                onClick={() => setCenterView('transform')}
+                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                  centerView === 'transform'
+                    ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+                    : 'text-text-muted hover:text-text-secondary hover:bg-surface-tertiary'
+                }`}
+              >
+                Transform Data
+              </button>
+            </div>
+          )}
+
+          {/* Content area */}
+          <div className="flex-1 p-4 lg:px-6 lg:pb-6 overflow-y-auto flex items-start justify-center">
+            <div className="w-full max-w-3xl">
+              {centerView === 'transform' && editorSourceId ? (
+                dataStore.preview ? (
+                  <DataTransformGrid
+                    data={dataStore.preview}
+                    sourceId={editorSourceId}
+                    onTransform={handleTransform}
+                    transforming={dataStore.transforming}
+                  />
+                ) : dataStore.loadingPreview ? (
+                  <div className="flex items-center justify-center h-40 text-sm text-text-muted">
+                    Loading data...
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-center h-40 text-sm text-text-muted">
+                    No data available for transform
+                  </div>
+                )
+              ) : showEmptyState ? (
+                <div className="flex items-center justify-center h-80 border-2 border-dashed border-border-default rounded-xl">
+                  <div className="text-center">
+                    <p className="text-sm text-text-muted">
+                      {store.config.dataMode === 'sql'
+                        ? 'Write a SQL query and click Run to see your data.'
+                        : 'Pick a chart type and map your columns in the toolbox to get started.'}
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <ChartWrapper
+                  title={store.config.title || undefined}
+                  subtitle={store.config.subtitle || undefined}
+                  source={store.config.source || undefined}
+                  sourceUrl={store.config.sourceUrl || undefined}
+                  altText={store.config.altText || undefined}
                   chartType={store.config.chartType}
-                  height={420}
-                  editable
-                />
-              </ChartWrapper>
-            )}
+                  xColumn={store.config.x || undefined}
+                  yColumn={Array.isArray(store.config.y) ? store.config.y[0] || undefined : store.config.y || undefined}
+                  dataLength={store.data.length}
+                  chartId={store.chartId || undefined}
+                  allowDataDownload={store.config.allowDataDownload}
+                >
+                  <ObservableChartFactory
+                    data={store.data}
+                    config={chartConfig}
+                    chartType={store.config.chartType}
+                    height={420}
+                    editable
+                  />
+                </ChartWrapper>
+              )}
+            </div>
           </div>
         </main>
 
