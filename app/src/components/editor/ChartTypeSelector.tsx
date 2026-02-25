@@ -193,6 +193,41 @@ const CHART_TYPES: { type: ChartType; label: string; icon: ReactNode }[] = [
       </svg>
     ),
   },
+  {
+    type: 'SymbolMap',
+    label: 'Symbols',
+    icon: (
+      <svg viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5">
+        <circle cx="8" cy="8" r="4" opacity="0.6" />
+        <circle cx="16" cy="12" r="3" opacity="0.4" />
+        <circle cx="10" cy="17" r="2.5" opacity="0.5" />
+        <circle cx="18" cy="6" r="2" opacity="0.3" />
+      </svg>
+    ),
+  },
+  {
+    type: 'LocatorMap',
+    label: 'Locator',
+    icon: (
+      <svg viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5">
+        <path d="M12,2 C8.13,2 5,5.13 5,9 C5,14.25 12,22 12,22 S19,14.25 19,9 C19,5.13 15.87,2 12,2Z" opacity="0.6" />
+        <circle cx="12" cy="9" r="2.5" fill="white" />
+      </svg>
+    ),
+  },
+  {
+    type: 'SpikeMap',
+    label: 'Spike',
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-5 w-5">
+        <line x1="6" y1="20" x2="6" y2="8" />
+        <line x1="10" y1="20" x2="10" y2="4" />
+        <line x1="14" y1="20" x2="14" y2="12" />
+        <line x1="18" y1="20" x2="18" y2="6" />
+        <line x1="3" y1="20" x2="21" y2="20" opacity="0.3" />
+      </svg>
+    ),
+  },
 ]
 
 interface ChartTypeSelectorProps {

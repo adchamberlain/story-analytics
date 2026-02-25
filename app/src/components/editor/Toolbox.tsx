@@ -8,7 +8,7 @@ import { MultiColumnSelect } from './MultiColumnSelect'
 import { AnnotationEditor } from './AnnotationEditor'
 import type { ChartType } from '../../types/chart'
 import type { PaletteKey } from '../../themes/plotTheme'
-import { loadCustomGeoJSON } from '../../utils/geoUtils'
+import { loadCustomGeoJSON, BASEMAPS, PROJECTIONS } from '../../utils/geoUtils'
 import { SUPPORTED_LOCALES } from '../../stores/localeStore'
 import type { AggregationType, TimeGrain, DataMode, EditorConfig, TableInfoItem } from '../../stores/editorStore'
 
@@ -404,6 +404,77 @@ export function Toolbox() {
                         <option value="geoAlbersUsa">Albers USA</option>
                         <option value="geoOrthographic">Orthographic</option>
                         <option value="geoNaturalEarth1">Natural Earth</option>
+                      </select>
+                    </div>
+                  </>
+                )}
+                {(config.chartType === 'SymbolMap' || config.chartType === 'LocatorMap' || config.chartType === 'SpikeMap') && (
+                  <>
+                    <div>
+                      <label className="block text-xs font-medium text-text-secondary mb-1">Basemap</label>
+                      <select
+                        value={config.basemap ?? 'world'}
+                        onChange={(e) => updateConfig({ basemap: e.target.value })}
+                        className="w-full px-2 py-1.5 text-sm border border-border-default rounded-md bg-surface text-text-primary focus:outline-none focus:border-blue-400"
+                      >
+                        {BASEMAPS.map((b) => <option key={b.id} value={b.id}>{b.label}</option>)}
+                        <option value="custom">Custom GeoJSON</option>
+                      </select>
+                    </div>
+                    <ColumnDropdown
+                      label="Latitude Column"
+                      value={config.geoLatColumn ?? null}
+                      columns={isSqlMode ? sqlResultColumns : columns}
+                      columnTypes={columnTypes}
+                      allowNone
+                      onChange={(geoLatColumn) => updateConfig({ geoLatColumn })}
+                    />
+                    <ColumnDropdown
+                      label="Longitude Column"
+                      value={config.geoLonColumn ?? null}
+                      columns={isSqlMode ? sqlResultColumns : columns}
+                      columnTypes={columnTypes}
+                      allowNone
+                      onChange={(geoLonColumn) => updateConfig({ geoLonColumn })}
+                    />
+                    {config.chartType === 'SymbolMap' && (
+                      <ColumnDropdown
+                        label="Size Column"
+                        value={config.geoSizeColumn ?? null}
+                        columns={isSqlMode ? sqlResultColumns : columns}
+                        columnTypes={columnTypes}
+                        allowNone
+                        onChange={(geoSizeColumn) => updateConfig({ geoSizeColumn })}
+                      />
+                    )}
+                    {config.chartType === 'LocatorMap' && (
+                      <ColumnDropdown
+                        label="Label Column"
+                        value={config.geoLabelColumn ?? null}
+                        columns={isSqlMode ? sqlResultColumns : columns}
+                        columnTypes={columnTypes}
+                        allowNone
+                        onChange={(geoLabelColumn) => updateConfig({ geoLabelColumn })}
+                      />
+                    )}
+                    {config.chartType === 'SpikeMap' && (
+                      <ColumnDropdown
+                        label="Value Column"
+                        value={config.geoSizeColumn ?? null}
+                        columns={isSqlMode ? sqlResultColumns : columns}
+                        columnTypes={columnTypes}
+                        allowNone
+                        onChange={(geoSizeColumn) => updateConfig({ geoSizeColumn })}
+                      />
+                    )}
+                    <div>
+                      <label className="block text-xs font-medium text-text-secondary mb-1">Projection</label>
+                      <select
+                        value={config.geoProjection ?? 'geoEqualEarth'}
+                        onChange={(e) => updateConfig({ geoProjection: e.target.value })}
+                        className="w-full px-2 py-1.5 text-sm border border-border-default rounded-md bg-surface text-text-primary focus:outline-none focus:border-blue-400"
+                      >
+                        {PROJECTIONS.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
                       </select>
                     </div>
                   </>
