@@ -43,7 +43,7 @@ class DatabaseConnection:
         elif path.startswith("/:memory:"):
             path = ":memory:"
 
-        self._conn = sqlite3.connect(path)
+        self._conn = sqlite3.connect(path, check_same_thread=False)
         self._conn.row_factory = sqlite3.Row
         self._conn.execute("PRAGMA journal_mode=WAL")
         self._conn.execute("PRAGMA foreign_keys=ON")
