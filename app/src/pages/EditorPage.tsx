@@ -344,6 +344,11 @@ export function EditorPage() {
                 subtitle={store.config.subtitle || undefined}
                 source={store.config.source || undefined}
                 sourceUrl={store.config.sourceUrl || undefined}
+                altText={store.config.altText || undefined}
+                chartType={store.config.chartType}
+                xColumn={store.config.x || undefined}
+                yColumn={Array.isArray(store.config.y) ? store.config.y[0] || undefined : store.config.y || undefined}
+                dataLength={store.data.length}
               >
                 <ObservableChartFactory
                   data={store.data}

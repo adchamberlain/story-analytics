@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react'
+import { useCallback, useEffect, useId, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { exportSVG, exportPNG, exportPDF, exportPPTX } from '../../utils/chartExport'
 import { useChartThemeStore } from '../../stores/chartThemeStore'
@@ -48,15 +48,33 @@ interface ChartWrapperProps {
   children: React.ReactNode
   className?: string
   compact?: boolean
+  /** Alt text for accessibility (screen readers) */
+  altText?: string
+  /** Chart type for auto-generated summary */
+  chartType?: string
+  /** X-axis column name for auto-generated summary */
+  xColumn?: string
+  /** Y-axis column name for auto-generated summary */
+  yColumn?: string
+  /** Number of data points for auto-generated summary */
+  dataLength?: number
 }
 
 /**
  * Publication-ready chart wrapper with title, subtitle, source note, and export buttons.
  * Replaces the PoC ChartCard — no library badge, adds export functionality.
  */
-export function ChartWrapper({ title, subtitle, source, sourceUrl, chartUrl, children, className = '', compact = false }: ChartWrapperProps) {
+export function ChartWrapper({ title, subtitle, source, sourceUrl, chartUrl, children, className = '', compact = false, altText, chartType, xColumn, yColumn, dataLength }: ChartWrapperProps) {
   const chartAreaRef = useRef<HTMLDivElement>(null)
   const theme = useChartThemeStore((s) => s.theme)
+
+  // Auto-generate summary for accessibility
+  const autoSummary = chartType
+    ? `${chartType}${yColumn ? ` showing ${yColumn}` : ''}${xColumn ? ` by ${xColumn}` : ''}${dataLength != null ? ` with ${dataLength} data points` : ''}`
+    : undefined
+  const ariaLabel = altText || title || autoSummary || 'Chart'
+  const reactId = useId()
+  const summaryId = `chart-summary-${reactId}`
 
   const handleExportSVG = useCallback(() => {
     const svg = chartAreaRef.current?.querySelector('svg')
@@ -179,8 +197,18 @@ export function ChartWrapper({ title, subtitle, source, sourceUrl, chartUrl, chi
         )}
 
         {/* Chart area */}
-        <div ref={chartAreaRef} className={`flex-1 min-h-0 overflow-hidden flex flex-col ${compact ? 'mt-2' : 'mt-3'}`}>
+        <div
+          ref={chartAreaRef}
+          role="img"
+          aria-label={ariaLabel}
+          aria-describedby={summaryId}
+          tabIndex={0}
+          className={`flex-1 min-h-0 overflow-hidden flex flex-col ${compact ? 'mt-2' : 'mt-3'} focus:outline-2 focus:outline-blue-500 focus:outline-offset-2 rounded-lg`}
+        >
           {children}
+        </div>
+        <div id={summaryId} className="sr-only">
+          {autoSummary || ariaLabel}
         </div>
 
         {/* Footer: source + export */}
