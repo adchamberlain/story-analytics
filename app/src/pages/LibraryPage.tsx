@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { DndContext, DragOverlay, useDraggable, pointerWithin, type DragEndEvent, type DragStartEvent } from '@dnd-kit/core'
+import { DndContext, DragOverlay, useDraggable, pointerWithin, useSensor, useSensors, PointerSensor, type DragEndEvent, type DragStartEvent } from '@dnd-kit/core'
 import { useLibraryStore } from '../stores/libraryStore'
 import { useFolderStore } from '../stores/folderStore'
 import { FolderSidebar } from '../components/library/FolderSidebar'
@@ -247,6 +247,9 @@ export function LibraryPage() {
   const isArchived = store.archiveFilter === 'archived'
 
   // Drag-and-drop state
+  const pointerSensor = useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
+  const sensors = useSensors(pointerSensor)
+
   const [activeChartId, setActiveChartId] = useState<string | null>(null)
   const draggedChart = activeChartId ? charts.find((c) => c.id === activeChartId) ?? store.charts.find((c) => c.id === activeChartId) : null
 
@@ -269,7 +272,7 @@ export function LibraryPage() {
   }
 
   return (
-    <DndContext collisionDetection={pointerWithin} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+    <DndContext sensors={sensors} collisionDetection={pointerWithin} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
     <div className="flex" style={{ padding: '48px 32px 48px 32px' }}>
       {/* Folder sidebar */}
       <div className="shrink-0 pr-6 border-r border-border-subtle" style={{ width: 220, paddingTop: 8 }}>
