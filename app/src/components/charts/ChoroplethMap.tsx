@@ -1,23 +1,18 @@
 /**
  * ChoroplethMap — D3-geo choropleth map component.
  * Renders as a non-Plot chart (like PieChart/Treemap), using D3 directly.
- * Supports zoom & pan via d3-zoom (mouse wheel, drag, pinch-to-zoom).
+ * Uses the shared useGeoMap hook for basemap loading, projection, zoom, and SVG management.
  */
 
-import { useRef, useEffect, useState, useCallback } from 'react'
+import { useEffect, useState } from 'react'
 import * as d3 from 'd3'
-import * as d3Geo from 'd3-geo'
-import { zoom as d3Zoom, zoomIdentity } from 'd3-zoom'
-import type { ZoomBehavior } from 'd3-zoom'
 import type { ChartConfig } from '../../types/chart'
 import {
-  loadBasemap,
   joinDataToFeatures,
   BASEMAPS,
   type BasemapId,
 } from '../../utils/geoUtils'
-import type { FeatureCollection } from 'geojson'
-import { useEditorStore } from '../../stores/editorStore'
+import { useGeoMap, zoomBtnStyle } from '../../hooks/useGeoMap'
 
 interface ChoroplethMapProps {
   data: Record<string, unknown>[]
@@ -26,33 +21,8 @@ interface ChoroplethMapProps {
   autoHeight?: boolean
 }
 
-const zoomBtnStyle: React.CSSProperties = {
-  width: 28,
-  height: 28,
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  fontSize: 16,
-  fontWeight: 600,
-  lineHeight: 1,
-  border: '1px solid var(--color-border-default, #e2e8f0)',
-  borderRadius: 6,
-  background: 'var(--color-surface-raised, rgba(255,255,255,0.9))',
-  color: 'var(--color-text-secondary, #64748b)',
-  cursor: 'pointer',
-  userSelect: 'none' as const,
-}
-
 export function ChoroplethMap({ data, config, height = 400, autoHeight = false }: ChoroplethMapProps) {
-  const containerRef = useRef<HTMLDivElement>(null)
-  const svgRef = useRef<SVGSVGElement | null>(null)
-  const zoomBehaviorRef = useRef<ZoomBehavior<SVGSVGElement, unknown> | null>(null)
-  const [containerWidth, setContainerWidth] = useState(0)
-  const [geoData, setGeoData] = useState<FeatureCollection | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
   const [tooltip, setTooltip] = useState<{ x: number; y: number; label: string; value: string } | null>(null)
-  const customGeoData = useEditorStore((s) => s.customGeoData)
 
   const basemapId = (config.basemap as BasemapId | 'custom') || 'world'
   const joinColumn = config.geoJoinColumn || config.x
@@ -60,52 +30,26 @@ export function ChoroplethMap({ data, config, height = 400, autoHeight = false }
   const colorScaleType = (config.geoColorScale as 'sequential' | 'diverging') || 'sequential'
   const projectionId = config.geoProjection || BASEMAPS.find((b) => b.id === basemapId)?.defaultProjection || 'geoEqualEarth'
 
-  // Load basemap
-  useEffect(() => {
-    if (basemapId === 'custom') {
-      if (customGeoData) {
-        setGeoData(customGeoData)
-        setLoading(false)
-        setError(null)
-      } else {
-        setLoading(false)
-        setError('Upload a GeoJSON or TopoJSON file')
-      }
-      return
-    }
-    setLoading(true)
-    setError(null)
-    loadBasemap(basemapId)
-      .then((fc) => {
-        setGeoData(fc)
-        setLoading(false)
-      })
-      .catch((err) => {
-        setError(err.message)
-        setLoading(false)
-      })
-  }, [basemapId, customGeoData])
+  const {
+    containerRef,
+    mapGroupRef,
+    geoData,
+    pathFn,
+    containerWidth,
+    effectiveHeight,
+    loading,
+    error,
+    handleZoomIn,
+    handleZoomOut,
+    handleReset,
+  } = useGeoMap({ basemap: basemapId, projection: projectionId, height, autoHeight })
 
-  // ResizeObserver
+  // Draw filled features when geoData, data, or dimensions change
   useEffect(() => {
-    const el = containerRef.current
-    if (!el) return
-    const ro = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        setContainerWidth(entry.contentRect.width)
-      }
-    })
-    ro.observe(el)
-    return () => ro.disconnect()
-  }, [])
+    const mapGroup = mapGroupRef.current
+    if (!mapGroup || !geoData || !pathFn || containerWidth <= 0) return
 
-  // Render map
-  useEffect(() => {
-    const el = containerRef.current
-    if (!el || !geoData || containerWidth <= 0) return
-
-    const width = containerWidth
-    const h = autoHeight ? Math.max(width * 0.55, 200) : height
+    const mapGroupSel = d3.select(mapGroup)
 
     // Join data to features
     const joined = basemapId === 'custom'
@@ -145,44 +89,20 @@ export function ChoroplethMap({ data, config, height = 400, autoHeight = false }
       }
     }
 
-    // Projection
-    const projFn = (d3Geo as Record<string, unknown>)[projectionId] as (() => d3Geo.GeoProjection) | undefined
-    const projection = projFn ? projFn() : d3Geo.geoEqualEarth()
-
-    // Fit projection to container
-    projection.fitSize([width, h], geoData)
-
-    const path = d3Geo.geoPath(projection)
-
-    // Clear previous render
-    d3.select(el).selectAll('svg').remove()
-
-    const svg = d3.select(el)
-      .append('svg')
-      .attr('width', width)
-      .attr('height', h)
-      .attr('viewBox', `0 0 ${width} ${h}`)
-      .style('max-width', '100%')
-      .style('touch-action', 'none')
-
-    // Store ref for zoom controls
-    svgRef.current = svg.node()
-
-    // Create a <g> wrapper that receives the zoom transform
-    const mapGroup = svg.append('g').attr('class', 'map-group')
+    const el = containerRef.current
 
     // Draw features inside the zoomable group
-    mapGroup.selectAll('path')
+    mapGroupSel.selectAll('path')
       .data(joined)
       .join('path')
-      .attr('d', (d) => path(d.feature) || '')
+      .attr('d', (d) => pathFn(d.feature) || '')
       .attr('fill', (d) => d.value !== null ? colorScale(d.value) : '#f0f0f0')
       .attr('stroke', 'var(--color-border-default, #e2e8f0)')
       .attr('stroke-width', 0.5)
       .style('cursor', 'pointer')
       .on('mouseenter', function (event, d) {
         d3.select(this).attr('stroke', 'var(--color-text-primary, #333)').attr('stroke-width', 1.5)
-        const rect = el.getBoundingClientRect()
+        const rect = el!.getBoundingClientRect()
         setTooltip({
           x: event.clientX - rect.left,
           y: event.clientY - rect.top,
@@ -191,7 +111,7 @@ export function ChoroplethMap({ data, config, height = 400, autoHeight = false }
         })
       })
       .on('mousemove', function (event) {
-        const rect = el.getBoundingClientRect()
+        const rect = el!.getBoundingClientRect()
         setTooltip((prev) => prev ? { ...prev, x: event.clientX - rect.left, y: event.clientY - rect.top } : null)
       })
       .on('mouseleave', function () {
@@ -199,14 +119,18 @@ export function ChoroplethMap({ data, config, height = 400, autoHeight = false }
         setTooltip(null)
       })
 
-    // Gradient legend (outside the zoomable group so it stays fixed)
+    // Gradient legend (appended to the SVG, outside the zoom group so it stays fixed)
+    const svgSel = d3.select(el!).select('svg')
+    svgSel.selectAll('.choropleth-legend').remove()
+
+    const width = containerWidth
+    const h = effectiveHeight
     const legendWidth = Math.min(200, width * 0.4)
     const legendHeight = 10
     const legendX = width - legendWidth - 16
     const legendY = h - 30
 
-    // Gradient defs
-    const defs = svg.append('defs')
+    const defs = svgSel.select('defs').empty() ? svgSel.append('defs') : svgSel.select('defs')
     const gradId = `choropleth-grad-${Math.random().toString(36).slice(2, 8)}`
     const grad = defs.append('linearGradient').attr('id', gradId)
     const steps = 10
@@ -218,7 +142,7 @@ export function ChoroplethMap({ data, config, height = 400, autoHeight = false }
         .attr('stop-color', colorScale(val))
     }
 
-    const legendG = svg.append('g').attr('transform', `translate(${legendX},${legendY})`)
+    const legendG = svgSel.append('g').attr('class', 'choropleth-legend').attr('transform', `translate(${legendX},${legendY})`)
     legendG.append('rect')
       .attr('width', legendWidth)
       .attr('height', legendHeight)
@@ -240,38 +164,7 @@ export function ChoroplethMap({ data, config, height = 400, autoHeight = false }
       .attr('fill', 'var(--color-text-secondary, #666)')
       .text(d3.format(',.2~s')(maxVal))
 
-    // Attach d3-zoom behavior
-    const zoomBehavior = d3Zoom<SVGSVGElement, unknown>()
-      .scaleExtent([1, 8])
-      .on('zoom', (event) => {
-        mapGroup.attr('transform', event.transform)
-      })
-
-    svg.call(zoomBehavior)
-    zoomBehaviorRef.current = zoomBehavior
-  }, [geoData, data, containerWidth, height, autoHeight, basemapId, joinColumn, valueColumn, colorScaleType, projectionId, config.colorRange, config.color])
-
-  // Zoom control handlers
-  const handleZoomIn = useCallback(() => {
-    const svgEl = svgRef.current
-    const zb = zoomBehaviorRef.current
-    if (!svgEl || !zb) return
-    d3.select(svgEl).transition().duration(300).call(zb.scaleBy, 1.5)
-  }, [])
-
-  const handleZoomOut = useCallback(() => {
-    const svgEl = svgRef.current
-    const zb = zoomBehaviorRef.current
-    if (!svgEl || !zb) return
-    d3.select(svgEl).transition().duration(300).call(zb.scaleBy, 1 / 1.5)
-  }, [])
-
-  const handleReset = useCallback(() => {
-    const svgEl = svgRef.current
-    const zb = zoomBehaviorRef.current
-    if (!svgEl || !zb) return
-    d3.select(svgEl).transition().duration(300).call(zb.transform, zoomIdentity)
-  }, [])
+  }, [geoData, data, containerWidth, effectiveHeight, basemapId, joinColumn, valueColumn, colorScaleType, pathFn, config.colorRange, config.color, containerRef, mapGroupRef])
 
   if (loading) {
     return (

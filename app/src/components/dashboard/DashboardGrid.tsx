@@ -248,6 +248,19 @@ function DashboardChartCell({
     positiveIsGood: (chart.config?.positiveIsGood as boolean) ?? true,
     metricLabel: (chart.config?.metricLabel as string) ?? undefined,
     unitColumn: (chart.config?.unitColumn as string) ?? undefined,
+    // Choropleth/map fields
+    basemap: (chart.config?.basemap as string) || undefined,
+    geoJoinColumn: (chart.config?.geoJoinColumn as string) ?? undefined,
+    geoValueColumn: (chart.config?.geoValueColumn as string) ?? undefined,
+    geoColorScale: (chart.config?.geoColorScale as string) || undefined,
+    geoProjection: (chart.config?.geoProjection as string) || undefined,
+    // Point map fields
+    geoLatColumn: (chart.config?.geoLatColumn as string) ?? undefined,
+    geoLonColumn: (chart.config?.geoLonColumn as string) ?? undefined,
+    geoLabelColumn: (chart.config?.geoLabelColumn as string) ?? undefined,
+    geoSizeColumn: (chart.config?.geoSizeColumn as string) ?? undefined,
+    geoSymbolShape: (chart.config?.geoSymbolShape as 'circle' | 'square' | 'triangle') || undefined,
+    geoSizeRange: (chart.config?.geoSizeRange as [number, number]) ?? undefined,
   }
 
   const palette = (chart.config?.palette as PaletteKey) ?? 'default'
