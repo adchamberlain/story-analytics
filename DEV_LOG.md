@@ -2,6 +2,28 @@
 
 ## 2026-02-25
 
+### Session 5: README & Website Update, Colorblind/Accessibility Removal, Theme Fixes
+
+**README.md and website/index.html updated to reflect current feature set:**
+- 11 chart types → 25 chart types with grouped categories (classic, analytical, maps, specialty)
+- Added: geographic maps, data transforms, version history, annotations (responsive scaling), API, custom themes, portable HTML export
+- Updated: export formats (added PPTX, CSV), data sources (added Google Sheets)
+- Removed: embedding (no hosting solution yet), collaboration (local-first limitation), accessibility/WCAG compliance (deleted from codebase)
+- Updated meta/OG/Twitter descriptions and "How It Works" step 3
+
+**Theme-aware colors across custom chart types:**
+- ChartWrapper: CSS custom property overrides when theme sets explicit colors (surface, text, border vars)
+- ElectionDonut/MultiplePies: use theme font/card colors instead of hardcoded dark/light values
+- ObservableChartFactory: theme-aware annotation and axis colors
+
+**Colorblind utilities removed:**
+- Deleted `ColorblindPreview.tsx`, `colorblind.ts`, and `colorblind.test.ts`
+- Removed colorblind references from PaletteBuilder, Toolbox, SharePanel, ChartViewPage
+- Cleaned up accessibility test file
+
+**PDF export fix:**
+- Subtitle now included in PDF export metadata
+
 ### Session 4: Map Label Collision Avoidance
 
 **Locator map label overlap fix:**
