@@ -1,5 +1,6 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
+import { ConfirmDialog } from '../components/ConfirmDialog'
 import { useChartThemeStore } from '../stores/chartThemeStore'
 import { CHART_THEMES } from '../themes/chartThemes'
 import { useLocaleStore, SUPPORTED_LOCALES } from '../stores/localeStore'
@@ -428,11 +429,14 @@ function ApiKeyManager() {
     }
   }
 
-  const handleRevoke = async (keyId: string) => {
-    if (!window.confirm('Are you sure you want to revoke this API key?')) return
-    await fetch(`/api/api-keys/${keyId}`, { method: 'DELETE' })
-    setKeys((prev) => prev.filter((k) => k.id !== keyId))
-  }
+  const [revokeKeyId, setRevokeKeyId] = useState<string | null>(null)
+
+  const handleRevoke = useCallback(async () => {
+    if (!revokeKeyId) return
+    await fetch(`/api/api-keys/${revokeKeyId}`, { method: 'DELETE' })
+    setKeys((prev) => prev.filter((k) => k.id !== revokeKeyId))
+    setRevokeKeyId(null)
+  }, [revokeKeyId])
 
   return (
     <section className="bg-surface-raised rounded-2xl shadow-card border border-border-default p-7">
@@ -497,7 +501,7 @@ function ApiKeyManager() {
                   </span>
                 )}
                 <button
-                  onClick={() => handleRevoke(k.id)}
+                  onClick={() => setRevokeKeyId(k.id)}
                   className="text-[13px] text-red-500 hover:text-red-400 transition-colors"
                 >
                   Revoke
@@ -506,6 +510,16 @@ function ApiKeyManager() {
             </div>
           ))}
         </div>
+      )}
+      {revokeKeyId && (
+        <ConfirmDialog
+          title="Revoke API key"
+          message="Are you sure you want to revoke this API key? This cannot be undone."
+          confirmLabel="Revoke"
+          destructive
+          onConfirm={handleRevoke}
+          onCancel={() => setRevokeKeyId(null)}
+        />
       )}
     </section>
   )
@@ -541,11 +555,14 @@ function TeamManager() {
     } catch { /* ignore */ } finally { setCreating(false) }
   }
 
-  const handleDelete = async (teamId: string) => {
-    if (!window.confirm('Delete this team?')) return
-    await fetch(`/api/teams/${teamId}`, { method: 'DELETE' })
-    setTeams((prev) => prev.filter((t) => t.id !== teamId))
-  }
+  const [deleteTeamId, setDeleteTeamId] = useState<string | null>(null)
+
+  const handleDelete = useCallback(async () => {
+    if (!deleteTeamId) return
+    await fetch(`/api/teams/${deleteTeamId}`, { method: 'DELETE' })
+    setTeams((prev) => prev.filter((t) => t.id !== deleteTeamId))
+    setDeleteTeamId(null)
+  }, [deleteTeamId])
 
   return (
     <section className="bg-surface-raised rounded-2xl shadow-card border border-border-default p-7">
@@ -580,12 +597,22 @@ function TeamManager() {
                 <span className="text-[14px] text-text-primary font-medium">{t.name}</span>
                 {t.description && <p className="text-[12px] text-text-muted">{t.description}</p>}
               </div>
-              <button onClick={() => handleDelete(t.id)} className="text-[13px] text-red-500 hover:text-red-400 transition-colors">
+              <button onClick={() => setDeleteTeamId(t.id)} className="text-[13px] text-red-500 hover:text-red-400 transition-colors">
                 Delete
               </button>
             </div>
           ))}
         </div>
+      )}
+      {deleteTeamId && (
+        <ConfirmDialog
+          title="Delete team"
+          message="Are you sure you want to delete this team?"
+          confirmLabel="Delete"
+          destructive
+          onConfirm={handleDelete}
+          onCancel={() => setDeleteTeamId(null)}
+        />
       )}
     </section>
   )

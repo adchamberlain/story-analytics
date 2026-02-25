@@ -10,6 +10,7 @@ import { CommentSidebar } from '../components/comments/CommentSidebar'
 import { VersionHistoryPanel } from '../components/editor/VersionHistoryPanel'
 import { DataTransformGrid } from '../components/editor/DataTransformGrid'
 import { PALETTES } from '../themes/plotTheme'
+import { ConfirmDialog } from '../components/ConfirmDialog'
 import type { ChartConfig } from '../types/chart'
 
 export function EditorPage() {
@@ -242,15 +243,24 @@ export function EditorPage() {
     chartConfig.colorRange = paletteColors
   }
 
-  const handleBack = useCallback(() => {
-    if (isDirty && !window.confirm('You have unsaved changes. Discard them?')) return
+  const [showBackConfirm, setShowBackConfirm] = useState(false)
+
+  const doBack = useCallback(() => {
     if (isNew || !store.chartId) {
       useDataStore.getState().reset()
       navigate('/library')
     } else {
       navigate(`/chart/${store.chartId}`)
     }
-  }, [isDirty, navigate, isNew, store.chartId])
+  }, [navigate, isNew, store.chartId])
+
+  const handleBack = useCallback(() => {
+    if (isDirty) {
+      setShowBackConfirm(true)
+    } else {
+      doBack()
+    }
+  }, [isDirty, doBack])
 
   if (store.loading) {
     return (
@@ -509,6 +519,16 @@ export function EditorPage() {
           )}
         </aside>
       </div>
+      {showBackConfirm && (
+        <ConfirmDialog
+          title="Unsaved changes"
+          message="You have unsaved changes. Discard them?"
+          confirmLabel="Discard"
+          destructive
+          onConfirm={() => { setShowBackConfirm(false); doBack() }}
+          onCancel={() => setShowBackConfirm(false)}
+        />
+      )}
     </div>
   )
 }

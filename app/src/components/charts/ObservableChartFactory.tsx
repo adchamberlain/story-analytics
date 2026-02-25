@@ -57,7 +57,7 @@ export function ObservableChartFactory({
   // We never rely on Observable Plot's built-in legend (unreliable for stroke marks).
   const showLegend = config.showLegend !== false && !!config.series
   const legendItems = showLegend
-    ? getUniqueSeries(data, config.series!).map((label, i) => ({
+    ? getUniqueSeries(data, config.series!, config).map((label, i) => ({
         label,
         color: colors[i % colors.length],
       }))
@@ -82,7 +82,7 @@ export function ObservableChartFactory({
       const marks = buildMarks(chartType, data, config, colors, chartTheme)
       const bgColor = getComputedStyle(document.documentElement).getPropertyValue('--color-surface-raised').trim() || '#1e293b'
       const textColor = getComputedStyle(document.documentElement).getPropertyValue('--color-text-primary').trim() || '#e2e8f0'
-      const annotationMarks = buildAnnotationMarks(config.annotations, bgColor, textColor)
+      const annotationMarks = buildAnnotationMarks(config.annotations, bgColor, textColor, chartTheme)
       const plotOptions = buildPlotOptions(chartType, data, config, colors, width, plotHeight, chartTheme)
       const plot = Plot.plot({ ...plotOptions, marks: [...marks, ...annotationMarks] })
 
@@ -146,6 +146,8 @@ export function ObservableChartFactory({
           bgColor,
           textColor,
           fontFamily: chartTheme.font.family || 'Inter, system-ui, sans-serif',
+          fontWeight: chartTheme.font.notes?.weight ?? 600,
+          fontStyle: chartTheme.font.notes?.italic ? 'italic' : 'normal',
           editable,
           onDragEnd: (id, dx, dy, dxRatio, dyRatio) => {
             const store = useEditorStore.getState()
@@ -429,6 +431,11 @@ function fmtWithUnit(rawVal: string, unit: { prefix: string; suffix: string }): 
   return `${unit.prefix}${rawVal}${unit.suffix}`
 }
 
+/** Title-case a column name: "hour of day" → "Hour Of Day", "visitors" → "Visitors" */
+function titleCase(s: string): string {
+  return s.replace(/\b\w/g, (c) => c.toUpperCase())
+}
+
 function tipTitle(
   d: Record<string, unknown>,
   xCol?: string, yCol?: string, seriesCol?: string,
@@ -438,10 +445,10 @@ function tipTitle(
   const cat = xCol && d[xCol] != null ? fmtTipValue(d[xCol]) : ''
   const ser = seriesCol && d[seriesCol] != null ? fmtTipValue(d[seriesCol]) : ''
   const val = yCol && d[yCol] != null ? fmtWithUnit(fmtTipValue(d[yCol]), unit) : ''
-  if (cat && ser && val) return `${cat} · ${ser}: ${val}`
-  if (cat && val) return `${cat}: ${val}`
-  if (ser && val) return `${ser}: ${val}`
-  if (cat) return cat
+  if (cat && ser && val) return `${titleCase(xCol!)}: ${cat} · ${titleCase(seriesCol!)}: ${ser} · ${titleCase(yCol!)}: ${val}`
+  if (cat && val) return `${titleCase(xCol!)}: ${cat} · ${titleCase(yCol!)}: ${val}`
+  if (ser && val) return `${titleCase(seriesCol!)}: ${ser} · ${titleCase(yCol!)}: ${val}`
+  if (cat) return `${titleCase(xCol!)}: ${cat}`
   return val
 }
 
@@ -691,7 +698,14 @@ function buildHeatMapMarks(
   const yAxis = series ?? y
   const fill = y
   return [
-    Plot.cell(data, { x, y: yAxis, fill, tip: true }),
+    Plot.cell(data, { x, y: yAxis, fill }),
+    Plot.tip(data, Plot.pointer({
+      x, y: yAxis,
+      title: (d: Record<string, unknown>) => {
+        const fVal = d[fill] != null ? fmtTipValue(d[fill]) : ''
+        return `${titleCase(x)}: ${fmtTipValue(d[x])} · ${titleCase(yAxis)}: ${fmtTipValue(d[yAxis])}${fVal ? ` · ${titleCase(fill)}: ${fVal}` : ''}`
+      },
+    })),
   ]
 }
 
@@ -1050,14 +1064,26 @@ function buildArrowPlotMarks(
 
 // ── Annotation Mark Builders ────────────────────────────────────────────────
 
-function buildAnnotationMarks(annotations?: Annotations, bgColor = '#1e293b', _textColor = '#e2e8f0'): Plot.Markish[] {
+function buildAnnotationMarks(
+  annotations?: Annotations,
+  bgColor = '#1e293b',
+  _textColor = '#e2e8f0',
+  chartTheme?: import('../../themes/chartThemes').ChartTheme,
+): Plot.Markish[] {
   if (!annotations) return []
 
   const marks: Plot.Markish[] = []
 
+  // Resolve annotation label style from chart theme
+  const noteStyle = chartTheme?.font.notes
+  const labelFontSize = noteStyle?.size ?? 11
+  const labelFontWeight = noteStyle?.weight ?? 600
+  const labelFontStyle = noteStyle?.italic ? 'italic' : 'normal'
+  const labelFontFamily = chartTheme?.font.family || undefined
+
   // Reference lines (guard against legacy data missing sub-arrays)
   for (const line of annotations.lines ?? []) {
-    const color = line.color ?? '#e45756'
+    const color = line.color ?? (noteStyle?.color || '#e45756')
     const strokeDash = line.strokeDash ?? [6, 4]
 
     if (line.axis === 'x') {
@@ -1072,7 +1098,8 @@ function buildAnnotationMarks(annotations?: Annotations, bgColor = '#1e293b', _t
         marks.push(
           Plot.text([{ x: val, label: line.label }], {
             x: 'x', text: 'label',
-            dy: -8, fontSize: 11, fill: color, fontWeight: 600,
+            dy: -24, fontSize: labelFontSize, fill: color,
+            fontWeight: labelFontWeight, fontStyle: labelFontStyle, fontFamily: labelFontFamily,
             stroke: bgColor, strokeWidth: 4,
             frameAnchor: 'top',
           })
@@ -1086,7 +1113,8 @@ function buildAnnotationMarks(annotations?: Annotations, bgColor = '#1e293b', _t
         marks.push(
           Plot.text([{ y: line.value, label: line.label }], {
             y: 'y', text: 'label',
-            dx: -4, fontSize: 11, fill: color, fontWeight: 600,
+            dx: -4, fontSize: labelFontSize, fill: color,
+            fontWeight: labelFontWeight, fontStyle: labelFontStyle, fontFamily: labelFontFamily,
             stroke: bgColor, strokeWidth: 4,
             textAnchor: 'end', frameAnchor: 'right',
           })
@@ -1145,11 +1173,13 @@ interface AppendPointNotesOpts {
   bgColor: string
   textColor: string
   fontFamily: string
+  fontWeight: number
+  fontStyle: string
   editable: boolean
   onDragEnd: (id: string, dx: number, dy: number, dxRatio: number, dyRatio: number) => void
 }
 
-function appendPointNotes({ svg, plotEl, annotations, bgColor, textColor, fontFamily, editable, onDragEnd }: AppendPointNotesOpts) {
+function appendPointNotes({ svg, plotEl, annotations, bgColor, textColor, fontFamily, fontWeight, fontStyle, editable, onDragEnd }: AppendPointNotesOpts) {
   let xScale: ReturnType<PlotElement['scale']>
   let yScale: ReturnType<PlotElement['scale']>
   try {
@@ -1222,7 +1252,8 @@ function appendPointNotes({ svg, plotEl, annotations, bgColor, textColor, fontFa
       .attr('dominant-baseline', 'central')
       .attr('font-family', fontFamily)
       .attr('font-size', fontSize)
-      .attr('font-weight', 600)
+      .attr('font-weight', fontWeight)
+      .attr('font-style', fontStyle)
       .attr('fill', color)
       .attr('paint-order', 'stroke')
       .attr('stroke', bgColor)
@@ -1552,6 +1583,55 @@ function appendHighlightRanges({ svg, plotEl, ranges, data, xColumn, editable, o
   }
 }
 
+// ── Ordinal Domain Sorting ──────────────────────────────────────────────────
+
+const DAYS_SHORT_MON = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+const DAYS_FULL_MON = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+const MONTHS_FULL = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
+
+function rotateToSunday(days: string[]): string[] {
+  // Move last element (Sun/Sunday) to front
+  return [days[days.length - 1], ...days.slice(0, -1)]
+}
+
+/**
+ * Detect day-of-week or month patterns in an ordinal domain and return
+ * a properly ordered array. Returns the original domain unchanged if
+ * no pattern is detected.
+ */
+function sortOrdinalDomain(domain: string[], config: ChartConfig): string[] {
+  if (domain.length === 0) return domain
+
+  // Normalise for matching (case-insensitive)
+  const lower = domain.map((d) => d.toLowerCase())
+
+  // Try each known ordinal sequence
+  const sequences: [string[], string[]][] = [
+    [DAYS_SHORT_MON, DAYS_SHORT_MON.map((d) => d.toLowerCase())],
+    [DAYS_FULL_MON, DAYS_FULL_MON.map((d) => d.toLowerCase())],
+    [MONTHS_SHORT, MONTHS_SHORT.map((d) => d.toLowerCase())],
+    [MONTHS_FULL, MONTHS_FULL.map((d) => d.toLowerCase())],
+  ]
+
+  for (const [canonical, canonicalLower] of sequences) {
+    // Check if every domain value is in this sequence
+    if (lower.every((v) => canonicalLower.includes(v))) {
+      const isDays = canonical === DAYS_SHORT_MON || canonical === DAYS_FULL_MON
+      let ordered = canonical
+      if (isDays && config.weekStartDay === 'Sun') {
+        ordered = rotateToSunday(canonical)
+      }
+      // Return only the values that exist in the data, in canonical order,
+      // preserving the original casing from the data
+      const lowerToOriginal = new Map(domain.map((d) => [d.toLowerCase(), d]))
+      return ordered.filter((v) => lowerToOriginal.has(v.toLowerCase())).map((v) => lowerToOriginal.get(v.toLowerCase())!)
+    }
+  }
+
+  return domain
+}
+
 // ── Plot Options Builder ────────────────────────────────────────────────────
 
 function buildPlotOptions(
@@ -1583,13 +1663,14 @@ function buildPlotOptions(
           const v = row[config.x] as string
           if (!seen.has(v)) { seen.add(v); domain.push(v) }
         }
+        const sorted = sortOrdinalDomain(domain, config)
         // RangePlot, BulletBar, ArrowPlot, SplitBars use x-axis for numeric values
         // and y-axis for categories, so ordinal domain must go on y-axis
         const isInherentlyHorizontal = chartType === 'RangePlot' || chartType === 'BulletBar' || chartType === 'ArrowPlot' || chartType === 'SplitBars'
         if (config.horizontal || isInherentlyHorizontal) {
-          overrides.y = { ...getBaseAxis(), domain }
+          overrides.y = { ...getBaseAxis(), domain: sorted }
         } else {
-          overrides.x = { ...getBaseAxis(), domain }
+          overrides.x = { ...getBaseAxis(), domain: sorted }
         }
       }
     }
@@ -1604,7 +1685,7 @@ function buildPlotOptions(
       const v = row[config.series] as string
       if (v != null && !seen.has(v)) { seen.add(v); yDomain.push(v) }
     }
-    overrides.y = { ...getBaseAxis(), domain: yDomain }
+    overrides.y = { ...getBaseAxis(), domain: sortOrdinalDomain(yDomain, config) }
   }
 
   // Axis labels — suppress Observable Plot's default column-name labels
@@ -1625,6 +1706,10 @@ function buildPlotOptions(
   }
   if (config.xAxisTitle) {
     overrides.marginBottom = Math.max((overrides.marginBottom as number | undefined) ?? 30, 52)
+  }
+  // Extra top margin when x-axis reference lines have labels (rendered above the plot area)
+  if (config.annotations?.lines?.some((l) => l.axis === 'x' && l.label)) {
+    overrides.marginTop = Math.max((overrides.marginTop as number | undefined) ?? 8, 36)
   }
   // Never let Observable Plot render the y-axis label — we render it manually
   // after plot creation (see appendYAxisLabel) to avoid overlap with tick values.
@@ -1715,7 +1800,7 @@ function buildPlotOptions(
   } else {
     const colorOpts: Record<string, unknown> = { range: [...colors], legend: false }
     if (config.series) {
-      colorOpts.domain = getUniqueSeries(data, config.series)
+      colorOpts.domain = getUniqueSeries(data, config.series, config)
     }
     overrides.color = colorOpts
   }
@@ -1735,15 +1820,16 @@ function getBaseAxis() {
 
 // ── Legend Helper ───────────────────────────────────────────────────────────
 
-function getUniqueSeries(data: Record<string, unknown>[], field: string): string[] {
+function getUniqueSeries(data: Record<string, unknown>[], field: string, config?: ChartConfig): string[] {
   const seen = new Set<string>()
   const result: string[] = []
   for (const row of data) {
     const v = String(row[field] ?? '')
     if (!seen.has(v)) { seen.add(v); result.push(v) }
   }
-  // Sort alphabetically to match Observable Plot's default ordinal domain ordering
-  return result.sort()
+  // Auto-sort day/month patterns; fall back to alphabetical for other ordinals
+  const sorted = config ? sortOrdinalDomain(result, config) : result
+  return sorted === result ? result.sort() : sorted
 }
 
 // ── Date Parsing Helper ─────────────────────────────────────────────────────
