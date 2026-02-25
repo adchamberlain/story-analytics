@@ -1,0 +1,40 @@
+{
+  "id": "a10fd22d0223",
+  "source_id": "9092f5e7b9c4",
+  "chart_type": "BulletBar",
+  "title": "Q4 Performance vs. Targets",
+  "subtitle": "All key metrics exceeded their targets",
+  "source": "Internal data",
+  "sql": "SELECT metric, actual, target FROM src_9092f5e7b9c4 LIMIT 5000",
+  "x": "metric",
+  "y": "actual",
+  "series": null,
+  "horizontal": false,
+  "sort": false,
+  "created_at": "2026-02-25T04:41:17.083752+00:00",
+  "updated_at": "2026-02-25T05:36:04.099377+00:00",
+  "reasoning": null,
+  "config": {
+    "stacked": false,
+    "showGrid": true,
+    "showLegend": true,
+    "showValues": false,
+    "palette": "bold",
+    "xAxisTitle": "% of Target",
+    "yAxisTitle": "",
+    "aggregation": "none",
+    "timeGrain": "none",
+    "dataMode": "table",
+    "annotations": {
+      "lines": [],
+      "texts": [],
+      "ranges": []
+    },
+    "targetColumn": "target"
+  },
+  "connection_id": null,
+  "source_table": null,
+  "status": "draft",
+  "folder_id": null,
+  "archived_at": null
+}

@@ -11,7 +11,8 @@ __pycache__
 *.bak
 
 # Local data (charts, dashboards, uploads, cached parquet)
-data/
+data/*
+!data/seed/
 
 # Source connection credentials
 sources/*/connection.yaml

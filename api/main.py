@@ -123,6 +123,34 @@ app.include_router(versions_router, prefix="/api")
 app.include_router(transforms_router, prefix="/api")
 
 
+def _seed_data_if_empty():
+    """Copy seed data into data/ on first run so new users see an example dashboard."""
+    import shutil
+    import logging
+
+    logger = logging.getLogger("story_analytics")
+    data_dir = Path(__file__).parent.parent / "data"
+    seed_dir = data_dir / "seed"
+
+    if not seed_dir.exists():
+        return
+
+    charts_dir = data_dir / "charts"
+    charts_dir.mkdir(parents=True, exist_ok=True)
+
+    # Only seed if no charts exist yet
+    if any(charts_dir.glob("*.json")):
+        return
+
+    for subdir in ("charts", "dashboards", "uploads"):
+        src = seed_dir / subdir
+        dst = data_dir / subdir
+        if src.exists():
+            shutil.copytree(src, dst, dirs_exist_ok=True)
+
+    logger.info("Loaded seed data: The Perfect Dashboard with 25 example charts")
+
+
 @app.on_event("startup")
 async def startup():
     """Create database tables on startup."""
@@ -130,6 +158,8 @@ async def startup():
     # Ensure default user exists so sharing/metadata FK constraints are satisfied
     from .services.metadata_db import ensure_default_user
     ensure_default_user()
+    # Seed example dashboard on first run
+    _seed_data_if_empty()
 
 
 @app.get("/")

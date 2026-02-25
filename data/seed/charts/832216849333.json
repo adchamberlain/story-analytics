@@ -1,0 +1,40 @@
+{
+  "id": "832216849333",
+  "source_id": "86c1319f06f5",
+  "chart_type": "ScatterPlot",
+  "title": "Study Hours vs. Exam Score",
+  "subtitle": "Clear positive correlation (r \u2248 0.87)",
+  "source": "Simulated academic data",
+  "sql": "SELECT study_hours, exam_score FROM src_86c1319f06f5 LIMIT 5000",
+  "x": "study_hours",
+  "y": "exam_score",
+  "series": null,
+  "horizontal": false,
+  "sort": false,
+  "created_at": "2026-02-25T04:41:16.976521+00:00",
+  "updated_at": "2026-02-25T04:41:16.976521+00:00",
+  "reasoning": null,
+  "config": {
+    "stacked": false,
+    "showGrid": true,
+    "showLegend": true,
+    "showValues": false,
+    "palette": "default",
+    "xAxisTitle": "Hours Studied",
+    "yAxisTitle": "Exam Score",
+    "aggregation": "none",
+    "timeGrain": "none",
+    "dataMode": "table",
+    "annotations": {
+      "lines": [],
+      "texts": [],
+      "ranges": []
+    },
+    "markerSize": 5
+  },
+  "connection_id": null,
+  "source_table": null,
+  "status": "draft",
+  "folder_id": null,
+  "archived_at": null
+}

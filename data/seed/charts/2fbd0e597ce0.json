@@ -1,0 +1,39 @@
+{
+  "id": "2fbd0e597ce0",
+  "source_id": "4234751bce08",
+  "chart_type": "PieChart",
+  "title": "Cloud Infrastructure Market Share",
+  "subtitle": "AWS maintains lead, Azure closing gap",
+  "source": "Synergy Research Group",
+  "sql": "SELECT provider, share FROM src_4234751bce08 LIMIT 5000",
+  "x": "provider",
+  "y": "share",
+  "series": null,
+  "horizontal": false,
+  "sort": false,
+  "created_at": "2026-02-25T04:41:17.013861+00:00",
+  "updated_at": "2026-02-25T04:41:17.013861+00:00",
+  "reasoning": null,
+  "config": {
+    "stacked": false,
+    "showGrid": true,
+    "showLegend": true,
+    "showValues": false,
+    "palette": "vivid",
+    "xAxisTitle": "",
+    "yAxisTitle": "",
+    "aggregation": "none",
+    "timeGrain": "none",
+    "dataMode": "table",
+    "annotations": {
+      "lines": [],
+      "texts": [],
+      "ranges": []
+    }
+  },
+  "connection_id": null,
+  "source_table": null,
+  "status": "draft",
+  "folder_id": null,
+  "archived_at": null
+}

@@ -1,0 +1,261 @@
+{
+  "id": "fe5b60395f3b",
+  "title": "The Perfect Dashboard",
+  "description": "A comprehensive showcase of all 25 chart types \u2014 from KPIs and time series to maps and tables.",
+  "charts": [
+    {
+      "chart_id": "bc065fd02e6c",
+      "width": "half",
+      "layout": {
+        "x": 0,
+        "y": 0,
+        "w": 1,
+        "h": 5
+      }
+    },
+    {
+      "chart_id": "7a00fa2eb73f",
+      "width": "half",
+      "layout": {
+        "x": 1,
+        "y": 0,
+        "w": 1,
+        "h": 5
+      }
+    },
+    {
+      "chart_id": "b07287084123",
+      "width": "half",
+      "layout": {
+        "x": 0,
+        "y": 5,
+        "w": 1,
+        "h": 5
+      }
+    },
+    {
+      "chart_id": "f533a82a0fad",
+      "width": "half",
+      "layout": {
+        "x": 1,
+        "y": 5,
+        "w": 1,
+        "h": 5
+      }
+    },
+    {
+      "chart_id": "832216849333",
+      "width": "half",
+      "layout": {
+        "x": 0,
+        "y": 10,
+        "w": 1,
+        "h": 5
+      }
+    },
+    {
+      "chart_id": "21c09cf010a3",
+      "width": "half",
+      "layout": {
+        "x": 1,
+        "y": 10,
+        "w": 1,
+        "h": 5
+      }
+    },
+    {
+      "chart_id": "ce8d6fbd5d12",
+      "width": "half",
+      "layout": {
+        "x": 0,
+        "y": 15,
+        "w": 1,
+        "h": 5
+      }
+    },
+    {
+      "chart_id": "d0040a12bf90",
+      "width": "half",
+      "layout": {
+        "x": 1,
+        "y": 15,
+        "w": 1,
+        "h": 5
+      }
+    },
+    {
+      "chart_id": "2fbd0e597ce0",
+      "width": "half",
+      "layout": {
+        "x": 0,
+        "y": 20,
+        "w": 1,
+        "h": 5
+      }
+    },
+    {
+      "chart_id": "a77254f6d139",
+      "width": "half",
+      "layout": {
+        "x": 1,
+        "y": 20,
+        "w": 1,
+        "h": 5
+      }
+    },
+    {
+      "chart_id": "8398f10fea34",
+      "width": "half",
+      "layout": {
+        "x": 0,
+        "y": 25,
+        "w": 1,
+        "h": 5
+      }
+    },
+    {
+      "chart_id": "e7a53212ee33",
+      "width": "half",
+      "layout": {
+        "x": 1,
+        "y": 25,
+        "w": 1,
+        "h": 5
+      }
+    },
+    {
+      "chart_id": "e84d443044fe",
+      "width": "half",
+      "layout": {
+        "x": 0,
+        "y": 30,
+        "w": 1,
+        "h": 5
+      }
+    },
+    {
+      "chart_id": "901ac6c36603",
+      "width": "half",
+      "layout": {
+        "x": 1,
+        "y": 30,
+        "w": 1,
+        "h": 5
+      }
+    },
+    {
+      "chart_id": "a10fd22d0223",
+      "width": "half",
+      "layout": {
+        "x": 0,
+        "y": 35,
+        "w": 1,
+        "h": 5
+      }
+    },
+    {
+      "chart_id": "1ca9e6916d15",
+      "width": "half",
+      "layout": {
+        "x": 1,
+        "y": 35,
+        "w": 1,
+        "h": 5
+      }
+    },
+    {
+      "chart_id": "b1d5a31030cb",
+      "width": "half",
+      "layout": {
+        "x": 0,
+        "y": 40,
+        "w": 1,
+        "h": 5
+      }
+    },
+    {
+      "chart_id": "0a0ff1743c2f",
+      "width": "half",
+      "layout": {
+        "x": 1,
+        "y": 40,
+        "w": 1,
+        "h": 5
+      }
+    },
+    {
+      "chart_id": "23d75330bfb6",
+      "width": "half",
+      "layout": {
+        "x": 0,
+        "y": 45,
+        "w": 1,
+        "h": 5
+      }
+    },
+    {
+      "chart_id": "4f60c7927f6a",
+      "width": "half",
+      "layout": {
+        "x": 1,
+        "y": 45,
+        "w": 1,
+        "h": 5
+      }
+    },
+    {
+      "chart_id": "4ca80a40431d",
+      "width": "half",
+      "layout": {
+        "x": 0,
+        "y": 50,
+        "w": 1,
+        "h": 5
+      }
+    },
+    {
+      "chart_id": "f85152d67b39",
+      "width": "half",
+      "layout": {
+        "x": 1,
+        "y": 50,
+        "w": 1,
+        "h": 5
+      }
+    },
+    {
+      "chart_id": "f8f6b6fc5f6f",
+      "width": "half",
+      "layout": {
+        "x": 0,
+        "y": 55,
+        "w": 1,
+        "h": 5
+      }
+    },
+    {
+      "chart_id": "4eeecfb32330",
+      "width": "half",
+      "layout": {
+        "x": 1,
+        "y": 55,
+        "w": 1,
+        "h": 5
+      }
+    },
+    {
+      "chart_id": "11ae3e27f8b7",
+      "width": "half",
+      "layout": {
+        "x": 0,
+        "y": 60,
+        "w": 1,
+        "h": 5
+      }
+    }
+  ],
+  "created_at": "2026-02-25T04:41:17.194021+00:00",
+  "updated_at": "2026-02-25T04:41:17.194021+00:00",
+  "filters": null,
+  "status": "draft"
+}
