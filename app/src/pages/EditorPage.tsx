@@ -349,6 +349,8 @@ export function EditorPage() {
                 xColumn={store.config.x || undefined}
                 yColumn={Array.isArray(store.config.y) ? store.config.y[0] || undefined : store.config.y || undefined}
                 dataLength={store.data.length}
+                chartId={store.chartId || undefined}
+                allowDataDownload={store.config.allowDataDownload}
               >
                 <ObservableChartFactory
                   data={store.data}

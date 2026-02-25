@@ -262,6 +262,18 @@ export function EmbedChartPage() {
           Source: {chart.source}
         </p>
       )}
+      {!flags.plain && chart.config?.allowDataDownload !== false && (
+        <p style={{ margin: '4px 0 0', fontSize: 11 }}>
+          <a
+            href={`/api/v2/charts/${chartId}/data.csv`}
+            download
+            data-testid="get-the-data"
+            style={{ color: isDark ? '#64748b' : '#999', textDecoration: 'underline' }}
+          >
+            Get the data
+          </a>
+        </p>
+      )}
       <noscript>
         <img
           src={`/api/v2/charts/${chartId}/snapshot.png`}

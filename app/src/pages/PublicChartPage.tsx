@@ -120,6 +120,8 @@ export function PublicChartPage() {
           title={chart.title ?? undefined}
           subtitle={chart.subtitle ?? undefined}
           source={chart.source ?? undefined}
+          chartId={chart.id}
+          allowDataDownload={(chart.config?.allowDataDownload as boolean) !== false}
         >
           <ObservableChartFactory
             data={data}
