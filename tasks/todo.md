@@ -20,7 +20,7 @@
 - [x] Frontend: PublicChartPage (read-only, no editor chrome)
 - [x] Frontend: Route `/public/chart/:id`
 - [x] Tests: pytest for publish/unpublish flow (10 tests)
-- [ ] Tests: Screenshot verify published view
+- [x] Tests: Screenshot verify published view
 
 ### Task 2: Embed System ✅
 - [x] Embed page route and component (`EmbedChartPage`)
@@ -36,7 +36,7 @@
 - [x] Tooltip editor UI in Toolbox
 - [x] Observable Plot tooltip integration (wired through ChartConfig)
 - [x] Tests: Template parsing unit tests (10 tests)
-- [ ] Tests: Screenshot verify tooltips
+- [x] Tests: Screenshot verify tooltips
 
 ### Task 4: Chart Type Expansion (11 → 15) ✅
 - [x] Dot plot (Cleveland style)
@@ -59,7 +59,7 @@
 - [x] Frontend: Font picker (Google Fonts + file upload) — 50 curated fonts, searchable, upload .woff2/.ttf
 - [x] Frontend: Logo uploader with position control — 4-corner positioning, size slider
 - [x] Frontend: Custom CSS override textarea (ThemeBuilderPage)
-- [ ] Tests: Screenshot verify theme builder page
+- [x] Tests: Screenshot verify theme builder page
 
 ### Task 6: Curated Themes (9 total) ✅
 - [x] Minimal (Helvetica, no chrome)
@@ -80,7 +80,7 @@
 - [x] Locale selector in Settings page with live preview
 - [x] Tests: German, Japanese, French formatting (11 tests)
 - [x] Per-chart locale override option (Toolbox locale dropdown)
-- [ ] Tests: Screenshot with non-US locale
+- [x] Tests: Screenshot with non-US locale
 
 ### Task 8: Color Tools ✅
 - [x] Custom palette builder (add/remove/reorder colors)
@@ -90,7 +90,7 @@
 - [x] ColorblindPreview component with CVD type toggle
 - [x] PaletteBuilder component with inline color editing
 - [x] Tests: 17 colorblind simulation unit tests
-- [ ] Tests: Screenshot palette builder UI
+- [x] Tests: Screenshot palette builder UI
 
 ## Phase 3: Rich Tables & Data ✅
 
@@ -103,7 +103,7 @@
 - [x] Sticky header row
 - [x] Per-column formatting and conditional coloring
 - [x] Tests: Sort, search, pagination logic (27 tests)
-- [ ] Tests: Screenshot with heatmap + sparkline columns
+- [x] Tests: Screenshot with heatmap + sparkline columns
 
 ### Task 10: Google Sheets Connector ✅
 - [x] Backend: Parse Sheets URL → extract sheet ID
@@ -144,14 +144,14 @@
 - [x] Tests: 8 unit tests (basemap registry, data joining, type registration)
 - [x] Custom GeoJSON/TopoJSON upload (file input in Toolbox + ChoroplethMap support)
 - [x] Map zoom & pan (d3-zoom, +/-/Reset controls, touch support)
-- [ ] Tests: Screenshot verify map at multiple projections
+- [x] Tests: Screenshot verify map at multiple projections
 
 ### Task 14: Responsive Annotations ✅
 - [x] Store proportional positions (dxRatio/dyRatio) alongside pixel positions
 - [x] Recalculate on resize via resolveResponsiveOffset()
 - [x] Collapse to footnotes below 400px via shouldCollapseAnnotations()
 - [x] Tests: 7 unit tests (responsive offsets, ratio computation, collapse threshold)
-- [ ] Tests: Screenshot at desktop vs mobile
+- [x] Tests: Screenshot at desktop vs mobile
 
 ### Task 15: Chart Templates & Duplication ✅
 - [x] Backend: Duplicate chart endpoint (POST /v2/charts/{id}/duplicate)
