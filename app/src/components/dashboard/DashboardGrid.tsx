@@ -7,10 +7,10 @@ import {
   type Layout,
 } from 'react-grid-layout'
 import { ChartWrapper } from '../charts/ChartWrapper'
+import { ChartErrorBoundary } from '../charts/ChartErrorBoundary'
 import { ObservableChartFactory } from '../charts/ObservableChartFactory'
-import { PALETTES } from '../../themes/plotTheme'
-import type { ChartConfig, ChartType } from '../../types/chart'
-import type { PaletteKey } from '../../themes/plotTheme'
+import { buildChartConfig } from '../../utils/buildChartConfig'
+import type { ChartType } from '../../types/chart'
 import type { GridLayout as GridLayoutPos } from '../../stores/dashboardBuilderStore'
 import type { EmbedFlags } from '../../utils/embedFlags'
 
@@ -88,9 +88,11 @@ function generateLayout(charts: ChartWithData[]): Layout {
 
     // Auto-generate: full → w=2, half → w=1
     const w = chart.width === 'full' ? 2 : 1
-    // BigValue KPI grids need more vertical space for multiple cards
+    // Give charts enough vertical space for legends, axis labels, and map features
     const isBigValue = chart.chart_type === 'BigValue'
-    const h = isBigValue ? 7 : 5
+    const isTable = chart.chart_type === 'DataTable'
+    const isMap = ['ChoroplethMap', 'SymbolMap', 'LocatorMap', 'SpikeMap'].includes(chart.chart_type)
+    const h = isBigValue ? 7 : isTable ? 8 : isMap ? 9 : 7
 
     // If this item won't fit on the current row, wrap
     if (x + w > 2) {
@@ -158,7 +160,9 @@ export function DashboardGrid({ charts, dashboardId, editable = false, onLayoutC
         >
           {charts.map((chart) => (
             <div key={chart.chart_id} className="overflow-hidden">
-              <DashboardChartCell chart={chart} dashboardId={dashboardId} editable={editable} embedFlags={embedFlags} />
+              <ChartErrorBoundary chartTitle={chart.title ?? undefined}>
+                <DashboardChartCell chart={chart} dashboardId={dashboardId} editable={editable} embedFlags={embedFlags} />
+              </ChartErrorBoundary>
             </div>
           ))}
         </GridLayout>
@@ -231,48 +235,7 @@ function DashboardChartCell({
 
   const chartType = (chart.chart_type ?? 'BarChart') as ChartType
 
-  // Multi-Y: backend UNPIVOT produces metric_name/metric_value columns
-  const isMultiY = Array.isArray(chart.y) && chart.y.length > 1
-  const chartConfig: ChartConfig = {
-    x: chart.x ?? undefined,
-    y: isMultiY ? 'metric_value' : (Array.isArray(chart.y) ? chart.y[0] : chart.y) ?? undefined,
-    series: isMultiY ? 'metric_name' : chart.series ?? undefined,
-    horizontal: chart.horizontal,
-    sort: chart.sort,
-    stacked: (chart.config?.stacked as boolean) ?? false,
-    showGrid: (chart.config?.showGrid as boolean) ?? true,
-    showLegend: (chart.config?.showLegend as boolean) ?? true,
-    showValues: (chart.config?.showValues as boolean) ?? false,
-    xAxisTitle: (chart.config?.xAxisTitle as string) || undefined,
-    yAxisTitle: (chart.config?.yAxisTitle as string) || undefined,
-    annotations: chart.config?.annotations as ChartConfig['annotations'],
-    value: (chart.config?.value as string) ?? undefined,
-    comparisonValue: (chart.config?.comparisonValue as string) ?? undefined,
-    comparisonLabel: (chart.config?.comparisonLabel as string) || undefined,
-    valueFormat: (chart.config?.valueFormat as ChartConfig['valueFormat']) || undefined,
-    positiveIsGood: (chart.config?.positiveIsGood as boolean) ?? true,
-    metricLabel: (chart.config?.metricLabel as string) ?? undefined,
-    unitColumn: (chart.config?.unitColumn as string) ?? undefined,
-    // Choropleth/map fields
-    basemap: (chart.config?.basemap as string) || undefined,
-    geoJoinColumn: (chart.config?.geoJoinColumn as string) ?? undefined,
-    geoValueColumn: (chart.config?.geoValueColumn as string) ?? undefined,
-    geoColorScale: (chart.config?.geoColorScale as string) || undefined,
-    geoProjection: (chart.config?.geoProjection as string) || undefined,
-    // Point map fields
-    geoLatColumn: (chart.config?.geoLatColumn as string) ?? undefined,
-    geoLonColumn: (chart.config?.geoLonColumn as string) ?? undefined,
-    geoLabelColumn: (chart.config?.geoLabelColumn as string) ?? undefined,
-    geoSizeColumn: (chart.config?.geoSizeColumn as string) ?? undefined,
-    geoSymbolShape: (chart.config?.geoSymbolShape as 'circle' | 'square' | 'triangle') || undefined,
-    geoSizeRange: (chart.config?.geoSizeRange as [number, number]) ?? undefined,
-  }
-
-  const palette = (chart.config?.palette as PaletteKey) ?? 'default'
-  const paletteColors = PALETTES[palette] ?? PALETTES.default
-  if (palette !== 'default') {
-    chartConfig.colorRange = paletteColors
-  }
+  const chartConfig = buildChartConfig(chart)
 
   // Apply embed search flag via extraProps for DataTable initialSearch
   if (embedFlags?.search) {

@@ -57,12 +57,23 @@ export function useObservablePlot(
     const el = containerRef.current
     if (!el || size.width === 0) return
 
-    const plot = renderFnRef.current(size.width, size.height)
+    let plot: HTMLElement | SVGSVGElement | null
+    try {
+      plot = renderFnRef.current(size.width, size.height)
+    } catch (err) {
+      console.error('[useObservablePlot] render error:', err)
+      el.replaceChildren()
+      const msg = document.createElement('p')
+      msg.textContent = `Chart render error: ${err instanceof Error ? err.message : String(err)}`
+      msg.style.cssText = 'color:#ef4444;font-size:13px;padding:16px;text-align:center'
+      el.appendChild(msg)
+      return
+    }
     if (!plot) return // render deferred (e.g. waiting for height measurement)
     el.replaceChildren(plot)
 
     return () => {
-      plot.remove()
+      plot?.remove()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [size.width, size.height, ...deps])

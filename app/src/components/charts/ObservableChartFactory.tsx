@@ -341,7 +341,7 @@ function buildMarks(
     case 'HeatMap':
       return buildHeatMapMarks(data, x, y, series, colors)
     case 'BoxPlot':
-      return buildBoxPlotMarks(data, x, y, colors)
+      return buildBoxPlotMarks(data, x, y, colors, config)
     case 'DotPlot':
       return buildDotPlotMarks(data, x, y, series, config, colors)
     case 'RangePlot':
@@ -364,6 +364,61 @@ function buildMarks(
   }
 }
 
+/** Build a clean human-readable tooltip string for Observable Plot tips.
+ *  Replaces the default table-format that shows raw column names. */
+function fmtTipValue(v: unknown): string {
+  if (v == null) return ''
+  if (v instanceof Date) return d3.timeFormat('%b %Y')(v)
+  const n = Number(v)
+  if (isFinite(n) && String(v) === String(n)) return d3.format(',.4~g')(n)
+  // Check if string looks like an ISO date
+  if (typeof v === 'string' && /^\d{4}-\d{2}/.test(v)) {
+    const d = new Date(v)
+    if (!isNaN(d.getTime())) return d3.timeFormat('%b %d, %Y')(d)
+  }
+  return String(v)
+}
+
+function detectValueUnit(config?: ChartConfig, yCol?: string): { prefix: string; suffix: string } {
+  const none = { prefix: '', suffix: '' }
+  if (!config && !yCol) return none
+  if (config?.valueFormat === 'percent') return { prefix: '', suffix: '%' }
+  const title = config?.yAxisTitle ?? ''
+  if (/[%]|percent/i.test(title)) return { prefix: '', suffix: '%' }
+  if (yCol && /percent|pct/i.test(yCol)) return { prefix: '', suffix: '%' }
+  // Extract unit from parentheses in y-axis title, e.g. "Revenue ($M)" → prefix "$", suffix "M"
+  const unitMatch = title.match(/\(([^)]+)\)\s*$/)
+  if (unitMatch) {
+    const unit = unitMatch[1]
+    // Split leading currency symbols from trailing scale suffix
+    const parts = unit.match(/^([$€£¥₹]?)(.*)$/)
+    if (parts) return { prefix: parts[1], suffix: parts[2] }
+    return { prefix: '', suffix: unit }
+  }
+  return none
+}
+
+function fmtWithUnit(rawVal: string, unit: { prefix: string; suffix: string }): string {
+  if (!rawVal) return ''
+  return `${unit.prefix}${rawVal}${unit.suffix}`
+}
+
+function tipTitle(
+  d: Record<string, unknown>,
+  xCol?: string, yCol?: string, seriesCol?: string,
+  config?: ChartConfig,
+): string {
+  const unit = detectValueUnit(config, yCol)
+  const cat = xCol && d[xCol] != null ? fmtTipValue(d[xCol]) : ''
+  const ser = seriesCol && d[seriesCol] != null ? fmtTipValue(d[seriesCol]) : ''
+  const val = yCol && d[yCol] != null ? fmtWithUnit(fmtTipValue(d[yCol]), unit) : ''
+  if (cat && ser && val) return `${cat} · ${ser}: ${val}`
+  if (cat && val) return `${cat}: ${val}`
+  if (ser && val) return `${ser}: ${val}`
+  if (cat) return cat
+  return val
+}
+
 function buildLineMarks(
   data: Record<string, unknown>[],
   x: string | undefined,
@@ -384,7 +439,7 @@ function buildLineMarks(
         stroke: series,
         strokeWidth: config.lineWidth ?? 2.5,
       }),
-      Plot.tip(lineData, Plot.pointerX({ x, y, stroke: series })),
+      Plot.tip(lineData, Plot.pointerX({ x, y, stroke: series, title: (d: Record<string, unknown>) => tipTitle(d, x, y, series, config) })),
     )
   } else {
     marks.push(
@@ -393,7 +448,7 @@ function buildLineMarks(
         stroke: colors[0],
         strokeWidth: config.lineWidth ?? 2.5,
       }),
-      Plot.tip(lineData, Plot.pointerX({ x, y })),
+      Plot.tip(lineData, Plot.pointerX({ x, y, title: (d: Record<string, unknown>) => tipTitle(d, x, y, undefined, config) })),
     )
   }
 
@@ -434,18 +489,18 @@ function buildBarMarks(
       if (config.stacked) {
         marks.push(
           Plot.barX(data, Plot.stackX({ y: x, x: y, fill: series, ...sortOpt })),
-          Plot.tip(data, Plot.pointerY({ x: y, y: x, fill: series })),
+          Plot.tip(data, Plot.pointerY({ x: y, y: x, fill: series, title: (d: Record<string, unknown>) => tipTitle(d, x, y, series, config) })),
         )
       } else {
         marks.push(
           Plot.barX(data, { x: y, y: x, fill: series, fy: x, ...sortOpt }),
-          Plot.tip(data, Plot.pointerY({ x: y, y: x, fill: series })),
+          Plot.tip(data, Plot.pointerY({ x: y, y: x, fill: series, title: (d: Record<string, unknown>) => tipTitle(d, x, y, series, config) })),
         )
       }
     } else {
       marks.push(
         Plot.barX(data, { x: y, y: x, fill: x, ...sortOpt }),
-        Plot.tip(data, Plot.pointerY({ x: y, y: x })),
+        Plot.tip(data, Plot.pointerY({ x: y, y: x, title: (d: Record<string, unknown>) => tipTitle(d, x, y, undefined, config) })),
       )
     }
   } else {
@@ -462,12 +517,12 @@ function buildBarMarks(
           ...(config.stacked ? {} : { fx: x }),
           ...sortOpt,
         }),
-        Plot.tip(data, Plot.pointerX({ x, y, fill: series })),
+        Plot.tip(data, Plot.pointerX({ x, y, fill: series, title: (d: Record<string, unknown>) => tipTitle(d, x, y, series, config) })),
       )
     } else {
       marks.push(
         Plot.barY(data, { x, y, fill: x, ...sortOpt }),
-        Plot.tip(data, Plot.pointerX({ x, y })),
+        Plot.tip(data, Plot.pointerX({ x, y, title: (d: Record<string, unknown>) => tipTitle(d, x, y, undefined, config) })),
       )
     }
 
@@ -503,16 +558,25 @@ function buildAreaMarks(
   const marks: Plot.Markish[] = []
 
   if (series) {
-    marks.push(
-      Plot.areaY(areaData, { x, y, fill: series, fillOpacity: areaFillOpacity }),
-      Plot.lineY(areaData, { x, y, stroke: series, strokeWidth: config.lineWidth ?? 2.5 }),
-      Plot.tip(areaData, Plot.pointerX({ x, y, stroke: series })),
-    )
+    if (config.stacked) {
+      // Stacked area: use Plot.stackY to stack series on top of each other
+      marks.push(
+        Plot.areaY(areaData, Plot.stackY({ x, y, fill: series, fillOpacity: areaFillOpacity, order: 'value' })),
+        Plot.lineY(areaData, Plot.stackY2({ x, y, stroke: series, strokeWidth: config.lineWidth ?? 2.5, order: 'value' })),
+        Plot.tip(areaData, Plot.pointerX(Plot.stackY({ x, y, stroke: series, title: (d: Record<string, unknown>) => tipTitle(d, x, y, series, config) }))),
+      )
+    } else {
+      marks.push(
+        Plot.areaY(areaData, { x, y, fill: series, fillOpacity: areaFillOpacity }),
+        Plot.lineY(areaData, { x, y, stroke: series, strokeWidth: config.lineWidth ?? 2.5 }),
+        Plot.tip(areaData, Plot.pointerX({ x, y, stroke: series, title: (d: Record<string, unknown>) => tipTitle(d, x, y, series, config) })),
+      )
+    }
   } else {
     marks.push(
       Plot.areaY(areaData, { x, y, fill: fillColor }),
       Plot.lineY(areaData, { x, y, stroke: colors[0], strokeWidth: config.lineWidth ?? 2.5 }),
-      Plot.tip(areaData, Plot.pointerX({ x, y })),
+      Plot.tip(areaData, Plot.pointerX({ x, y, title: (d: Record<string, unknown>) => tipTitle(d, x, y, undefined, config) })),
     )
   }
 
@@ -532,15 +596,23 @@ function buildScatterMarks(
   const r = config.markerSize ?? 5
   const marks: Plot.Markish[] = []
 
+  const scatterTip = (d: Record<string, unknown>) => {
+    const xv = fmtTipValue(d[x])
+    const yUnit = detectValueUnit(config, y)
+    const yv = fmtWithUnit(fmtTipValue(d[y]), yUnit)
+    const ser = series && d[series] != null ? String(d[series]) : ''
+    return ser ? `${ser}: (${xv}, ${yv})` : `(${xv}, ${yv})`
+  }
+
   if (series) {
     marks.push(
       Plot.dot(data, { x, y, fill: series, r, fillOpacity: 0.85 }),
-      Plot.tip(data, Plot.pointer({ x, y, fill: series })),
+      Plot.tip(data, Plot.pointer({ x, y, fill: series, title: scatterTip })),
     )
   } else {
     marks.push(
       Plot.dot(data, { x, y, fill: colors[0], r, fillOpacity: 0.85 }),
-      Plot.tip(data, Plot.pointer({ x, y })),
+      Plot.tip(data, Plot.pointer({ x, y, title: scatterTip })),
     )
   }
 
@@ -555,9 +627,27 @@ function buildHistogramMarks(
 ): Plot.Markish[] {
   if (!x) return []
 
+  // Compute nice, even bin thresholds
+  const vals = data.map((d) => Number(d[x])).filter(isFinite)
+  const [lo, hi] = d3.extent(vals) as [number, number]
+  const thresholds = d3.ticks(lo, hi, 15)
+  const fmt = d3.format(',.6~g')
+
   return [
-    Plot.rectY(data, { ...Plot.binX({ y: 'count' }, { x }), fill: colors[0] as string }),
-    Plot.tip(data, Plot.pointerX(Plot.binX({ y: 'count' }, { x }))),
+    Plot.rectY(data, { ...Plot.binX({ y: 'count' }, { x, thresholds }), fill: colors[0] as string }),
+    Plot.tip(data, Plot.pointerX(Plot.binX({ y: 'count', title: (bins: Record<string, unknown>[]) => {
+      if (bins.length === 0) return ''
+      const bv = bins.map((d) => Number(d[x!])).filter(isFinite)
+      const minV = Math.min(...bv)
+      // Find the threshold edges for this bin
+      let binLo = thresholds[0], binHi = thresholds[thresholds.length - 1]
+      for (let i = 0; i < thresholds.length - 1; i++) {
+        if (minV >= thresholds[i] && minV < thresholds[i + 1]) {
+          binLo = thresholds[i]; binHi = thresholds[i + 1]; break
+        }
+      }
+      return `${fmt(binLo)}–${fmt(binHi)}: ${bins.length}`
+    } }, { x, thresholds }))),
   ]
 }
 
@@ -583,11 +673,13 @@ function buildBoxPlotMarks(
   data: Record<string, unknown>[],
   x: string | undefined,
   y: string | undefined,
-  colors: readonly string[] | string[]
+  colors: readonly string[] | string[],
+  config?: ChartConfig,
 ): Plot.Markish[] {
   if (!x || !y) return []
   return [
     Plot.boxY(data, { x, y, fill: colors[0] }),
+    Plot.tip(data, Plot.pointer({ x, y, title: (d: Record<string, unknown>) => tipTitle(d, x, y, undefined, config) })),
   ]
 }
 
@@ -613,13 +705,13 @@ function buildDotPlotMarks(
   if (series) {
     marks.push(
       Plot.dot(data, { x: y, y: x, fill: series, r, fillOpacity: 0.85 }),
-      Plot.tip(data, Plot.pointer({ x: y, y: x, fill: series })),
+      Plot.tip(data, Plot.pointer({ x: y, y: x, fill: series, title: (d: Record<string, unknown>) => tipTitle(d, x, y, series, config) })),
     )
   } else {
     marks.push(
       Plot.ruleY(data, { y: x, x1: 0, x2: y, strokeOpacity: 0.2, stroke: colors[0] }),
       Plot.dot(data, { x: y, y: x, fill: colors[0], r, fillOpacity: 0.85 }),
-      Plot.tip(data, Plot.pointer({ x: y, y: x })),
+      Plot.tip(data, Plot.pointer({ x: y, y: x, title: (d: Record<string, unknown>) => tipTitle(d, x, y, undefined, config) })),
     )
   }
 
@@ -643,7 +735,7 @@ function buildRangePlotMarks(
     if (x && y) {
       return [
         Plot.dot(data, { x, y, fill: colors[0], r: 5, fillOpacity: 0.85 }),
-        Plot.tip(data, Plot.pointer({ x, y })),
+        Plot.tip(data, Plot.pointer({ x, y, title: (d: Record<string, unknown>) => tipTitle(d, x, y, undefined, config) })),
       ]
     }
     return []
@@ -656,7 +748,11 @@ function buildRangePlotMarks(
     Plot.ruleY(data, { y: cat, x1: minCol, x2: maxCol, stroke: colors[0], strokeWidth: 3 }),
     Plot.dot(data, { x: minCol, y: cat, fill: colors[0], r: 5 }),
     Plot.dot(data, { x: maxCol, y: cat, fill: colors[0], r: 5 }),
-    Plot.tip(data, Plot.pointer({ x: minCol, y: cat })),
+    Plot.tip(data, Plot.pointer({ x: minCol, y: cat, title: (d: Record<string, unknown>) => {
+      const unit = detectValueUnit(config, y)
+      const fmt = (v: unknown) => { const n = Number(v); return isFinite(n) ? fmtWithUnit(d3.format(',.4~g')(n), unit) : String(v ?? '') }
+      return `${d[cat!] ?? ''}: ${fmt(d[minCol!])} – ${fmt(d[maxCol!])}`
+    } })),
   )
 
   return marks
@@ -695,7 +791,7 @@ function buildBulletBarMarks(
   }
 
   marks.push(
-    Plot.tip(data, Plot.pointer({ x: actual, y: cat })),
+    Plot.tip(data, Plot.pointer({ x: actual, y: cat, title: (d: Record<string, unknown>) => tipTitle(d, cat, actual, undefined, config) })),
   )
 
   return marks
@@ -716,7 +812,7 @@ function buildSmallMultiplesMarks(
     // No facet column: fall back to line chart
     return [
       Plot.lineY(maybeParseDates(data, x), { x, y, stroke: colors[0], strokeWidth: 2 }),
-      Plot.tip(data, Plot.pointerX({ x, y })),
+      Plot.tip(data, Plot.pointerX({ x, y, title: (d: Record<string, unknown>) => tipTitle(d, x, y, undefined, config) })),
     ]
   }
 
@@ -728,26 +824,26 @@ function buildSmallMultiplesMarks(
     case 'bar':
       marks.push(
         Plot.barY(lineData, { x, y, fill: colors[0], fy: facet }),
-        Plot.tip(lineData, Plot.pointerX({ x, y, fy: facet })),
+        Plot.tip(lineData, Plot.pointerX({ x, y, fy: facet, title: (d: Record<string, unknown>) => tipTitle(d, x, y, facet, config) })),
       )
       break
     case 'area':
       marks.push(
         Plot.areaY(lineData, { x, y, fill: colors[0], fillOpacity: 0.3, fy: facet }),
         Plot.lineY(lineData, { x, y, stroke: colors[0], strokeWidth: 2, fy: facet }),
-        Plot.tip(lineData, Plot.pointerX({ x, y, fy: facet })),
+        Plot.tip(lineData, Plot.pointerX({ x, y, fy: facet, title: (d: Record<string, unknown>) => tipTitle(d, x, y, facet, config) })),
       )
       break
     case 'scatter':
       marks.push(
         Plot.dot(lineData, { x, y, fill: colors[0], r: 4, fy: facet }),
-        Plot.tip(lineData, Plot.pointer({ x, y, fy: facet })),
+        Plot.tip(lineData, Plot.pointer({ x, y, fy: facet, title: (d: Record<string, unknown>) => tipTitle(d, x, y, facet, config) })),
       )
       break
     default: // 'line'
       marks.push(
         Plot.lineY(lineData, { x, y, stroke: colors[0], strokeWidth: 2, fy: facet }),
-        Plot.tip(lineData, Plot.pointerX({ x, y, fy: facet })),
+        Plot.tip(lineData, Plot.pointerX({ x, y, fy: facet, title: (d: Record<string, unknown>) => tipTitle(d, x, y, facet, config) })),
       )
   }
 
@@ -761,7 +857,7 @@ function buildStackedColumnMarks(
   x: string | undefined,
   y: string | undefined,
   series: string | undefined,
-  _config: ChartConfig,
+  config: ChartConfig,
   _colors: readonly string[] | string[],
 ): Plot.Markish[] {
   if (!x || !y || !series) return []
@@ -770,7 +866,7 @@ function buildStackedColumnMarks(
 
   marks.push(
     Plot.barY(data, Plot.stackY({ x, y, fill: series })),
-    Plot.tip(data, Plot.pointerX({ x, y, fill: series })),
+    Plot.tip(data, Plot.pointer(Plot.stackY({ x, y, fill: series, title: (d: Record<string, unknown>) => tipTitle(d, x, y, series, config) }))),
     Plot.ruleY([0]),
   )
 
@@ -782,7 +878,7 @@ function buildGroupedColumnMarks(
   x: string | undefined,
   y: string | undefined,
   series: string | undefined,
-  _config: ChartConfig,
+  config: ChartConfig,
   _colors: readonly string[] | string[],
 ): Plot.Markish[] {
   if (!x || !y || !series) return []
@@ -791,7 +887,13 @@ function buildGroupedColumnMarks(
 
   marks.push(
     Plot.barY(data, { x: series, y, fill: series, fx: x }),
-    Plot.tip(data, Plot.pointerX({ x: series, y, fill: series, fx: x })),
+    Plot.tip(data, Plot.pointerX({ x: series, y, fill: series, fx: x, title: (d: Record<string, unknown>) => {
+      const unit = detectValueUnit(config, y)
+      const group = d[x] != null ? String(d[x]) : ''
+      const ser = d[series] != null ? String(d[series]) : ''
+      const val = d[y] != null ? fmtWithUnit(fmtTipValue(d[y]), unit) : ''
+      return group ? `${group}, ${ser}: ${val}` : `${ser}: ${val}`
+    } })),
     Plot.ruleY([0]),
   )
 
@@ -818,7 +920,6 @@ function buildSplitBarMarks(
       y: cat,
       x: (d: Record<string, unknown>) => -Math.abs(Number(d[leftCol!] ?? 0)),
       fill: colors[0],
-      tip: true,
     }),
   )
 
@@ -828,8 +929,20 @@ function buildSplitBarMarks(
       y: cat,
       x: (d: Record<string, unknown>) => Math.abs(Number(d[rightCol!] ?? 0)),
       fill: colors[1] ?? colors[0],
-      tip: true,
     }),
+  )
+
+  // Tooltip
+  marks.push(
+    Plot.tip(data, Plot.pointer({
+      y: cat,
+      x: (d: Record<string, unknown>) => Number(d[leftCol!] ?? 0),
+      title: (d: Record<string, unknown>) => {
+        const unit = detectValueUnit(config)
+        const fmt = (v: unknown) => { const n = Number(v); return isFinite(n) ? fmtWithUnit(d3.format(',.4~g')(n), unit) : String(v ?? '') }
+        return `${d[cat!] ?? ''}: ${fmt(d[leftCol!])} / ${fmt(d[rightCol!])}`
+      },
+    })),
   )
 
   // Center axis line
@@ -888,7 +1001,11 @@ function buildArrowPlotMarks(
   )
 
   marks.push(
-    Plot.tip(data, Plot.pointer({ x: endCol, y: cat })),
+    Plot.tip(data, Plot.pointer({ x: endCol, y: cat, title: (d: Record<string, unknown>) => {
+      const unit = detectValueUnit(config)
+      const fmt = (v: unknown) => { const n = Number(v); return isFinite(n) ? fmtWithUnit(d3.format(',.4~g')(n), unit) : String(v ?? '') }
+      return `${d[cat!] ?? ''}: ${fmt(d[startCol!])} → ${fmt(d[endCol!])}`
+    } })),
   )
 
   return marks
@@ -1410,7 +1527,9 @@ function buildPlotOptions(
     if (typeof sample === 'string' && !/^\d{4}-\d{2}/.test(sample)) {
       // Skip explicit domain for bar charts when sorting is enabled —
       // Observable Plot's sort option in marks needs to control the domain.
-      const skipDomain = chartType === 'BarChart' && config.sort !== false
+      // Also skip for GroupedColumn — its marks use fx for categories and x for series,
+      // so the x domain must match series values, not category values.
+      const skipDomain = (chartType === 'BarChart' && config.sort !== false) || chartType === 'GroupedColumn'
       if (!skipDomain) {
         const seen = new Set<string>()
         const domain: string[] = []
@@ -1418,13 +1537,28 @@ function buildPlotOptions(
           const v = row[config.x] as string
           if (!seen.has(v)) { seen.add(v); domain.push(v) }
         }
-        if (config.horizontal) {
+        // RangePlot, BulletBar, ArrowPlot, SplitBars use x-axis for numeric values
+        // and y-axis for categories, so ordinal domain must go on y-axis
+        const isInherentlyHorizontal = chartType === 'RangePlot' || chartType === 'BulletBar' || chartType === 'ArrowPlot' || chartType === 'SplitBars'
+        if (config.horizontal || isInherentlyHorizontal) {
           overrides.y = { ...getBaseAxis(), domain }
         } else {
           overrides.x = { ...getBaseAxis(), domain }
         }
       }
     }
+  }
+
+  // HeatMap: also preserve data ordering for the y-axis (series column used as rows).
+  // Observable Plot sorts the y domain alphabetically which breaks day-of-week ordering etc.
+  if (chartType === 'HeatMap' && config.series && data.length > 0) {
+    const seen = new Set<string>()
+    const yDomain: string[] = []
+    for (const row of data) {
+      const v = row[config.series] as string
+      if (v != null && !seen.has(v)) { seen.add(v); yDomain.push(v) }
+    }
+    overrides.y = { ...getBaseAxis(), domain: yDomain }
   }
 
   // Axis labels — suppress Observable Plot's default column-name labels
@@ -1436,12 +1570,15 @@ function buildPlotOptions(
     ...getBaseAxis(),
     label: config.xAxisTitle || null,
     // Center the label below the tick marks instead of inline at the right edge
-    ...(config.xAxisTitle ? { labelAnchor: 'center', labelOffset: 36, labelArrow: false } : {}),
+    ...(config.xAxisTitle ? { labelAnchor: 'center', labelOffset: 42, labelArrow: false } : {}),
     ...(tickRotate ? { tickRotate, textAnchor: 'end' } : {}),
   }
-  // Extra bottom margin for rotated labels
+  // Extra bottom margin for rotated labels or x-axis title
   if (tickRotate) {
     overrides.marginBottom = Math.max((overrides.marginBottom as number | undefined) ?? 30, 60)
+  }
+  if (config.xAxisTitle) {
+    overrides.marginBottom = Math.max((overrides.marginBottom as number | undefined) ?? 30, 52)
   }
   // Never let Observable Plot render the y-axis label — we render it manually
   // after plot creation (see appendYAxisLabel) to avoid overlap with tick values.
@@ -1452,7 +1589,7 @@ function buildPlotOptions(
     grid: true,
   }
   // Horizontal bars need wider left margin for categorical labels
-  if (config.horizontal || chartType === 'DotPlot' || chartType === 'RangePlot' || chartType === 'BulletBar') {
+  if (config.horizontal || chartType === 'DotPlot' || chartType === 'RangePlot' || chartType === 'BulletBar' || chartType === 'ArrowPlot' || chartType === 'SplitBars') {
     overrides.marginLeft = 100
   }
 
@@ -1508,12 +1645,20 @@ function buildPlotOptions(
     overrides.y = yOpts
   }
 
-  // Small multiples: add facet y-axis configuration
+  // Small multiples: add facet y-axis configuration + right margin for facet labels
   if (chartType === 'SmallMultiples') {
     const facet = config.facetColumn ?? config.series
     if (facet) {
       overrides.fy = { label: null }
+      overrides.marginRight = 80
     }
+  }
+
+  // GroupedColumn: configure fx (facet x) axis — show group labels at bottom, suppress x ticks
+  // since the series (H1/H2) is already in the legend
+  if (chartType === 'GroupedColumn') {
+    overrides.fx = { label: null, axis: 'bottom' }
+    overrides.x = { ...(overrides.x as Record<string, unknown> ?? {}), axis: null }
   }
 
   // Color range — legend is always suppressed here; we render a custom React legend instead.
@@ -1651,6 +1796,7 @@ function BigValueChart({ data, config }: { data: Record<string, unknown>[]; conf
 function PieChartComponent({ data, config, height, autoHeight }: { data: Record<string, unknown>[]; config: ChartConfig; height: number; autoHeight?: boolean }) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [containerWidth, setContainerWidth] = useState(0)
+  const [tooltip, setTooltip] = useState<{ x: number; y: number; text: string } | null>(null)
   const resolved = useThemeStore((s) => s.resolved)
   const chartTheme = useChartThemeStore((s) => s.theme)
 
@@ -1670,7 +1816,7 @@ function PieChartComponent({ data, config, height, autoHeight }: { data: Record<
     const el = containerRef.current
     if (!el) return
 
-    el.innerHTML = ''
+    d3.select(el).selectAll('svg').remove()
 
     if (data.length === 0) return
 
@@ -1684,11 +1830,13 @@ function PieChartComponent({ data, config, height, autoHeight }: { data: Record<
 
     // Reserve space for external labels — scale with available space
     const isExternal = chartTheme.pie.labelStyle === 'external'
-    const hLabelSpace = isExternal ? Math.min(80, width * 0.18) : 10
-    const vLabelSpace = isExternal ? Math.min(30, effectiveHeight * 0.08) : 10
+    const compact = effectiveHeight < 280
+    const hLabelSpace = isExternal ? Math.min(compact ? 50 : 80, width * (compact ? 0.12 : 0.18)) : 10
+    const vLabelSpace = isExternal ? Math.min(compact ? 15 : 30, effectiveHeight * 0.06) : 10
     const maxRadiusW = (width - hLabelSpace * 2) / 2
     const maxRadiusH = (effectiveHeight - vLabelSpace * 2) / 2
     const radius = Math.max(40, Math.min(maxRadiusW, maxRadiusH))
+    const labelFontSize = Math.max(14, Math.round(effectiveHeight / 16))
 
     const pieData = data.map((d) => ({
       label: String(d[labelField] ?? ''),
@@ -1732,6 +1880,25 @@ function PieChartComponent({ data, config, height, autoHeight }: { data: Record<
       .attr('fill', (_, i) => colorScale(String(i)))
       .attr('stroke', sliceStroke)
       .attr('stroke-width', sliceStrokeWidth)
+      .style('cursor', 'pointer')
+      .on('mouseenter', function (event, d) {
+        d3.select(this).attr('opacity', 0.8)
+        const rect = el.getBoundingClientRect()
+        const pct = ((d.data.value / total) * 100).toFixed(1)
+        setTooltip({
+          x: event.clientX - rect.left,
+          y: event.clientY - rect.top - 28,
+          text: `${d.data.label}: ${d3.format(',.4~g')(d.data.value)} (${pct}%)`,
+        })
+      })
+      .on('mousemove', function (event) {
+        const rect = el.getBoundingClientRect()
+        setTooltip((prev) => prev ? { ...prev, x: event.clientX - rect.left, y: event.clientY - rect.top - 28 } : null)
+      })
+      .on('mouseleave', function () {
+        d3.select(this).attr('opacity', 1)
+        setTooltip(null)
+      })
 
     const textColor = resolved === 'dark' ? '#e2e8f0' : '#374151'
 
@@ -1790,7 +1957,7 @@ function PieChartComponent({ data, config, height, autoHeight }: { data: Record<
           return midAngle < Math.PI ? 'start' : 'end'
         })
         .attr('dominant-baseline', 'central')
-        .attr('font-size', 12)
+        .attr('font-size', labelFontSize)
         .attr('font-family', chartTheme.font.family)
         .attr('fill', textColor)
         .text((d) => {
@@ -1818,12 +1985,37 @@ function PieChartComponent({ data, config, height, autoHeight }: { data: Record<
   }, [data, config, height, autoHeight, resolved, chartTheme, containerWidth])
 
   if (data.length === 0) return <p className="text-sm text-text-muted">No data</p>
-  return <div ref={containerRef} style={{ width: '100%', ...(autoHeight ? { height: '100%' } : { height }) }} />
+  return (
+    <div ref={containerRef} style={{ width: '100%', position: 'relative', ...(autoHeight ? { height: '100%' } : { height }) }}>
+      {tooltip && (
+        <div style={{
+          position: 'absolute',
+          left: tooltip.x,
+          top: tooltip.y,
+          transform: 'translateX(-50%)',
+          background: resolved === 'dark' ? '#1e293b' : '#fff',
+          color: resolved === 'dark' ? '#e2e8f0' : '#374151',
+          border: `1px solid ${resolved === 'dark' ? '#475569' : '#d1d5db'}`,
+          borderRadius: 6,
+          padding: '4px 8px',
+          fontSize: 12,
+          fontFamily: chartTheme.font.family,
+          pointerEvents: 'none',
+          whiteSpace: 'nowrap',
+          zIndex: 10,
+          boxShadow: '0 2px 4px rgba(0,0,0,0.15)',
+        }}>
+          {tooltip.text}
+        </div>
+      )}
+    </div>
+  )
 }
 
 function TreemapComponent({ data, config, height, autoHeight }: { data: Record<string, unknown>[]; config: ChartConfig; height: number; autoHeight?: boolean }) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [containerWidth, setContainerWidth] = useState(0)
+  const [tooltip, setTooltip] = useState<{ x: number; y: number; name: string; value: string } | null>(null)
   const resolved = useThemeStore((s) => s.resolved)
   const themePalette = useChartThemeStore((s) => s.theme.palette.colors)
 
@@ -1843,7 +2035,8 @@ function TreemapComponent({ data, config, height, autoHeight }: { data: Record<s
     const el = containerRef.current
     if (!el) return
 
-    el.innerHTML = ''
+    // Clear only the SVG, not the tooltip div
+    d3.select(el).selectAll('svg').remove()
 
     if (data.length === 0) return
 
@@ -1863,6 +2056,7 @@ function TreemapComponent({ data, config, height, autoHeight }: { data: Record<s
     interface TreeNode { name: string; value: number; children?: TreeNode[] }
     const rootData: TreeNode = { name: 'root', value: 0, children: treeData }
     const root = d3.hierarchy(rootData).sum((d) => d.value)
+    const totalValue = d3.sum(treeData, (d) => d.value)
 
     d3.treemap<TreeNode>().size([width, effectiveHeight]).padding(2)(root)
 
@@ -1872,32 +2066,109 @@ function TreemapComponent({ data, config, height, autoHeight }: { data: Record<s
     const svg = d3.select(el).append('svg')
       .attr('width', width)
       .attr('height', effectiveHeight)
+      .style('position', 'absolute')
+      .style('top', 0)
+      .style('left', 0)
 
     type TreeLeaf = d3.HierarchyRectangularNode<TreeNode>
     const nodes = root.leaves() as TreeLeaf[]
 
-    svg.selectAll('rect')
+    // Clip definitions so labels don't overflow their rectangles
+    const defs = svg.append('defs')
+    nodes.forEach((d, i) => {
+      defs.append('clipPath')
+        .attr('id', `treemap-clip-${i}`)
+        .append('rect')
+        .attr('x', d.x0)
+        .attr('y', d.y0)
+        .attr('width', d.x1 - d.x0)
+        .attr('height', d.y1 - d.y0)
+    })
+
+    svg.selectAll('rect.cell')
       .data(nodes)
       .join('rect')
+      .attr('class', 'cell')
       .attr('x', (d) => d.x0)
       .attr('y', (d) => d.y0)
       .attr('width', (d) => d.x1 - d.x0)
       .attr('height', (d) => d.y1 - d.y0)
       .attr('fill', (_, i) => colorScale(String(i)))
       .attr('rx', 2)
+      .style('cursor', 'pointer')
+      .on('mouseenter', function (event, d) {
+        d3.select(this).attr('opacity', 0.85)
+        const rect = el.getBoundingClientRect()
+        const pct = ((d.data.value / totalValue) * 100).toFixed(1)
+        setTooltip({
+          x: event.clientX - rect.left,
+          y: event.clientY - rect.top,
+          name: d.data.name,
+          value: `${d3.format(',.0f')(d.data.value)} (${pct}%)`,
+        })
+      })
+      .on('mousemove', function (event) {
+        const rect = el.getBoundingClientRect()
+        setTooltip((prev) => prev ? { ...prev, x: event.clientX - rect.left, y: event.clientY - rect.top } : null)
+      })
+      .on('mouseleave', function () {
+        d3.select(this).attr('opacity', 1)
+        setTooltip(null)
+      })
 
-    svg.selectAll('text')
+    const labelFontSize = 12
+    const charWidth = labelFontSize * 0.6 // approximate character width
+    svg.selectAll('text.label')
       .data(nodes)
       .join('text')
-      .attr('x', (d) => d.x0 + 4)
-      .attr('y', (d) => d.y0 + 14)
-      .attr('font-size', 11)
+      .attr('class', 'label')
+      .attr('x', (d) => d.x0 + 5)
+      .attr('y', (d) => d.y0 + 16)
+      .attr('clip-path', (_, i) => `url(#treemap-clip-${i})`)
+      .attr('font-size', labelFontSize)
+      .attr('font-weight', 500)
       .attr('fill', resolved === 'dark' ? '#e2e8f0' : '#fff')
-      .text((d) => (d.x1 - d.x0) > 40 ? d.data.name : '')
+      .attr('pointer-events', 'none')
+      .text((d) => {
+        const tileW = d.x1 - d.x0
+        const tileH = d.y1 - d.y0
+        if (tileW < 30 || tileH < 20) return '' // too small for any label
+        const availW = tileW - 10 // padding
+        const maxChars = Math.floor(availW / charWidth)
+        const name = d.data.name
+        if (name.length <= maxChars) return name
+        if (maxChars < 4) return '' // not enough room for truncation
+        return name.slice(0, maxChars - 1) + '\u2026' // ellipsis
+      })
 
   }, [data, config, height, autoHeight, resolved, themePalette, containerWidth])
 
   if (data.length === 0) return <p className="text-sm text-text-muted">No data</p>
-  return <div ref={containerRef} style={{ width: '100%', ...(autoHeight ? { height: '100%' } : { height }) }} />
+  return (
+    <div ref={containerRef} style={{ width: '100%', position: 'relative', ...(autoHeight ? { height: '100%' } : { height }) }}>
+      {tooltip && (
+        <div
+          style={{
+            position: 'absolute',
+            left: Math.min(tooltip.x + 12, (containerWidth || 400) - 180),
+            top: Math.max(0, tooltip.y - 30),
+            background: 'var(--color-surface-raised, #1e293b)',
+            color: 'var(--color-text-primary, #e2e8f0)',
+            border: '1px solid var(--color-border-default, #334155)',
+            borderRadius: 6,
+            padding: '6px 10px',
+            fontSize: 12,
+            pointerEvents: 'none',
+            zIndex: 10,
+            whiteSpace: 'nowrap',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+          }}
+        >
+          <div style={{ fontWeight: 600 }}>{tooltip.name}</div>
+          <div style={{ opacity: 0.8 }}>{tooltip.value}</div>
+        </div>
+      )}
+    </div>
+  )
 }
 

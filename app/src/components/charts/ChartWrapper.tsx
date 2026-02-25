@@ -82,25 +82,43 @@ export function ChartWrapper({ title, subtitle, source, sourceUrl, chartUrl, chi
   const reactId = useId()
   const summaryId = `chart-summary-${reactId}`
 
-  const handleExportSVG = useCallback(() => {
+  const findSvg = useCallback(() => {
     const svg = chartAreaRef.current?.querySelector('svg')
-    if (svg) exportSVG(svg, title ?? 'chart')
+    if (!svg) console.warn(`[ChartWrapper] No SVG found for export in "${title ?? 'chart'}"`)
+    return svg
   }, [title])
 
+  const handleExportSVG = useCallback(() => {
+    const svg = findSvg()
+    if (svg) exportSVG(svg, title ?? 'chart')
+  }, [title, findSvg])
+
   const handleExportPNG = useCallback(() => {
-    const svg = chartAreaRef.current?.querySelector('svg')
+    const svg = findSvg()
     if (svg) exportPNG(svg, title ?? 'chart', 2, { title, subtitle, source })
-  }, [title, subtitle, source])
+  }, [title, subtitle, source, findSvg])
 
   const handleExportPDF = useCallback(async () => {
-    const svg = chartAreaRef.current?.querySelector('svg')
-    if (svg) await exportPDF(svg, title ?? 'chart', { title, source })
-  }, [title, source])
+    const svg = findSvg()
+    if (svg) {
+      try {
+        await exportPDF(svg, title ?? 'chart', { title, source })
+      } catch (err) {
+        console.error('[ChartWrapper] PDF export failed:', err)
+      }
+    }
+  }, [title, source, findSvg])
 
   const handleExportPPTX = useCallback(async () => {
-    const svg = chartAreaRef.current?.querySelector('svg')
-    if (svg) await exportPPTX(svg, title ?? 'chart', { title, subtitle, source })
-  }, [title, subtitle, source])
+    const svg = findSvg()
+    if (svg) {
+      try {
+        await exportPPTX(svg, title ?? 'chart', { title, subtitle, source })
+      } catch (err) {
+        console.error('[ChartWrapper] PPTX export failed:', err)
+      }
+    }
+  }, [title, subtitle, source, findSvg])
 
   const handleExportCSV = useCallback(() => {
     if (chartId) {

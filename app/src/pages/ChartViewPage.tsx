@@ -4,9 +4,8 @@ import { ChartWrapper } from '../components/charts/ChartWrapper'
 import { ObservableChartFactory } from '../components/charts/ObservableChartFactory'
 import { SharePanel } from '../components/sharing/SharePanel'
 import { ThemeToggle } from '../components/layout/ThemeToggle'
-import { PALETTES } from '../themes/plotTheme'
-import type { ChartConfig, ChartType } from '../types/chart'
-import type { PaletteKey } from '../themes/plotTheme'
+import { buildChartConfig } from '../utils/buildChartConfig'
+import type { ChartType } from '../types/chart'
 
 interface ChartData {
   chart: {
@@ -95,36 +94,8 @@ export function ChartViewPage() {
   const { chart, data } = chartData
   const chartType = (chart.chart_type ?? 'BarChart') as ChartType
 
-  // Map API response → ChartConfig (apply same multi-Y logic as EditorPage)
-  const isMultiY = Array.isArray(chart.y) && chart.y.length > 1
-  const chartConfig: ChartConfig = {
-    x: chart.x ?? undefined,
-    y: isMultiY ? 'metric_value' : (Array.isArray(chart.y) ? chart.y[0] : chart.y) ?? undefined,
-    series: isMultiY ? 'metric_name' : chart.series ?? undefined,
-    horizontal: chart.horizontal,
-    sort: chart.sort,
-    stacked: (chart.config?.stacked as boolean) ?? false,
-    showGrid: (chart.config?.showGrid as boolean) ?? true,
-    showLegend: (chart.config?.showLegend as boolean) ?? true,
-    showValues: (chart.config?.showValues as boolean) ?? false,
-    xAxisTitle: (chart.config?.xAxisTitle as string) || undefined,
-    yAxisTitle: (chart.config?.yAxisTitle as string) || undefined,
-    annotations: chart.config?.annotations as ChartConfig['annotations'],
-    value: (chart.config?.value as string) ?? undefined,
-    comparisonValue: (chart.config?.comparisonValue as string) ?? undefined,
-    comparisonLabel: (chart.config?.comparisonLabel as string) || undefined,
-    valueFormat: (chart.config?.valueFormat as ChartConfig['valueFormat']) || undefined,
-    positiveIsGood: (chart.config?.positiveIsGood as boolean) ?? true,
-    metricLabel: (chart.config?.metricLabel as string) ?? undefined,
-    unitColumn: (chart.config?.unitColumn as string) ?? undefined,
-  }
-
-  // Apply palette colors
-  const palette = (chart.config?.palette as PaletteKey) ?? 'default'
-  const paletteColors = PALETTES[palette] ?? PALETTES.default
-  if (palette !== 'default') {
-    chartConfig.colorRange = paletteColors
-  }
+  // Map API response → ChartConfig (shared helper handles all fields + palette)
+  const chartConfig = buildChartConfig(chart)
 
   return (
     <div className="min-h-screen bg-surface-secondary">

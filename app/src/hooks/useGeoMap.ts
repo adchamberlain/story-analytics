@@ -79,21 +79,28 @@ export function useGeoMap({
       })
   }, [basemapId, customGeoData])
 
-  // ResizeObserver
+  // ResizeObserver — track both width and height
+  const [containerHeight, setContainerHeight] = useState(0)
+
   useEffect(() => {
     const el = containerRef.current
     if (!el) return
     const ro = new ResizeObserver((entries) => {
       for (const entry of entries) {
         setContainerWidth(entry.contentRect.width)
+        if (autoHeight && entry.contentRect.height > 0) {
+          setContainerHeight(entry.contentRect.height)
+        }
       }
     })
     ro.observe(el)
     return () => ro.disconnect()
-  }, [])
+  }, [autoHeight])
 
-  // Compute effective dimensions
-  const effectiveHeight = autoHeight ? Math.max(containerWidth * 0.55, 200) : height
+  // Compute effective dimensions — in autoHeight mode, use actual container height
+  const effectiveHeight = autoHeight
+    ? (containerHeight > 0 ? containerHeight : Math.max(containerWidth * 0.55, 200))
+    : height
 
   // Compute projection and path when geoData/dimensions change
   const projectionFn = (() => {
