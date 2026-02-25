@@ -205,7 +205,7 @@ const minimalTheme: ChartTheme = {
   description: 'Stripped-back Helvetica style, no visual chrome',
 
   palette: {
-    colors: ['#333333', '#666666', '#999999', '#bbbbbb', '#555555', '#888888', '#aaaaaa', '#dddddd'],
+    colors: ['#333333', '#7a9eb1', '#c2695a', '#6b8f71', '#bba058', '#9178a0', '#5e8e8e', '#aaaaaa'],
     primary: '#333333',
   },
 
@@ -417,7 +417,7 @@ const academicTheme: ChartTheme = {
   description: 'Times New Roman, APA-style margins, grayscale-friendly',
 
   palette: {
-    colors: ['#000000', '#555555', '#999999', '#cccccc', '#333333', '#777777', '#aaaaaa', '#e0e0e0'],
+    colors: ['#000000', '#4a6fa5', '#b5495b', '#7a7a7a', '#d4a843', '#2e8b57', '#8b5e83', '#bbbbbb'],
     primary: '#000000',
   },
 
@@ -523,8 +523,8 @@ const pastelTheme: ChartTheme = {
   description: 'Soft colors, friendly rounded feel, approachable',
 
   palette: {
-    colors: ['#b5e48c', '#99d98c', '#76c893', '#52b69a', '#34a0a4', '#168aad', '#1a759f', '#1e6091'],
-    primary: '#52b69a',
+    colors: ['#89c4e1', '#f4a7a7', '#a8d5a2', '#f7c876', '#c4a8d8', '#f5b971', '#8ecfc0', '#e8a8c8'],
+    primary: '#89c4e1',
   },
 
   font: {

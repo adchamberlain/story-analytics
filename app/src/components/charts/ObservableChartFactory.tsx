@@ -323,7 +323,7 @@ function buildMarks(
     case 'BarChart':
       return buildBarMarks(data, x, y, series, config, colors, chartTheme)
     case 'AreaChart':
-      return buildAreaMarks(data, x, y, series, config, colors)
+      return buildAreaMarks(data, x, y, series, config, colors, chartTheme)
     case 'ScatterPlot':
       return buildScatterMarks(data, x, y, series, config, colors)
     case 'Histogram':
@@ -468,17 +468,25 @@ function buildAreaMarks(
   y: string | undefined,
   series: string | undefined,
   config: ChartConfig,
-  colors: readonly string[] | string[]
+  colors: readonly string[] | string[],
+  chartTheme?: ChartTheme,
 ): Plot.Markish[] {
   if (!x || !y) return []
 
   const areaData = maybeParseDates(data, x)
-  const fillColor = config.fillColor ?? `${colors[0]}26` // 15% opacity
+  // Theme-aware fill opacity: higher for low-contrast/grayscale themes
+  const themeId = chartTheme?.id ?? 'default'
+  const areaFillOpacity = themeId === 'academic' || themeId === 'minimal'
+    ? 0.35
+    : themeId === 'dark'
+      ? 0.25
+      : 0.15
+  const fillColor = config.fillColor ?? `${colors[0]}26` // 15% opacity fallback for single-series
   const marks: Plot.Markish[] = []
 
   if (series) {
     marks.push(
-      Plot.areaY(areaData, { x, y, fill: series, fillOpacity: 0.15 }),
+      Plot.areaY(areaData, { x, y, fill: series, fillOpacity: areaFillOpacity }),
       Plot.lineY(areaData, { x, y, stroke: series, strokeWidth: config.lineWidth ?? 2.5 }),
       Plot.tip(areaData, Plot.pointerX({ x, y, stroke: series })),
     )
@@ -1352,11 +1360,16 @@ function buildPlotOptions(
 
   // Color range — legend is always suppressed here; we render a custom React legend instead.
   // Set explicit domain (alphabetically sorted series values) to match the custom React legend's ordering.
-  const colorOpts: Record<string, unknown> = { range: [...colors], legend: false }
-  if (config.series) {
-    colorOpts.domain = getUniqueSeries(data, config.series)
+  // HeatMap uses a sequential color scale (fill is numeric), not categorical.
+  if (chartType === 'HeatMap') {
+    overrides.color = { scheme: 'YlOrRd', legend: false }
+  } else {
+    const colorOpts: Record<string, unknown> = { range: [...colors], legend: false }
+    if (config.series) {
+      colorOpts.domain = getUniqueSeries(data, config.series)
+    }
+    overrides.color = colorOpts
   }
-  overrides.color = colorOpts
 
   return plotDefaults({
     width,
