@@ -1,5 +1,38 @@
 # Dev Log
 
+## 2026-02-25
+
+### Session: Chart Polish — Smart Tooltips, Map Fixes, Dashboard UX
+
+**Tooltip unit detection (all chart types):**
+- Treemap, pie, choropleth, symbol, and spike map tooltips now auto-detect units from title/subtitle text (e.g. "FY 2025 spending in billions of dollars" → `$1,340B` instead of `1,340`)
+- Extracted shared `detectScaleFromText()`, `fmtWithUnit()`, `detectUnitFromTitleSubtitle()` to `utils/formatters.ts`
+- `buildChartConfig()` now passes title/subtitle into ChartConfig so detection works in dashboard context
+
+**Tooltip targeting fix (line/area charts):**
+- Multi-series line and non-stacked area charts switched from `Plot.pointerX` to `Plot.pointer` — picks the series line nearest to cursor instead of arbitrary nearest-x point
+- Stacked area tooltip now includes `order: 'value'` to match visual stack order
+
+**Map fixes:**
+- Symbol/spike/locator maps auto-detect label column when `geoLabelColumn` not configured
+- Locator map pins: added transparent hit rect + `pointer-events: none` on children for reliable `mouseleave`
+- Container-level `onMouseLeave` safety net on all map components
+- `overflow: hidden` on map containers prevents SVG overlapping title/subtitle in dashboard view
+- SVG `overflow: visible` → `overflow: hidden` in `useGeoMap.ts`
+
+**Dashboard UX:**
+- Chart view shows "← Dashboard" link when navigated from a dashboard (via `?dashboard=` query param)
+- Pie/donut/election charts get larger default dashboard height (h=9, 540px instead of 420px)
+
+**Dot plot domain:**
+- X-axis auto-tightens when all values are far from zero (min > 40% of max), removing wasted whitespace
+- Zero rule line conditionally hidden when domain doesn't include zero
+
+**Source notes:**
+- Added source attributions to 34 charts (government data, industry reports, internal data, etc.)
+
+---
+
 ## 2026-02-24
 
 ### Session: Phase 8 — Data Transforms, Edit History, CSV Download
