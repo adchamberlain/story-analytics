@@ -27,7 +27,7 @@ export const BASEMAPS: BasemapMeta[] = [
     path: '/basemaps/world-countries.json',
     objectKey: 'countries',
     idProperty: 'id',            // ISO 3166-1 numeric
-    defaultProjection: 'geoEqualEarth',
+    defaultProjection: 'geoMercator',
   },
   {
     id: 'us-states',

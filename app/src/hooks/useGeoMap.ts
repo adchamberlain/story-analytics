@@ -107,7 +107,18 @@ export function useGeoMap({
     if (!geoData || containerWidth <= 0) return null
     const projFactory = (d3Geo as Record<string, unknown>)[projectionId] as (() => d3Geo.GeoProjection) | undefined
     const proj = projFactory ? projFactory() : d3Geo.geoEqualEarth()
-    proj.fitSize([containerWidth, effectiveHeight], geoData)
+
+    const pad = 8
+    if (basemap === 'world') {
+      // Clip Mercator to 55°S–80°N for a clean rectangular world view
+      const worldClip: GeoJSON.Feature = {
+        type: 'Feature', properties: {},
+        geometry: { type: 'Polygon', coordinates: [[[-180, -55], [180, -55], [180, 80], [-180, 80], [-180, -55]]] },
+      }
+      proj.fitExtent([[pad, pad], [containerWidth - pad, effectiveHeight - pad]], worldClip)
+    } else {
+      proj.fitExtent([[pad, pad], [containerWidth - pad, effectiveHeight - pad]], geoData)
+    }
     return proj
   })()
 
