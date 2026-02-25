@@ -286,6 +286,9 @@ export interface ChartConfig {
   /** Per-chart locale override (empty string = use global locale) */
   locale?: string
 
+  /** Allow users to download the chart's underlying data as CSV (default: true) */
+  allowDataDownload?: boolean
+
   /** Data mode (used by editor) */
   dataMode?: 'table' | 'sql'
 
