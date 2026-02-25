@@ -125,28 +125,27 @@ app.include_router(transforms_router, prefix="/api")
 
 def _seed_data_if_empty():
     """Copy seed data into data/ on first run so new users see an example dashboard."""
-    import shutil
     import logging
+    from api.services.storage import get_storage
 
     logger = logging.getLogger("story_analytics")
-    data_dir = Path(__file__).parent.parent / "data"
-    seed_dir = data_dir / "seed"
+    storage = get_storage()
+    seed_dir = Path(__file__).parent.parent / "data" / "seed"
 
     if not seed_dir.exists():
         return
 
-    charts_dir = data_dir / "charts"
-    charts_dir.mkdir(parents=True, exist_ok=True)
-
     # Only seed if no charts exist yet
-    if any(charts_dir.glob("*.json")):
+    if storage.list("charts/"):
         return
 
-    for subdir in ("charts", "dashboards", "uploads"):
-        src = seed_dir / subdir
-        dst = data_dir / subdir
-        if src.exists():
-            shutil.copytree(src, dst, dirs_exist_ok=True)
+    # Copy seed files through storage backend
+    for subdir in seed_dir.iterdir():
+        if subdir.is_dir():
+            for f in subdir.rglob("*"):
+                if f.is_file():
+                    rel = f.relative_to(seed_dir)
+                    storage.write(str(rel), f.read_bytes())
 
     logger.info("Loaded seed data: The Perfect Dashboard with 25 example charts")
 
