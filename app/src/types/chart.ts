@@ -23,6 +23,9 @@ export type ChartType =
   | 'BulletBar'
   | 'SmallMultiples'
   | 'ChoroplethMap'
+  | 'SymbolMap'
+  | 'LocatorMap'
+  | 'SpikeMap'
 
 // =============================================================================
 // Annotation Types
@@ -246,6 +249,19 @@ export interface ChartConfig {
   geoValueColumn?: string     // Data column for choropleth coloring
   geoColorScale?: string      // 'sequential' | 'diverging'
   geoProjection?: string      // D3 projection name
+
+  /** Point map: latitude column */
+  geoLatColumn?: string
+  /** Point map: longitude column */
+  geoLonColumn?: string
+  /** Point map: label column for locator pins */
+  geoLabelColumn?: string
+  /** Point map: size column for symbol map circles */
+  geoSizeColumn?: string
+  /** Point map: symbol shape (circle, square, triangle) */
+  geoSymbolShape?: 'circle' | 'square' | 'triangle'
+  /** Point map: [min, max] radius for symbol sizing */
+  geoSizeRange?: [number, number]
 
   /** Per-chart locale override (empty string = use global locale) */
   locale?: string

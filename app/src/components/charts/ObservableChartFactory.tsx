@@ -12,6 +12,7 @@ import type { ChartTheme } from '../../themes/chartThemes'
 import { shouldShowGrid, formatBigValue, computePctDelta, formatDelta } from './bigValueHelpers'
 import { RichDataTable } from './table/RichDataTable'
 import { ChoroplethMap } from './ChoroplethMap'
+import { GeoPointMap } from './GeoPointMap'
 
 /** Minimal type for the Observable Plot element with scale access. */
 interface PlotElement extends HTMLElement {
@@ -241,6 +242,11 @@ export function ObservableChartFactory({
 
   if (chartType === 'ChoroplethMap') {
     return <ChoroplethMap data={data} config={config} height={height} autoHeight={autoHeight} />
+  }
+
+  if (chartType === 'SymbolMap' || chartType === 'LocatorMap' || chartType === 'SpikeMap') {
+    const variant = chartType === 'SymbolMap' ? 'symbol' : chartType === 'LocatorMap' ? 'locator' : 'spike'
+    return <GeoPointMap data={data} config={config} height={height} autoHeight={autoHeight} mapVariant={variant} />
   }
 
   // Auto-height: flex layout fills available space. Fixed: explicit pixel height.

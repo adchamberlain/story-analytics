@@ -54,6 +54,13 @@ export interface EditorConfig {
   geoValueColumn: string | null
   geoColorScale: string
   geoProjection: string
+  // Point maps (Symbol, Locator, Spike)
+  geoLatColumn: string | null
+  geoLonColumn: string | null
+  geoLabelColumn: string | null
+  geoSizeColumn: string | null
+  geoSymbolShape: 'circle' | 'square' | 'triangle'
+  geoSizeRange: [number, number]
   // Locale override
   locale: string
   // Auto-refresh interval (seconds) for embed view — 0/undefined = off
@@ -100,6 +107,12 @@ const DEFAULT_CONFIG: EditorConfig = {
   geoValueColumn: null,
   geoColorScale: 'sequential',
   geoProjection: 'geoEqualEarth',
+  geoLatColumn: null,
+  geoLonColumn: null,
+  geoLabelColumn: null,
+  geoSizeColumn: null,
+  geoSymbolShape: 'circle',
+  geoSizeRange: [3, 25],
   locale: '',
   refreshInterval: 0,
 }
@@ -289,6 +302,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         geoValueColumn: chart.config?.geoValueColumn ?? null,
         geoColorScale: chart.config?.geoColorScale ?? 'sequential',
         geoProjection: chart.config?.geoProjection ?? 'geoEqualEarth',
+        geoLatColumn: chart.config?.geoLatColumn ?? null,
+        geoLonColumn: chart.config?.geoLonColumn ?? null,
+        geoLabelColumn: chart.config?.geoLabelColumn ?? null,
+        geoSizeColumn: chart.config?.geoSizeColumn ?? null,
+        geoSymbolShape: chart.config?.geoSymbolShape ?? 'circle',
+        geoSizeRange: chart.config?.geoSizeRange ?? [3, 25],
         locale: chart.config?.locale ?? '',
         refreshInterval: (chart.config?.refreshInterval as number) ?? 0,
       }
@@ -500,6 +519,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
             geoValueColumn: config.geoValueColumn ?? undefined,
             geoColorScale: config.geoColorScale !== 'sequential' ? config.geoColorScale : undefined,
             geoProjection: config.geoProjection !== 'geoEqualEarth' ? config.geoProjection : undefined,
+            geoLatColumn: config.geoLatColumn ?? undefined,
+            geoLonColumn: config.geoLonColumn ?? undefined,
+            geoLabelColumn: config.geoLabelColumn ?? undefined,
+            geoSizeColumn: config.geoSizeColumn ?? undefined,
+            geoSymbolShape: config.geoSymbolShape !== 'circle' ? config.geoSymbolShape : undefined,
+            geoSizeRange: (config.geoSizeRange[0] !== 3 || config.geoSizeRange[1] !== 25) ? config.geoSizeRange : undefined,
             locale: config.locale || undefined,
             refreshInterval: config.refreshInterval || undefined,
           },
@@ -761,6 +786,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
             geoValueColumn: config.geoValueColumn ?? undefined,
             geoColorScale: config.geoColorScale !== 'sequential' ? config.geoColorScale : undefined,
             geoProjection: config.geoProjection !== 'geoEqualEarth' ? config.geoProjection : undefined,
+            geoLatColumn: config.geoLatColumn ?? undefined,
+            geoLonColumn: config.geoLonColumn ?? undefined,
+            geoLabelColumn: config.geoLabelColumn ?? undefined,
+            geoSizeColumn: config.geoSizeColumn ?? undefined,
+            geoSymbolShape: config.geoSymbolShape !== 'circle' ? config.geoSymbolShape : undefined,
+            geoSizeRange: (config.geoSizeRange[0] !== 3 || config.geoSizeRange[1] !== 25) ? config.geoSizeRange : undefined,
             locale: config.locale || undefined,
             refreshInterval: config.refreshInterval || undefined,
           },
