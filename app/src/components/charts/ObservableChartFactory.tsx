@@ -55,13 +55,24 @@ export function ObservableChartFactory({
 
   // Build custom legend data — unique series values mapped to palette colors.
   // We never rely on Observable Plot's built-in legend (unreliable for stroke marks).
-  const showLegend = config.showLegend !== false && !!config.series
+  const showLegend = config.showLegend !== false && !!config.series && chartType !== 'HeatMap'
   const legendItems = showLegend
     ? getUniqueSeries(data, config.series!, config).map((label, i) => ({
         label,
         color: colors[i % colors.length],
       }))
     : []
+
+  // HeatMap: gradient legend showing the sequential color scale
+  const heatmapLegend = chartType === 'HeatMap' && config.showLegend !== false && config.y ? (() => {
+    const yCol = Array.isArray(config.y) ? config.y[0] : config.y
+    if (!yCol) return null
+    const vals = data.map((d) => Number(d[yCol])).filter((v) => isFinite(v))
+    if (vals.length === 0) return null
+    const lo = Math.min(...vals)
+    const hi = Math.max(...vals)
+    return { lo, hi }
+  })() : null
 
   // ArrowPlot / RangePlot: custom legend for start (hollow) vs end (filled) dots
   const showStartEndLegend = (chartType === 'ArrowPlot' || chartType === 'RangePlot') && legendItems.length === 0
@@ -282,6 +293,13 @@ export function ObservableChartFactory({
               <span style={{ color: 'var(--color-text-secondary)' }}>{item.label}</span>
             </span>
           ))}
+        </div>
+      )}
+      {heatmapLegend && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0 0 6px', fontSize: 12 }}>
+          <span style={{ color: 'var(--color-text-secondary)' }}>{heatmapLegend.lo.toLocaleString()}</span>
+          <span style={{ width: 120, height: 10, borderRadius: 2, background: 'linear-gradient(to right, rgb(255,255,204), rgb(255,234,155), rgb(254,206,108), rgb(254,165,71), rgb(252,106,50), rgb(234,44,34), rgb(195,7,35), rgb(128,0,38))' }} />
+          <span style={{ color: 'var(--color-text-secondary)' }}>{heatmapLegend.hi.toLocaleString()}</span>
         </div>
       )}
       {showStartEndLegend && (

@@ -59,28 +59,29 @@ export function MultiplePies({ data, config, height, autoHeight }: MultiplePiesP
 
     if (numGroups === 0) return
 
-    // Grid layout: determine columns and rows
-    const cols = Math.min(numGroups, Math.max(2, Math.ceil(Math.sqrt(numGroups))))
+    // Layout: single row when ≤4 groups, otherwise grid
+    const cols = numGroups <= 4 ? numGroups : Math.min(numGroups, Math.max(2, Math.ceil(Math.sqrt(numGroups))))
     const rows = Math.ceil(numGroups / cols)
+
+    const legendHeight = 28
+    const availableForPies = effectiveHeight - legendHeight - 8
 
     const cellWidth = width / cols
     const titleHeight = 24
-    const cellHeight = Math.min((effectiveHeight - 10) / rows, cellWidth)
+    const cellHeight = Math.min(availableForPies / rows, cellWidth)
 
-    const legendHeight = 24
-    // Reserve space for legend within effective height
-    const availableForPies = effectiveHeight - legendHeight - 8
-    const actualCellHeight = Math.min(cellHeight, availableForPies / rows)
-    const chartRadius = Math.max(15, Math.min(cellWidth, actualCellHeight - titleHeight) / 2 - 2)
+    // Maximize pie radius within the cell
+    const chartRadius = Math.max(20, Math.min(cellWidth * 0.42, (cellHeight - titleHeight) / 2))
 
-    const isDonut = config.pieVariant === 'donut'
-    const innerRadius = isDonut ? chartRadius * 0.5 : 0
+    // Always render as donut for modern look (respect explicit 'pie' variant)
+    const isDonut = config.pieVariant !== 'pie'
+    const innerRadius = isDonut ? chartRadius * 0.55 : 0
 
     const colors = config.colorRange ? [...config.colorRange] : [...chartTheme.palette.colors]
     const colorScale = d3.scaleOrdinal(colors)
 
     const textColor = resolved === 'dark' ? '#e2e8f0' : '#374151'
-    const sliceStroke = resolved === 'dark' ? '#1e293b' : '#ffffff'
+    const bgColor = resolved === 'dark' ? '#1e293b' : '#ffffff'
 
     const svgHeight = effectiveHeight
     const svg = d3.select(el).append('svg')
@@ -92,13 +93,19 @@ export function MultiplePies({ data, config, height, autoHeight }: MultiplePiesP
     const arc = d3.arc<d3.PieArcDatum<{ label: string; value: number }>>()
       .innerRadius(innerRadius)
       .outerRadius(chartRadius)
+      .cornerRadius(isDonut ? 2 : 0)
+      .padAngle(isDonut ? 0.02 : 0)
 
     groupKeys.forEach((groupKey, i) => {
       const col = i % cols
       const row = Math.floor(i / cols)
 
-      const cx = col * cellWidth + cellWidth / 2
-      const cy = row * actualCellHeight + titleHeight + chartRadius
+      // Center the last row if it has fewer items than cols
+      const itemsInRow = row < rows - 1 ? cols : numGroups - row * cols
+      const rowOffset = (width - itemsInRow * cellWidth) / 2
+
+      const cx = rowOffset + col * cellWidth + cellWidth / 2
+      const cy = row * cellHeight + titleHeight + chartRadius
 
       const groupData = groups.get(groupKey) ?? []
       const pieData = groupData.map((d) => ({
@@ -111,9 +118,9 @@ export function MultiplePies({ data, config, height, autoHeight }: MultiplePiesP
       // Group title
       svg.append('text')
         .attr('x', cx)
-        .attr('y', row * actualCellHeight + 16)
+        .attr('y', row * cellHeight + 16)
         .attr('text-anchor', 'middle')
-        .attr('font-size', 14)
+        .attr('font-size', 13)
         .attr('font-weight', 600)
         .attr('font-family', chartTheme.font.family)
         .attr('fill', textColor)
@@ -123,16 +130,18 @@ export function MultiplePies({ data, config, height, autoHeight }: MultiplePiesP
         .attr('transform', `translate(${cx},${cy})`)
 
       const arcs = pie(pieData)
-
       const total = d3.sum(pieData, (d) => d.value)
+
+      // Find the largest slice for inline label
+      const largestArc = arcs.reduce((a, b) => (a.data.value > b.data.value ? a : b))
 
       g.selectAll('path')
         .data(arcs)
         .join('path')
         .attr('d', arc as never)
         .attr('fill', (d) => colorScale(d.data.label))
-        .attr('stroke', sliceStroke)
-        .attr('stroke-width', 1)
+        .attr('stroke', bgColor)
+        .attr('stroke-width', 0.5)
         .style('cursor', 'pointer')
         .on('mouseenter', function (event, d) {
           d3.select(this).attr('opacity', 0.8)
@@ -152,6 +161,26 @@ export function MultiplePies({ data, config, height, autoHeight }: MultiplePiesP
           d3.select(this).attr('opacity', 1)
           setTooltip(null)
         })
+
+      // Label on the largest slice — show percentage
+      const largestPct = ((largestArc.data.value / total) * 100).toFixed(0)
+      const labelArc = d3.arc<d3.PieArcDatum<{ label: string; value: number }>>()
+        .innerRadius(isDonut ? (innerRadius + chartRadius) / 2 : chartRadius * 0.6)
+        .outerRadius(isDonut ? (innerRadius + chartRadius) / 2 : chartRadius * 0.6)
+      const [lx, ly] = labelArc.centroid(largestArc)
+      if (chartRadius >= 30) {
+        g.append('text')
+          .attr('x', lx)
+          .attr('y', ly)
+          .attr('text-anchor', 'middle')
+          .attr('dominant-baseline', 'central')
+          .attr('font-size', Math.min(13, chartRadius * 0.28))
+          .attr('font-weight', 600)
+          .attr('font-family', chartTheme.font.family)
+          .attr('fill', '#fff')
+          .attr('pointer-events', 'none')
+          .text(`${largestPct}%`)
+      }
     })
 
     // Color legend at bottom — collect unique labels in order
@@ -163,7 +192,7 @@ export function MultiplePies({ data, config, height, autoHeight }: MultiplePiesP
     }
     const legendItemWidths = allLabels.map((l) => l.length * 7.5 + 28)
     const totalLw = legendItemWidths.reduce((a, b) => a + b, 0)
-    const legendY = rows * actualCellHeight + 6
+    const legendY = rows * cellHeight + 10
     const legendGrp = svg.append('g')
       .attr('transform', `translate(${(width - totalLw) / 2},${legendY})`)
     let lx = 0
