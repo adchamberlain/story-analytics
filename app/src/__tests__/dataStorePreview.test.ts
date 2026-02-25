@@ -8,16 +8,16 @@
  */
 
 import { describe, it, expect } from 'vitest'
-// @ts-expect-error -- Node built-ins available in vitest runtime
+
 import { resolve, dirname } from 'path'
-// @ts-expect-error -- Node built-ins available in vitest runtime
+
 import { fileURLToPath } from 'url'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
 describe('dataStore loadPreview stale guard', () => {
   it('should clear loadingPreview even for stale responses', async () => {
-    // @ts-expect-error -- Node built-ins available in vitest runtime
+    
     const fs = await import('fs')
     const source = fs.readFileSync(
       resolve(__dirname, '../stores/dataStore.ts'),
