@@ -195,6 +195,11 @@ interface EditorState {
   placingAnnotationId: string | null
   setPlacingAnnotation: (id: string | null) => void
 
+  // Version history
+  saveCount: number
+  versionHistoryOpen: boolean
+  setVersionHistoryOpen: (open: boolean) => void
+
   // Computed
   isDirty: () => boolean
 
@@ -215,6 +220,7 @@ interface EditorState {
   sendChatMessage: (message: string) => Promise<void>
   publishChart: () => Promise<void>
   unpublishChart: () => Promise<void>
+  saveVersion: (label?: string) => Promise<void>
   reset: () => void
 }
 
@@ -225,6 +231,15 @@ const DATA_KEYS: (keyof EditorConfig)[] = ['x', 'y', 'series', 'aggregation', 't
 
 /** Debounce timer for auto buildQuery calls from updateConfig */
 let _buildQueryTimer: ReturnType<typeof setTimeout>
+
+/** Debounce timer for idle auto-version snapshot (60s after last edit) */
+let _idleVersionTimer: ReturnType<typeof setTimeout>
+
+/** How many saves between auto-version snapshots */
+const AUTO_VERSION_INTERVAL = 30
+
+/** Idle timeout (ms) before auto-creating a version snapshot */
+const IDLE_VERSION_TIMEOUT = 60_000
 
 /** Monotonically increasing counter for unique chat message IDs */
 let _msgIdCounter = 0
@@ -255,6 +270,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   error: null,
   placingAnnotationId: null,
   setPlacingAnnotation: (id) => set({ placingAnnotationId: id }),
+  saveCount: 0,
+  versionHistoryOpen: false,
+  setVersionHistoryOpen: (open) => set({ versionHistoryOpen: open }),
 
   isDirty: () => {
     const { config, savedConfig, data, chartId, sql, savedSql } = get()
@@ -608,6 +626,22 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         _buildQueryTimer = setTimeout(() => get().buildQuery(), 150)
       }
     }
+
+    // Idle auto-version: reset timer on each edit, snapshot after 60s of inactivity
+    clearTimeout(_idleVersionTimer)
+    const chartIdForIdle = get().chartId
+    if (chartIdForIdle) {
+      _idleVersionTimer = setTimeout(() => {
+        const currentId = get().chartId
+        if (currentId) {
+          fetch(`/api/v2/charts/${currentId}/versions`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ trigger: 'auto', label: 'Idle auto-save' }),
+          }).catch(() => { /* Non-critical */ })
+        }
+      }, IDLE_VERSION_TIMEOUT)
+    }
   },
 
   setDataMode: (mode: DataMode) => {
@@ -838,7 +872,17 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       }
 
       // Snapshot saved state and clear undo/redo history
-      set({ saving: false, savedConfig: { ...config }, savedSql: sql, configHistory: [], configFuture: [] })
+      const newSaveCount = get().saveCount + 1
+      set({ saving: false, savedConfig: { ...config }, savedSql: sql, configHistory: [], configFuture: [], saveCount: newSaveCount })
+
+      // Every Nth save, auto-create a version snapshot (fire and forget)
+      if (newSaveCount % AUTO_VERSION_INTERVAL === 0 && chartId) {
+        fetch(`/api/v2/charts/${chartId}/versions`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ trigger: 'auto', label: `Auto-save #${newSaveCount}` }),
+        }).catch(() => { /* Non-critical */ })
+      }
     } catch (e) {
       set({ saving: false, error: e instanceof Error ? e.message : String(e) })
     }
@@ -990,6 +1034,13 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       if (res.ok) {
         set({ status: 'published' })
 
+        // Auto-create a version snapshot on publish (fire and forget)
+        fetch(`/api/v2/charts/${chartId}/versions`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ trigger: 'publish', label: 'Published' }),
+        }).catch(() => { /* Non-critical */ })
+
         // Auto-generate snapshot after successful publish
         const svgEl = document.querySelector('.chart-area svg') as SVGSVGElement | null
         if (svgEl) {
@@ -1028,8 +1079,23 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }
   },
 
+  saveVersion: async (label?: string) => {
+    const { chartId } = get()
+    if (!chartId) return
+    try {
+      await fetch(`/api/v2/charts/${chartId}/versions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ trigger: 'manual', label: label || 'Manual save point' }),
+      })
+    } catch {
+      // Non-critical
+    }
+  },
+
   reset: () => {
     clearTimeout(_buildQueryTimer)
+    clearTimeout(_idleVersionTimer)
     set({
       chartId: null,
       sourceId: null,
@@ -1054,6 +1120,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       saving: false,
       error: null,
       placingAnnotationId: null,
+      saveCount: 0,
+      versionHistoryOpen: false,
     })
   },
 }))
