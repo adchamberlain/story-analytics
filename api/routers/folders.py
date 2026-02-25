@@ -1,7 +1,7 @@
 """Folders API: create, list, get, update, delete folders for chart organization."""
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from ..services import folder_storage
 from ..services.chart_storage import list_charts
@@ -10,8 +10,8 @@ router = APIRouter(prefix="/folders", tags=["folders"])
 
 
 class CreateFolderRequest(BaseModel):
-    name: str
-    parent_id: str | None = None
+    name: str = Field(..., examples=["Marketing Charts"], description="Folder name")
+    parent_id: str | None = Field(None, description="Parent folder ID for nesting")
 
 
 class UpdateFolderRequest(BaseModel):
@@ -37,6 +37,7 @@ class FolderChartResponse(BaseModel):
 
 @router.post("/", response_model=FolderResponse)
 async def create_folder(request: CreateFolderRequest):
+    """Create a new folder for organizing charts."""
     name = request.name.strip()
     if not name:
         raise HTTPException(status_code=400, detail="Folder name cannot be empty")
@@ -53,6 +54,7 @@ async def create_folder(request: CreateFolderRequest):
 
 @router.get("/", response_model=list[FolderResponse])
 async def get_folders():
+    """List all folders."""
     folders = folder_storage.list_folders()
     return [
         FolderResponse(
@@ -68,6 +70,7 @@ async def get_folders():
 
 @router.get("/{folder_id}", response_model=FolderResponse)
 async def get_folder(folder_id: str):
+    """Get a folder by ID."""
     folder = folder_storage.load_folder(folder_id)
     if not folder:
         raise HTTPException(status_code=404, detail="Folder not found")
@@ -82,6 +85,7 @@ async def get_folder(folder_id: str):
 
 @router.put("/{folder_id}", response_model=FolderResponse)
 async def update_folder(folder_id: str, request: UpdateFolderRequest):
+    """Update a folder's name or parent."""
     fields = {}
     if request.name is not None:
         fields["name"] = request.name.strip()
@@ -102,6 +106,7 @@ async def update_folder(folder_id: str, request: UpdateFolderRequest):
 
 @router.delete("/{folder_id}")
 async def delete_folder(folder_id: str):
+    """Delete a folder. Charts in the folder are not deleted."""
     if not folder_storage.delete_folder(folder_id):
         raise HTTPException(status_code=404, detail="Folder not found")
     return {"deleted": True}
