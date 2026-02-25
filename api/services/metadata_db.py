@@ -168,6 +168,17 @@ def get_user_by_email(email: str) -> dict | None:
     )
 
 
+def update_user_password(user_id: str, password_hash: str) -> bool:
+    """Update a user's password hash. Returns True if user was found and updated."""
+    _ensure_tables()
+    db = get_db()
+    row = db.fetchone("SELECT id FROM users WHERE id = ? AND is_active = 1", (user_id,))
+    if not row:
+        return False
+    db.execute("UPDATE users SET password_hash = ? WHERE id = ?", (password_hash, user_id))
+    return True
+
+
 def get_user_by_id(user_id: str) -> dict | None:
     """Lookup user by ID."""
     _ensure_tables()
@@ -477,6 +488,17 @@ def remove_team_member(team_id: str, user_id: str) -> bool:
         (team_id, user_id),
     )
     return count > 0
+
+
+def get_team_member_role(team_id: str, user_id: str) -> str | None:
+    """Get a user's role in a team, or None if not a member."""
+    _ensure_tables()
+    db = get_db()
+    row = db.fetchone(
+        "SELECT role FROM team_members WHERE team_id = ? AND user_id = ?",
+        (team_id, user_id),
+    )
+    return row["role"] if row else None
 
 
 def delete_team(team_id: str, owner_id: str) -> bool:
