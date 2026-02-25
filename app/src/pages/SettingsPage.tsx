@@ -214,6 +214,9 @@ export function SettingsPage() {
         {/* ── Locale ───────────────────────────────────────────────── */}
         <LocaleSelector />
 
+        {/* ── Teams ────────────────────────────────────────────────── */}
+        <TeamManager />
+
         {/* ── Data Sources ─────────────────────────────────────────── */}
         <section className="bg-surface-raised rounded-2xl shadow-card border border-border-default p-7">
           <div className="flex items-center justify-between mb-5">
@@ -371,6 +374,86 @@ function ChartThemeSelector() {
           )
         })}
       </div>
+    </section>
+  )
+}
+
+// ── Team Manager ────────────────────────────────────────────────────────────
+
+function TeamManager() {
+  const [teams, setTeams] = useState<{ id: string; name: string; description: string | null; owner_id: string; created_at: string }[]>([])
+  const [newTeamName, setNewTeamName] = useState('')
+  const [creating, setCreating] = useState(false)
+
+  useEffect(() => {
+    fetch('/api/teams/')
+      .then((r) => r.ok ? r.json() : [])
+      .then(setTeams)
+      .catch(() => {})
+  }, [])
+
+  const handleCreate = async () => {
+    if (!newTeamName.trim()) return
+    setCreating(true)
+    try {
+      const res = await fetch('/api/teams/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newTeamName.trim() }),
+      })
+      if (!res.ok) throw new Error('Failed')
+      setNewTeamName('')
+      const listRes = await fetch('/api/teams/')
+      if (listRes.ok) setTeams(await listRes.json())
+    } catch { /* ignore */ } finally { setCreating(false) }
+  }
+
+  const handleDelete = async (teamId: string) => {
+    if (!window.confirm('Delete this team?')) return
+    await fetch(`/api/teams/${teamId}`, { method: 'DELETE' })
+    setTeams((prev) => prev.filter((t) => t.id !== teamId))
+  }
+
+  return (
+    <section className="bg-surface-raised rounded-2xl shadow-card border border-border-default p-7">
+      <h2 className="text-[17px] font-semibold text-text-primary mb-1.5">Teams</h2>
+      <p className="text-[14px] text-text-muted mb-5">Create teams to organize collaboration.</p>
+
+      <div className="flex gap-2 mb-4">
+        <input
+          type="text"
+          value={newTeamName}
+          onChange={(e) => setNewTeamName(e.target.value)}
+          placeholder="Team name"
+          className="flex-1 px-3 py-2.5 text-[14px] rounded-xl bg-surface-input border border-border-strong text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+          onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
+        />
+        <button
+          onClick={handleCreate}
+          disabled={creating || !newTeamName.trim()}
+          className="px-4 py-2.5 text-[14px] font-medium rounded-xl bg-blue-600 text-white hover:bg-blue-500 transition-colors disabled:opacity-50"
+        >
+          {creating ? 'Creating...' : 'Create'}
+        </button>
+      </div>
+
+      {teams.length === 0 ? (
+        <p className="text-[14px] text-text-muted py-2">No teams yet.</p>
+      ) : (
+        <div className="flex flex-col gap-2">
+          {teams.map((t) => (
+            <div key={t.id} className="flex items-center justify-between px-4 py-3 rounded-xl bg-surface-input border border-border-default">
+              <div>
+                <span className="text-[14px] text-text-primary font-medium">{t.name}</span>
+                {t.description && <p className="text-[12px] text-text-muted">{t.description}</p>}
+              </div>
+              <button onClick={() => handleDelete(t.id)} className="text-[13px] text-red-500 hover:text-red-400 transition-colors">
+                Delete
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
     </section>
   )
 }
