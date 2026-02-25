@@ -15,12 +15,10 @@ from dataclasses import dataclass
 
 import duckdb
 
+from api.services.storage import get_storage
+
 # source_id values are 12-char hex strings from uuid4().hex[:12]
 _SAFE_SOURCE_ID_RE = re.compile(r"^[a-f0-9]{12}$")
-
-
-DATA_DIR = Path(__file__).parent.parent.parent / "data" / "uploads"
-CACHE_DIR = Path(__file__).parent.parent.parent / "data" / "snowflake_saas"
 
 
 @dataclass
@@ -63,45 +61,53 @@ class DuckDBService:
         self._conn = duckdb.connect(":memory:")
         self._lock = threading.RLock()
         self._sources: dict[str, SourceMeta] = {}
-        DATA_DIR.mkdir(parents=True, exist_ok=True)
+        self._storage = get_storage()
+        # Ensure the uploads directory exists (storage.write() creates parents on demand)
         self._reload_uploaded_sources()
 
     def _reload_uploaded_sources(self) -> None:
-        """Re-ingest all CSVs from data/uploads/ on startup.
+        """Re-ingest all CSVs from uploads/ on startup.
 
         Each subdirectory name is the original source_id. This ensures charts
         that reference src_{source_id} tables survive server restarts.
         """
-        if not DATA_DIR.exists():
+        all_files = self._storage.list("uploads")
+        if not all_files:
             return
 
-        count = 0
-        for subdir in sorted(DATA_DIR.iterdir()):
-            if not subdir.is_dir():
+        # Group files by source_id subdirectory, pick only .csv files
+        csv_by_source: dict[str, str] = {}  # source_id -> storage path
+        for fpath in sorted(all_files):
+            # fpath is like "uploads/<source_id>/file.csv"
+            parts = fpath.split("/")
+            if len(parts) < 3:
                 continue
-            source_id = subdir.name
+            source_id = parts[1]
+            filename = parts[2]
             if not _SAFE_SOURCE_ID_RE.match(source_id):
                 print(f"[DuckDB] Skipping unsafe source_id directory: {source_id!r}")
                 continue
-            csv_file = next(subdir.glob("*.csv"), None)
-            if not csv_file:
-                continue
+            if filename.lower().endswith(".csv") and source_id not in csv_by_source:
+                csv_by_source[source_id] = fpath
 
+        count = 0
+        for source_id, storage_path in sorted(csv_by_source.items()):
+            local_path = self._storage.get_local_path(storage_path)
             table_name = f"src_{source_id}"
             try:
-                delimiter = self._detect_delimiter(csv_file)
+                delimiter = self._detect_delimiter(local_path)
                 with self._lock:
                     self._conn.execute(f"""
                         CREATE OR REPLACE TABLE {table_name} AS
-                        SELECT * FROM read_csv_auto('{_sql_string(str(csv_file))}', delim='{delimiter}', header=true)
+                        SELECT * FROM read_csv_auto('{_sql_string(str(local_path))}', delim='{delimiter}', header=true)
                     """)
                 self._sources[source_id] = SourceMeta(
-                    path=csv_file,
-                    ingested_at=datetime.fromtimestamp(csv_file.stat().st_mtime, tz=timezone.utc),
+                    path=local_path,
+                    ingested_at=datetime.fromtimestamp(local_path.stat().st_mtime, tz=timezone.utc),
                 )
                 count += 1
             except (duckdb.Error, UnicodeDecodeError, ValueError) as e:
-                print(f"[DuckDB] Skipping {source_id}/{csv_file.name}: {e}")
+                print(f"[DuckDB] Skipping {source_id}/{local_path.name}: {e}")
 
         if count:
             print(f"[DuckDB] Reloaded {count} CSV source(s) from disk")
@@ -120,12 +126,11 @@ class DuckDBService:
         safe_filename = Path(filename).name
         if not safe_filename:
             safe_filename = "upload.csv"
-        dest = DATA_DIR / source_id
-        dest.mkdir(parents=True, exist_ok=True)
-        stored_path = dest / safe_filename
+        storage_key = f"uploads/{source_id}/{safe_filename}"
+        stored_path = self._storage.get_local_path(storage_key)
         if file_path != stored_path:
-            import shutil
-            shutil.copy2(file_path, stored_path)
+            # Write the uploaded file contents into storage
+            self._storage.write(storage_key, file_path.read_bytes())
 
         table_name = f"src_{source_id}"
 
@@ -164,8 +169,7 @@ class DuckDBService:
                     continue
         except BaseException:
             # Unexpected error (OSError, MemoryError, etc.) — clean up files and table
-            import shutil
-            shutil.rmtree(dest, ignore_errors=True)
+            self._storage.delete_tree(f"uploads/{source_id}")
             try:
                 with self._lock:
                     self._conn.execute(f"DROP TABLE IF EXISTS {table_name}")
@@ -175,8 +179,7 @@ class DuckDBService:
 
         if not success:
             # All attempts failed — clean up and raise a user-friendly message
-            import shutil
-            shutil.rmtree(dest, ignore_errors=True)
+            self._storage.delete_tree(f"uploads/{source_id}")
             try:
                 with self._lock:
                     self._conn.execute(f"DROP TABLE IF EXISTS {table_name}")
@@ -233,7 +236,7 @@ class DuckDBService:
             config: Connection config (account, warehouse, database, schema).
             credentials: Dict with 'username' and 'password'.
             table_names: Which tables to sync.
-            cache: Whether to cache parquet files to data/snowflake_saas/.
+            cache: Whether to cache parquet files to snowflake_saas/.
 
         Returns:
             One SourceSchema per synced table.
@@ -280,9 +283,9 @@ class DuckDBService:
 
                 # Write to temp parquet, then ingest
                 if cache:
-                    cache_subdir = CACHE_DIR / table.lower()
-                    cache_subdir.mkdir(parents=True, exist_ok=True)
-                    pq_path = cache_subdir / f"{table.lower()}.parquet"
+                    cache_key = f"snowflake_saas/{table.lower()}/{table.lower()}.parquet"
+                    pq_path = self._storage.get_local_path(cache_key)
+                    pq_path.parent.mkdir(parents=True, exist_ok=True)
                     pq.write_table(arrow_table, str(pq_path))
                 else:
                     tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".parquet")
@@ -305,23 +308,46 @@ class DuckDBService:
         return results
 
     def ingest_cached_parquet(self, cache_dir: Path | None = None) -> list[SourceSchema]:
-        """Load all cached parquet files from data/snowflake_saas/ subdirectories.
+        """Load all cached parquet files from snowflake_saas/ subdirectories.
 
         This is the offline fallback for environments without Snowflake credentials.
         """
-        base = cache_dir or CACHE_DIR
-        if not base.exists():
+        if cache_dir:
+            # Explicit path override (used in tests) — use direct filesystem access
+            if not cache_dir.exists():
+                return []
+            results: list[SourceSchema] = []
+            for subdir in sorted(cache_dir.iterdir()):
+                if not subdir.is_dir():
+                    continue
+                for pq_file in subdir.glob("*.parquet"):
+                    existing_id = self.find_source_by_filename(subdir.name)
+                    schema = self.ingest_parquet(pq_file, subdir.name, source_id=existing_id)
+                    results.append(schema)
+            return results
+
+        # Default: use storage backend
+        all_files = self._storage.list("snowflake_saas")
+        if not all_files:
             return []
 
-        results: list[SourceSchema] = []
-        for subdir in sorted(base.iterdir()):
-            if not subdir.is_dir():
+        # Group parquet files by subdirectory
+        pq_by_subdir: dict[str, str] = {}  # subdir_name -> storage path
+        for fpath in sorted(all_files):
+            parts = fpath.split("/")
+            if len(parts) < 3:
                 continue
-            for pq_file in subdir.glob("*.parquet"):
-                # Reuse existing source_id so charts survive server restarts
-                existing_id = self.find_source_by_filename(subdir.name)
-                schema = self.ingest_parquet(pq_file, subdir.name, source_id=existing_id)
-                results.append(schema)
+            subdir_name = parts[1]
+            filename = parts[2]
+            if filename.lower().endswith(".parquet") and subdir_name not in pq_by_subdir:
+                pq_by_subdir[subdir_name] = fpath
+
+        results = []
+        for subdir_name, storage_path in sorted(pq_by_subdir.items()):
+            local_path = self._storage.get_local_path(storage_path)
+            existing_id = self.find_source_by_filename(subdir_name)
+            schema = self.ingest_parquet(local_path, subdir_name, source_id=existing_id)
+            results.append(schema)
         return results
 
     def get_preview(self, source_id: str, limit: int = 10) -> QueryResult:

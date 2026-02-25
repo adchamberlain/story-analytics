@@ -2,12 +2,14 @@
 from __future__ import annotations
 
 import csv
+import io
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from ..services.duckdb_service import get_duckdb_service, _SAFE_SOURCE_ID_RE
+from ..services.storage import get_storage
 
 router = APIRouter(prefix="/data", tags=["transforms"])
 
@@ -56,33 +58,42 @@ def _validate_source_id(source_id: str) -> None:
         raise HTTPException(400, "Invalid source_id")
 
 
-def _get_source_path(source_id: str) -> Path:
-    """Find the CSV file for a source_id."""
+def _get_source_info(source_id: str) -> tuple[Path, str]:
+    """Find the CSV file for a source_id. Returns (local_path, storage_key)."""
     _validate_source_id(source_id)
     svc = get_duckdb_service()
     meta = svc._sources.get(source_id)
     if not meta:
         raise HTTPException(404, f"Source {source_id} not found")
-    return meta.path
+    storage_key = f"uploads/{source_id}/{meta.path.name}"
+    return meta.path, storage_key
 
 
-def _read_csv(path: Path) -> tuple[list[str], list[dict[str, str]]]:
-    """Read CSV into (columns, rows)."""
-    with open(path, newline="", encoding="utf-8-sig") as f:
-        reader = csv.DictReader(f)
-        columns = list(reader.fieldnames or [])
-        rows = list(reader)
+def _get_source_path(source_id: str) -> Path:
+    """Find the CSV file for a source_id (backward-compat wrapper)."""
+    path, _ = _get_source_info(source_id)
+    return path
+
+
+def _read_csv(storage_key: str) -> tuple[list[str], list[dict[str, str]]]:
+    """Read CSV from storage into (columns, rows)."""
+    storage = get_storage()
+    data = storage.read(storage_key)
+    text = data.decode("utf-8-sig")
+    reader = csv.DictReader(io.StringIO(text))
+    columns = list(reader.fieldnames or [])
+    rows = list(reader)
     return columns, rows
 
 
-def _write_csv(path: Path, columns: list[str], rows: list[dict[str, str]]) -> None:
-    """Write rows back to CSV atomically via temp file."""
-    tmp = path.with_suffix(".tmp")
-    with open(tmp, "w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=columns)
-        writer.writeheader()
-        writer.writerows(rows)
-    tmp.rename(path)
+def _write_csv(storage_key: str, columns: list[str], rows: list[dict[str, str]]) -> None:
+    """Write rows back to CSV atomically via storage backend."""
+    buf = io.StringIO()
+    writer = csv.DictWriter(buf, fieldnames=columns)
+    writer.writeheader()
+    writer.writerows(rows)
+    storage = get_storage()
+    storage.write(storage_key, buf.getvalue().encode("utf-8"))
 
 
 def _reingest_and_preview(source_id: str, path: Path, limit: int = 50) -> dict:
@@ -102,8 +113,8 @@ def _reingest_and_preview(source_id: str, path: Path, limit: int = 50) -> dict:
 @router.post("/{source_id}/transform/transpose")
 async def transpose(source_id: str):
     """Transpose the data: rows become columns and columns become rows."""
-    path = _get_source_path(source_id)
-    columns, rows = _read_csv(path)
+    path, key = _get_source_info(source_id)
+    columns, rows = _read_csv(key)
     if not rows:
         raise HTTPException(400, "No data to transpose")
 
@@ -119,15 +130,15 @@ async def transpose(source_id: str):
             new_row[new_cols[i + 1]] = row.get(col, "")
         new_rows.append(new_row)
 
-    _write_csv(path, new_cols, new_rows)
+    _write_csv(key, new_cols, new_rows)
     return _reingest_and_preview(source_id, path)
 
 
 @router.post("/{source_id}/transform/rename-column")
 async def rename_column(source_id: str, req: RenameColumnRequest):
     """Rename a single column."""
-    path = _get_source_path(source_id)
-    columns, rows = _read_csv(path)
+    path, key = _get_source_info(source_id)
+    columns, rows = _read_csv(key)
     if req.old not in columns:
         raise HTTPException(404, f"Column '{req.old}' not found")
 
@@ -136,43 +147,43 @@ async def rename_column(source_id: str, req: RenameColumnRequest):
         {(req.new if k == req.old else k): v for k, v in row.items()}
         for row in rows
     ]
-    _write_csv(path, new_columns, new_rows)
+    _write_csv(key, new_columns, new_rows)
     return _reingest_and_preview(source_id, path)
 
 
 @router.post("/{source_id}/transform/delete-column")
 async def delete_column(source_id: str, req: DeleteColumnRequest):
     """Delete a column from the dataset."""
-    path = _get_source_path(source_id)
-    columns, rows = _read_csv(path)
+    path, key = _get_source_info(source_id)
+    columns, rows = _read_csv(key)
     if req.column not in columns:
         raise HTTPException(404, f"Column '{req.column}' not found")
 
     new_columns = [c for c in columns if c != req.column]
     new_rows = [{k: v for k, v in row.items() if k != req.column} for row in rows]
-    _write_csv(path, new_columns, new_rows)
+    _write_csv(key, new_columns, new_rows)
     return _reingest_and_preview(source_id, path)
 
 
 @router.post("/{source_id}/transform/reorder-columns")
 async def reorder_columns(source_id: str, req: ReorderColumnsRequest):
     """Reorder columns to match the provided order."""
-    path = _get_source_path(source_id)
-    columns, rows = _read_csv(path)
+    path, key = _get_source_info(source_id)
+    columns, rows = _read_csv(key)
     for col in req.columns:
         if col not in columns:
             raise HTTPException(404, f"Column '{col}' not found")
 
     new_rows = [{c: row.get(c, "") for c in req.columns} for row in rows]
-    _write_csv(path, req.columns, new_rows)
+    _write_csv(key, req.columns, new_rows)
     return _reingest_and_preview(source_id, path)
 
 
 @router.post("/{source_id}/transform/round")
 async def round_column(source_id: str, req: RoundRequest):
     """Round numeric values in a column to N decimal places."""
-    path = _get_source_path(source_id)
-    columns, rows = _read_csv(path)
+    path, key = _get_source_info(source_id)
+    columns, rows = _read_csv(key)
     if req.column not in columns:
         raise HTTPException(404, f"Column '{req.column}' not found")
 
@@ -181,45 +192,45 @@ async def round_column(source_id: str, req: RoundRequest):
             row[req.column] = str(round(float(row[req.column]), req.decimals))
         except (ValueError, TypeError):
             pass  # Leave non-numeric values as-is
-    _write_csv(path, columns, rows)
+    _write_csv(key, columns, rows)
     return _reingest_and_preview(source_id, path)
 
 
 @router.post("/{source_id}/transform/prepend-append")
 async def prepend_append(source_id: str, req: PrependAppendRequest):
     """Prepend and/or append text to all values in a column."""
-    path = _get_source_path(source_id)
-    columns, rows = _read_csv(path)
+    path, key = _get_source_info(source_id)
+    columns, rows = _read_csv(key)
     if req.column not in columns:
         raise HTTPException(404, f"Column '{req.column}' not found")
 
     for row in rows:
         val = row.get(req.column, "")
         row[req.column] = f"{req.prepend}{val}{req.append}"
-    _write_csv(path, columns, rows)
+    _write_csv(key, columns, rows)
     return _reingest_and_preview(source_id, path)
 
 
 @router.post("/{source_id}/transform/edit-cell")
 async def edit_cell(source_id: str, req: EditCellRequest):
     """Edit a single cell value by row index and column name."""
-    path = _get_source_path(source_id)
-    columns, rows = _read_csv(path)
+    path, key = _get_source_info(source_id)
+    columns, rows = _read_csv(key)
     if req.column not in columns:
         raise HTTPException(404, f"Column '{req.column}' not found")
     if req.row < 0 or req.row >= len(rows):
         raise HTTPException(400, f"Row {req.row} out of range (0-{len(rows) - 1})")
 
     rows[req.row][req.column] = "" if req.value is None else str(req.value)
-    _write_csv(path, columns, rows)
+    _write_csv(key, columns, rows)
     return _reingest_and_preview(source_id, path)
 
 
 @router.post("/{source_id}/transform/cast-type")
 async def cast_type(source_id: str, req: CastTypeRequest):
     """Cast a column to a different type (text, number, date)."""
-    path = _get_source_path(source_id)
-    columns, rows = _read_csv(path)
+    path, key = _get_source_info(source_id)
+    columns, rows = _read_csv(key)
     if req.column not in columns:
         raise HTTPException(404, f"Column '{req.column}' not found")
 
@@ -233,5 +244,5 @@ async def cast_type(source_id: str, req: CastTypeRequest):
         elif req.type == "text":
             row[req.column] = str(val)
         # "date" -- leave as-is; DuckDB handles date parsing on ingest
-    _write_csv(path, columns, rows)
+    _write_csv(key, columns, rows)
     return _reingest_and_preview(source_id, path)
