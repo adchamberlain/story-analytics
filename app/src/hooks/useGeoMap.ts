@@ -131,6 +131,7 @@ export function useGeoMap({
       .attr('viewBox', `0 0 ${width} ${h}`)
       .style('max-width', '100%')
       .style('touch-action', 'none')
+      .style('overflow', 'visible')
 
     svgRef.current = svg.node()
 

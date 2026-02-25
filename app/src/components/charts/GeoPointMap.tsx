@@ -184,18 +184,24 @@ export function GeoPointMap({ data, config, height = 400, autoHeight = false, ma
       const maxSpikeHeight = Math.min(effectiveHeight * 0.3, 80)
       const heightScale = d3.scaleLinear().domain(sizeExtent).range([6, maxSpikeHeight])
 
+      // Sort large spikes behind small ones so dense areas stay readable
+      const sorted = [...points].sort((a, b) => (b.sizeVal ?? 0) - (a.sizeVal ?? 0))
+
+      // Derive a darker stroke color for contrast
+      const strokeColor = d3.color(color)?.darker(0.6)?.formatHex() ?? color
+
       mapGroupSel.selectAll('path.spike')
-        .data(points)
+        .data(sorted)
         .join('path')
         .attr('class', 'spike')
         .attr('d', (d) => {
           const h = d.sizeVal !== null ? heightScale(d.sizeVal) : 6
-          const w = Math.max(1.5, h * 0.12)
+          const w = Math.max(1, h * 0.04)
           return `M${d.x},${d.y} L${d.x - w},${d.y} L${d.x},${d.y - h} L${d.x + w},${d.y} Z`
         })
         .attr('fill', color)
-        .attr('fill-opacity', 0.7)
-        .attr('stroke', color)
+        .attr('fill-opacity', 0.5)
+        .attr('stroke', strokeColor)
         .attr('stroke-width', 0.5)
         .style('cursor', 'pointer')
         .on('mouseenter', function (event, d) {
@@ -251,7 +257,9 @@ export function GeoPointMap({ data, config, height = 400, autoHeight = false, ma
         <div
           style={{
             position: 'absolute',
-            left: tooltip.x + 12,
+            ...(tooltip.x > containerWidth * 0.6
+              ? { right: containerWidth - tooltip.x + 12 }
+              : { left: tooltip.x + 12 }),
             top: tooltip.y - 30,
             background: 'var(--color-surface-raised, #1e293b)',
             color: 'var(--color-text-primary, #e2e8f0)',

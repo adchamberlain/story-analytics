@@ -76,7 +76,7 @@ export function ElectionDonut({ data, config, height, autoHeight }: ElectionDonu
       const gap = i > 0 ? 10 : 0
       if (preRowW + w + gap > width && i > 0) { preRows++; preRowW = w } else { preRowW += w + gap }
     })
-    const legendHeight = preRows * 18 + 8
+    const legendHeight = preRows * 22 + 8
     const radius = Math.min(width / 2 - 20, effectiveHeight - legendHeight - 22)
     if (radius <= 0) return
 
@@ -145,7 +145,7 @@ export function ElectionDonut({ data, config, height, autoHeight }: ElectionDonu
     })
     if (curRow.length > 0) legendRows.push({ indices: curRow, widths: curWidths })
 
-    const rowLineHeight = 18
+    const rowLineHeight = 22
     const totalLegendH = legendRows.length * rowLineHeight
     const legendStartY = effectiveHeight - totalLegendH - 2
 

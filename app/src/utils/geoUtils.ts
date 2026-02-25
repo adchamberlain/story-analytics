@@ -72,7 +72,17 @@ export async function loadBasemap(basemapId: BasemapId): Promise<FeatureCollecti
   }
 
   const obj = topo.objects[meta.objectKey] as GeometryCollection
-  return topojson.feature(topo, obj) as unknown as FeatureCollection
+  const fc = topojson.feature(topo, obj) as unknown as FeatureCollection
+
+  // Strip Antarctica from the world basemap — it's not a real country and
+  // wastes vertical space that could be used by the actual countries.
+  if (basemapId === 'world') {
+    fc.features = fc.features.filter(
+      (f) => f.properties?.name !== 'Antarctica' && String(f.id ?? f.properties?.id) !== '010',
+    )
+  }
+
+  return fc
 }
 
 export async function loadCustomGeoJSON(file: File): Promise<FeatureCollection> {

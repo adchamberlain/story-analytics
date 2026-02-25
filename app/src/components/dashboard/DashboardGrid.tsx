@@ -159,7 +159,7 @@ export function DashboardGrid({ charts, dashboardId, editable = false, onLayoutC
           }}
         >
           {charts.map((chart) => (
-            <div key={chart.chart_id} className="overflow-hidden">
+            <div key={chart.chart_id}>
               <ChartErrorBoundary chartTitle={chart.title ?? undefined}>
                 <DashboardChartCell chart={chart} dashboardId={dashboardId} editable={editable} embedFlags={embedFlags} />
               </ChartErrorBoundary>

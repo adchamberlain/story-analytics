@@ -233,7 +233,7 @@ export function ChartWrapper({ title, subtitle, source, sourceUrl, chartUrl, chi
           aria-label={ariaLabel}
           aria-describedby={summaryId}
           tabIndex={0}
-          className={`flex-1 min-h-0 overflow-hidden flex flex-col ${compact ? 'mt-2' : 'mt-3'} focus:outline-2 focus:outline-blue-500 focus:outline-offset-2 rounded-lg`}
+          className={`flex-1 min-h-0 flex flex-col ${compact ? 'mt-2' : 'mt-3'} focus:outline-2 focus:outline-blue-500 focus:outline-offset-2 rounded-lg`}
         >
           {children}
         </div>
