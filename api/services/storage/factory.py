@@ -14,7 +14,7 @@ def get_storage() -> StorageBackend:
 
     Set STORAGE_BACKEND env var to choose:
         - "local" (default) → LocalStorageBackend
-        - "s3" → S3StorageBackend (not yet implemented)
+        - "s3" → S3StorageBackend (requires STORAGE_S3_BUCKET)
     """
     backend = os.environ.get("STORAGE_BACKEND", "local").lower()
 
@@ -24,7 +24,11 @@ def get_storage() -> StorageBackend:
         return LocalStorageBackend(base_dir=base_dir)
 
     if backend == "s3":
-        from api.services.storage.s3 import S3StorageBackend  # type: ignore[import-not-found]
-        return S3StorageBackend()
+        from api.services.storage.s3 import S3StorageBackend
+        bucket = os.environ.get("STORAGE_S3_BUCKET", "")
+        if not bucket:
+            raise ValueError("STORAGE_S3_BUCKET env var is required when using S3 backend.")
+        region = os.environ.get("STORAGE_S3_REGION") or None
+        return S3StorageBackend(bucket=bucket, region=region)
 
     raise ValueError(f"Unknown STORAGE_BACKEND: {backend!r}. Use 'local' or 's3'.")
