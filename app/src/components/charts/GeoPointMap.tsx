@@ -8,6 +8,7 @@ import * as d3 from 'd3'
 import type { ChartConfig } from '../../types/chart'
 import { BASEMAPS, type BasemapId } from '../../utils/geoUtils'
 import { useGeoMap, zoomBtnStyle } from '../../hooks/useGeoMap'
+import { detectUnitFromTitleSubtitle, fmtWithUnit } from '../../utils/formatters'
 
 export interface GeoPointMapProps {
   data: Record<string, unknown>[]
@@ -66,6 +67,19 @@ export function GeoPointMap({ data, config, height = 400, autoHeight = false, ma
     // Project data points
     if (!latColumn || !lonColumn) return
 
+    // Auto-detect a label column if not explicitly configured
+    const effectiveLabelCol = labelColumn || (() => {
+      if (data.length === 0) return undefined
+      const reserved = new Set([latColumn, lonColumn, sizeColumn].filter(Boolean))
+      const keys = Object.keys(data[0])
+      // Prefer columns with string content that aren't lat/lon/size
+      return keys.find((k) => !reserved.has(k) && typeof data[0][k] === 'string')
+        ?? keys.find((k) => !reserved.has(k) && typeof data[0][k] !== 'number')
+    })()
+
+    // Detect units from title/subtitle for tooltip formatting
+    const unit = detectUnitFromTitleSubtitle(config.title, config.extraProps?.subtitle as string | undefined)
+
     const points = data
       .map((row) => {
         const lat = Number(row[latColumn])
@@ -74,7 +88,7 @@ export function GeoPointMap({ data, config, height = 400, autoHeight = false, ma
         const projected = projectionFn([lon, lat])
         if (!projected) return null
         const sizeVal = sizeColumn ? Number(row[sizeColumn]) : null
-        const labelVal = labelColumn ? String(row[labelColumn] ?? '') : ''
+        const labelVal = effectiveLabelCol ? String(row[effectiveLabelCol] ?? '') : ''
         return {
           x: projected[0],
           y: projected[1],
@@ -115,7 +129,7 @@ export function GeoPointMap({ data, config, height = 400, autoHeight = false, ma
             x: event.clientX - rect.left,
             y: event.clientY - rect.top,
             label: d.label || `${d.row[latColumn]}, ${d.row[lonColumn]}`,
-            value: d.sizeVal !== null ? d3.format(',.2~f')(d.sizeVal) : '',
+            value: d.sizeVal !== null ? fmtWithUnit(d3.format(',.2~f')(d.sizeVal), unit) : '',
           })
         })
         .on('mousemove', function (event) {
@@ -136,12 +150,22 @@ export function GeoPointMap({ data, config, height = 400, autoHeight = false, ma
         .attr('transform', (d) => `translate(${d.x},${d.y})`)
         .style('cursor', 'pointer')
 
+      // Invisible hit area so the entire pin region triggers events reliably
+      pinGroup.append('rect')
+        .attr('x', -10)
+        .attr('y', -16)
+        .attr('width', 20)
+        .attr('height', 28)
+        .attr('fill', 'transparent')
+        .attr('pointer-events', 'all')
+
       // Pin icon (teardrop shape)
       pinGroup.append('path')
         .attr('d', 'M0,-12 C-4,-12 -7,-8 -7,-5 C-7,0 0,8 0,8 S7,0 7,-5 C7,-8 4,-12 0,-12Z')
         .attr('fill', color)
         .attr('stroke', '#fff')
         .attr('stroke-width', 1)
+        .attr('pointer-events', 'none')
 
       // Inner dot
       pinGroup.append('circle')
@@ -149,6 +173,7 @@ export function GeoPointMap({ data, config, height = 400, autoHeight = false, ma
         .attr('cy', -5)
         .attr('r', 2.5)
         .attr('fill', '#fff')
+        .attr('pointer-events', 'none')
 
       // Labels
       pinGroup.append('text')
@@ -157,6 +182,7 @@ export function GeoPointMap({ data, config, height = 400, autoHeight = false, ma
         .attr('font-size', 10)
         .attr('fill', 'var(--color-text-primary, #333)')
         .attr('font-weight', 500)
+        .attr('pointer-events', 'none')
         .text((d) => d.label)
 
       pinGroup
@@ -211,7 +237,7 @@ export function GeoPointMap({ data, config, height = 400, autoHeight = false, ma
             x: event.clientX - rect.left,
             y: event.clientY - rect.top,
             label: d.label || `${d.row[latColumn]}, ${d.row[lonColumn]}`,
-            value: d.sizeVal !== null ? d3.format(',.2~f')(d.sizeVal) : '',
+            value: d.sizeVal !== null ? fmtWithUnit(d3.format(',.2~f')(d.sizeVal), unit) : '',
           })
         })
         .on('mousemove', function (event) {
@@ -242,7 +268,7 @@ export function GeoPointMap({ data, config, height = 400, autoHeight = false, ma
   }
 
   return (
-    <div ref={containerRef} style={{ width: '100%', height: autoHeight ? '100%' : height, position: 'relative' }}>
+    <div ref={containerRef} onMouseLeave={() => setTooltip(null)} style={{ width: '100%', height: autoHeight ? '100%' : height, position: 'relative', overflow: 'hidden' }}>
       {/* Zoom controls */}
       <div
         data-testid="zoom-controls"

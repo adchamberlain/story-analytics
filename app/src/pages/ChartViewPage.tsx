@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useParams, useSearchParams, Link } from 'react-router-dom'
 import { ChartWrapper } from '../components/charts/ChartWrapper'
 import { ObservableChartFactory } from '../components/charts/ObservableChartFactory'
 import { SharePanel } from '../components/sharing/SharePanel'
@@ -31,6 +31,8 @@ interface ChartData {
  */
 export function ChartViewPage() {
   const { chartId } = useParams<{ chartId: string }>()
+  const [searchParams] = useSearchParams()
+  const dashboardId = searchParams.get('dashboard')
   const [chartData, setChartData] = useState<ChartData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -101,9 +103,16 @@ export function ChartViewPage() {
     <div className="min-h-screen bg-surface-secondary">
       {/* Header */}
       <header className="bg-surface border-b border-border-default px-6 py-3 flex items-center justify-between">
-        <Link to="/library" className="text-sm text-text-secondary hover:text-text-on-surface transition-colors">
-          &larr; Library
-        </Link>
+        <div className="flex items-center gap-4">
+          {dashboardId && (
+            <Link to={`/dashboard/${dashboardId}`} className="text-sm text-text-secondary hover:text-text-on-surface transition-colors">
+              &larr; Dashboard
+            </Link>
+          )}
+          <Link to="/library" className="text-sm text-text-secondary hover:text-text-on-surface transition-colors">
+            {dashboardId ? 'Library' : <>&larr; Library</>}
+          </Link>
+        </div>
         <div className="flex items-center gap-2">
           <Link
             to={`/editor/${chartId}`}

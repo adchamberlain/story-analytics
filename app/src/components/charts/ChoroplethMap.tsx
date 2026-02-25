@@ -13,6 +13,7 @@ import {
   type BasemapId,
 } from '../../utils/geoUtils'
 import { useGeoMap, zoomBtnStyle } from '../../hooks/useGeoMap'
+import { detectUnitFromTitleSubtitle, fmtWithUnit } from '../../utils/formatters'
 
 /** Format legend value — use SI prefixes only for large numbers to avoid
  *  confusing "m" (milli) suffix on values < 1 (e.g. 0.6 → "600m"). */
@@ -100,6 +101,9 @@ export function ChoroplethMap({ data, config, height = 400, autoHeight = false }
 
     const el = containerRef.current
 
+    // Detect units from title/subtitle for tooltip formatting
+    const unit = detectUnitFromTitleSubtitle(config.title, config.extraProps?.subtitle as string | undefined)
+
     // Draw features inside the zoomable group
     mapGroupSel.selectAll('path')
       .data(joined)
@@ -116,7 +120,7 @@ export function ChoroplethMap({ data, config, height = 400, autoHeight = false }
           x: event.clientX - rect.left,
           y: event.clientY - rect.top,
           label: d.label,
-          value: d.value !== null ? d3.format(',.2~f')(d.value) : 'No data',
+          value: d.value !== null ? fmtWithUnit(d3.format(',.2~f')(d.value), unit) : 'No data',
         })
       })
       .on('mousemove', function (event) {
@@ -161,7 +165,7 @@ export function ChoroplethMap({ data, config, height = 400, autoHeight = false }
   return (
     <div style={{ width: '100%', height: autoHeight ? '100%' : height, display: 'flex', flexDirection: 'column' }}>
       {/* Map area */}
-      <div ref={containerRef} style={{ width: '100%', flex: '1 1 0', minHeight: 0, position: 'relative' }}>
+      <div ref={containerRef} onMouseLeave={() => setTooltip(null)} style={{ width: '100%', flex: '1 1 0', minHeight: 0, position: 'relative', overflow: 'hidden' }}>
         {/* Zoom controls */}
         <div
           data-testid="zoom-controls"

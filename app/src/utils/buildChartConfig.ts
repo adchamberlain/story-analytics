@@ -13,6 +13,8 @@ export function buildChartConfig(chart: {
   horizontal?: boolean
   sort?: boolean
   config?: Record<string, unknown> | null
+  title?: string | null
+  subtitle?: string | null
 }): ChartConfig {
   const cfg = chart.config ?? {}
 
@@ -95,6 +97,10 @@ export function buildChartConfig(chart: {
     geoSymbolShape: (cfg.geoSymbolShape as ChartConfig['geoSymbolShape']) ?? undefined,
     geoSizeRange: (cfg.geoSizeRange as ChartConfig['geoSizeRange']) ?? undefined,
   }
+
+  // Pass title and subtitle so detectValueUnit() can infer units from them
+  if (chart.title) chartConfig.title = chart.title
+  if (chart.subtitle) chartConfig.extraProps = { ...chartConfig.extraProps, subtitle: chart.subtitle }
 
   // Apply palette colors
   const palette = (cfg.palette as PaletteKey) ?? 'default'
