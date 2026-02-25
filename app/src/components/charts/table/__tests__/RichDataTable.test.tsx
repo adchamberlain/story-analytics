@@ -256,6 +256,49 @@ describe('RichDataTable', () => {
     })
   })
 
+  describe('initialSearch via extraProps', () => {
+    it('pre-fills search from config.extraProps.initialSearch', () => {
+      render(
+        <RichDataTable
+          data={SAMPLE_DATA}
+          config={{ extraProps: { initialSearch: 'West' } }}
+        />,
+      )
+      const searchInput = screen.getByPlaceholderText(/search/i) as HTMLInputElement
+      expect(searchInput.value).toBe('West')
+    })
+
+    it('filters rows based on initialSearch value', () => {
+      render(
+        <RichDataTable
+          data={SAMPLE_DATA}
+          config={{ extraProps: { initialSearch: 'West' } }}
+        />,
+      )
+      // Should show only West region rows
+      expect(screen.getByText('Alice')).toBeDefined()
+      expect(screen.getByText('Charlie')).toBeDefined()
+      expect(screen.queryByText('Bob')).toBeNull()
+      expect(screen.queryByText('Diana')).toBeNull()
+    })
+
+    it('shows filtered row count when initialSearch is set', () => {
+      render(
+        <RichDataTable
+          data={SAMPLE_DATA}
+          config={{ extraProps: { initialSearch: 'West' } }}
+        />,
+      )
+      expect(screen.getByText(/2 of 5 rows/)).toBeDefined()
+    })
+
+    it('defaults to empty search when extraProps.initialSearch is absent', () => {
+      render(<RichDataTable data={SAMPLE_DATA} config={{}} />)
+      const searchInput = screen.getByPlaceholderText(/search/i) as HTMLInputElement
+      expect(searchInput.value).toBe('')
+    })
+  })
+
   describe('edge cases', () => {
     it('handles null and undefined values', () => {
       const dataWithNulls = [

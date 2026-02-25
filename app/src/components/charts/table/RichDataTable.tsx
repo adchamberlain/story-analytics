@@ -98,7 +98,9 @@ function SparklineSvg({ values }: { values: number[] }) {
 export function RichDataTable({ data, config }: RichDataTableProps) {
   const [sortCol, setSortCol] = useState<string | null>(null)
   const [sortDir, setSortDir] = useState<SortDir>(null)
-  const [search, setSearch] = useState('')
+  // Support initialSearch from embed ?search= query param (passed via config.extraProps)
+  const initialSearch = (config?.extraProps?.initialSearch as string) || ''
+  const [search, setSearch] = useState(initialSearch)
   const [page, setPage] = useState(0)
   const [pageSize, setPageSize] = useState(25)
 
