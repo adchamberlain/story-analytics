@@ -18,18 +18,34 @@ export function unitToFormat(unit: unknown): 'currency' | 'percent' | 'number' |
   return undefined
 }
 
+/** Count decimal places in a number's string representation. */
+function decimalPlaces(n: number): number {
+  const s = String(n)
+  const dot = s.indexOf('.')
+  return dot === -1 ? 0 : s.length - dot - 1
+}
+
 export function formatBigValue(
   value: unknown,
   format: 'currency' | 'percent' | 'number' | undefined,
   /** Per-row unit string (e.g. "USD", "percent"). Overrides format when present. */
   unit?: unknown,
+  /** Reference value whose decimal precision this value should match. */
+  referenceValue?: unknown,
 ): string {
   if (value == null) return '—'
   if (typeof value !== 'number') return String(value)
   // Per-row unit overrides global format
   const effectiveFormat = unitToFormat(unit) ?? format
-  if (effectiveFormat === 'currency') return `$${value.toLocaleString()}`
-  if (effectiveFormat === 'percent') return `${value.toFixed(1)}%`
+  // Match decimal precision of reference value when provided
+  const refDecimals = typeof referenceValue === 'number' ? decimalPlaces(referenceValue) : null
+  const decimals = refDecimals != null ? Math.max(decimalPlaces(value), refDecimals) : null
+  if (effectiveFormat === 'currency') {
+    const formatted = decimals != null ? value.toLocaleString(undefined, { minimumFractionDigits: decimals }) : value.toLocaleString()
+    return `$${formatted}`
+  }
+  if (effectiveFormat === 'percent') return `${value.toFixed(decimals ?? 1)}%`
+  if (decimals != null) return value.toLocaleString(undefined, { minimumFractionDigits: decimals })
   return value.toLocaleString()
 }
 
