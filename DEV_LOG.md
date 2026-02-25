@@ -2,7 +2,33 @@
 
 ## 2026-02-25
 
-### Session: Chart Polish — Smart Tooltips, Map Fixes, Dashboard UX
+### Session 2: DataTable Default Sort, Area Chart Fix, Library UX, Dashboard Copy
+
+**DataTable default sort column:**
+- Added `tableDefaultSortColumn` and `tableDefaultSortDir` to `ChartConfig` and `EditorConfig`
+- Toolbox UI: column dropdown + asc/desc toggle, only shown for DataTable charts
+- `RichDataTable` initializes sort state from config, syncs live via `useEffect` for editor preview
+- Wired through `loadChart`, `saveNew`, `save`, and `EditorPage` chartConfig mapping
+- Seed data: Global Country Statistics ships pre-sorted by GDP descending
+
+**Multi-series area chart zigzag fix:**
+- Non-stacked multi-series area charts rendered wild zigzag artifacts
+- Root cause: UNPIVOT data arrives interleaved by series at each x-value; Observable Plot's `areaY` needs monotonic x per series
+- Fix: added `sort: x` to both `areaY` and `lineY` marks in the non-stacked branch
+- Stacked areas were unaffected (Plot.stackY handles sorting internally)
+
+**Folder sidebar cleanup:**
+- "Unfiled" virtual folder was always shown, even with zero real folders (redundant with "All charts")
+- Now only renders when `folders.length > 0`
+- Edge case: resets filter to "All charts" if last real folder is deleted while viewing "Unfiled"
+
+**Dashboard content polish:**
+- Rewrote titles and subtitles for all 25 Perfect Dashboard charts with clever, personality-driven copy
+- Copied updated seed files to live `data/charts/` for immediate visibility
+
+---
+
+### Session 1: Chart Polish — Smart Tooltips, Map Fixes, Dashboard UX
 
 **Tooltip unit detection (all chart types):**
 - Treemap, pie, choropleth, symbol, and spike map tooltips now auto-detect units from title/subtitle text (e.g. "FY 2025 spending in billions of dollars" → `$1,340B` instead of `1,340`)
