@@ -24,7 +24,6 @@ An AI assistant (Claude, GPT, or Gemini) is available to help write SQL, add cal
 - **Data transforms** — Transpose, rename, delete, reorder, round, prepend/append, edit cells, cast types
 - **Version history** — Auto-save snapshots with one-click restore
 - **Annotations** — Reference lines, text labels, and highlighted ranges with responsive scaling
-- **Collaboration** — Threaded comments, team management, and notifications
 - **API** — RESTful endpoints with key-based authentication
 - **Custom themes** — 9 built-in themes, custom CSS, 50+ Google Fonts, and logo upload
 - **KPI cards** — Single-number displays with comparison values, trend indicators, and color-coded deltas
