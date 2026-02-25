@@ -55,6 +55,12 @@ beforeEach(() => {
         json: () => Promise.resolve([]),
       })
     }
+    if (url === '/api/teams/') {
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve([]),
+      })
+    }
     return Promise.resolve({ ok: true, json: () => Promise.resolve({}) })
   }))
 })

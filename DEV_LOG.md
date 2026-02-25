@@ -2,6 +2,39 @@
 
 ## 2026-02-24
 
+### Session: Phase 6 — Final Datawrapper Parity + Screenshot Verification
+
+**10 tasks across 5 sessions (4 parallel + 1 sequential)**, all merged to main. 613 total tests (163 backend + 450 frontend).
+
+**Session F — Screenshot Verification:**
+- 8 deferred Playwright E2E screenshot tests: published view, tooltips, theme builder, non-US locale, palette builder, rich table heatmap+sparkline, map projections, responsive annotations
+
+**Session G — New Map Types:**
+- Extracted `useGeoMap` hook from ChoroplethMap (shared basemap loading, projection, zoom/pan, ResizeObserver)
+- GeoPointMap component with 3 variants: Symbol (sized circles), Locator (pin markers), Spike (vertical lines)
+- Type registration: 3 new ChartTypes, 6 new ChartConfig fields, across 7 files
+- 12 vitest tests
+
+**Session H — PowerPoint Export + Dark Mode Embeds:**
+- `pptxgenjs` (lazy-loaded): exportPPTX() with title/subtitle/image/source slide, PPTX button in ChartWrapper
+- Dark mode auto-detection: `?theme=dark|light|auto` query param, `prefers-color-scheme` listener, PostMessage override
+- Applied to both EmbedChartPage and EmbedDashboardPage
+- 19 vitest tests (8 export + 11 embed)
+
+**Session I — API Documentation + API Keys:**
+- OpenAPI enrichment: description, version 0.2.0, openapi_tags, all router docstrings + Pydantic Field examples
+- API key system: `sa_live_` prefix + SHA-256 hash, create/list/revoke endpoints, `X-API-Key` header + `?api_key=` auth
+- ApiKeyManager UI in SettingsPage
+- 12 tests (9 pytest + 3 vitest)
+
+**Session J — Collaboration:**
+- Comments: polymorphic (chart/dashboard), threaded via parent_id, soft-delete, CommentSidebar in EditorPage
+- Teams: create/manage teams, membership CRUD, TeamManager in SettingsPage
+- Notifications: create/list/mark-read, NotificationBell in TopNav with 60s polling
+- 35 tests (24 pytest + 11 vitest)
+
+**Merge notes:** Sessions F/G/H/I ran in parallel worktrees, merged sequentially (clean). Session J had 3 conflicts (main.py, metadata_db.py, SettingsPage.tsx) — all additive, resolved by keeping both sides.
+
 ### Session: Phase 5 — Close Remaining Datawrapper Parity Gaps
 
 **11 tasks across 5 parallel worktree sessions**, all merged to main. 535 total tests (130 backend + 405 frontend).

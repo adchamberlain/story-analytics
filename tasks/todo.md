@@ -232,12 +232,87 @@
 - [x] Visual feedback: highlight on hover, ghost drag preview
 - [x] Tests: 5 vitest tests
 
+## Phase 6: Final Datawrapper Parity ✅
+
+### Task 6.1: Screenshot Verification (8 Deferred E2E Tests) ✅
+- [x] Published view screenshot
+- [x] Tooltips screenshot
+- [x] Theme builder page screenshot
+- [x] Non-US locale screenshot
+- [x] Palette builder UI screenshot
+- [x] Rich table with heatmap + sparkline screenshot
+- [x] Map at multiple projections screenshot
+- [x] Responsive annotations desktop vs mobile screenshot
+
+### Task 6.2: Shared Geo Hook ✅
+- [x] Extract useGeoMap hook from ChoroplethMap (~160 lines)
+- [x] Refactor ChoroplethMap to consume hook (328→175 lines)
+
+### Task 6.3: New Map Types (Symbol, Locator, Spike) ✅
+- [x] GeoPointMap component with mapVariant prop
+- [x] Symbol map: circles sized by value (d3.scaleSqrt)
+- [x] Locator map: pin markers with text labels
+- [x] Spike map: vertical lines proportional to value
+- [x] Type registration across 7 files (chart.ts, editorStore, factory, selector, toolbox, editor, dashboard)
+- [x] Tests: 12 vitest tests
+
+### Task 6.4: PowerPoint Export ✅
+- [x] pptxgenjs dependency (lazy-loaded)
+- [x] exportPPTX() in chartExport.ts
+- [x] PPTX button in ChartWrapper export row
+- [x] Tests: 8 vitest tests
+
+### Task 6.5: Dark Mode Auto-Detection for Embeds ✅
+- [x] ?theme=dark|light|auto query param on EmbedChartPage
+- [x] prefers-color-scheme media query listener
+- [x] PostMessage override (sa-theme)
+- [x] Dark styles for embed pages
+- [x] Same for EmbedDashboardPage
+- [x] Tests: 11 vitest tests
+
+### Task 6.6: OpenAPI Documentation ✅
+- [x] Enhanced FastAPI constructor (description, version 0.2.0, openapi_tags)
+- [x] All router docstrings + Pydantic Field examples enriched
+
+### Task 6.7: API Key Authentication ✅
+- [x] api_keys table in metadata_db.py
+- [x] api_key_service.py (generate, verify with SHA-256)
+- [x] api_keys.py router (create, list, revoke)
+- [x] auth_simple.py extended for X-API-Key header + ?api_key= param
+- [x] ApiKeyManager component in SettingsPage
+- [x] Tests: 9 pytest + 3 vitest tests
+
+### Task 6.8: Comments System ✅
+- [x] comments table (polymorphic: chart or dashboard, threaded, soft-delete)
+- [x] Comments CRUD in metadata_db.py
+- [x] comments.py router (POST, GET, PUT, DELETE)
+- [x] commentStore.ts (Zustand)
+- [x] CommentInput, CommentThread, CommentSidebar components
+- [x] EditorPage: AI Chat / Comments tab switcher
+- [x] Tests: 10 pytest + 7 vitest tests
+
+### Task 6.9: Teams ✅
+- [x] teams + team_members tables
+- [x] Teams CRUD in metadata_db.py
+- [x] teams.py router (CRUD + membership management)
+- [x] TeamManager component in SettingsPage
+- [x] Tests: 8 pytest tests
+
+### Task 6.10: Notifications ✅
+- [x] notifications table
+- [x] Notifications CRUD in metadata_db.py
+- [x] notifications.py router (list, unread-count, mark-read, mark-all-read)
+- [x] notificationStore.ts (Zustand, 60s polling)
+- [x] NotificationBell + NotificationDropdown components
+- [x] TopNav: NotificationBell integration
+- [x] Tests: 6 pytest + 4 vitest tests
+
 ---
 
-## Test Summary (Phase 5 Complete)
+## Test Summary (Phase 6 Complete)
 
 | Suite | Count |
 |-------|-------|
-| Backend (pytest) | 130 |
-| Frontend (vitest) | 405 |
-| **Total** | **535** |
+| Backend (pytest) | 163 |
+| Frontend (vitest) | 450 |
+| **Total** | **613** |
