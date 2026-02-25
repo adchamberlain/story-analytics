@@ -1,5 +1,5 @@
 /**
- * Tests for EmbedChartPage dark mode functionality.
+ * Tests for EmbedChartPage dark mode and embed render flags.
  *
  * Uses source-code inspection pattern consistent with the project's test style.
  */
@@ -59,8 +59,8 @@ describe('EmbedChartPage dark mode', () => {
   })
 
   it('applies dark background and text colors', () => {
-    // Dark mode background
-    expect(source).toContain("backgroundColor: isDark ? '#0f172a' : undefined")
+    // Dark mode background (with transparent flag check)
+    expect(source).toContain("isDark ? '#0f172a' : undefined")
     // Dark mode text colors for title, subtitle, source, staleness
     expect(source).toContain("isDark ? '#f1f5f9' : '#1a1a1a'")
     expect(source).toContain("isDark ? '#94a3b8' : '#666'")
@@ -70,6 +70,59 @@ describe('EmbedChartPage dark mode', () => {
 
   it('sets data-theme attribute on container', () => {
     expect(source).toContain("data-theme={isDark ? 'dark' : 'light'}")
+  })
+})
+
+describe('EmbedChartPage embed flags', () => {
+  let source: string
+
+  beforeEach(async () => {
+    const fs = await import('fs')
+    source = fs.readFileSync(
+      resolve(__dirname, '../EmbedChartPage.tsx'),
+      'utf-8',
+    )
+  })
+
+  it('imports parseEmbedFlags utility', () => {
+    expect(source).toContain("import { parseEmbedFlags } from '../utils/embedFlags'")
+  })
+
+  it('calls parseEmbedFlags with searchParams', () => {
+    expect(source).toContain('parseEmbedFlags(searchParams)')
+  })
+
+  it('plain flag: hides title when flags.plain is true', () => {
+    expect(source).toContain('!flags.plain && chart.title')
+  })
+
+  it('plain flag: hides subtitle when flags.plain is true', () => {
+    expect(source).toContain('!flags.plain && chart.subtitle')
+  })
+
+  it('plain flag: hides source when flags.plain is true', () => {
+    expect(source).toContain('!flags.plain && chart.source')
+  })
+
+  it('plain flag: hides staleness indicator when flags.plain is true', () => {
+    expect(source).toContain('!flags.plain && displayAge')
+  })
+
+  it('plain flag: removes padding when plain=true', () => {
+    expect(source).toContain("padding: flags.plain ? '0' : '12px 16px'")
+  })
+
+  it('transparent flag: sets background to transparent', () => {
+    expect(source).toContain('flags.transparent')
+    expect(source).toContain("? 'transparent'")
+  })
+
+  it('static flag: wraps chart in pointer-events:none div', () => {
+    expect(source).toContain("flags.static ? { pointerEvents: 'none' } : undefined")
+  })
+
+  it('search flag: passes initialSearch via extraProps', () => {
+    expect(source).toContain('initialSearch: flags.search')
   })
 })
 
