@@ -8,8 +8,10 @@ import { MultiColumnSelect } from './MultiColumnSelect'
 import { AnnotationEditor } from './AnnotationEditor'
 import type { ChartType } from '../../types/chart'
 import type { PaletteKey } from '../../themes/plotTheme'
+import { PALETTES } from '../../themes/plotTheme'
 import { loadCustomGeoJSON, BASEMAPS, PROJECTIONS } from '../../utils/geoUtils'
 import { SUPPORTED_LOCALES } from '../../stores/localeStore'
+import { ColorblindPreview } from './ColorblindPreview'
 import type { AggregationType, TimeGrain, DataMode, EditorConfig, TableInfoItem } from '../../stores/editorStore'
 
 function isDateColumn(type: string | undefined): boolean {
@@ -533,6 +535,9 @@ export function Toolbox() {
           value={config.palette}
           onChange={(palette: PaletteKey) => updateConfig({ palette })}
         />
+        <div className="mt-3">
+          <ColorblindPreview colors={[...(PALETTES[config.palette] ?? PALETTES.default)]} />
+        </div>
       </Section>
 
       {/* Toggles */}
