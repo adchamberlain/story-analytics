@@ -1,7 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
-import { checkPaletteAccessibility, contrastRatio, simulateCVD, simulatePalette } from '../utils/colorblind'
-import type { PaletteAccessibility } from '../utils/colorblind'
+import { checkPaletteAccessibility, contrastRatio, simulateCVD } from '../utils/colorblind'
 
 // ── M.1: Alt text field in config ─────────────────────────────────────────────
 
