@@ -344,6 +344,7 @@ export function DashboardBuilderPage() {
                 {store.charts.map((ref) => (
                   <div key={ref.chart_id}>
                     <BuilderGridCard
+                      chartId={ref.chart_id}
                       chartFullData={chartData[ref.chart_id]}
                       chartError={chartErrors[ref.chart_id]}
                       onRemove={() => store.removeChart(ref.chart_id)}
@@ -403,10 +404,12 @@ export function DashboardBuilderPage() {
 // ── Builder Grid Card ───────────────────────────────────────────────────────
 
 function BuilderGridCard({
+  chartId,
   chartFullData,
   chartError,
   onRemove,
 }: {
+  chartId: string
   chartFullData?: ChartFullData
   chartError?: string
   onRemove: () => void
@@ -492,6 +495,8 @@ function BuilderGridCard({
         subtitle={chartFullData.subtitle ?? undefined}
         source={chartFullData.source ?? undefined}
         sourceUrl={(chartFullData.config?.sourceUrl as string) ?? undefined}
+        chartId={chartId}
+        allowDataDownload={(chartFullData.config?.allowDataDownload as boolean) !== false}
         className="h-full cursor-grab active:cursor-grabbing"
         compact
       >

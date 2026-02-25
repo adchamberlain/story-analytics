@@ -60,13 +60,17 @@ interface ChartWrapperProps {
   yColumn?: string
   /** Number of data points for auto-generated summary */
   dataLength?: number
+  /** Chart ID for CSV download link */
+  chartId?: string
+  /** Whether CSV download is allowed (default: true) */
+  allowDataDownload?: boolean
 }
 
 /**
  * Publication-ready chart wrapper with title, subtitle, source note, and export buttons.
  * Replaces the PoC ChartCard — no library badge, adds export functionality.
  */
-export function ChartWrapper({ title, subtitle, source, sourceUrl, chartUrl, children, className = '', compact = false, hideLogo = false, altText, chartType, xColumn, yColumn, dataLength }: ChartWrapperProps) {
+export function ChartWrapper({ title, subtitle, source, sourceUrl, chartUrl, children, className = '', compact = false, hideLogo = false, altText, chartType, xColumn, yColumn, dataLength, chartId, allowDataDownload = true }: ChartWrapperProps) {
   const chartAreaRef = useRef<HTMLDivElement>(null)
   const theme = useChartThemeStore((s) => s.theme)
 
@@ -97,6 +101,12 @@ export function ChartWrapper({ title, subtitle, source, sourceUrl, chartUrl, chi
     const svg = chartAreaRef.current?.querySelector('svg')
     if (svg) await exportPPTX(svg, title ?? 'chart', { title, subtitle, source })
   }, [title, subtitle, source])
+
+  const handleExportCSV = useCallback(() => {
+    if (chartId) {
+      window.open(`/api/v2/charts/${chartId}/data.csv`, '_blank')
+    }
+  }, [chartId])
 
   // Inject theme font on mount / theme change
   useEffect(() => {
@@ -240,10 +250,10 @@ export function ChartWrapper({ title, subtitle, source, sourceUrl, chartUrl, chi
             </p>
           ) : <div />}
           <div className={`flex gap-2 ${compact ? 'opacity-0 group-hover:opacity-100 transition-opacity' : ''}`}>
-            {['SVG', 'PNG', 'PDF', 'PPTX'].map((fmt) => (
+            {['SVG', 'PNG', 'PDF', 'PPTX', ...(chartId && allowDataDownload ? ['CSV'] : [])].map((fmt) => (
               <button
                 key={fmt}
-                onClick={fmt === 'SVG' ? handleExportSVG : fmt === 'PNG' ? handleExportPNG : fmt === 'PDF' ? handleExportPDF : handleExportPPTX}
+                onClick={fmt === 'SVG' ? handleExportSVG : fmt === 'PNG' ? handleExportPNG : fmt === 'PDF' ? handleExportPDF : fmt === 'CSV' ? handleExportCSV : handleExportPPTX}
                 className={`text-[12px] px-2.5 py-1 rounded-lg border transition-colors ${
                   btnColor
                     ? 'hover:opacity-80'

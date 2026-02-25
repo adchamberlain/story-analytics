@@ -300,6 +300,8 @@ function DashboardChartCell({
         source={embedFlags?.plain ? undefined : (chart.source ?? undefined)}
         sourceUrl={embedFlags?.plain ? undefined : ((chart.config?.sourceUrl as string) ?? undefined)}
         chartUrl={`/chart/${chart.chart_id}`}
+        chartId={chart.chart_id}
+        allowDataDownload={(chart.config?.allowDataDownload as boolean) !== false}
         className="h-full"
         compact
         hideLogo={showLogo === false}
