@@ -8,12 +8,12 @@ interface TransformData {
 
 interface DataTransformGridProps {
   data: TransformData
-  sourceId: string
+  sourceId?: string
   onTransform: (action: string, params: Record<string, unknown>) => Promise<void>
   transforming?: boolean
 }
 
-export function DataTransformGrid({ data, sourceId, onTransform, transforming }: DataTransformGridProps) {
+export function DataTransformGrid({ data, onTransform, transforming }: DataTransformGridProps) {
   const [editingCell, setEditingCell] = useState<{ row: number; col: string } | null>(null)
   const [editValue, setEditValue] = useState('')
   const [menuCol, setMenuCol] = useState<string | null>(null)
