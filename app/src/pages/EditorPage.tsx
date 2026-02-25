@@ -237,6 +237,8 @@ export function EditorPage() {
     geoSizeColumn: store.config.geoSizeColumn ?? undefined,
     geoSymbolShape: store.config.geoSymbolShape !== 'circle' ? store.config.geoSymbolShape : undefined,
     geoSizeRange: store.config.geoSizeRange,
+    tableDefaultSortColumn: store.config.tableDefaultSortColumn ?? undefined,
+    tableDefaultSortDir: store.config.tableDefaultSortColumn ? store.config.tableDefaultSortDir : undefined,
   }
 
   // Apply palette colors

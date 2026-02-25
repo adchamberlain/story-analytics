@@ -132,9 +132,6 @@ export function MultiplePies({ data, config, height, autoHeight }: MultiplePiesP
       const arcs = pie(pieData)
       const total = d3.sum(pieData, (d) => d.value)
 
-      // Find the largest slice for inline label
-      const largestArc = arcs.reduce((a, b) => (a.data.value > b.data.value ? a : b))
-
       g.selectAll('path')
         .data(arcs)
         .join('path')
@@ -162,25 +159,6 @@ export function MultiplePies({ data, config, height, autoHeight }: MultiplePiesP
           setTooltip(null)
         })
 
-      // Label on the largest slice — show percentage
-      const largestPct = ((largestArc.data.value / total) * 100).toFixed(0)
-      const labelArc = d3.arc<d3.PieArcDatum<{ label: string; value: number }>>()
-        .innerRadius(isDonut ? (innerRadius + chartRadius) / 2 : chartRadius * 0.6)
-        .outerRadius(isDonut ? (innerRadius + chartRadius) / 2 : chartRadius * 0.6)
-      const [lx, ly] = labelArc.centroid(largestArc)
-      if (chartRadius >= 30) {
-        g.append('text')
-          .attr('x', lx)
-          .attr('y', ly)
-          .attr('text-anchor', 'middle')
-          .attr('dominant-baseline', 'central')
-          .attr('font-size', Math.min(13, chartRadius * 0.28))
-          .attr('font-weight', 600)
-          .attr('font-family', chartTheme.font.family)
-          .attr('fill', '#fff')
-          .attr('pointer-events', 'none')
-          .text(`${largestPct}%`)
-      }
     })
 
     // Color legend at bottom — collect unique labels in order
@@ -192,7 +170,7 @@ export function MultiplePies({ data, config, height, autoHeight }: MultiplePiesP
     }
     const legendItemWidths = allLabels.map((l) => l.length * 7.5 + 28)
     const totalLw = legendItemWidths.reduce((a, b) => a + b, 0)
-    const legendY = rows * cellHeight + 10
+    const legendY = rows * cellHeight + 24
     const legendGrp = svg.append('g')
       .attr('transform', `translate(${(width - totalLw) / 2},${legendY})`)
     let lx = 0
