@@ -41,7 +41,10 @@ export function FolderSidebar() {
     try {
       await deleteFolder(id)
       setConfirmDeleteId(null)
+      // Reset filter if viewing the deleted folder, or if this was the last
+      // real folder and we're viewing "Unfiled" (which will now be hidden)
       if (folderFilter === id) setFolderFilter(null)
+      else if (folderFilter === 'unfiled' && folders.length <= 1) setFolderFilter(null)
     } catch {
       // Error handled by store
     }
@@ -77,12 +80,14 @@ export function FolderSidebar() {
         <span className="text-[11px] text-text-muted">{charts.length}</span>
       </button>
 
-      {/* Unfiled — droppable target */}
-      <DroppableUnfiled
-        active={folderFilter === 'unfiled'}
-        count={unfiledCount}
-        onClick={() => setFolderFilter('unfiled')}
-      />
+      {/* Unfiled — only show when real folders exist (otherwise it duplicates "All charts") */}
+      {folders.length > 0 && (
+        <DroppableUnfiled
+          active={folderFilter === 'unfiled'}
+          count={unfiledCount}
+          onClick={() => setFolderFilter('unfiled')}
+        />
+      )}
 
       {/* Folder list */}
       {folders.map((folder) => (

@@ -259,6 +259,10 @@ export interface ChartConfig {
 
   /** Rich Data Table: per-column configuration */
   tableColumns?: Record<string, TableColumnConfig>
+  /** DataTable: default sort column name */
+  tableDefaultSortColumn?: string
+  /** DataTable: default sort direction */
+  tableDefaultSortDir?: 'asc' | 'desc'
 
   /** Choropleth map options */
   basemap?: string            // BasemapId: 'world' | 'us-states' | 'us-counties' | 'europe'

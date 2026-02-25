@@ -58,6 +58,7 @@ export function Toolbox() {
 
   const isBar = config.chartType === 'BarChart'
   const isBigValue = config.chartType === 'BigValue'
+  const isDataTable = config.chartType === 'DataTable'
   const hasSeriesOption = ['BarChart', 'LineChart', 'AreaChart', 'ScatterPlot', 'DotPlot', 'SmallMultiples'].includes(config.chartType)
   const isSqlMode = config.dataMode === 'sql'
   const sqlHasResults = isSqlMode && data.length > 0
@@ -721,6 +722,36 @@ export function Toolbox() {
           ))}
         </select>
       </Section>
+
+      {/* DataTable: Default Sort */}
+      {isDataTable && (
+        <Section title="Default Sort">
+          <ColumnDropdown
+            label="Sort column"
+            value={config.tableDefaultSortColumn}
+            columns={isSqlMode ? sqlResultColumns : columns}
+            allowNone
+            onChange={(v) => updateConfig({ tableDefaultSortColumn: v })}
+          />
+          {config.tableDefaultSortColumn && (
+            <div className="flex gap-1 mt-2">
+              {(['asc', 'desc'] as const).map((dir) => (
+                <button
+                  key={dir}
+                  onClick={() => updateConfig({ tableDefaultSortDir: dir })}
+                  className={`flex-1 px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                    config.tableDefaultSortDir === dir
+                      ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+                      : 'text-text-secondary hover:text-text-on-surface hover:bg-surface-tertiary'
+                  }`}
+                >
+                  {dir === 'asc' ? 'Ascending' : 'Descending'}
+                </button>
+              ))}
+            </div>
+          )}
+        </Section>
+      )}
 
       {/* Tooltip Template */}
       {!isBigValue && config.chartType !== 'DataTable' && (

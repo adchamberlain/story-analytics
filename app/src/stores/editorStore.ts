@@ -79,6 +79,9 @@ export interface EditorConfig {
   allowDataDownload: boolean
   // Week start day for ordinal day-of-week sorting
   weekStartDay: 'Mon' | 'Sun'
+  // DataTable default sort
+  tableDefaultSortColumn: string | null
+  tableDefaultSortDir: 'asc' | 'desc'
 }
 
 const DEFAULT_CONFIG: EditorConfig = {
@@ -137,6 +140,8 @@ const DEFAULT_CONFIG: EditorConfig = {
   refreshInterval: 0,
   allowDataDownload: true,
   weekStartDay: 'Mon',
+  tableDefaultSortColumn: null,
+  tableDefaultSortDir: 'asc',
 }
 
 export interface TableInfoItem {
@@ -358,6 +363,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         refreshInterval: (chart.config?.refreshInterval as number) ?? 0,
         allowDataDownload: (chart.config?.allowDataDownload as boolean) ?? true,
         weekStartDay: (chart.config?.weekStartDay as 'Mon' | 'Sun') ?? 'Mon',
+        tableDefaultSortColumn: (chart.config?.tableDefaultSortColumn as string) ?? null,
+        tableDefaultSortDir: (chart.config?.tableDefaultSortDir as 'asc' | 'desc') ?? 'asc',
       }
 
       const loadedDataMode = config.dataMode
@@ -583,6 +590,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
             refreshInterval: config.refreshInterval || undefined,
             allowDataDownload: config.allowDataDownload === false ? false : undefined,
             weekStartDay: config.weekStartDay !== 'Mon' ? config.weekStartDay : undefined,
+            tableDefaultSortColumn: config.tableDefaultSortColumn ?? undefined,
+            tableDefaultSortDir: config.tableDefaultSortColumn ? config.tableDefaultSortDir : undefined,
           },
         }),
       })
@@ -874,6 +883,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
             refreshInterval: config.refreshInterval || undefined,
             allowDataDownload: config.allowDataDownload === false ? false : undefined,
             weekStartDay: config.weekStartDay !== 'Mon' ? config.weekStartDay : undefined,
+            tableDefaultSortColumn: config.tableDefaultSortColumn ?? undefined,
+            tableDefaultSortDir: config.tableDefaultSortColumn ? config.tableDefaultSortDir : undefined,
           },
         }),
       })

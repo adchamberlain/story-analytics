@@ -31,23 +31,29 @@
       "ranges": []
     },
     "tableColumns": {
-      "population_m": {
+      "Population (M)": {
         "type": "bar",
         "barColor": "#6366f1"
       },
-      "gdp_t": {
+      "GDP ($T)": {
         "type": "heatmap",
         "format": "number",
         "heatmapColors": [
-          "#dbeafe",
-          "#1d4ed8"
+          "rgba(99,102,241,0.08)",
+          "rgba(99,102,241,0.45)"
         ]
       },
-      "life_expectancy": {
-        "type": "number",
-        "format": "number"
+      "Life Expectancy": {
+        "type": "heatmap",
+        "format": "number",
+        "heatmapColors": [
+          "rgba(16,185,129,0.08)",
+          "rgba(16,185,129,0.45)"
+        ]
       }
-    }
+    },
+    "tableDefaultSortColumn": "GDP ($T)",
+    "tableDefaultSortDir": "desc"
   },
   "connection_id": null,
   "source_table": null,

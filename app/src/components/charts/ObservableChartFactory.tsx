@@ -654,9 +654,11 @@ function buildAreaMarks(
         Plot.tip(areaData, Plot.pointerX(Plot.stackY({ x, y, stroke: series, order: 'value', title: (d: Record<string, unknown>) => tipTitle(d, x, y, series, config) }))),
       )
     } else {
+      // Sort by x within each series to prevent zigzag area fill artifacts
+      // when UNPIVOT data arrives interleaved by series at each x value
       marks.push(
-        Plot.areaY(areaData, { x, y, fill: series, fillOpacity: areaFillOpacity }),
-        Plot.lineY(areaData, { x, y, stroke: series, strokeWidth: config.lineWidth ?? 2.5 }),
+        Plot.areaY(areaData, { x, y, fill: series, fillOpacity: areaFillOpacity, sort: x }),
+        Plot.lineY(areaData, { x, y, stroke: series, strokeWidth: config.lineWidth ?? 2.5, sort: x }),
         Plot.tip(areaData, Plot.pointer({ x, y, stroke: series, title: (d: Record<string, unknown>) => tipTitle(d, x, y, series, config) })),
       )
     }

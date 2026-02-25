@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import type { ChartConfig, TableColumnConfig } from '../../../types/chart'
 
 interface RichDataTableProps {
@@ -37,6 +37,21 @@ function formatCell(value: unknown, colType: 'number' | 'string', fmt?: string):
     return new Intl.NumberFormat('en-US').format(n)
   }
   return String(value)
+}
+
+/** Grade-aware string compare: treats trailing +/- as sub-rank (A+ < A < A- < B+ < B < B-). */
+function gradeAwareCompare(a: string, b: string): number {
+  const gradeRe = /^([A-Za-z]+)([+-])?$/
+  const ma = gradeRe.exec(a.trim())
+  const mb = gradeRe.exec(b.trim())
+  if (ma && mb) {
+    const baseCmp = ma[1].localeCompare(mb[1])
+    if (baseCmp !== 0) return baseCmp
+    // Same base: + < (none) < -
+    const rank = (mod: string | undefined) => mod === '+' ? 0 : mod === '-' ? 2 : 1
+    return rank(ma[2]) - rank(mb[2])
+  }
+  return a.localeCompare(b)
 }
 
 function getNumericExtent(data: Record<string, unknown>[], col: string): [number, number] {
@@ -96,8 +111,17 @@ function SparklineSvg({ values }: { values: number[] }) {
 // ---------------------------------------------------------------------------
 
 export function RichDataTable({ data, config }: RichDataTableProps) {
-  const [sortCol, setSortCol] = useState<string | null>(null)
-  const [sortDir, setSortDir] = useState<SortDir>(null)
+  const [sortCol, setSortCol] = useState<string | null>(config.tableDefaultSortColumn ?? null)
+  const [sortDir, setSortDir] = useState<SortDir>(config.tableDefaultSortDir ?? null)
+
+  // Sync sort state when default sort config changes (editor preview)
+  const cfgSortCol = config.tableDefaultSortColumn
+  const cfgSortDir = config.tableDefaultSortDir
+  useEffect(() => {
+    setSortCol(cfgSortCol ?? null)
+    setSortDir(cfgSortDir ?? null)
+  }, [cfgSortCol, cfgSortDir])
+
   // Support initialSearch from embed ?search= query param (passed via config.extraProps)
   const initialSearch = (config?.extraProps?.initialSearch as string) || ''
   const [search, setSearch] = useState(initialSearch)
@@ -153,7 +177,7 @@ export function RichDataTable({ data, config }: RichDataTableProps) {
       if (isNum) {
         cmp = Number(va) - Number(vb)
       } else {
-        cmp = String(va).localeCompare(String(vb))
+        cmp = gradeAwareCompare(String(va), String(vb))
       }
       return sortDir === 'desc' ? -cmp : cmp
     })
@@ -202,7 +226,7 @@ export function RichDataTable({ data, config }: RichDataTableProps) {
       const [min, max] = extents[col] ?? [0, 0]
       const bg = heatmapColor(Number(value), min, max, cfg.heatmapColors)
       return (
-        <span style={{ backgroundColor: bg, padding: '2px 6px', borderRadius: 3 }}>
+        <span style={{ backgroundColor: bg, padding: '3px 8px', borderRadius: 4, fontVariantNumeric: 'tabular-nums' }}>
           {formatted}
         </span>
       )
@@ -245,7 +269,7 @@ export function RichDataTable({ data, config }: RichDataTableProps) {
   return (
     <div className="flex flex-col h-full">
       {/* Toolbar */}
-      <div className="flex items-center gap-3 px-3 py-2 border-b border-border-default">
+      <div className="flex items-center gap-3 px-3 py-1.5">
         <input
           type="text"
           placeholder="Search..."
@@ -254,7 +278,7 @@ export function RichDataTable({ data, config }: RichDataTableProps) {
             setSearch(e.target.value)
             setPage(0)
           }}
-          className="px-2 py-1 text-xs border border-border-default rounded bg-surface text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-1 focus:ring-accent w-48"
+          className="px-2.5 py-1 text-xs border border-border-default rounded-md bg-transparent text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-1 focus:ring-accent/50 w-44"
         />
         <span className="text-xs text-text-muted ml-auto">
           {isFiltered
@@ -289,10 +313,10 @@ export function RichDataTable({ data, config }: RichDataTableProps) {
                       tabIndex={0}
                       role="columnheader"
                       aria-sort={currentDir === 'asc' ? 'ascending' : currentDir === 'desc' ? 'descending' : 'none'}
-                      className={`group cursor-pointer select-none px-3 py-2 border-b-2 border-border-default font-semibold text-text-primary whitespace-nowrap focus:outline-2 focus:outline-blue-500 focus:outline-offset-[-2px] ${
+                      className={`group cursor-pointer select-none px-3 py-2.5 border-b border-border-subtle font-medium text-text-muted whitespace-nowrap focus:outline-2 focus:outline-blue-500 focus:outline-offset-[-2px] ${
                         align === 'right' ? 'text-right' : align === 'center' ? 'text-center' : 'text-left'
                       }`}
-                      style={{ fontSize: 12 }}
+                      style={{ fontSize: 11, letterSpacing: '0.03em', textTransform: 'uppercase' }}
                     >
                       {col}
                       <SortIcon dir={currentDir} />
@@ -305,9 +329,7 @@ export function RichDataTable({ data, config }: RichDataTableProps) {
               {pageData.map((row, i) => (
                 <tr
                   key={i}
-                  className={`${
-                    i % 2 === 0 ? 'bg-surface' : 'bg-surface-secondary'
-                  } hover:bg-surface-secondary/80 transition-colors`}
+                  className="hover:bg-surface-secondary/50 transition-colors"
                 >
                   {columns.map((col) => {
                     const isNum = colTypes[col] === 'number'
@@ -316,10 +338,10 @@ export function RichDataTable({ data, config }: RichDataTableProps) {
                     return (
                       <td
                         key={col}
-                        className={`px-3 py-1.5 border-b border-border-subtle ${
+                        className={`px-3 py-2.5 border-b border-border-subtle/50 text-text-primary ${
                           align === 'right' ? 'text-right' : align === 'center' ? 'text-center' : 'text-left'
                         }`}
-                        style={{ fontSize: 12 }}
+                        style={{ fontSize: 13 }}
                       >
                         {renderCell(row, col)}
                       </td>
