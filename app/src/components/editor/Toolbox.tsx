@@ -8,7 +8,6 @@ import { MultiColumnSelect } from './MultiColumnSelect'
 import { AnnotationEditor } from './AnnotationEditor'
 import type { ChartType } from '../../types/chart'
 import type { PaletteKey } from '../../themes/plotTheme'
-import { PALETTES } from '../../themes/plotTheme'
 import { loadCustomGeoJSON, BASEMAPS, PROJECTIONS } from '../../utils/geoUtils'
 import { SUPPORTED_LOCALES } from '../../stores/localeStore'
 
