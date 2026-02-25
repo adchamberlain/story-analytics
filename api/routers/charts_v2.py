@@ -5,13 +5,15 @@ The core product loop: upload → propose → render → save.
 
 from __future__ import annotations
 
+import csv
+import io
 import traceback
 from pathlib import Path
 
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, HTTPException, Query, Request
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
 from ..services.duckdb_service import get_duckdb_service, q
@@ -591,6 +593,49 @@ async def get_chart(chart_id: str):
         chart=_chart_to_response(chart),
         data=data,
         columns=columns,
+    )
+
+
+@router.get("/{chart_id}/data.csv")
+async def download_csv(chart_id: str):
+    """Download the chart's underlying data as a CSV file.
+
+    Re-executes the chart's SQL query and streams the result as CSV.
+    Returns 403 if the chart's config has allowDataDownload set to False.
+    """
+    chart = load_chart(chart_id)
+    if not chart:
+        raise HTTPException(status_code=404, detail="Chart not found")
+
+    # Check allowDataDownload flag in chart config
+    if chart.config and chart.config.get("allowDataDownload") is False:
+        raise HTTPException(status_code=403, detail="Data download is disabled for this chart")
+
+    if not chart.sql:
+        raise HTTPException(status_code=422, detail="Chart has no SQL query")
+
+    db = get_duckdb_service()
+    try:
+        result = db.execute_query(chart.sql, chart.source_id)
+    except Exception as e:
+        raise HTTPException(status_code=422, detail=f"Failed to execute chart SQL: {e}")
+
+    # Build CSV in memory
+    output = io.StringIO()
+    writer = csv.DictWriter(output, fieldnames=result.columns)
+    writer.writeheader()
+    writer.writerows(result.rows)
+    csv_content = output.getvalue()
+
+    # Sanitize title for filename
+    safe_title = (chart.title or "data").replace('"', "").replace("/", "_").replace("\\", "_")
+
+    return StreamingResponse(
+        iter([csv_content]),
+        media_type="text/csv",
+        headers={
+            "Content-Disposition": f'attachment; filename="{safe_title}.csv"',
+        },
     )
 
 
