@@ -175,7 +175,7 @@ export function GeoPointMap({ data, config, height = 400, autoHeight = false, ma
         .attr('fill', '#fff')
         .attr('pointer-events', 'none')
 
-      // Labels
+      // Labels (initial position — collision pass repositions below)
       pinGroup.append('text')
         .attr('x', 10)
         .attr('y', -4)
@@ -184,6 +184,55 @@ export function GeoPointMap({ data, config, height = 400, autoHeight = false, ma
         .attr('font-weight', 500)
         .attr('pointer-events', 'none')
         .text((d) => d.label)
+
+      // Resolve label collisions — greedy placement with 4 candidate positions
+      const candidates = [
+        { dx: 10, dy: -4, anchor: 'start' },   // right (default)
+        { dx: -10, dy: -4, anchor: 'end' },     // left
+        { dx: 0, dy: -20, anchor: 'middle' },   // above
+        { dx: 0, dy: 16, anchor: 'middle' },    // below
+      ]
+      const PAD = 4
+      const placed: { x: number; y: number; w: number; h: number }[] = []
+      const TEXT_H = 12 // approx line height for font-size 10
+
+      const textNodes = pinGroup.selectAll('text').nodes() as SVGTextElement[]
+      for (const textEl of textNodes) {
+        const g = textEl.parentNode as SVGGElement
+        const transform = g.getAttribute('transform') || ''
+        const m = transform.match(/translate\(\s*([\d.e+-]+)\s*,\s*([\d.e+-]+)\s*\)/)
+        if (!m) continue
+        const pinX = parseFloat(m[1])
+        const pinY = parseFloat(m[2])
+        const textW = textEl.getComputedTextLength() || 40
+
+        let fitted = false
+        for (const c of candidates) {
+          // Compute bounding rect in SVG coordinate space
+          let rx: number
+          if (c.anchor === 'end') rx = pinX + c.dx - textW
+          else if (c.anchor === 'middle') rx = pinX + c.dx - textW / 2
+          else rx = pinX + c.dx
+          const ry = pinY + c.dy - TEXT_H
+          const rect = { x: rx, y: ry, w: textW, h: TEXT_H }
+
+          const overlaps = placed.some(
+            (p) => rect.x < p.x + p.w + PAD && rect.x + rect.w + PAD > p.x &&
+                   rect.y < p.y + p.h + PAD && rect.y + rect.h + PAD > p.y,
+          )
+          if (!overlaps) {
+            textEl.setAttribute('x', String(c.dx))
+            textEl.setAttribute('y', String(c.dy))
+            textEl.setAttribute('text-anchor', c.anchor)
+            placed.push(rect)
+            fitted = true
+            break
+          }
+        }
+        if (!fitted) {
+          textEl.setAttribute('visibility', 'hidden')
+        }
+      }
 
       pinGroup
         .on('mouseenter', function (event, d) {

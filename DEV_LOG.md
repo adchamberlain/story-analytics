@@ -2,6 +2,16 @@
 
 ## 2026-02-25
 
+### Session 4: Map Label Collision Avoidance
+
+**Locator map label overlap fix:**
+- Pin labels were positioned at a fixed offset (x=10, y=-4) with no collision detection — overlapping when points are close together
+- Added greedy collision avoidance pass after initial label render in `GeoPointMap.tsx`
+- Tries 4 candidate positions per label: right (default), left, above, below
+- Picks first non-overlapping position using AABB overlap test with 4px padding
+- Labels that can't fit in any position are hidden (`visibility: hidden`) — tooltip still works on hover
+- Uses `getComputedTextLength()` for accurate width measurement in SVG coordinate space
+
 ### Session 3: Heatmap Auto-Binning, BigValue Height, Tooltip Formatting, Annotation Theming
 
 **Heatmap auto-binning for numeric axes:**
