@@ -61,6 +61,8 @@ export interface EditorConfig {
   geoSizeColumn: string | null
   geoSymbolShape: 'circle' | 'square' | 'triangle'
   geoSizeRange: [number, number]
+  // Accessibility
+  altText: string
   // Locale override
   locale: string
   // Auto-refresh interval (seconds) for embed view — 0/undefined = off
@@ -113,6 +115,7 @@ const DEFAULT_CONFIG: EditorConfig = {
   geoSizeColumn: null,
   geoSymbolShape: 'circle',
   geoSizeRange: [3, 25],
+  altText: '',
   locale: '',
   refreshInterval: 0,
 }
@@ -308,6 +311,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         geoSizeColumn: chart.config?.geoSizeColumn ?? null,
         geoSymbolShape: chart.config?.geoSymbolShape ?? 'circle',
         geoSizeRange: chart.config?.geoSizeRange ?? [3, 25],
+        altText: chart.config?.altText ?? '',
         locale: chart.config?.locale ?? '',
         refreshInterval: (chart.config?.refreshInterval as number) ?? 0,
       }
@@ -525,6 +529,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
             geoSizeColumn: config.geoSizeColumn ?? undefined,
             geoSymbolShape: config.geoSymbolShape !== 'circle' ? config.geoSymbolShape : undefined,
             geoSizeRange: (config.geoSizeRange[0] !== 3 || config.geoSizeRange[1] !== 25) ? config.geoSizeRange : undefined,
+            altText: config.altText || undefined,
             locale: config.locale || undefined,
             refreshInterval: config.refreshInterval || undefined,
           },
@@ -792,6 +797,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
             geoSizeColumn: config.geoSizeColumn ?? undefined,
             geoSymbolShape: config.geoSymbolShape !== 'circle' ? config.geoSymbolShape : undefined,
             geoSizeRange: (config.geoSizeRange[0] !== 3 || config.geoSizeRange[1] !== 25) ? config.geoSizeRange : undefined,
+            altText: config.altText || undefined,
             locale: config.locale || undefined,
             refreshInterval: config.refreshInterval || undefined,
           },

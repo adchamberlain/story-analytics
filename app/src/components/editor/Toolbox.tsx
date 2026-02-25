@@ -511,6 +511,19 @@ export function Toolbox() {
               placeholder="https://..."
             />
           )}
+          <div>
+            <label className="block text-xs font-medium text-text-secondary mb-1">Alt Text</label>
+            <textarea
+              value={config.altText}
+              onChange={(e) => updateConfig({ altText: e.target.value })}
+              placeholder="Describe the chart for screen readers..."
+              rows={2}
+              className="w-full px-2 py-1.5 text-sm border border-border-default rounded-md bg-surface text-text-primary placeholder:text-text-muted focus:outline-none focus:border-blue-400 resize-y"
+            />
+            <p className="text-[10px] text-text-muted mt-0.5">
+              Used by screen readers and search engines.
+            </p>
+          </div>
         </div>
       </Section>
 
