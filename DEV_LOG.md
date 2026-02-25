@@ -2,6 +2,67 @@
 
 ## 2026-02-24
 
+### Session: Phase 8 — Data Transforms, Edit History, CSV Download
+
+**3 parallel worktree sessions (N, O, P)**, all merged to main. 771 total tests (200 backend + 571 frontend).
+
+**Session N — Data Transforms:**
+- 8 transform endpoints in `api/routers/transforms.py` (transpose, rename-column, delete-column, reorder-columns, round, prepend-append, edit-cell, cast-type)
+- Each transform modifies source CSV on disk and re-ingests into DuckDB
+- `DataTransformGrid.tsx`: editable HTML table with column header dropdown menus, inline cell editing, transpose button
+- 8 transform methods added to `dataStore.ts`
+- Chart/Transform Data view toggle in EditorPage
+- 27 tests (17 backend + 10 frontend)
+
+**Session O — Edit History / Versioning:**
+- `version_storage.py`: snapshot storage in `data/versions/{chart_id}/`, auto-prune at 50 versions
+- `versions.py` router: create, list, get, restore, delete version endpoints
+- Auto-save triggers: every 30 saves, 60s idle debounce, on publish, manual "Save Version" button
+- `VersionHistoryPanel.tsx`: chronological version list with trigger badges (auto/publish/manual), restore with confirmation dialog
+- Republish distinction: button label changes after first publish, version badge in header
+- 22 tests (14 backend + 8 frontend)
+
+**Session P — CSV Download:**
+- `GET /api/v2/charts/{chart_id}/data.csv`: re-executes chart SQL, streams CSV with Content-Disposition
+- `allowDataDownload` config toggle (default true), returns 403 when disabled
+- "Get the data" link in EmbedChartPage/PublicChartPage footer (hidden when disabled or plain mode)
+- CSV button in ChartWrapper export row (alongside SVG/PNG/PDF/PPTX)
+- 12 tests (6 backend + 6 frontend)
+
+**Merge:** P → O (auto) → N (2 conflicts: `api/main.py` both routers, `EditorPage.tsx` imports + transform toggle layout with CSV download props). All resolved, 771 tests green.
+
+**Phase 8 closes medium-impact gaps 2-4.** Remaining: localization expansion (12→50+ locales, RTL) + lower-impact items (map basemaps, table column types, advanced tooltips, oEmbed, real-time collab).
+
+---
+
+### Session: Phase 7 — Embed Flags, Chart Types, Accessibility
+
+**3 parallel worktree sessions (K, L, M)**, all merged to main. 705 total tests (163 backend + 542 frontend).
+
+**Session K — Embed Render Flags:**
+- `parseEmbedFlags()`: 5 URL query params (plain, static, transparent, logo, search)
+- EmbedChartPage + EmbedDashboardPage: conditional header/footer, pointer-events, background, logo, search passthrough
+- RichDataTable: `initialSearch` via extraProps for pre-filtered embeds
+- ChartWrapper: `hideLogo` prop
+- 33 vitest tests
+
+**Session L — Chart Types (19 → 25):**
+- StackedColumn, GroupedColumn, SplitBars, ArrowPlot, ElectionDonut, MultiplePies
+- Custom D3 hemicycle for ElectionDonut, small-multiples pie/donut grid for MultiplePies
+- ChartTypeSelector entries with SVG icons, Toolbox conditional fields
+- 23 vitest tests
+
+**Session M — WCAG AA Accessibility:**
+- `altText` field in ChartConfig + editor textarea
+- ARIA attributes: `role="img"`, `aria-label`, `aria-describedby`, auto-generated sr-only summary
+- Keyboard focus indicators (tabIndex, focus ring), keyboard sort on table headers
+- `checkPaletteAccessibility()`: contrast ratio warnings, ColorblindPreview badges
+- 26 vitest tests
+
+**Merge:** K (fast-forward) → L (auto) → M (1 conflict in ChartWrapper.tsx: hideLogo + accessibility props). All resolved, 705 tests green.
+
+---
+
 ### Session: Phase 6 — Final Datawrapper Parity + Screenshot Verification
 
 **10 tasks across 5 sessions (4 parallel + 1 sequential)**, all merged to main. 613 total tests (163 backend + 450 frontend).
