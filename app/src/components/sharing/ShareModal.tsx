@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useAuthStore } from '../../stores/authStore'
+import { authFetch } from '../../utils/authFetch'
 
 type Visibility = 'private' | 'team' | 'public'
 
@@ -41,7 +42,7 @@ export function ShareModal({ dashboardId, onClose }: ShareModalProps) {
     const abortController = new AbortController()
     const fetchMeta = async () => {
       try {
-        const res = await fetch(`/api/v2/dashboards/${dashboardId}/sharing`, {
+        const res = await authFetch(`/api/v2/dashboards/${dashboardId}/sharing`, {
           headers: buildHeaders(),
           signal: abortController.signal,
         })
@@ -66,7 +67,7 @@ export function ShareModal({ dashboardId, onClose }: ShareModalProps) {
     setSaving(true)
     setError(null)
     try {
-      const res = await fetch(`/api/v2/dashboards/${dashboardId}/sharing`, {
+      const res = await authFetch(`/api/v2/dashboards/${dashboardId}/sharing`, {
         method: 'PUT',
         headers: buildHeaders(),
         body: JSON.stringify({ visibility: newVisibility }),

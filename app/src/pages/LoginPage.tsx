@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../stores/authStore'
 import { LogoMark } from '../components/brand/Logo'
@@ -8,7 +8,16 @@ import { LogoMark } from '../components/brand/Logo'
  */
 export function LoginPage() {
   const navigate = useNavigate()
-  const { login, register } = useAuthStore()
+  const { login, register, user, checkStatus } = useAuthStore()
+
+  // Redirect to home if already logged in
+  useEffect(() => {
+    checkStatus()
+  }, [checkStatus])
+
+  useEffect(() => {
+    if (user) navigate('/', { replace: true })
+  }, [user, navigate])
 
   const [mode, setMode] = useState<'login' | 'register'>('login')
   const [email, setEmail] = useState('')

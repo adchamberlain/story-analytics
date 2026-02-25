@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { authFetch } from '../utils/authFetch'
 import { OnboardingWizard } from '../components/onboarding/OnboardingWizard'
 
 interface DashboardSummary {
@@ -21,7 +22,7 @@ export function DashboardsHome() {
 
   useEffect(() => {
     const abortController = new AbortController()
-    fetch('/api/v2/dashboards/', { signal: abortController.signal })
+    authFetch('/api/v2/dashboards/', { signal: abortController.signal })
       .then(async (res) => {
         if (!res.ok) {
           const body = await res.json().catch(() => ({ detail: res.statusText }))

@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { authFetch } from '../utils/authFetch'
 
 export interface Notification {
   id: string
@@ -26,7 +27,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
   fetchNotifications: async () => {
     set({ loading: true })
     try {
-      const res = await fetch('/api/notifications/')
+      const res = await authFetch('/api/notifications/')
       if (res.ok) {
         const data = await res.json()
         set({ notifications: data, loading: false })
@@ -38,7 +39,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
 
   fetchUnreadCount: async () => {
     try {
-      const res = await fetch('/api/notifications/unread-count')
+      const res = await authFetch('/api/notifications/unread-count')
       if (res.ok) {
         const data = await res.json()
         set({ unreadCount: data.count })
@@ -47,13 +48,13 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
   },
 
   markRead: async (id) => {
-    await fetch(`/api/notifications/${id}/read`, { method: 'PUT' })
+    await authFetch(`/api/notifications/${id}/read`, { method: 'PUT' })
     set({ notifications: get().notifications.map((n) => n.id === id ? { ...n, read_at: new Date().toISOString() } : n) })
     get().fetchUnreadCount()
   },
 
   markAllRead: async () => {
-    await fetch('/api/notifications/read-all', { method: 'PUT' })
+    await authFetch('/api/notifications/read-all', { method: 'PUT' })
     set({ notifications: get().notifications.map((n) => ({ ...n, read_at: n.read_at ?? new Date().toISOString() })), unreadCount: 0 })
   },
 }))

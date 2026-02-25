@@ -7,9 +7,10 @@ from __future__ import annotations
 
 from dataclasses import asdict
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
+from ..auth_simple import get_current_user
 from ..services.chart_storage import load_chart, update_chart, _validate_id
 from ..services.version_storage import (
     create_version,
@@ -48,7 +49,7 @@ class VersionDetailResponse(BaseModel):
 
 
 @router.post("/{chart_id}/versions", response_model=VersionMetaResponse)
-async def create_chart_version(chart_id: str, request: CreateVersionRequest):
+async def create_chart_version(chart_id: str, request: CreateVersionRequest, user: dict = Depends(get_current_user)):
     """Create a version snapshot of the current chart state."""
     if not _validate_id(chart_id):
         raise HTTPException(status_code=400, detail="Invalid chart ID")
@@ -69,7 +70,7 @@ async def create_chart_version(chart_id: str, request: CreateVersionRequest):
 
 
 @router.get("/{chart_id}/versions", response_model=list[VersionMetaResponse])
-async def list_chart_versions(chart_id: str):
+async def list_chart_versions(chart_id: str, user: dict = Depends(get_current_user)):
     """List all version snapshots for a chart, newest first."""
     if not _validate_id(chart_id):
         raise HTTPException(status_code=400, detail="Invalid chart ID")
@@ -79,7 +80,7 @@ async def list_chart_versions(chart_id: str):
 
 
 @router.get("/{chart_id}/versions/{version}", response_model=VersionDetailResponse)
-async def get_chart_version(chart_id: str, version: int):
+async def get_chart_version(chart_id: str, version: int, user: dict = Depends(get_current_user)):
     """Get the full content of a specific version."""
     if not _validate_id(chart_id):
         raise HTTPException(status_code=400, detail="Invalid chart ID")
@@ -99,7 +100,7 @@ async def get_chart_version(chart_id: str, version: int):
 
 
 @router.post("/{chart_id}/versions/{version}/restore")
-async def restore_chart_version(chart_id: str, version: int):
+async def restore_chart_version(chart_id: str, version: int, user: dict = Depends(get_current_user)):
     """Restore a chart to a specific version's state."""
     if not _validate_id(chart_id):
         raise HTTPException(status_code=400, detail="Invalid chart ID")
@@ -142,7 +143,7 @@ async def restore_chart_version(chart_id: str, version: int):
 
 
 @router.delete("/{chart_id}/versions/{version}")
-async def delete_chart_version(chart_id: str, version: int):
+async def delete_chart_version(chart_id: str, version: int, user: dict = Depends(get_current_user)):
     """Delete a specific version snapshot."""
     if not _validate_id(chart_id):
         raise HTTPException(status_code=400, detail="Invalid chart ID")

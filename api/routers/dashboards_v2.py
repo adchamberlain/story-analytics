@@ -11,9 +11,10 @@ import threading
 import traceback
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
+from ..auth_simple import get_current_user
 from fastapi.responses import HTMLResponse
 
 from ..services.dashboard_storage import (
@@ -269,7 +270,7 @@ def _dashboard_to_response(d) -> DashboardResponse:
 # ── Endpoints ────────────────────────────────────────────────────────────────
 
 @router.post("/", response_model=DashboardResponse)
-async def create(request: CreateDashboardRequest):
+async def create(request: CreateDashboardRequest, user: dict = Depends(get_current_user)):
     """Create a new dashboard."""
     charts_dicts = [c.model_dump() for c in request.charts]
     filters_dicts = [f.model_dump(exclude_none=True) for f in request.filters]
@@ -409,7 +410,7 @@ async def get_dashboard(dashboard_id: str, filters: str | None = None):
 
 
 @router.post("/{dashboard_id}/health-check", response_model=HealthCheckResponse)
-async def run_health_check(dashboard_id: str):
+async def run_health_check(dashboard_id: str, user: dict = Depends(get_current_user)):
     """Run data-level health checks for all charts in a dashboard."""
     # Re-use get_dashboard; its 404 propagates with correct status
     try:
@@ -448,7 +449,7 @@ async def run_health_check(dashboard_id: str):
 
 
 @router.get("/{dashboard_id}/health", response_model=HealthCheckResponse)
-async def get_health(dashboard_id: str):
+async def get_health(dashboard_id: str, user: dict = Depends(get_current_user)):
     """Get cached health check results (without re-running checks)."""
     with _health_cache_lock:
         cached = _health_cache.get(dashboard_id)
@@ -461,7 +462,7 @@ async def get_health(dashboard_id: str):
 
 
 @router.put("/{dashboard_id}", response_model=DashboardResponse)
-async def update(dashboard_id: str, request: UpdateDashboardRequest):
+async def update(dashboard_id: str, request: UpdateDashboardRequest, user: dict = Depends(get_current_user)):
     """Update a dashboard."""
     raw = request.model_dump(exclude_unset=True)
     fields: dict = {}
@@ -484,7 +485,7 @@ async def update(dashboard_id: str, request: UpdateDashboardRequest):
 
 
 @router.get("/{dashboard_id}/export/html")
-async def export_html(dashboard_id: str):
+async def export_html(dashboard_id: str, user: dict = Depends(get_current_user)):
     """Export a dashboard as a self-contained HTML file."""
     try:
         dashboard_data = await get_dashboard(dashboard_id)
@@ -530,7 +531,7 @@ async def export_html(dashboard_id: str):
 
 
 @router.delete("/{dashboard_id}")
-async def remove_dashboard(dashboard_id: str):
+async def remove_dashboard(dashboard_id: str, user: dict = Depends(get_current_user)):
     """Delete a dashboard."""
     if not delete_dashboard(dashboard_id):
         raise HTTPException(status_code=404, detail="Dashboard not found")
@@ -554,7 +555,7 @@ async def get_public_dashboard(dashboard_id: str):
 
 
 @router.put("/{dashboard_id}/publish", response_model=DashboardResponse)
-async def publish_dashboard(dashboard_id: str):
+async def publish_dashboard(dashboard_id: str, user: dict = Depends(get_current_user)):
     """Publish a dashboard."""
     dashboard = update_dashboard(dashboard_id, status="published")
     if not dashboard:
@@ -563,7 +564,7 @@ async def publish_dashboard(dashboard_id: str):
 
 
 @router.put("/{dashboard_id}/unpublish", response_model=DashboardResponse)
-async def unpublish_dashboard(dashboard_id: str):
+async def unpublish_dashboard(dashboard_id: str, user: dict = Depends(get_current_user)):
     """Unpublish a dashboard, reverting it to draft status."""
     dashboard = update_dashboard(dashboard_id, status="draft")
     if not dashboard:
@@ -584,7 +585,7 @@ class UpdateSharingRequest(BaseModel):
 
 
 @router.get("/{dashboard_id}/sharing", response_model=SharingResponse)
-async def get_sharing(dashboard_id: str):
+async def get_sharing(dashboard_id: str, user: dict = Depends(get_current_user)):
     """Get dashboard sharing/visibility settings."""
     meta = get_dashboard_meta(dashboard_id)
     return SharingResponse(
@@ -594,7 +595,7 @@ async def get_sharing(dashboard_id: str):
 
 
 @router.put("/{dashboard_id}/sharing", response_model=SharingResponse)
-async def update_sharing(dashboard_id: str, request: UpdateSharingRequest):
+async def update_sharing(dashboard_id: str, request: UpdateSharingRequest, user: dict = Depends(get_current_user)):
     """Update dashboard visibility."""
     if request.visibility not in ("private", "team", "public"):
         raise HTTPException(status_code=400, detail="Invalid visibility. Use: private, team, public")

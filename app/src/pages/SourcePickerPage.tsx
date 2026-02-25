@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { authFetch } from '../utils/authFetch'
 import { FileDropzone } from '../components/data/FileDropzone'
 import { PasteDataInput } from '../components/data/PasteDataInput'
 import { GoogleSheetsInput } from '../components/data/GoogleSheetsInput'
@@ -54,7 +55,7 @@ export function SourcePickerPage() {
 
   useEffect(() => {
     setLoading(true)
-    fetch('/api/data/sources')
+    authFetch('/api/data/sources')
       .then((res) => {
         if (!res.ok) throw new Error(`Sources fetch failed: ${res.status}`)
         return res.json()
@@ -195,7 +196,7 @@ export function SourcePickerPage() {
                   const trimmed = sourceName.trim()
                   if (trimmed) {
                     try {
-                      await fetch(`/api/data/sources/${sid}/rename`, {
+                      await authFetch(`/api/data/sources/${sid}/rename`, {
                         method: 'PATCH',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ name: trimmed }),

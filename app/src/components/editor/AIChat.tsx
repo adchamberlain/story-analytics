@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { useEditorStore } from '../../stores/editorStore'
+import { authFetch } from '../../utils/authFetch'
 
 const PROVIDER_LABELS: Record<string, string> = {
   anthropic: 'Anthropic (Claude)',
@@ -53,7 +54,7 @@ export function AIChat() {
   // Check if AI is available and which provider
   useEffect(() => {
     const abortController = new AbortController()
-    fetch('/api/v2/charts/ai-status', { signal: abortController.signal })
+    authFetch('/api/v2/charts/ai-status', { signal: abortController.signal })
       .then((res) => {
         if (abortController.signal.aborted) return
         if (!res.ok) {
@@ -82,7 +83,7 @@ export function AIChat() {
   const handleProviderChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newProvider = e.target.value
     try {
-      const res = await fetch('/api/settings/', {
+      const res = await authFetch('/api/settings/', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ai_provider: newProvider }),

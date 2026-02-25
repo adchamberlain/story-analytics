@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { authFetch } from '../../utils/authFetch'
 
 interface GoogleSheetsInputProps {
   onImport: (sourceId: string) => void
@@ -17,7 +18,7 @@ export function GoogleSheetsInput({ onImport, importing }: GoogleSheetsInputProp
     setLoading(true)
 
     try {
-      const resp = await fetch('/api/data/import/google-sheets', {
+      const resp = await authFetch('/api/data/import/google-sheets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url: url.trim(), name: name.trim() || undefined }),

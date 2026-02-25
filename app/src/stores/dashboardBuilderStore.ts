@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { authFetch } from '../utils/authFetch'
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -117,7 +118,7 @@ export const useDashboardBuilderStore = create<DashboardBuilderState>((set, get)
         : '/api/v2/dashboards/'
       const method = dashboardId ? 'PUT' : 'POST'
 
-      const res = await fetch(url, {
+      const res = await authFetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title, description: description || null, charts }),
@@ -142,7 +143,7 @@ export const useDashboardBuilderStore = create<DashboardBuilderState>((set, get)
 
     try {
       // Fetch single dashboard metadata by ID
-      const res = await fetch(`/api/v2/dashboards/${dashboardId}`, { signal })
+      const res = await authFetch(`/api/v2/dashboards/${dashboardId}`, { signal })
       if (signal?.aborted) return
       if (!res.ok) {
         if (res.status === 404) throw new Error('Dashboard not found')

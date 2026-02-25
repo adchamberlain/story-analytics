@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react'
 import { buildShaperSql, type ShaperConfig } from '../../utils/buildShaperSql'
+import { authFetch } from '../../utils/authFetch'
 import type { SyncedColumnInfo } from './DatabaseConnector'
 
 interface DataShaperProps {
@@ -88,7 +89,7 @@ export function DataShaper({ sourceId, tableName, rowCount, columns, onApprove, 
     setPreviewLoading(true)
     setPreviewError(null)
     try {
-      const res = await fetch('/api/data/query-raw', {
+      const res = await authFetch('/api/data/query-raw', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sql: `${sql}\nLIMIT 50` }),

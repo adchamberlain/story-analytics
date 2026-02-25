@@ -6,8 +6,10 @@ import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
-from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Response
+from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException, Response
 from pydantic import BaseModel, Field
+
+from ..auth_simple import get_current_user
 
 from ..services.duckdb_service import get_duckdb_service, _SAFE_SOURCE_ID_RE
 from ..services.connectors.google_sheets import parse_sheets_url, build_export_url, fetch_sheet_csv
@@ -106,7 +108,7 @@ class UrlSourceRequest(BaseModel):
 # ── Endpoints ────────────────────────────────────────────────────────────────
 
 @router.get("/sources", response_model=list[SourceSummary])
-async def list_sources():
+async def list_sources(user: dict = Depends(get_current_user)):
     """List all data sources currently loaded in DuckDB, newest first."""
     service = get_duckdb_service()
     results: list[tuple[datetime, SourceSummary]] = []
@@ -129,7 +131,7 @@ async def list_sources():
     return [summary for _, summary in results]
 
 @router.get("/tables", response_model=list[TableInfo])
-async def list_tables():
+async def list_tables(user: dict = Depends(get_current_user)):
     """List all loaded DuckDB tables with their internal names (for raw SQL queries)."""
     service = get_duckdb_service()
     results = []
@@ -149,7 +151,7 @@ async def list_tables():
 
 
 @router.delete("/sources/{source_id}")
-async def delete_source(source_id: str):
+async def delete_source(source_id: str, user: dict = Depends(get_current_user)):
     """Delete a CSV data source: drop DuckDB table, remove from memory, delete files."""
     if not _SAFE_SOURCE_ID_RE.match(source_id):
         raise HTTPException(status_code=400, detail="Invalid source_id")
@@ -177,7 +179,7 @@ async def delete_source(source_id: str):
 
 
 @router.post("/query-raw", response_model=RawQueryResponse)
-async def query_raw(request: RawQueryRequest):
+async def query_raw(request: RawQueryRequest, user: dict = Depends(get_current_user)):
     """Execute user-written SQL directly on DuckDB, bypassing table name substitution."""
     service = get_duckdb_service()
 
@@ -227,7 +229,7 @@ async def query_raw(request: RawQueryRequest):
 
 
 @router.post("/upload", response_model=UploadResponse)
-async def upload_csv(file: UploadFile = File(...), replace: str = Form("")):
+async def upload_csv(file: UploadFile = File(...), replace: str = Form(""), user: dict = Depends(get_current_user)):
     """Upload a CSV file, load into DuckDB, return schema info.
 
     If a source with the same filename already exists and ``replace`` is not
@@ -316,7 +318,7 @@ async def upload_csv(file: UploadFile = File(...), replace: str = Form("")):
 
 
 @router.post("/paste", response_model=UploadResponse)
-async def paste_data(request: PasteRequest):
+async def paste_data(request: PasteRequest, user: dict = Depends(get_current_user)):
     """Ingest pasted tabular data (CSV/TSV), load into DuckDB, return schema info."""
     text = request.data.strip()
     if not text:
@@ -387,7 +389,7 @@ async def paste_data(request: PasteRequest):
 
 
 @router.patch("/sources/{source_id}/rename")
-async def rename_source(source_id: str, request: RenameRequest):
+async def rename_source(source_id: str, request: RenameRequest, user: dict = Depends(get_current_user)):
     """Rename a data source (update the display filename)."""
     if not _SAFE_SOURCE_ID_RE.match(source_id):
         raise HTTPException(status_code=400, detail="Invalid source_id")
@@ -420,7 +422,7 @@ async def rename_source(source_id: str, request: RenameRequest):
 
 
 @router.get("/preview/{source_id}", response_model=PreviewResponse)
-async def preview_data(source_id: str, limit: int = 10):
+async def preview_data(source_id: str, limit: int = 10, user: dict = Depends(get_current_user)):
     """Get first N rows of an uploaded source."""
     if not _SAFE_SOURCE_ID_RE.match(source_id):
         raise HTTPException(status_code=400, detail="Invalid source_id")
@@ -439,7 +441,7 @@ async def preview_data(source_id: str, limit: int = 10):
 
 
 @router.post("/query", response_model=QueryResponse)
-async def execute_query(request: QueryRequest):
+async def execute_query(request: QueryRequest, user: dict = Depends(get_current_user)):
     """Execute SQL against an uploaded data source."""
     if not _SAFE_SOURCE_ID_RE.match(request.source_id):
         raise HTTPException(status_code=400, detail="Invalid source_id")
@@ -457,7 +459,7 @@ async def execute_query(request: QueryRequest):
 
 
 @router.get("/schema/{source_id}", response_model=UploadResponse)
-async def get_schema(source_id: str):
+async def get_schema(source_id: str, user: dict = Depends(get_current_user)):
     """Get schema information for an uploaded source."""
     service = get_duckdb_service()
     try:
@@ -508,7 +510,7 @@ def _build_upload_response(schema) -> UploadResponse:
 
 
 @router.post("/import/google-sheets", response_model=UploadResponse)
-async def import_google_sheets(request: GoogleSheetsRequest, response: Response):
+async def import_google_sheets(request: GoogleSheetsRequest, response: Response, user: dict = Depends(get_current_user)):
     """Import data from a public Google Sheets document.
 
     The sheet must be publicly shared (Anyone with the link).
@@ -571,7 +573,7 @@ async def import_google_sheets(request: GoogleSheetsRequest, response: Response)
 
 
 @router.post("/import/url", response_model=UploadResponse)
-async def import_from_url(request: UrlSourceRequest, response: Response):
+async def import_from_url(request: UrlSourceRequest, response: Response, user: dict = Depends(get_current_user)):
     """Import CSV or JSON data from an external URL.
 
     Optionally pass custom HTTP headers for authenticated endpoints.

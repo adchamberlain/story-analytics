@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { authFetch } from '../utils/authFetch'
 
 export interface ColumnInfo {
   name: string
@@ -75,7 +76,7 @@ async function _postTransform(
   action: string,
   body?: Record<string, unknown>,
 ): Promise<PreviewData> {
-  const res = await fetch(`${API_BASE}/${sourceId}/transform/${action}`, {
+  const res = await authFetch(`${API_BASE}/${sourceId}/transform/${action}`, {
     method: 'POST',
     headers: body ? { 'Content-Type': 'application/json' } : undefined,
     body: body ? JSON.stringify(body) : undefined,
@@ -104,7 +105,7 @@ export const useDataStore = create<DataState>((set, get) => ({
       formData.append('file', file)
       if (replace) formData.append('replace', 'true')
 
-      const res = await fetch(`${API_BASE}/upload`, {
+      const res = await authFetch(`${API_BASE}/upload`, {
         method: 'POST',
         body: formData,
       })
@@ -153,7 +154,7 @@ export const useDataStore = create<DataState>((set, get) => ({
       const payload: Record<string, string> = { data: text }
       if (name) payload.name = name
 
-      const res = await fetch(`${API_BASE}/paste`, {
+      const res = await authFetch(`${API_BASE}/paste`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -179,7 +180,7 @@ export const useDataStore = create<DataState>((set, get) => ({
     set({ loadingPreview: true })
 
     try {
-      const res = await fetch(`${API_BASE}/preview/${sourceId}?limit=10`)
+      const res = await authFetch(`${API_BASE}/preview/${sourceId}?limit=10`)
       if (!res.ok) throw new Error(`Preview failed: ${res.status}`)
 
       const preview: PreviewData = await res.json()

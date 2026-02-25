@@ -33,6 +33,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
       const res = await fetch('/api/auth/status', { headers })
       const data = await res.json()
+
+      // If auth is enabled but token is invalid (no user returned), clear it
+      if (data.auth_enabled && token && !data.user) {
+        localStorage.removeItem('auth_token')
+        set({ token: null })
+      }
+
       set({
         authEnabled: data.auth_enabled,
         user: data.user ?? null,

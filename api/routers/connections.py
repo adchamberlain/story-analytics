@@ -7,8 +7,10 @@ import os
 import traceback
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
+
+from ..auth_simple import get_current_user
 
 from ..services.connection_service import (
     save_connection,
@@ -115,7 +117,7 @@ def _try_cached_parquet(db, tables: list[str]) -> list:
 # ── Endpoints ────────────────────────────────────────────────────────────────
 
 @router.get("/types", response_model=ConnectorTypesResponse)
-async def list_connector_types():
+async def list_connector_types(user: dict = Depends(get_current_user)):
     """List all supported database connector types and their required fields."""
     types = []
     for name, cls in CONNECTOR_REGISTRY.items():
@@ -128,7 +130,7 @@ async def list_connector_types():
 
 
 @router.post("/", response_model=ConnectionResponse, status_code=201)
-async def create_connection(request: CreateConnectionRequest):
+async def create_connection(request: CreateConnectionRequest, user: dict = Depends(get_current_user)):
     """Save a new database connection (metadata only, no credentials)."""
     if request.db_type not in CONNECTOR_REGISTRY:
         raise HTTPException(
@@ -152,7 +154,7 @@ async def create_connection(request: CreateConnectionRequest):
 
 
 @router.get("/", response_model=list[ConnectionResponse])
-async def list_all():
+async def list_all(user: dict = Depends(get_current_user)):
     """List all saved connections."""
     return [
         ConnectionResponse(
@@ -167,7 +169,7 @@ async def list_all():
 
 
 @router.get("/{connection_id}", response_model=ConnectionResponse)
-async def get_connection(connection_id: str):
+async def get_connection(connection_id: str, user: dict = Depends(get_current_user)):
     """Get a connection by ID."""
     conn = load_connection(connection_id)
     if not conn:
@@ -182,7 +184,7 @@ async def get_connection(connection_id: str):
 
 
 @router.delete("/{connection_id}")
-async def remove_connection(connection_id: str):
+async def remove_connection(connection_id: str, user: dict = Depends(get_current_user)):
     """Delete a connection."""
     if not delete_connection(connection_id):
         raise HTTPException(status_code=404, detail="Connection not found")
@@ -190,7 +192,7 @@ async def remove_connection(connection_id: str):
 
 
 @router.post("/{connection_id}/test", response_model=TestConnectionResponse)
-async def test_connection(connection_id: str, request: TestConnectionRequest):
+async def test_connection(connection_id: str, request: TestConnectionRequest, user: dict = Depends(get_current_user)):
     """Test a database connection using the pluggable connector system."""
     conn = load_connection(connection_id)
     if not conn:
@@ -225,7 +227,7 @@ async def test_connection(connection_id: str, request: TestConnectionRequest):
 
 
 @router.post("/{connection_id}/tables", response_model=ListTablesResponse)
-async def list_tables(connection_id: str, request: ListTablesRequest):
+async def list_tables(connection_id: str, request: ListTablesRequest, user: dict = Depends(get_current_user)):
     """List available tables in the connected database."""
     conn = load_connection(connection_id)
     if not conn:
@@ -256,7 +258,7 @@ async def list_tables(connection_id: str, request: ListTablesRequest):
 
 
 @router.post("/{connection_id}/sync", response_model=SyncResponse)
-async def sync_tables(connection_id: str, request: SyncRequest):
+async def sync_tables(connection_id: str, request: SyncRequest, user: dict = Depends(get_current_user)):
     """
     Sync tables from a database connection into DuckDB.
 

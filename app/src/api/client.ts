@@ -3,6 +3,7 @@
  */
 
 import type { ChartConfig } from '../types/chart'
+import { authFetch } from '../utils/authFetch'
 
 // Base URL for API requests (Vite proxy handles /api -> localhost:8000)
 const API_BASE = '/api'
@@ -14,7 +15,7 @@ async function apiFetch<T>(
 ): Promise<T> {
   const url = `${API_BASE}${endpoint}`
 
-  const response = await fetch(url, {
+  const response = await authFetch(url, {
     ...options,
     headers: {
       'Content-Type': 'application/json',

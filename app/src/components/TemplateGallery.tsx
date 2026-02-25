@@ -4,6 +4,7 @@
  */
 
 import { useEffect, useState } from 'react'
+import { authFetch } from '../utils/authFetch'
 
 // ── Template type ────────────────────────────────────────────────────────────
 
@@ -51,7 +52,7 @@ export function TemplateGallery({ onSelect }: TemplateGalleryProps) {
   useEffect(() => {
     setLoading(true)
     setError(null)
-    fetch('/api/v2/templates/')
+    authFetch('/api/v2/templates/')
       .then((res) => {
         if (!res.ok) throw new Error(`Failed to load templates: ${res.statusText}`)
         return res.json()

@@ -12,10 +12,11 @@ from pathlib import Path
 
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
+from ..auth_simple import get_current_user
 from ..services.duckdb_service import get_duckdb_service, q
 from ..services.chart_storage import save_chart, load_chart, list_charts, delete_chart, update_chart, _validate_id
 
@@ -250,7 +251,7 @@ VALID_TIME_GRAINS = {"none", "day", "week", "month", "quarter", "year"}
 
 
 @router.post("/build-query", response_model=BuildQueryResponse)
-async def build_query(request: BuildQueryRequest):
+async def build_query(request: BuildQueryRequest, user: dict = Depends(get_current_user)):
     """
     Deterministic SQL builder: user picks columns, we generate and execute SQL.
     No LLM involved.
@@ -419,7 +420,7 @@ async def build_query(request: BuildQueryRequest):
 
 
 @router.post("/propose", response_model=ProposeResponse)
-async def propose(request: ProposeRequest):
+async def propose(request: ProposeRequest, user: dict = Depends(get_current_user)):
     """
     AI proposes the best chart for an uploaded dataset.
 
@@ -531,7 +532,7 @@ def _validate_readonly_sql(sql: str) -> str | None:
 
 
 @router.post("/save", response_model=SavedChartResponse)
-async def save(request: SaveRequest):
+async def save(request: SaveRequest, user: dict = Depends(get_current_user)):
     """Save a chart configuration."""
     if request.sql:
         err = _validate_readonly_sql(request.sql)
@@ -640,7 +641,7 @@ async def download_csv(chart_id: str):
 
 
 @router.put("/{chart_id}", response_model=SavedChartResponse)
-async def update(chart_id: str, request: UpdateChartRequest):
+async def update(chart_id: str, request: UpdateChartRequest, user: dict = Depends(get_current_user)):
     """Update a saved chart's configuration."""
     fields = request.model_dump(exclude_unset=True)
     if not fields:
@@ -654,7 +655,7 @@ async def update(chart_id: str, request: UpdateChartRequest):
 
 
 @router.post("/edit", response_model=EditResponse)
-async def edit(request: EditRequest):
+async def edit(request: EditRequest, user: dict = Depends(get_current_user)):
     """AI edits a chart config based on a user message."""
     try:
         result = edit_chart(
@@ -678,7 +679,7 @@ async def edit(request: EditRequest):
 
 
 @router.delete("/{chart_id}")
-async def remove_chart(chart_id: str):
+async def remove_chart(chart_id: str, user: dict = Depends(get_current_user)):
     """Delete a saved chart."""
     if not delete_chart(chart_id):
         raise HTTPException(status_code=404, detail="Chart not found")
@@ -688,7 +689,7 @@ async def remove_chart(chart_id: str):
 # ── Publish / Unpublish ──────────────────────────────────────────────────────
 
 @router.put("/{chart_id}/publish", response_model=SavedChartResponse)
-async def publish_chart(chart_id: str):
+async def publish_chart(chart_id: str, user: dict = Depends(get_current_user)):
     """Publish a chart, making it accessible via the public endpoint."""
     chart = update_chart(chart_id, status="published")
     if not chart:
@@ -697,7 +698,7 @@ async def publish_chart(chart_id: str):
 
 
 @router.put("/{chart_id}/unpublish", response_model=SavedChartResponse)
-async def unpublish_chart(chart_id: str):
+async def unpublish_chart(chart_id: str, user: dict = Depends(get_current_user)):
     """Unpublish a chart, reverting it to draft status."""
     chart = update_chart(chart_id, status="draft")
     if not chart:
@@ -708,7 +709,7 @@ async def unpublish_chart(chart_id: str):
 # ── Archive / Restore ─────────────────────────────────────────────────────
 
 @router.put("/{chart_id}/archive", response_model=SavedChartResponse)
-async def archive_chart(chart_id: str):
+async def archive_chart(chart_id: str, user: dict = Depends(get_current_user)):
     """Archive a chart (soft-delete). Idempotent — re-archiving is a no-op."""
     from ..services.chart_storage import load_chart as _load
 
@@ -728,7 +729,7 @@ async def archive_chart(chart_id: str):
 
 
 @router.put("/{chart_id}/restore", response_model=SavedChartResponse)
-async def restore_chart(chart_id: str):
+async def restore_chart(chart_id: str, user: dict = Depends(get_current_user)):
     """Restore an archived chart. Idempotent — restoring a non-archived chart is a no-op."""
     from ..services.chart_storage import load_chart as _load
 
@@ -760,7 +761,7 @@ async def get_public_chart(chart_id: str):
 # ── Snapshot (static PNG fallback) ────────────────────────────────────────
 
 @router.post("/{chart_id}/snapshot")
-async def upload_snapshot(chart_id: str, request: Request):
+async def upload_snapshot(chart_id: str, request: Request, user: dict = Depends(get_current_user)):
     """Upload a PNG snapshot for a chart (used as noscript fallback and OG image)."""
     chart = load_chart(chart_id)
     if not chart:
@@ -789,7 +790,7 @@ async def get_snapshot(chart_id: str):
 
 
 @router.post("/{chart_id}/duplicate", response_model=SavedChartResponse)
-async def duplicate_chart(chart_id: str):
+async def duplicate_chart(chart_id: str, user: dict = Depends(get_current_user)):
     """Duplicate a chart with a new ID. Preserves config and SQL, resets status to draft."""
     original = load_chart(chart_id)
     if not original:
@@ -821,7 +822,7 @@ class SaveAsTemplateRequest(BaseModel):
 
 
 @router.post("/{chart_id}/save-as-template")
-async def save_chart_as_template(chart_id: str, request: SaveAsTemplateRequest):
+async def save_chart_as_template(chart_id: str, request: SaveAsTemplateRequest, user: dict = Depends(get_current_user)):
     """Save a chart's config as a reusable template."""
     from ..services.template_storage import save_template
 
