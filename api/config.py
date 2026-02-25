@@ -2,6 +2,7 @@
 API configuration settings.
 """
 
+import os
 from functools import lru_cache
 
 from pydantic_settings import BaseSettings
@@ -11,7 +12,11 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
 
     # Database
-    database_url: str = "sqlite:///data/story_analytics.db"
+    database_url: str = os.environ.get("DATABASE_URL", "sqlite:///data/story_analytics.db")
+
+    # Cloud-mode config
+    storage_backend: str = os.environ.get("STORAGE_BACKEND", "local")
+    s3_bucket: str = os.environ.get("S3_BUCKET", "")
 
     # JWT Authentication
     secret_key: str = "dev-secret-key-change-in-production"
