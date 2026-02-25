@@ -284,13 +284,6 @@ export function LibraryPage() {
       <div className="flex items-center justify-between" style={{ marginBottom: '40px' }}>
         <h1 className="text-[28px] font-bold text-text-primary tracking-tight">Chart Library</h1>
         <div className="flex items-center gap-4">
-          <button
-            onClick={() => setShowTemplateGallery(true)}
-            className="text-[14px] font-medium rounded-lg border border-border-default text-text-secondary hover:text-text-primary hover:border-border-hover transition-colors inline-flex items-center gap-1.5"
-            style={{ padding: '7px 16px' }}
-          >
-            From Template
-          </button>
           <Link
             to="/editor/new/source"
             className="text-[14px] font-medium rounded-lg border border-border-default text-text-secondary hover:text-text-primary hover:border-border-hover transition-colors inline-flex items-center gap-1.5"
@@ -298,6 +291,13 @@ export function LibraryPage() {
           >
             + New Chart
           </Link>
+          <button
+            onClick={() => setShowTemplateGallery(true)}
+            className="text-[14px] font-medium rounded-lg border border-border-default text-text-secondary hover:text-text-primary hover:border-border-hover transition-colors inline-flex items-center gap-1.5"
+            style={{ padding: '7px 16px' }}
+          >
+            From Template
+          </button>
           {charts.length > 0 && (
             <button
               onClick={() => { if (selectMode) { setSelectMode(false); setSelectedIds(new Set()); setBulkConfirm(false) } else setSelectMode(true) }}
@@ -480,7 +480,7 @@ export function LibraryPage() {
       {/* Template Gallery Modal */}
       {showTemplateGallery && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-surface-primary rounded-2xl border border-border-default shadow-lg max-w-4xl w-full max-h-[80vh] overflow-y-auto p-8">
+          <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-border-default shadow-lg max-w-4xl w-full max-h-[80vh] overflow-y-auto p-8">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-bold text-text-primary">Choose a Template</h2>
               <button
@@ -491,7 +491,7 @@ export function LibraryPage() {
               </button>
             </div>
             <TemplateGallery onSelect={(t) => {
-              navigate(`/editor/new?template=${t.id}`)
+              navigate(`/editor/new/source?template=${t.id}`)
               setShowTemplateGallery(false)
             }} />
           </div>

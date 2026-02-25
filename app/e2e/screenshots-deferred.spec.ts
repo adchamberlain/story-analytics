@@ -17,6 +17,7 @@ import {
   waitForChart,
   publishChart,
   deleteChart,
+  deleteSource,
   saveScreenshot,
 } from './helpers'
 
@@ -24,22 +25,28 @@ const APP_URL = 'http://localhost:3001'
 const API_BASE = 'http://localhost:8000'
 
 test.describe('Deferred Screenshots', () => {
-  // Track chart IDs for cleanup
+  // Track chart IDs and source IDs for cleanup
   const chartIds: string[] = []
+  const sourceIds: string[] = []
 
   test.afterEach(async () => {
-    // Clean up all charts created during the test
+    // Clean up all charts and sources created during the test
     for (const id of chartIds) {
       await deleteChart(id).catch(() => {})
     }
+    for (const id of sourceIds) {
+      await deleteSource(id).catch(() => {})
+    }
     chartIds.length = 0
+    sourceIds.length = 0
   })
 
   // ── 1. Published View ──────────────────────────────────────────────────────
 
   test('01 — published view', async ({ page }) => {
-    const chartId = await createTestChart({ title: 'Published View Test' })
+    const { chartId, sourceId } = await createTestChart({ title: 'Published View Test' })
     chartIds.push(chartId)
+    sourceIds.push(sourceId)
 
     await publishChart(chartId)
 
@@ -57,8 +64,9 @@ test.describe('Deferred Screenshots', () => {
   // ── 2. Tooltip Hover ───────────────────────────────────────────────────────
 
   test('02 — tooltip hover on bar chart', async ({ page }) => {
-    const chartId = await createTestChart({ title: 'Tooltip Hover Test' })
+    const { chartId, sourceId } = await createTestChart({ title: 'Tooltip Hover Test' })
     chartIds.push(chartId)
+    sourceIds.push(sourceId)
 
     await page.goto(`${APP_URL}/editor/${chartId}`, {
       waitUntil: 'networkidle',
@@ -106,8 +114,9 @@ test.describe('Deferred Screenshots', () => {
   // ── 4. Non-US Locale ──────────────────────────────────────────────────────
 
   test('04 — non-US locale (de-DE)', async ({ page }) => {
-    const chartId = await createTestChart({ title: 'Locale Test Chart' })
+    const { chartId, sourceId } = await createTestChart({ title: 'Locale Test Chart' })
     chartIds.push(chartId)
+    sourceIds.push(sourceId)
 
     // Navigate to settings and select German locale
     await page.goto(`${APP_URL}/settings`, { waitUntil: 'networkidle' })
@@ -190,6 +199,7 @@ test.describe('Deferred Screenshots', () => {
     })
     const uploadResult = await uploadRes.json()
     const sourceId = uploadResult.source_id
+    sourceIds.push(sourceId)
 
     // Create a DataTable chart with heatmap and sparkline column configs
     const saveRes = await fetch(`${API_BASE}/api/v2/charts/save`, {
@@ -264,6 +274,7 @@ test.describe('Deferred Screenshots', () => {
     })
     const uploadResult = await uploadRes.json()
     const sourceId = uploadResult.source_id
+    sourceIds.push(sourceId)
 
     // Create a ChoroplethMap chart
     const saveRes = await fetch(`${API_BASE}/api/v2/charts/save`, {
@@ -337,6 +348,7 @@ test.describe('Deferred Screenshots', () => {
       body: usFormData,
     })
     const usUploadResult = await usUploadRes.json()
+    if (usUploadResult.source_id) sourceIds.push(usUploadResult.source_id)
 
     await fetch(`${API_BASE}/api/v2/charts/${chartId}`, {
       method: 'PUT',
@@ -375,6 +387,7 @@ test.describe('Deferred Screenshots', () => {
     })
     const uploadResult = await uploadRes.json()
     const sourceId = uploadResult.source_id
+    sourceIds.push(sourceId)
 
     const saveRes = await fetch(`${API_BASE}/api/v2/charts/save`, {
       method: 'POST',

@@ -1,11 +1,11 @@
 {
   "id": "1ca9e6916d15",
-  "source_id": "af7631c0a472",
+  "source_id": "3d751b7e108d",
   "chart_type": "ArrowPlot",
   "title": "Before and After",
   "subtitle": "Every metric moved right \u2014 the consultants were worth it",
   "source": "Internal data",
-  "sql": "SELECT metric, \"before\", \"after\" FROM src_af7631c0a472 LIMIT 5000",
+  "sql": "SELECT metric, \"before\", \"after\" FROM src_3d751b7e108d LIMIT 5000",
   "x": "metric",
   "y": null,
   "series": null,

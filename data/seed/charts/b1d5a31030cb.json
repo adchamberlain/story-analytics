@@ -1,11 +1,11 @@
 {
   "id": "b1d5a31030cb",
-  "source_id": "c2403696d3e1",
+  "source_id": "49748cf8a95e",
   "chart_type": "SplitBars",
   "title": "Two Perspectives, One Survey",
   "subtitle": "Satisfaction rates diverge more than you'd expect",
   "source": "Internal data",
-  "sql": "SELECT topic, male_pct, female_pct FROM src_c2403696d3e1 LIMIT 5000",
+  "sql": "SELECT topic, male_pct, female_pct FROM src_49748cf8a95e LIMIT 5000",
   "x": "topic",
   "y": null,
   "series": null,

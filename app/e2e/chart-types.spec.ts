@@ -1,5 +1,5 @@
 import { test } from '@playwright/test'
-import { createTestChart, publishChart, deleteChart, waitForChart, saveScreenshot } from './helpers'
+import { createTestChart, publishChart, deleteChart, deleteSource, waitForChart, saveScreenshot } from './helpers'
 
 const CHART_TYPES = [
   { type: 'BarChart', name: 'bar' },
@@ -9,17 +9,22 @@ const CHART_TYPES = [
 
 test.describe('Chart Type Screenshots', () => {
   const chartIds: string[] = []
+  const sourceIds: string[] = []
 
   test.afterAll(async () => {
     for (const id of chartIds) {
       await deleteChart(id).catch(() => {})
     }
+    for (const id of sourceIds) {
+      await deleteSource(id).catch(() => {})
+    }
   })
 
   for (const { type, name } of CHART_TYPES) {
     test(`screenshot ${name} chart`, async ({ page }) => {
-      const id = await createTestChart({ title: `${name} E2E`, chartType: type })
+      const { chartId: id, sourceId } = await createTestChart({ title: `${name} E2E`, chartType: type })
       chartIds.push(id)
+      sourceIds.push(sourceId)
       await publishChart(id)
 
       await page.setViewportSize({ width: 1280, height: 900 })

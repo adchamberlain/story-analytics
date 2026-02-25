@@ -5,12 +5,12 @@ import { type Page, expect } from '@playwright/test'
 
 const API_BASE = 'http://localhost:8000'
 
-/** Create a test chart via the API and return its ID. */
+/** Create a test chart via the API and return its ID and source ID. */
 export async function createTestChart(options?: {
   title?: string
   chartType?: string
   sourceId?: string
-}): Promise<string> {
+}): Promise<{ chartId: string; sourceId: string }> {
   const title = options?.title ?? 'E2E Test Chart'
   const chartType = options?.chartType ?? 'BarChart'
 
@@ -43,7 +43,7 @@ export async function createTestChart(options?: {
     }),
   })
   const result = await res.json()
-  return result.id
+  return { chartId: result.id, sourceId }
 }
 
 /** Wait for a chart SVG or canvas to render inside the page. */
@@ -68,6 +68,13 @@ export async function publishChart(chartId: string): Promise<void> {
 /** Delete a chart (cleanup after tests). */
 export async function deleteChart(chartId: string): Promise<void> {
   await fetch(`${API_BASE}/api/v2/charts/${chartId}`, {
+    method: 'DELETE',
+  })
+}
+
+/** Delete a data source (cleanup uploaded CSVs after tests). */
+export async function deleteSource(sourceId: string): Promise<void> {
+  await fetch(`${API_BASE}/api/data/sources/${sourceId}`, {
     method: 'DELETE',
   })
 }

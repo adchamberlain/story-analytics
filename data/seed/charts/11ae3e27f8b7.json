@@ -1,11 +1,11 @@
 {
   "id": "11ae3e27f8b7",
-  "source_id": "a8f1c621cb1c",
+  "source_id": "f8d0b7704deb",
   "chart_type": "DataTable",
   "title": "The Global Leaderboard",
   "subtitle": "GDP, population, and life expectancy for the world's top 10",
   "source": "World Bank, IMF",
-  "sql": "SELECT \"Country\", \"Population (M)\", \"GDP ($T)\", \"Life Expectancy\", \"Credit Rating\" FROM src_a8f1c621cb1c LIMIT 5000",
+  "sql": "SELECT \"Country\", \"Population (M)\", \"GDP (T$)\", \"Life Expectancy\", \"Credit Rating\" FROM src_f8d0b7704deb ORDER BY \"GDP (T$)\" DESC",
   "x": null,
   "y": null,
   "series": null,

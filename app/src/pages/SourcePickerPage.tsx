@@ -22,6 +22,7 @@ export function SourcePickerPage() {
   const [searchParams] = useSearchParams()
   const returnTo = searchParams.get('returnTo')
   const returnToDashboard = searchParams.get('returnToDashboard')
+  const template = searchParams.get('template')
   const [sources, setSources] = useState<SourceSummary[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshKey, setRefreshKey] = useState(0)
@@ -71,9 +72,10 @@ export function SourcePickerPage() {
     (sourceId: string) => {
       const params = new URLSearchParams({ sourceId })
       if (returnToDashboard) params.set('returnToDashboard', returnToDashboard)
+      if (template) params.set('template', template)
       navigate(`/editor/new?${params}`)
     },
-    [navigate, returnToDashboard]
+    [navigate, returnToDashboard, template]
   )
 
   const handleFileSelected = useCallback(
@@ -100,15 +102,17 @@ export function SourcePickerPage() {
     if (!syncedInfo) return
     const params = new URLSearchParams({ sourceId: syncedInfo.sourceId })
     if (returnToDashboard) params.set('returnToDashboard', returnToDashboard)
+    if (template) params.set('template', template)
     navigate(`/editor/new?${params}`, { state: { initialSql: sql } })
-  }, [syncedInfo, navigate, returnToDashboard])
+  }, [syncedInfo, navigate, returnToDashboard, template])
 
   const handleShaperSkip = useCallback(() => {
     if (!syncedInfo) return
     const params = new URLSearchParams({ sourceId: syncedInfo.sourceId })
     if (returnToDashboard) params.set('returnToDashboard', returnToDashboard)
+    if (template) params.set('template', template)
     navigate(`/editor/new?${params}`)
-  }, [syncedInfo, navigate, returnToDashboard])
+  }, [syncedInfo, navigate, returnToDashboard, template])
 
   const handleShaperBack = useCallback(() => {
     setSyncedInfo(null)
@@ -212,6 +216,7 @@ export function SourcePickerPage() {
                   } else {
                     const params = new URLSearchParams({ sourceId: sid })
                     if (returnToDashboard) params.set('returnToDashboard', returnToDashboard)
+                    if (template) params.set('template', template)
                     navigate(`/editor/new?${params}`)
                   }
                 }}

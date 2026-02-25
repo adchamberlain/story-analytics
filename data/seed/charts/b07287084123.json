@@ -3,7 +3,7 @@
   "source_id": "27e4ae7cf09e",
   "chart_type": "BarChart",
   "title": "What Developers Actually Use",
-  "subtitle": "2025 survey results \u2014 yes, JavaScript is still winning",
+  "subtitle": "2025 survey results \u2014 yes, Python is still winning",
   "source": "Stack Overflow Developer Survey 2025",
   "sql": "SELECT language, popularity FROM src_27e4ae7cf09e ORDER BY popularity DESC LIMIT 5000",
   "x": "language",
@@ -12,7 +12,7 @@
   "horizontal": false,
   "sort": true,
   "created_at": "2026-02-25T04:41:16.954739+00:00",
-  "updated_at": "2026-02-25T04:41:16.954739+00:00",
+  "updated_at": "2026-02-25T10:30:23.176817+00:00",
   "reasoning": null,
   "config": {
     "stacked": false,
@@ -29,7 +29,13 @@
       "lines": [],
       "texts": [],
       "ranges": []
-    }
+    },
+    "value": null,
+    "comparisonValue": null,
+    "comparisonLabel": "",
+    "positiveIsGood": true,
+    "metricLabel": null,
+    "unitColumn": null
   },
   "connection_id": null,
   "source_table": null,
