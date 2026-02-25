@@ -60,6 +60,19 @@ def _ensure_tables(conn: sqlite3.Connection) -> None:
             FOREIGN KEY (user_id) REFERENCES users(id),
             UNIQUE(dashboard_id, user_id)
         );
+
+        CREATE TABLE IF NOT EXISTS api_keys (
+            id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL,
+            name TEXT NOT NULL,
+            key_hash TEXT NOT NULL,
+            key_prefix TEXT NOT NULL,
+            scopes TEXT NOT NULL DEFAULT 'read',
+            last_used_at TEXT,
+            created_at TEXT NOT NULL,
+            expires_at TEXT,
+            FOREIGN KEY (user_id) REFERENCES users(id)
+        );
     """)
 
 
@@ -263,5 +276,77 @@ def can_access_dashboard(dashboard_id: str, user_id: str) -> bool:
             (dashboard_id, user_id),
         ).fetchone()
         return row is not None
+    finally:
+        conn.close()
+
+
+# ── API Key Management ─────────────────────────────────────────────────────
+
+
+def create_api_key(user_id: str, name: str, key_hash: str, key_prefix: str, scopes: str = "read", expires_at: str | None = None) -> dict:
+    """Create a new API key record."""
+    conn = _get_conn()
+    try:
+        key_id = uuid.uuid4().hex[:12]
+        now = datetime.now(timezone.utc).isoformat()
+        conn.execute(
+            "INSERT INTO api_keys (id, user_id, name, key_hash, key_prefix, scopes, created_at, expires_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (key_id, user_id, name, key_hash, key_prefix, scopes, now, expires_at),
+        )
+        conn.commit()
+        return {"id": key_id, "name": name, "key_prefix": key_prefix, "scopes": scopes, "created_at": now, "expires_at": expires_at}
+    finally:
+        conn.close()
+
+
+def list_api_keys(user_id: str) -> list[dict]:
+    """List API keys for a user (prefix only, no hash)."""
+    conn = _get_conn()
+    try:
+        rows = conn.execute(
+            "SELECT id, name, key_prefix, scopes, last_used_at, created_at, expires_at "
+            "FROM api_keys WHERE user_id = ? ORDER BY created_at DESC",
+            (user_id,),
+        ).fetchall()
+        return [dict(r) for r in rows]
+    finally:
+        conn.close()
+
+
+def get_api_key_by_prefix(prefix: str) -> dict | None:
+    """Lookup API key by its prefix."""
+    conn = _get_conn()
+    try:
+        row = conn.execute(
+            "SELECT id, user_id, key_hash, key_prefix, scopes, expires_at FROM api_keys WHERE key_prefix = ?",
+            (prefix,),
+        ).fetchone()
+        return dict(row) if row else None
+    finally:
+        conn.close()
+
+
+def update_api_key_last_used(key_id: str) -> None:
+    """Update the last_used_at timestamp for an API key."""
+    conn = _get_conn()
+    try:
+        now = datetime.now(timezone.utc).isoformat()
+        conn.execute("UPDATE api_keys SET last_used_at = ? WHERE id = ?", (now, key_id))
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def delete_api_key(key_id: str, user_id: str) -> bool:
+    """Delete an API key. Returns True if deleted."""
+    conn = _get_conn()
+    try:
+        cursor = conn.execute(
+            "DELETE FROM api_keys WHERE id = ? AND user_id = ?",
+            (key_id, user_id),
+        )
+        conn.commit()
+        return cursor.rowcount > 0
     finally:
         conn.close()

@@ -8,7 +8,7 @@ import traceback
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from ..services.connection_service import (
     save_connection,
@@ -28,9 +28,9 @@ CACHE_DIR = Path(__file__).parent.parent.parent / "data" / "snowflake_saas"
 # ── Request / Response Schemas ───────────────────────────────────────────────
 
 class CreateConnectionRequest(BaseModel):
-    name: str
-    db_type: str = "snowflake"
-    config: dict  # varies by db_type
+    name: str = Field(..., examples=["Production Warehouse"], description="Human-readable connection name")
+    db_type: str = Field("snowflake", examples=["snowflake", "postgres", "bigquery"], description="Database type")
+    config: dict = Field(..., description="Connection configuration (varies by db_type)")
 
 class ConnectionResponse(BaseModel):
     connection_id: str
