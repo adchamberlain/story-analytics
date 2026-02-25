@@ -7,6 +7,7 @@ import { ObservableChartFactory } from '../components/charts/ObservableChartFact
 import { Toolbox } from '../components/editor/Toolbox'
 import { AIChat } from '../components/editor/AIChat'
 import { CommentSidebar } from '../components/comments/CommentSidebar'
+import { VersionHistoryPanel } from '../components/editor/VersionHistoryPanel'
 import { PALETTES } from '../themes/plotTheme'
 import type { ChartConfig } from '../types/chart'
 
@@ -287,6 +288,24 @@ export function EditorPage() {
             {store.saving ? 'Saving...' : 'Save'}
           </button>
           {store.chartId && !isNew && (
+            <>
+              <button
+                onClick={() => store.saveVersion()}
+                className="px-3 py-2 text-xs rounded-lg border border-border-default text-text-on-surface hover:bg-surface-secondary transition-colors font-medium"
+                title="Save a named version snapshot"
+              >
+                Save Version
+              </button>
+              <button
+                onClick={() => store.setVersionHistoryOpen(true)}
+                className="px-3 py-2 text-xs rounded-lg border border-border-default text-text-on-surface hover:bg-surface-secondary transition-colors font-medium"
+                title="View version history"
+              >
+                History
+              </button>
+            </>
+          )}
+          {store.chartId && !isNew && (
             <button
               onClick={store.status === 'published' ? store.unpublishChart : store.publishChart}
               className={`px-3 py-2 text-xs rounded-lg border transition-colors font-medium ${
@@ -295,7 +314,7 @@ export function EditorPage() {
                   : 'border-border-default text-text-on-surface hover:bg-surface-secondary'
               }`}
             >
-              {store.status === 'published' ? 'Published' : 'Publish'}
+              {store.status === 'published' ? 'Republish' : 'Publish'}
             </button>
           )}
           {store.chartId && !isNew && (
@@ -362,30 +381,36 @@ export function EditorPage() {
           </div>
         </main>
 
-        {/* Right: AI Chat / Comments — hidden on mobile, visible on lg+ */}
+        {/* Right: AI Chat / Comments / Version History — hidden on mobile, visible on lg+ */}
         <aside className="hidden lg:flex lg:flex-col w-[320px] border-l border-border-default bg-surface shrink-0">
-          {/* Tab switcher */}
-          <div className="flex border-b border-border-default shrink-0">
-            <button
-              onClick={() => setRightTab('chat')}
-              className={`flex-1 py-2.5 text-xs font-medium transition-colors ${
-                rightTab === 'chat' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-text-muted hover:text-text-secondary'
-              }`}
-            >
-              AI Chat
-            </button>
-            <button
-              onClick={() => setRightTab('comments')}
-              className={`flex-1 py-2.5 text-xs font-medium transition-colors ${
-                rightTab === 'comments' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-text-muted hover:text-text-secondary'
-              }`}
-            >
-              Comments
-            </button>
-          </div>
-          <div className="flex-1 min-h-0">
-            {rightTab === 'chat' ? <AIChat /> : <CommentSidebar chartId={store.chartId} />}
-          </div>
+          {store.versionHistoryOpen ? (
+            <VersionHistoryPanel />
+          ) : (
+            <>
+              {/* Tab switcher */}
+              <div className="flex border-b border-border-default shrink-0">
+                <button
+                  onClick={() => setRightTab('chat')}
+                  className={`flex-1 py-2.5 text-xs font-medium transition-colors ${
+                    rightTab === 'chat' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-text-muted hover:text-text-secondary'
+                  }`}
+                >
+                  AI Chat
+                </button>
+                <button
+                  onClick={() => setRightTab('comments')}
+                  className={`flex-1 py-2.5 text-xs font-medium transition-colors ${
+                    rightTab === 'comments' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-text-muted hover:text-text-secondary'
+                  }`}
+                >
+                  Comments
+                </button>
+              </div>
+              <div className="flex-1 min-h-0">
+                {rightTab === 'chat' ? <AIChat /> : <CommentSidebar chartId={store.chartId} />}
+              </div>
+            </>
+          )}
         </aside>
       </div>
     </div>
