@@ -214,6 +214,9 @@ export function SettingsPage() {
         {/* ── Locale ───────────────────────────────────────────────── */}
         <LocaleSelector />
 
+        {/* ── API Keys ──────────────────────────────────────────── */}
+        <ApiKeyManager />
+
         {/* ── Data Sources ─────────────────────────────────────────── */}
         <section className="bg-surface-raised rounded-2xl shadow-card border border-border-default p-7">
           <div className="flex items-center justify-between mb-5">
@@ -371,6 +374,136 @@ function ChartThemeSelector() {
           )
         })}
       </div>
+    </section>
+  )
+}
+
+// ── API Key Manager ─────────────────────────────────────────────────────────
+
+interface ApiKey {
+  id: string
+  name: string
+  key_prefix: string
+  scopes: string
+  last_used_at: string | null
+  created_at: string
+}
+
+function ApiKeyManager() {
+  const [keys, setKeys] = useState<ApiKey[]>([])
+  const [newKeyName, setNewKeyName] = useState('')
+  const [createdKey, setCreatedKey] = useState<string | null>(null)
+  const [creating, setCreating] = useState(false)
+
+  useEffect(() => {
+    fetch('/api/api-keys/')
+      .then((r) => r.ok ? r.json() : [])
+      .then(setKeys)
+      .catch(() => {})
+  }, [])
+
+  const handleCreate = async () => {
+    if (!newKeyName.trim()) return
+    setCreating(true)
+    try {
+      const res = await fetch('/api/api-keys/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newKeyName.trim() }),
+      })
+      if (!res.ok) throw new Error('Failed to create key')
+      const data = await res.json()
+      setCreatedKey(data.key)
+      setNewKeyName('')
+      // Refresh list
+      const listRes = await fetch('/api/api-keys/')
+      if (listRes.ok) setKeys(await listRes.json())
+    } catch {
+      // ignore
+    } finally {
+      setCreating(false)
+    }
+  }
+
+  const handleRevoke = async (keyId: string) => {
+    if (!window.confirm('Are you sure you want to revoke this API key?')) return
+    await fetch(`/api/api-keys/${keyId}`, { method: 'DELETE' })
+    setKeys((prev) => prev.filter((k) => k.id !== keyId))
+  }
+
+  return (
+    <section className="bg-surface-raised rounded-2xl shadow-card border border-border-default p-7">
+      <h2 className="text-[17px] font-semibold text-text-primary mb-1.5">API Keys</h2>
+      <p className="text-[14px] text-text-muted mb-5">
+        Create API keys for programmatic access. Keys are shown only once when created.
+      </p>
+
+      {/* Created key banner */}
+      {createdKey && (
+        <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 mb-4">
+          <p className="text-sm text-emerald-800 font-medium mb-1">API key created. Copy it now -- it won't be shown again.</p>
+          <code className="text-xs bg-white border border-emerald-200 rounded px-2 py-1 block break-all select-all">
+            {createdKey}
+          </code>
+          <button
+            onClick={() => { navigator.clipboard.writeText(createdKey); setCreatedKey(null) }}
+            className="text-xs text-emerald-700 underline mt-2"
+          >
+            Copy &amp; dismiss
+          </button>
+        </div>
+      )}
+
+      {/* Create form */}
+      <div className="flex gap-2 mb-4">
+        <input
+          type="text"
+          value={newKeyName}
+          onChange={(e) => setNewKeyName(e.target.value)}
+          placeholder="Key name (e.g., 'CI Pipeline')"
+          className="flex-1 px-3 py-2.5 text-[14px] rounded-xl bg-surface-input border border-border-strong text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+          onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
+        />
+        <button
+          onClick={handleCreate}
+          disabled={creating || !newKeyName.trim()}
+          className="px-4 py-2.5 text-[14px] font-medium rounded-xl bg-blue-600 text-white hover:bg-blue-500 transition-colors disabled:opacity-50"
+        >
+          {creating ? 'Creating...' : 'Create Key'}
+        </button>
+      </div>
+
+      {/* Keys list */}
+      {keys.length === 0 ? (
+        <p className="text-[14px] text-text-muted py-2">No API keys yet.</p>
+      ) : (
+        <div className="flex flex-col gap-2">
+          {keys.map((k) => (
+            <div
+              key={k.id}
+              className="flex items-center justify-between px-4 py-3 rounded-xl bg-surface-input border border-border-default"
+            >
+              <div className="flex flex-col gap-0.5">
+                <span className="text-[14px] text-text-primary font-medium">{k.name}</span>
+                <span className="text-[12px] text-text-muted font-mono">{k.key_prefix}...</span>
+              </div>
+              <div className="flex items-center gap-4">
+                {k.last_used_at && (
+                  <span className="text-[12px] text-text-muted">
+                    Last used: {new Date(k.last_used_at).toLocaleDateString()}
+                  </span>
+                )}
+                <button
+                  onClick={() => handleRevoke(k.id)}
+                  className="text-[13px] text-red-500 hover:text-red-400 transition-colors"
+                >
+                  Revoke
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </section>
   )
 }

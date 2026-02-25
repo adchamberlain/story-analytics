@@ -3,7 +3,7 @@ Templates router: CRUD for chart templates.
 """
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from ..services.template_storage import (
     save_template, load_template, list_templates, update_template, delete_template,
@@ -16,10 +16,10 @@ router = APIRouter(prefix="/v2/templates", tags=["templates"])
 
 
 class CreateTemplateRequest(BaseModel):
-    name: str
-    description: str
-    chart_type: str
-    config: dict
+    name: str = Field(..., examples=["Sales Bar Chart"], description="Template name")
+    description: str = Field(..., examples=["Standard sales bar chart template"], description="Template description")
+    chart_type: str = Field(..., examples=["BarChart", "LineChart"], description="Chart type this template applies to")
+    config: dict = Field(..., description="Chart configuration to save as template")
 
 
 class UpdateTemplateRequest(BaseModel):

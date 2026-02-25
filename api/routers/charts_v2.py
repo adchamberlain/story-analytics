@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import FileResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from ..services.duckdb_service import get_duckdb_service, q
 from ..services.chart_storage import save_chart, load_chart, list_charts, delete_chart, update_chart, _validate_id
@@ -22,7 +22,7 @@ from engine.v2.chart_proposer import propose_chart
 from engine.v2.chart_editor import edit_chart
 
 
-router = APIRouter(prefix="/v2/charts", tags=["charts-v2"])
+router = APIRouter(prefix="/v2/charts", tags=["charts"])
 
 SNAPSHOTS_DIR = Path(__file__).parent.parent.parent / "data" / "snapshots"
 
@@ -90,8 +90,8 @@ async def ai_status():
 # ── Request / Response Schemas ───────────────────────────────────────────────
 
 class ProposeRequest(BaseModel):
-    source_id: str
-    user_hint: str | None = None
+    source_id: str = Field(..., examples=["abc123def456"], description="ID of the uploaded data source")
+    user_hint: str | None = Field(None, examples=["Show monthly revenue trend"], description="Optional hint for chart type or focus")
 
 
 class ChartConfigResponse(BaseModel):
@@ -117,17 +117,17 @@ class ProposeResponse(BaseModel):
 
 
 class SaveRequest(BaseModel):
-    source_id: str
-    chart_type: str
-    title: str
-    sql: str
-    x: str | None = None
-    y: str | list[str] | None = None
-    series: str | None = None
+    source_id: str = Field(..., examples=["abc123def456"], description="ID of the data source")
+    chart_type: str = Field(..., examples=["BarChart", "LineChart", "PieChart"], description="Chart visualization type")
+    title: str = Field(..., examples=["Monthly Revenue"], description="Chart title")
+    sql: str = Field(..., examples=["SELECT month, revenue FROM sales ORDER BY month"], description="SQL query for chart data")
+    x: str | None = Field(None, examples=["month"], description="X-axis column")
+    y: str | list[str] | None = Field(None, examples=["revenue"], description="Y-axis column(s)")
+    series: str | None = Field(None, examples=["region"], description="Series/group-by column")
     horizontal: bool = False
     sort: bool = True
     subtitle: str | None = None
-    source: str | None = None
+    source: str | None = Field(None, examples=["Company Data"], description="Data source attribution")
     reasoning: str | None = None
     config: dict | None = None
     connection_id: str | None = None
