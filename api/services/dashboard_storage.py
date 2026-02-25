@@ -5,17 +5,16 @@ Mirrors chart_storage.py — local-first, Git-friendly persistence.
 
 import json
 import logging
-import os
 import re
-import tempfile
 import uuid
 from datetime import datetime, timezone
-from pathlib import Path
 from dataclasses import dataclass, asdict, fields as dc_fields
+
+from api.services.storage import get_storage
 
 logger = logging.getLogger(__name__)
 
-DASHBOARDS_DIR = Path(__file__).parent.parent.parent / "data" / "dashboards"
+_storage = get_storage()
 
 _SAFE_ID_RE = re.compile(r"^[a-f0-9]{1,32}$")
 
@@ -47,8 +46,6 @@ def save_dashboard(
     filters: list[dict] | None = None,
 ) -> SavedDashboard:
     """Save a new dashboard to disk."""
-    DASHBOARDS_DIR.mkdir(parents=True, exist_ok=True)
-
     dashboard_id = uuid.uuid4().hex[:12]
     now = datetime.now(timezone.utc).isoformat()
 
@@ -62,31 +59,8 @@ def save_dashboard(
         filters=filters,
     )
 
-    path = DASHBOARDS_DIR / f"{dashboard_id}.json"
-    _atomic_write(path, json.dumps(asdict(dashboard), indent=2))
+    _storage.write_text(f"dashboards/{dashboard_id}.json", json.dumps(asdict(dashboard), indent=2))
     return dashboard
-
-
-def _atomic_write(path: Path, content: str) -> None:
-    """Write content to a file atomically via uniquely-named temp file + rename."""
-    fd, tmp_name = tempfile.mkstemp(dir=path.parent, suffix=".tmp")
-    fd_closed = False
-    try:
-        os.write(fd, content.encode())
-        os.close(fd)
-        fd_closed = True
-        os.replace(tmp_name, str(path))
-    except BaseException:
-        if not fd_closed:
-            try:
-                os.close(fd)
-            except OSError:
-                pass
-        try:
-            os.unlink(tmp_name)
-        except OSError:
-            pass
-        raise
 
 
 def _safe_load_dashboard(data: dict) -> SavedDashboard:
@@ -104,12 +78,12 @@ def load_dashboard(dashboard_id: str) -> SavedDashboard | None:
     """Load a dashboard from disk."""
     if not _validate_id(dashboard_id):
         return None
-    path = DASHBOARDS_DIR / f"{dashboard_id}.json"
-    if not path.exists():
+    key = f"dashboards/{dashboard_id}.json"
+    if not _storage.exists(key):
         return None
 
     try:
-        data = json.loads(path.read_text())
+        data = json.loads(_storage.read_text(key))
         return _safe_load_dashboard(data)
     except Exception:
         logger.warning("Failed to load dashboard %s (corrupted or schema mismatch?)", dashboard_id)
@@ -118,18 +92,18 @@ def load_dashboard(dashboard_id: str) -> SavedDashboard | None:
 
 def list_dashboards() -> list[SavedDashboard]:
     """List all saved dashboards, newest first."""
-    if not DASHBOARDS_DIR.exists():
-        return []
-
     dashboards = []
-    for path in sorted(DASHBOARDS_DIR.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True):
+    for key in _storage.list("dashboards/"):
+        if not key.endswith(".json"):
+            continue
         try:
-            data = json.loads(path.read_text())
+            data = json.loads(_storage.read_text(key))
             dashboards.append(_safe_load_dashboard(data))
         except Exception:
-            logger.warning("Skipping corrupted dashboard file: %s", path.name)
+            logger.warning("Skipping corrupted dashboard file: %s", key)
             continue
 
+    dashboards.sort(key=lambda d: d.updated_at, reverse=True)
     return dashboards
 
 
@@ -137,21 +111,25 @@ def update_dashboard(dashboard_id: str, **fields) -> SavedDashboard | None:
     """Update a dashboard on disk. Merges provided fields."""
     if not _validate_id(dashboard_id):
         return None
-    path = DASHBOARDS_DIR / f"{dashboard_id}.json"
-    if not path.exists():
+    key = f"dashboards/{dashboard_id}.json"
+    if not _storage.exists(key):
         return None
 
-    data = json.loads(path.read_text())
+    try:
+        data = json.loads(_storage.read_text(key))
+    except (json.JSONDecodeError, OSError):
+        logger.warning("Failed to read dashboard %s for update (corrupted?)", dashboard_id)
+        return None
     now = datetime.now(timezone.utc).isoformat()
 
     # Only allow updating presentation fields — protect id and timestamps
     _UPDATABLE = {"title", "description", "charts", "filters", "status"}
-    for key, value in fields.items():
-        if key in _UPDATABLE:
-            data[key] = value
+    for key_name, value in fields.items():
+        if key_name in _UPDATABLE:
+            data[key_name] = value
 
     data["updated_at"] = now
-    _atomic_write(path, json.dumps(data, indent=2))
+    _storage.write_text(key, json.dumps(data, indent=2))
     return _safe_load_dashboard(data)
 
 
@@ -159,8 +137,8 @@ def delete_dashboard(dashboard_id: str) -> bool:
     """Delete a dashboard."""
     if not _validate_id(dashboard_id):
         return False
-    path = DASHBOARDS_DIR / f"{dashboard_id}.json"
-    if path.exists():
-        path.unlink()
+    key = f"dashboards/{dashboard_id}.json"
+    if _storage.exists(key):
+        _storage.delete(key)
         return True
     return False

@@ -1,64 +1,45 @@
 """
 Version storage: save and restore chart edit history as JSON snapshots.
 Each version is a complete SavedChart JSON plus _version_meta.
-Storage: data/versions/{chart_id}/{version_number}.json
+Storage: versions/{chart_id}/{version_number}.json
 Auto-prune: keep last MAX_VERSIONS per chart.
 """
 
 import json
 import logging
-import os
-import tempfile
 from datetime import datetime, timezone
-from pathlib import Path
+
+from api.services.storage import get_storage
 
 logger = logging.getLogger(__name__)
 
-VERSIONS_DIR = Path(__file__).parent.parent.parent / "data" / "versions"
+_storage = get_storage()
 
 MAX_VERSIONS = 50
 
 
-def _versions_dir(chart_id: str) -> Path:
-    """Return the versions directory for a given chart."""
-    return VERSIONS_DIR / chart_id
+def _version_key(chart_id: str, version: int) -> str:
+    """Return the storage key for a specific version."""
+    return f"versions/{chart_id}/{version}.json"
 
 
-def _version_path(chart_id: str, version: int) -> Path:
-    """Return the file path for a specific version."""
-    return _versions_dir(chart_id) / f"{version}.json"
-
-
-def _atomic_write(path: Path, content: str) -> None:
-    """Write content to a file atomically via temp file + rename."""
-    fd, tmp_name = tempfile.mkstemp(dir=path.parent, suffix=".tmp")
-    fd_closed = False
-    try:
-        os.write(fd, content.encode())
-        os.close(fd)
-        fd_closed = True
-        os.replace(tmp_name, str(path))
-    except BaseException:
-        if not fd_closed:
-            try:
-                os.close(fd)
-            except OSError:
-                pass
-        try:
-            os.unlink(tmp_name)
-        except OSError:
-            pass
-        raise
+def _list_version_numbers(chart_id: str) -> list[int]:
+    """List all version numbers for a chart, sorted ascending."""
+    prefix = f"versions/{chart_id}/"
+    keys = _storage.list(prefix)
+    versions = []
+    for key in keys:
+        # key looks like "versions/{chart_id}/{number}.json"
+        filename = key.rsplit("/", 1)[-1]
+        stem = filename.removesuffix(".json")
+        if stem.isdigit():
+            versions.append(int(stem))
+    return sorted(versions)
 
 
 def _next_version_number(chart_id: str) -> int:
     """Determine the next version number for a chart (1-based)."""
-    chart_dir = _versions_dir(chart_id)
-    if not chart_dir.exists():
-        return 1
-    existing = sorted(
-        int(p.stem) for p in chart_dir.glob("*.json") if p.stem.isdigit()
-    )
+    existing = _list_version_numbers(chart_id)
     if not existing:
         return 1
     return existing[-1] + 1
@@ -66,20 +47,15 @@ def _next_version_number(chart_id: str) -> int:
 
 def _prune_versions(chart_id: str) -> None:
     """Keep only the last MAX_VERSIONS versions, deleting oldest."""
-    chart_dir = _versions_dir(chart_id)
-    if not chart_dir.exists():
-        return
-    versions = sorted(
-        int(p.stem) for p in chart_dir.glob("*.json") if p.stem.isdigit()
-    )
+    versions = _list_version_numbers(chart_id)
     if len(versions) <= MAX_VERSIONS:
         return
     to_delete = versions[: len(versions) - MAX_VERSIONS]
     for v in to_delete:
-        path = chart_dir / f"{v}.json"
+        key = _version_key(chart_id, v)
         try:
-            path.unlink()
-        except OSError:
+            _storage.delete(key)
+        except (OSError, FileNotFoundError):
             logger.warning("Failed to prune version %d for chart %s", v, chart_id)
 
 
@@ -101,9 +77,6 @@ def create_version(
     Returns:
         The version metadata dict.
     """
-    chart_dir = _versions_dir(chart_id)
-    chart_dir.mkdir(parents=True, exist_ok=True)
-
     version_number = _next_version_number(chart_id)
     now = datetime.now(timezone.utc).isoformat()
 
@@ -117,8 +90,8 @@ def create_version(
     # Build the full snapshot: chart data + version metadata
     snapshot = {**chart_data, "_version_meta": version_meta}
 
-    path = _version_path(chart_id, version_number)
-    _atomic_write(path, json.dumps(snapshot, indent=2))
+    key = _version_key(chart_id, version_number)
+    _storage.write_text(key, json.dumps(snapshot, indent=2))
 
     # Prune old versions
     _prune_versions(chart_id)
@@ -133,25 +106,25 @@ def list_versions(chart_id: str) -> list[dict]:
     Returns:
         List of version metadata dicts (version, created_at, trigger, label).
     """
-    chart_dir = _versions_dir(chart_id)
-    if not chart_dir.exists():
-        return []
-
     versions = []
-    for path in chart_dir.glob("*.json"):
-        if not path.stem.isdigit():
+    prefix = f"versions/{chart_id}/"
+    for key in _storage.list(prefix):
+        # Extract version number from key
+        filename = key.rsplit("/", 1)[-1]
+        stem = filename.removesuffix(".json")
+        if not stem.isdigit():
             continue
         try:
-            data = json.loads(path.read_text())
+            data = json.loads(_storage.read_text(key))
             meta = data.get("_version_meta", {})
             versions.append({
-                "version": meta.get("version", int(path.stem)),
+                "version": meta.get("version", int(stem)),
                 "created_at": meta.get("created_at", ""),
                 "trigger": meta.get("trigger", "unknown"),
                 "label": meta.get("label"),
             })
         except (json.JSONDecodeError, OSError):
-            logger.warning("Skipping corrupted version file: %s", path)
+            logger.warning("Skipping corrupted version file: %s", key)
             continue
 
     # Sort newest first
@@ -166,12 +139,12 @@ def get_version(chart_id: str, version: int) -> dict | None:
     Returns:
         The complete snapshot dict (chart data + _version_meta), or None if not found.
     """
-    path = _version_path(chart_id, version)
-    if not path.exists():
+    key = _version_key(chart_id, version)
+    if not _storage.exists(key):
         return None
 
     try:
-        return json.loads(path.read_text())
+        return json.loads(_storage.read_text(key))
     except (json.JSONDecodeError, OSError):
         logger.warning("Failed to read version %d for chart %s", version, chart_id)
         return None
@@ -184,13 +157,13 @@ def delete_version(chart_id: str, version: int) -> bool:
     Returns:
         True if deleted, False if not found.
     """
-    path = _version_path(chart_id, version)
-    if not path.exists():
+    key = _version_key(chart_id, version)
+    if not _storage.exists(key):
         return False
 
     try:
-        path.unlink()
+        _storage.delete(key)
         return True
-    except OSError:
+    except (OSError, FileNotFoundError):
         logger.warning("Failed to delete version %d for chart %s", version, chart_id)
         return False

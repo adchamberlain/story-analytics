@@ -1,6 +1,6 @@
 """
 Settings storage: save and load app settings (LLM provider, API keys) as JSON.
-Local-first persistence via a single JSON file at data/settings.json.
+Local-first persistence via a single JSON file at settings.json.
 
 On first load, bootstraps from environment variables so existing .env users
 aren't broken. After save, pushes keys into os.environ so downstream code
@@ -9,13 +9,12 @@ that reads env vars still works without restart.
 
 import json
 import os
-import tempfile
 from datetime import datetime, timezone
-from pathlib import Path
 from dataclasses import dataclass, asdict, fields as dc_fields
 
+from api.services.storage import get_storage
 
-SETTINGS_PATH = Path(__file__).parent.parent.parent / "data" / "settings.json"
+_storage = get_storage()
 
 # Map provider names to the env var that holds their API key
 _PROVIDER_KEY_MAP = {
@@ -35,9 +34,9 @@ class AppSettings:
 
 
 def load_settings() -> AppSettings:
-    """Load settings from data/settings.json, bootstrapping from env vars if needed."""
-    if SETTINGS_PATH.exists():
-        data = json.loads(SETTINGS_PATH.read_text())
+    """Load settings from settings.json, bootstrapping from env vars if needed."""
+    if _storage.exists("settings.json"):
+        data = json.loads(_storage.read_text("settings.json"))
         known = {f.name for f in dc_fields(AppSettings)}
         settings = AppSettings(**{k: v for k, v in data.items() if k in known})
 
@@ -74,7 +73,7 @@ def load_settings() -> AppSettings:
 
 
 def save_settings(**fields: str) -> AppSettings:
-    """Merge fields into existing settings, write to data/settings.json,
+    """Merge fields into existing settings, write to settings.json,
     and push API keys into os.environ so LLM calls work immediately."""
     current = load_settings()
 
@@ -84,23 +83,8 @@ def save_settings(**fields: str) -> AppSettings:
 
     current.updated_at = datetime.now(timezone.utc).isoformat()
 
-    # Persist to disk atomically via uniquely-named temp file
-    SETTINGS_PATH.parent.mkdir(parents=True, exist_ok=True)
-    fd, tmp_name = tempfile.mkstemp(dir=SETTINGS_PATH.parent, suffix=".tmp")
-    try:
-        os.write(fd, json.dumps(asdict(current), indent=2).encode())
-        os.close(fd)
-        os.replace(tmp_name, str(SETTINGS_PATH))
-    except BaseException:
-        try:
-            os.close(fd)
-        except OSError:
-            pass
-        try:
-            os.unlink(tmp_name)
-        except OSError:
-            pass
-        raise
+    # Persist to disk via storage backend
+    _storage.write_text("settings.json", json.dumps(asdict(current), indent=2))
 
     # Push keys into os.environ so downstream code works immediately.
     # Clear env var when key is removed so providers stop using the old key.

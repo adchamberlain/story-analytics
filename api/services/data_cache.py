@@ -1,17 +1,18 @@
 """
 Simple file-based data cache with TTL and staleness tracking.
-Stores cached data source responses in data/cache/ with metadata.
+Stores cached data source responses via StorageBackend with metadata.
 """
 
 import hashlib
 import json
 import logging
 from datetime import datetime, timezone
-from pathlib import Path
+
+from api.services.storage import get_storage
 
 logger = logging.getLogger(__name__)
 
-CACHE_DIR = Path(__file__).parent.parent.parent / "data" / "cache"
+_storage = get_storage()
 
 
 def _cache_key(url: str, headers: dict | None = None) -> str:
@@ -28,14 +29,14 @@ def get_cached(url: str, headers: dict | None = None, ttl_seconds: int = 300) ->
     Returns dict with keys: data (bytes), fetched_at (ISO str), etag (str|None), age_seconds (int)
     """
     key = _cache_key(url, headers)
-    meta_path = CACHE_DIR / f"{key}.meta.json"
-    data_path = CACHE_DIR / f"{key}.data"
+    meta_key = f"cache/{key}.meta.json"
+    data_key = f"cache/{key}.data"
 
-    if not meta_path.exists() or not data_path.exists():
+    if not _storage.exists(meta_key) or not _storage.exists(data_key):
         return None
 
     try:
-        meta = json.loads(meta_path.read_text())
+        meta = json.loads(_storage.read_text(meta_key))
         fetched_at = datetime.fromisoformat(meta["fetched_at"])
         age = (datetime.now(timezone.utc) - fetched_at).total_seconds()
 
@@ -43,7 +44,7 @@ def get_cached(url: str, headers: dict | None = None, ttl_seconds: int = 300) ->
             return None  # Stale
 
         return {
-            "data": data_path.read_bytes(),
+            "data": _storage.read(data_key),
             "fetched_at": meta["fetched_at"],
             "etag": meta.get("etag"),
             "age_seconds": int(age),
@@ -55,7 +56,6 @@ def get_cached(url: str, headers: dict | None = None, ttl_seconds: int = 300) ->
 
 def set_cached(url: str, data: bytes, headers: dict | None = None, etag: str | None = None):
     """Store data in cache."""
-    CACHE_DIR.mkdir(parents=True, exist_ok=True)
     key = _cache_key(url, headers)
 
     meta = {
@@ -64,24 +64,24 @@ def set_cached(url: str, data: bytes, headers: dict | None = None, etag: str | N
         "etag": etag,
     }
 
-    meta_path = CACHE_DIR / f"{key}.meta.json"
-    data_path = CACHE_DIR / f"{key}.data"
+    meta_key = f"cache/{key}.meta.json"
+    data_key = f"cache/{key}.data"
 
-    # Write data then metadata
-    data_path.write_bytes(data)
-    meta_path.write_text(json.dumps(meta, indent=2))
+    # Write data (binary) then metadata (text)
+    _storage.write(data_key, data)
+    _storage.write_text(meta_key, json.dumps(meta, indent=2))
 
 
 def get_staleness(url: str, headers: dict | None = None) -> int | None:
     """Get age of cached data in seconds. None if not cached."""
     key = _cache_key(url, headers)
-    meta_path = CACHE_DIR / f"{key}.meta.json"
+    meta_key = f"cache/{key}.meta.json"
 
-    if not meta_path.exists():
+    if not _storage.exists(meta_key):
         return None
 
     try:
-        meta = json.loads(meta_path.read_text())
+        meta = json.loads(_storage.read_text(meta_key))
         fetched_at = datetime.fromisoformat(meta["fetched_at"])
         return int((datetime.now(timezone.utc) - fetched_at).total_seconds())
     except Exception:

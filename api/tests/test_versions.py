@@ -2,12 +2,12 @@
 Tests for version history: CRUD, restore, auto-prune at 50, 404s.
 """
 import json
-import shutil
 from pathlib import Path
 
 from fastapi.testclient import TestClient
 from api.main import app
-from api.services.version_storage import VERSIONS_DIR, MAX_VERSIONS
+from api.services.version_storage import MAX_VERSIONS
+from api.services.storage import get_storage
 
 client = TestClient(app)
 
@@ -29,9 +29,8 @@ def _create_chart(**overrides) -> dict:
 def _cleanup_chart(chart_id: str):
     """Delete chart and its versions directory."""
     client.delete(f"/api/v2/charts/{chart_id}")
-    version_dir = VERSIONS_DIR / chart_id
-    if version_dir.exists():
-        shutil.rmtree(version_dir)
+    _storage = get_storage()
+    _storage.delete_tree(f"versions/{chart_id}/")
 
 
 class TestCreateVersion:

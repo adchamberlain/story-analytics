@@ -5,17 +5,16 @@ Follows the same pattern as chart_storage.py.
 
 import json
 import logging
-import os
 import re
-import tempfile
 import uuid
 from datetime import datetime, timezone
-from pathlib import Path
 from dataclasses import dataclass, asdict, fields as dc_fields
+
+from api.services.storage import get_storage
 
 logger = logging.getLogger(__name__)
 
-THEMES_DIR = Path(__file__).parent.parent.parent / "data" / "themes"
+_storage = get_storage()
 
 _SAFE_ID_RE = re.compile(r"^[a-f0-9]{1,32}$")
 
@@ -39,8 +38,6 @@ def save_theme(
     theme_id: str | None = None,
 ) -> SavedTheme:
     """Save a theme to disk. If theme_id is provided, use it (for imports)."""
-    THEMES_DIR.mkdir(parents=True, exist_ok=True)
-
     tid = theme_id or uuid.uuid4().hex[:12]
     now = datetime.now(timezone.utc).isoformat()
 
@@ -53,31 +50,8 @@ def save_theme(
         updated_at=now,
     )
 
-    path = THEMES_DIR / f"{tid}.json"
-    _atomic_write(path, json.dumps(asdict(theme), indent=2))
+    _storage.write_text(f"themes/{tid}.json", json.dumps(asdict(theme), indent=2))
     return theme
-
-
-def _atomic_write(path: Path, content: str) -> None:
-    """Write content atomically via temp file + rename."""
-    fd, tmp_name = tempfile.mkstemp(dir=path.parent, suffix=".tmp")
-    fd_closed = False
-    try:
-        os.write(fd, content.encode())
-        os.close(fd)
-        fd_closed = True
-        os.replace(tmp_name, str(path))
-    except BaseException:
-        if not fd_closed:
-            try:
-                os.close(fd)
-            except OSError:
-                pass
-        try:
-            os.unlink(tmp_name)
-        except OSError:
-            pass
-        raise
 
 
 def _safe_load_theme(data: dict) -> SavedTheme:
@@ -94,11 +68,11 @@ def load_theme(theme_id: str) -> SavedTheme | None:
     """Load a theme from disk."""
     if not _validate_id(theme_id):
         return None
-    path = THEMES_DIR / f"{theme_id}.json"
-    if not path.exists():
+    key = f"themes/{theme_id}.json"
+    if not _storage.exists(key):
         return None
     try:
-        data = json.loads(path.read_text())
+        data = json.loads(_storage.read_text(key))
         return _safe_load_theme(data)
     except Exception:
         logger.warning("Failed to load theme %s", theme_id)
@@ -107,16 +81,16 @@ def load_theme(theme_id: str) -> SavedTheme | None:
 
 def list_themes() -> list[SavedTheme]:
     """List all saved themes, newest first."""
-    if not THEMES_DIR.exists():
-        return []
-
     themes = []
-    for path in sorted(THEMES_DIR.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True):
+    for key in _storage.list("themes/"):
+        if not key.endswith(".json"):
+            continue
         try:
-            data = json.loads(path.read_text())
+            data = json.loads(_storage.read_text(key))
             themes.append(_safe_load_theme(data))
         except Exception:
-            logger.warning("Skipping corrupted theme file: %s", path.name)
+            logger.warning("Skipping corrupted theme file: %s", key)
+    themes.sort(key=lambda t: t.updated_at, reverse=True)
     return themes
 
 
@@ -124,22 +98,22 @@ def update_theme(theme_id: str, **fields) -> SavedTheme | None:
     """Update a theme on disk."""
     if not _validate_id(theme_id):
         return None
-    path = THEMES_DIR / f"{theme_id}.json"
-    if not path.exists():
+    key = f"themes/{theme_id}.json"
+    if not _storage.exists(key):
         return None
 
     try:
-        data = json.loads(path.read_text())
+        data = json.loads(_storage.read_text(key))
     except (json.JSONDecodeError, OSError):
         return None
 
     _UPDATABLE = {"name", "description", "theme_data"}
-    for key, value in fields.items():
-        if key in _UPDATABLE:
-            data[key] = value
+    for key_name, value in fields.items():
+        if key_name in _UPDATABLE:
+            data[key_name] = value
 
     data["updated_at"] = datetime.now(timezone.utc).isoformat()
-    _atomic_write(path, json.dumps(data, indent=2))
+    _storage.write_text(key, json.dumps(data, indent=2))
     try:
         return _safe_load_theme(data)
     except Exception:
@@ -150,8 +124,8 @@ def delete_theme(theme_id: str) -> bool:
     """Delete a theme."""
     if not _validate_id(theme_id):
         return False
-    path = THEMES_DIR / f"{theme_id}.json"
-    if path.exists():
-        path.unlink()
+    key = f"themes/{theme_id}.json"
+    if _storage.exists(key):
+        _storage.delete(key)
         return True
     return False
