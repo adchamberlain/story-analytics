@@ -21,6 +21,7 @@ An AI assistant (Claude, GPT, or Gemini) is available to help write SQL, add cal
 - **Any data source** — Snowflake, PostgreSQL, BigQuery, Google Sheets, or CSV upload
 - **AI assistant** — Claude, GPT, or Gemini helps with SQL, derived metrics, and chart refinement
 - **Export** — SVG, PNG, PDF, PowerPoint (PPTX), and CSV data download
+- **Portable HTML export** — Download a self-contained HTML dashboard you can host anywhere — GitHub Pages, Netlify, S3, or your own server
 - **Data transforms** — Transpose, rename, delete, reorder, round, prepend/append, edit cells, cast types
 - **Version history** — Auto-save snapshots with one-click restore
 - **Annotations** — Reference lines, text labels, and highlighted ranges with responsive scaling
