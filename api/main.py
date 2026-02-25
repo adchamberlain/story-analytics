@@ -187,3 +187,41 @@ async def list_providers():
             {"id": "gemini", "name": "Gemini (Google)", "models": ["gemini-2.0-flash", "gemini-2.5-pro"]},
         ]
     }
+
+
+# ---------------------------------------------------------------------------
+# Serve built React SPA in production (when static/ dir exists)
+# ---------------------------------------------------------------------------
+import os
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+
+_static_dir = os.path.join(os.path.dirname(__file__), "..", "static")
+if os.path.isdir(_static_dir):
+    # Serve embed.html for embed routes (separate entry point)
+    @app.get("/embed/{rest:path}")
+    async def _serve_embed(rest: str):
+        embed_html = os.path.join(_static_dir, "embed.html")
+        if os.path.isfile(embed_html):
+            return FileResponse(embed_html)
+        return FileResponse(os.path.join(_static_dir, "index.html"))
+
+    # Serve static assets (JS, CSS chunks)
+    _assets_dir = os.path.join(_static_dir, "assets")
+    if os.path.isdir(_assets_dir):
+        app.mount("/assets", StaticFiles(directory=_assets_dir), name="static-assets")
+
+    # Serve basemaps if present
+    _basemaps_dir = os.path.join(_static_dir, "basemaps")
+    if os.path.isdir(_basemaps_dir):
+        app.mount("/basemaps", StaticFiles(directory=_basemaps_dir), name="basemaps")
+
+    # SPA catch-all: serve index.html for all other non-API routes
+    @app.get("/{path:path}")
+    async def _serve_spa(path: str):
+        # Check if it's a real static file
+        file_path = os.path.join(_static_dir, path)
+        if os.path.isfile(file_path):
+            return FileResponse(file_path)
+        # Otherwise serve index.html for client-side routing
+        return FileResponse(os.path.join(_static_dir, "index.html"))
