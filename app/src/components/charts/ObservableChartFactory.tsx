@@ -13,6 +13,8 @@ import { shouldShowGrid, formatBigValue, computePctDelta, formatDelta } from './
 import { RichDataTable } from './table/RichDataTable'
 import { ChoroplethMap } from './ChoroplethMap'
 import { GeoPointMap } from './GeoPointMap'
+import { ElectionDonut } from './ElectionDonut'
+import { MultiplePies } from './MultiplePies'
 
 /** Minimal type for the Observable Plot element with scale access. */
 interface PlotElement extends HTMLElement {
@@ -249,6 +251,14 @@ export function ObservableChartFactory({
     return <GeoPointMap data={data} config={config} height={height} autoHeight={autoHeight} mapVariant={variant} />
   }
 
+  if (chartType === 'ElectionDonut') {
+    return <ElectionDonut data={data} config={config} height={height} autoHeight={autoHeight} />
+  }
+
+  if (chartType === 'MultiplePies') {
+    return <MultiplePies data={data} config={config} height={height} autoHeight={autoHeight} />
+  }
+
   // Auto-height: flex layout fills available space. Fixed: explicit pixel height.
   const rootStyle: React.CSSProperties = autoHeight
     ? { display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, width: '100%' }
@@ -340,6 +350,14 @@ function buildMarks(
       return buildBulletBarMarks(data, x, y, config, colors)
     case 'SmallMultiples':
       return buildSmallMultiplesMarks(data, x, y, series, config, colors)
+    case 'StackedColumn':
+      return buildStackedColumnMarks(data, x, y, series, config, colors)
+    case 'GroupedColumn':
+      return buildGroupedColumnMarks(data, x, y, series, config, colors)
+    case 'SplitBars':
+      return buildSplitBarMarks(data, x, config, colors)
+    case 'ArrowPlot':
+      return buildArrowPlotMarks(data, x, config, colors)
     default:
       // Fallback: render as bar chart
       return buildBarMarks(data, x, y, series, config, colors)
@@ -732,6 +750,146 @@ function buildSmallMultiplesMarks(
         Plot.tip(lineData, Plot.pointerX({ x, y, fy: facet })),
       )
   }
+
+  return marks
+}
+
+// ── Phase 7 Mark Builders ───────────────────────────────────────────────────
+
+function buildStackedColumnMarks(
+  data: Record<string, unknown>[],
+  x: string | undefined,
+  y: string | undefined,
+  series: string | undefined,
+  _config: ChartConfig,
+  _colors: readonly string[] | string[],
+): Plot.Markish[] {
+  if (!x || !y || !series) return []
+
+  const marks: Plot.Markish[] = []
+
+  marks.push(
+    Plot.barY(data, Plot.stackY({ x, y, fill: series })),
+    Plot.tip(data, Plot.pointerX({ x, y, fill: series })),
+    Plot.ruleY([0]),
+  )
+
+  return marks
+}
+
+function buildGroupedColumnMarks(
+  data: Record<string, unknown>[],
+  x: string | undefined,
+  y: string | undefined,
+  series: string | undefined,
+  _config: ChartConfig,
+  _colors: readonly string[] | string[],
+): Plot.Markish[] {
+  if (!x || !y || !series) return []
+
+  const marks: Plot.Markish[] = []
+
+  marks.push(
+    Plot.barY(data, { x: series, y, fill: series, fx: x }),
+    Plot.tip(data, Plot.pointerX({ x: series, y, fill: series, fx: x })),
+    Plot.ruleY([0]),
+  )
+
+  return marks
+}
+
+function buildSplitBarMarks(
+  data: Record<string, unknown>[],
+  x: string | undefined,
+  config: ChartConfig,
+  colors: readonly string[] | string[],
+): Plot.Markish[] {
+  const cat = x
+  const leftCol = config.leftColumn
+  const rightCol = config.rightColumn
+
+  if (!cat || !leftCol || !rightCol) return []
+
+  const marks: Plot.Markish[] = []
+
+  // Left bars: negative direction
+  marks.push(
+    Plot.barX(data, {
+      y: cat,
+      x: (d: Record<string, unknown>) => -Math.abs(Number(d[leftCol!] ?? 0)),
+      fill: colors[0],
+      tip: true,
+    }),
+  )
+
+  // Right bars: positive direction
+  marks.push(
+    Plot.barX(data, {
+      y: cat,
+      x: (d: Record<string, unknown>) => Math.abs(Number(d[rightCol!] ?? 0)),
+      fill: colors[1] ?? colors[0],
+      tip: true,
+    }),
+  )
+
+  // Center axis line
+  marks.push(Plot.ruleX([0], { stroke: '#666', strokeWidth: 1 }))
+
+  return marks
+}
+
+function buildArrowPlotMarks(
+  data: Record<string, unknown>[],
+  x: string | undefined,
+  config: ChartConfig,
+  colors: readonly string[] | string[],
+): Plot.Markish[] {
+  const cat = x
+  const startCol = config.startColumn
+  const endCol = config.endColumn
+
+  if (!cat || !startCol || !endCol) return []
+
+  const marks: Plot.Markish[] = []
+
+  // Start dots (hollow)
+  marks.push(
+    Plot.dot(data, {
+      x: startCol,
+      y: cat,
+      r: 5,
+      fill: 'none',
+      stroke: colors[0],
+      strokeWidth: 1.5,
+    }),
+  )
+
+  // Link from start to end
+  marks.push(
+    Plot.link(data, {
+      x1: startCol,
+      y1: cat,
+      x2: endCol,
+      y2: cat,
+      stroke: colors[0],
+      strokeWidth: 1.5,
+      markerEnd: 'arrow',
+    }),
+  )
+
+  // End dots (filled)
+  marks.push(
+    Plot.dot(data, {
+      x: endCol,
+      y: cat,
+      r: 5,
+      fill: colors[0],
+    }),
+  )
+
+  marks.push(
+    Plot.tip(data, Plot.pointer({ x: endCol, y: cat })),
+  )
 
   return marks
 }
