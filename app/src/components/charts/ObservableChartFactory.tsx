@@ -63,6 +63,9 @@ export function ObservableChartFactory({
       }))
     : []
 
+  // ArrowPlot / RangePlot: custom legend for start (hollow) vs end (filled) dots
+  const showStartEndLegend = (chartType === 'ArrowPlot' || chartType === 'RangePlot') && legendItems.length === 0
+
   // Ref to the Observable Plot element — used for scale inversion on click-to-place
   const plotRef = useRef<PlotElement | null>(null)
 
@@ -279,6 +282,18 @@ export function ObservableChartFactory({
           ))}
         </div>
       )}
+      {showStartEndLegend && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', padding: '0 0 6px', fontSize: 12 }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+            <span style={{ width: 10, height: 10, borderRadius: '50%', border: `2px solid ${colors[0]}`, flexShrink: 0 }} />
+            <span style={{ color: 'var(--color-text-secondary)' }}>{chartType === 'ArrowPlot' ? 'Before' : 'Min'}</span>
+          </span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+            <span style={{ width: 10, height: 10, borderRadius: '50%', backgroundColor: colors[0], flexShrink: 0 }} />
+            <span style={{ color: 'var(--color-text-secondary)' }}>{chartType === 'ArrowPlot' ? 'After' : 'Max'}</span>
+          </span>
+        </div>
+      )}
       {placingId && (
         <div style={{ padding: '4px 8px', fontSize: 11, color: 'var(--color-blue-500)', textAlign: 'center' }}>
           Click on the chart to place the point note
@@ -379,22 +394,33 @@ function fmtTipValue(v: unknown): string {
   return String(v)
 }
 
+function parseUnitFromTitle(title: string): { prefix: string; suffix: string } | null {
+  const unitMatch = title.match(/\(([^)]+)\)\s*$/)
+  if (!unitMatch) return null
+  let unit = unitMatch[1]
+  // "out of N" → "/N"
+  const outOf = unit.match(/^out\s+of\s+(.+)$/i)
+  if (outOf) return { prefix: '', suffix: `/${outOf[1]}` }
+  // Split leading currency symbols from trailing scale suffix
+  const parts = unit.match(/^([$€£¥₹]?)(.*)$/)
+  if (parts) return { prefix: parts[1], suffix: parts[2] }
+  return { prefix: '', suffix: unit }
+}
+
 function detectValueUnit(config?: ChartConfig, yCol?: string): { prefix: string; suffix: string } {
   const none = { prefix: '', suffix: '' }
   if (!config && !yCol) return none
   if (config?.valueFormat === 'percent') return { prefix: '', suffix: '%' }
-  const title = config?.yAxisTitle ?? ''
-  if (/[%]|percent/i.test(title)) return { prefix: '', suffix: '%' }
+  // Check both y-axis and x-axis titles for units (handles horizontal charts)
+  const yTitle = config?.yAxisTitle ?? ''
+  const xTitle = config?.xAxisTitle ?? ''
+  if (/[%]|percent/i.test(yTitle) || /[%]|percent/i.test(xTitle)) return { prefix: '', suffix: '%' }
   if (yCol && /percent|pct/i.test(yCol)) return { prefix: '', suffix: '%' }
-  // Extract unit from parentheses in y-axis title, e.g. "Revenue ($M)" → prefix "$", suffix "M"
-  const unitMatch = title.match(/\(([^)]+)\)\s*$/)
-  if (unitMatch) {
-    const unit = unitMatch[1]
-    // Split leading currency symbols from trailing scale suffix
-    const parts = unit.match(/^([$€£¥₹]?)(.*)$/)
-    if (parts) return { prefix: parts[1], suffix: parts[2] }
-    return { prefix: '', suffix: unit }
-  }
+  // Try y-axis title first, then x-axis title
+  const fromY = parseUnitFromTitle(yTitle)
+  if (fromY) return fromY
+  const fromX = parseUnitFromTitle(xTitle)
+  if (fromX) return fromX
   return none
 }
 
@@ -705,13 +731,13 @@ function buildDotPlotMarks(
   if (series) {
     marks.push(
       Plot.dot(data, { x: y, y: x, fill: series, r, fillOpacity: 0.85 }),
-      Plot.tip(data, Plot.pointer({ x: y, y: x, fill: series, title: (d: Record<string, unknown>) => tipTitle(d, x, y, series, config) })),
+      Plot.tip(data, Plot.pointer({ x: y, y: x, fill: series, maxRadius: 30, title: (d: Record<string, unknown>) => tipTitle(d, x, y, series, config) })),
     )
   } else {
     marks.push(
       Plot.ruleY(data, { y: x, x1: 0, x2: y, strokeOpacity: 0.2, stroke: colors[0] }),
       Plot.dot(data, { x: y, y: x, fill: colors[0], r, fillOpacity: 0.85 }),
-      Plot.tip(data, Plot.pointer({ x: y, y: x, title: (d: Record<string, unknown>) => tipTitle(d, x, y, undefined, config) })),
+      Plot.tip(data, Plot.pointer({ x: y, y: x, maxRadius: 30, title: (d: Record<string, unknown>) => tipTitle(d, x, y, undefined, config) })),
     )
   }
 
@@ -791,7 +817,7 @@ function buildBulletBarMarks(
   }
 
   marks.push(
-    Plot.tip(data, Plot.pointer({ x: actual, y: cat, title: (d: Record<string, unknown>) => tipTitle(d, cat, actual, undefined, config) })),
+    Plot.tip(data, Plot.pointerY({ x: actual, y: cat, title: (d: Record<string, unknown>) => tipTitle(d, cat, actual, undefined, config) })),
   )
 
   return marks
@@ -932,11 +958,11 @@ function buildSplitBarMarks(
     }),
   )
 
-  // Tooltip
+  // Tooltip — use pointerY so hovering anywhere on the row (left or right bar) triggers it
   marks.push(
-    Plot.tip(data, Plot.pointer({
+    Plot.tip(data, Plot.pointerY({
       y: cat,
-      x: (d: Record<string, unknown>) => Number(d[leftCol!] ?? 0),
+      x: 0,
       title: (d: Record<string, unknown>) => {
         const unit = detectValueUnit(config)
         const fmt = (v: unknown) => { const n = Number(v); return isFinite(n) ? fmtWithUnit(d3.format(',.4~g')(n), unit) : String(v ?? '') }
@@ -1000,12 +1026,18 @@ function buildArrowPlotMarks(
     }),
   )
 
+  // Tooltip anchored to the midpoint of each row so it triggers across the full range
+  const tipFn = (d: Record<string, unknown>) => {
+    const unit = detectValueUnit(config)
+    const fmt = (v: unknown) => { const n = Number(v); return isFinite(n) ? fmtWithUnit(d3.format(',.4~g')(n), unit) : String(v ?? '') }
+    return `${d[cat!] ?? ''}: ${fmt(d[startCol!])} → ${fmt(d[endCol!])}`
+  }
   marks.push(
-    Plot.tip(data, Plot.pointer({ x: endCol, y: cat, title: (d: Record<string, unknown>) => {
-      const unit = detectValueUnit(config)
-      const fmt = (v: unknown) => { const n = Number(v); return isFinite(n) ? fmtWithUnit(d3.format(',.4~g')(n), unit) : String(v ?? '') }
-      return `${d[cat!] ?? ''}: ${fmt(d[startCol!])} → ${fmt(d[endCol!])}`
-    } })),
+    Plot.tip(data, Plot.pointerY({
+      x: (d: Record<string, unknown>) => (Number(d[startCol!]) + Number(d[endCol!])) / 2,
+      y: cat,
+      title: tipFn,
+    })),
   )
 
   return marks
@@ -1068,17 +1100,26 @@ function buildAnnotationMarks(annotations?: Annotations, bgColor = '#1e293b', _t
 
 /** Append a rotated y-axis label to the left of the tick values, inside the extra margin. */
 function appendYAxisLabel(svg: SVGSVGElement, plotEl: PlotElement, title: string) {
-  let yScale: ReturnType<PlotElement['scale']>
+  // For faceted charts (fy), use the facet-y range to span all panels;
+  // otherwise fall back to the y-scale range for a single-panel chart.
+  let midY: number | undefined
   try {
-    yScale = plotEl.scale('y')
-  } catch {
-    return
+    const fyScale = plotEl.scale('fy')
+    const fyRange = fyScale.range as unknown as [number, number] | undefined
+    if (fyRange) midY = (fyRange[0] + fyRange[1]) / 2
+  } catch { /* no fy scale — not faceted */ }
+
+  if (midY === undefined) {
+    let yScale: ReturnType<PlotElement['scale']>
+    try {
+      yScale = plotEl.scale('y')
+    } catch {
+      return
+    }
+    const yRange = yScale.range as unknown as [number, number] | undefined
+    if (!yRange) return
+    midY = (yRange[0] + yRange[1]) / 2
   }
-
-  const yRange = yScale.range as unknown as [number, number] | undefined
-  if (!yRange) return
-
-  const midY = (yRange[0] + yRange[1]) / 2
   const textColor = getComputedStyle(document.documentElement).getPropertyValue('--color-text-secondary').trim() || '#666'
 
   d3.select(svg).append('text')
@@ -2150,7 +2191,9 @@ function TreemapComponent({ data, config, height, autoHeight }: { data: Record<s
         <div
           style={{
             position: 'absolute',
-            left: Math.min(tooltip.x + 12, (containerWidth || 400) - 180),
+            ...(tooltip.x > (containerWidth || 400) * 0.6
+              ? { right: (containerWidth || 400) - tooltip.x + 12 }
+              : { left: tooltip.x + 12 }),
             top: Math.max(0, tooltip.y - 30),
             background: 'var(--color-surface-raised, #1e293b)',
             color: 'var(--color-text-primary, #e2e8f0)',

@@ -14,6 +14,14 @@ import {
 } from '../../utils/geoUtils'
 import { useGeoMap, zoomBtnStyle } from '../../hooks/useGeoMap'
 
+/** Format legend value — use SI prefixes only for large numbers to avoid
+ *  confusing "m" (milli) suffix on values < 1 (e.g. 0.6 → "600m"). */
+function fmtLegend(val: number): string {
+  const abs = Math.abs(val)
+  if (abs >= 1e3) return d3.format(',.2~s')(val)
+  return d3.format(',.4~g')(val)
+}
+
 interface ChoroplethMapProps {
   data: Record<string, unknown>[]
   config: ChartConfig
@@ -23,6 +31,7 @@ interface ChoroplethMapProps {
 
 export function ChoroplethMap({ data, config, height = 400, autoHeight = false }: ChoroplethMapProps) {
   const [tooltip, setTooltip] = useState<{ x: number; y: number; label: string; value: string } | null>(null)
+  const [legendInfo, setLegendInfo] = useState<{ min: number; max: number; colors: string[] } | null>(null)
 
   const basemapId = (config.basemap as BasemapId | 'custom') || 'world'
   const joinColumn = config.geoJoinColumn || config.x
@@ -119,50 +128,13 @@ export function ChoroplethMap({ data, config, height = 400, autoHeight = false }
         setTooltip(null)
       })
 
-    // Gradient legend (appended to the SVG, outside the zoom group so it stays fixed)
-    const svgSel = d3.select(el!).select('svg')
-    svgSel.selectAll('.choropleth-legend').remove()
-
-    const width = containerWidth
-    const h = effectiveHeight
-    const legendWidth = Math.min(200, width * 0.4)
-    const legendHeight = 10
-    const legendX = width - legendWidth - 16
-    const legendY = h - 30
-
-    const defs = svgSel.select('defs').empty() ? svgSel.append('defs') : svgSel.select('defs')
-    const gradId = `choropleth-grad-${Math.random().toString(36).slice(2, 8)}`
-    const grad = defs.append('linearGradient').attr('id', gradId)
+    // Store legend info for the HTML legend rendered below the map
+    const gradColors: string[] = []
     const steps = 10
     for (let i = 0; i <= steps; i++) {
-      const t = i / steps
-      const val = minVal + t * (maxVal - minVal)
-      grad.append('stop')
-        .attr('offset', `${t * 100}%`)
-        .attr('stop-color', colorScale(val))
+      gradColors.push(colorScale(minVal + (i / steps) * (maxVal - minVal)))
     }
-
-    const legendG = svgSel.append('g').attr('class', 'choropleth-legend').attr('transform', `translate(${legendX},${legendY})`)
-    legendG.append('rect')
-      .attr('width', legendWidth)
-      .attr('height', legendHeight)
-      .attr('rx', 2)
-      .attr('fill', `url(#${gradId})`)
-
-    legendG.append('text')
-      .attr('x', 0)
-      .attr('y', legendHeight + 14)
-      .attr('font-size', 10)
-      .attr('fill', 'var(--color-text-secondary, #666)')
-      .text(d3.format(',.2~s')(minVal))
-
-    legendG.append('text')
-      .attr('x', legendWidth)
-      .attr('y', legendHeight + 14)
-      .attr('text-anchor', 'end')
-      .attr('font-size', 10)
-      .attr('fill', 'var(--color-text-secondary, #666)')
-      .text(d3.format(',.2~s')(maxVal))
+    setLegendInfo({ min: minVal, max: maxVal, colors: gradColors })
 
   }, [geoData, data, containerWidth, effectiveHeight, basemapId, joinColumn, valueColumn, colorScaleType, pathFn, config.colorRange, config.color, containerRef, mapGroupRef])
 
@@ -182,38 +154,56 @@ export function ChoroplethMap({ data, config, height = 400, autoHeight = false }
     )
   }
 
+  const gradientCSS = legendInfo
+    ? `linear-gradient(to right, ${legendInfo.colors.join(', ')})`
+    : undefined
+
   return (
-    <div ref={containerRef} style={{ width: '100%', height: autoHeight ? '100%' : height, position: 'relative' }}>
-      {/* Zoom controls */}
-      <div
-        data-testid="zoom-controls"
-        style={{ position: 'absolute', top: 8, right: 8, display: 'flex', flexDirection: 'column', gap: 2, zIndex: 5 }}
-      >
-        <button onClick={handleZoomIn} style={zoomBtnStyle} aria-label="Zoom in">+</button>
-        <button onClick={handleZoomOut} style={zoomBtnStyle} aria-label="Zoom out">-</button>
-        <button onClick={handleReset} style={{ ...zoomBtnStyle, fontSize: 10 }} aria-label="Reset zoom">Reset</button>
+    <div style={{ width: '100%', height: autoHeight ? '100%' : height, display: 'flex', flexDirection: 'column' }}>
+      {/* Map area */}
+      <div ref={containerRef} style={{ width: '100%', flex: '1 1 0', minHeight: 0, position: 'relative' }}>
+        {/* Zoom controls */}
+        <div
+          data-testid="zoom-controls"
+          style={{ position: 'absolute', top: 8, right: 8, display: 'flex', flexDirection: 'column', gap: 2, zIndex: 5 }}
+        >
+          <button onClick={handleZoomIn} style={zoomBtnStyle} aria-label="Zoom in">+</button>
+          <button onClick={handleZoomOut} style={zoomBtnStyle} aria-label="Zoom out">-</button>
+          <button onClick={handleReset} style={{ ...zoomBtnStyle, fontSize: 10 }} aria-label="Reset zoom">Reset</button>
+        </div>
+
+        {tooltip && (
+          <div
+            style={{
+              position: 'absolute',
+              ...(tooltip.x > containerWidth * 0.6
+                ? { right: containerWidth - tooltip.x + 12 }
+                : { left: tooltip.x + 12 }),
+              top: tooltip.y - 30,
+              background: 'var(--color-surface-raised, #1e293b)',
+              color: 'var(--color-text-primary, #e2e8f0)',
+              border: '1px solid var(--color-border-default, #334155)',
+              borderRadius: 6,
+              padding: '6px 10px',
+              fontSize: 12,
+              pointerEvents: 'none',
+              zIndex: 10,
+              whiteSpace: 'nowrap',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+            }}
+          >
+            <div style={{ fontWeight: 600 }}>{tooltip.label}</div>
+            <div style={{ opacity: 0.8 }}>{tooltip.value}</div>
+          </div>
+        )}
       </div>
 
-      {tooltip && (
-        <div
-          style={{
-            position: 'absolute',
-            left: tooltip.x + 12,
-            top: tooltip.y - 30,
-            background: 'var(--color-surface-raised, #1e293b)',
-            color: 'var(--color-text-primary, #e2e8f0)',
-            border: '1px solid var(--color-border-default, #334155)',
-            borderRadius: 6,
-            padding: '6px 10px',
-            fontSize: 12,
-            pointerEvents: 'none',
-            zIndex: 10,
-            whiteSpace: 'nowrap',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-          }}
-        >
-          <div style={{ fontWeight: 600 }}>{tooltip.label}</div>
-          <div style={{ opacity: 0.8 }}>{tooltip.value}</div>
+      {/* Legend below the map */}
+      {legendInfo && gradientCSS && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 16px 2px', flexShrink: 0 }}>
+          <span style={{ fontSize: 10, color: 'var(--color-text-secondary, #666)', whiteSpace: 'nowrap' }}>{fmtLegend(legendInfo.min)}</span>
+          <div style={{ flex: '0 1 200px', height: 8, borderRadius: 2, background: gradientCSS }} />
+          <span style={{ fontSize: 10, color: 'var(--color-text-secondary, #666)', whiteSpace: 'nowrap' }}>{fmtLegend(legendInfo.max)}</span>
         </div>
       )}
     </div>

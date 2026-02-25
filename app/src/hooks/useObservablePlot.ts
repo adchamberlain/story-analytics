@@ -72,6 +72,10 @@ export function useObservablePlot(
     if (!plot) return // render deferred (e.g. waiting for height measurement)
     el.replaceChildren(plot)
 
+    // Allow tooltips and labels to overflow the SVG boundary
+    const svg = el.querySelector('svg')
+    if (svg) svg.style.overflow = 'visible'
+
     return () => {
       plot?.remove()
     }
