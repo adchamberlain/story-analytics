@@ -7,7 +7,6 @@ copy, rename, delete_tree, and convenience text helpers.
 """
 
 import os
-import shutil
 import threading
 from pathlib import Path
 
@@ -195,3 +194,16 @@ class TestGetLocalPath:
         assert isinstance(p, Path)
         assert p.is_absolute()
         assert p.exists()
+
+
+# ── Path traversal protection ──────────────────────────────────────
+
+class TestPathTraversal:
+    def test_path_traversal_blocked(self, storage: LocalStorageBackend):
+        """Paths containing ../ that escape the base dir are rejected."""
+        with pytest.raises(ValueError, match="escapes base directory"):
+            storage.read("../../etc/passwd")
+
+    def test_path_traversal_write_blocked(self, storage: LocalStorageBackend):
+        with pytest.raises(ValueError, match="escapes base directory"):
+            storage.write("../../evil.txt", b"bad")
