@@ -2,7 +2,6 @@
 Data router: CSV upload, schema inspection, and query execution.
 """
 
-import shutil
 import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
@@ -13,6 +12,7 @@ from pydantic import BaseModel, Field
 from ..services.duckdb_service import get_duckdb_service, _SAFE_SOURCE_ID_RE
 from ..services.connectors.google_sheets import parse_sheets_url, build_export_url, fetch_sheet_csv
 from ..services.data_cache import get_cached, set_cached
+from ..services.storage import get_storage
 
 
 router = APIRouter(prefix="/data", tags=["data"])
@@ -169,10 +169,9 @@ async def delete_source(source_id: str):
         # Remove inside lock to avoid race with concurrent iterators
         service._sources.pop(source_id, None)
 
-    # Delete upload directory from disk
-    upload_dir = Path(__file__).parent.parent.parent / "data" / "uploads" / source_id
-    if upload_dir.exists():
-        shutil.rmtree(upload_dir)
+    # Delete upload directory from storage
+    storage = get_storage()
+    storage.delete_tree(f"uploads/{source_id}")
 
     return {"deleted": True}
 
@@ -264,9 +263,8 @@ async def upload_csv(file: UploadFile = File(...), replace: str = Form("")):
             except Exception:
                 pass
             service._sources.pop(existing_id, None)
-        upload_dir = Path(__file__).parent.parent.parent / "data" / "uploads" / existing_id
-        if upload_dir.exists():
-            shutil.rmtree(upload_dir)
+        storage = get_storage()
+        storage.delete_tree(f"uploads/{existing_id}")
 
     # Write uploaded file to temp location, then ingest
     MAX_UPLOAD_BYTES = 100 * 1024 * 1024  # 100 MB
@@ -407,11 +405,15 @@ async def rename_source(source_id: str, request: RenameRequest):
     if not meta:
         raise HTTPException(status_code=404, detail="Source not found")
 
-    # Rename the file on disk
+    # Rename the file via storage backend
     old_path = meta.path
-    new_path = old_path.parent / Path(name).name  # sanitize
+    safe_new_name = Path(name).name  # sanitize
+    new_path = old_path.parent / safe_new_name
     if old_path != new_path:
-        old_path.rename(new_path)
+        storage = get_storage()
+        old_key = f"uploads/{source_id}/{old_path.name}"
+        new_key = f"uploads/{source_id}/{safe_new_name}"
+        storage.rename(old_key, new_key)
         meta.path = new_path
 
     return {"ok": True, "filename": new_path.name}
