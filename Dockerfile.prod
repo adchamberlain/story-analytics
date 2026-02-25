@@ -52,7 +52,7 @@ RUN mkdir -p /app/data
 
 # Default to local storage mode
 ENV STORAGE_BACKEND=local
-ENV DATABASE_URL=sqlite:///app/data/metadata.db
+ENV DATABASE_URL=sqlite:///data/metadata.db
 
 EXPOSE 8000
 CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]
