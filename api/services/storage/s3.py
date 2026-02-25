@@ -5,10 +5,17 @@ All paths are treated as S3 keys within a single bucket.
 Uses boto3 for all operations.
 """
 
+import os
+import tempfile
+from pathlib import Path
+
 import boto3
 from botocore.exceptions import ClientError
 
 from api.services.storage.base import StorageBackend
+
+# Persistent cache dir for S3 downloads (survives across requests, cleared on restart)
+_S3_CACHE_DIR = os.path.join(tempfile.gettempdir(), "story-analytics-s3-cache")
 
 
 class S3StorageBackend(StorageBackend):
@@ -78,5 +85,15 @@ class S3StorageBackend(StorageBackend):
                 Delete={"Objects": [{"Key": k} for k in batch]},
             )
 
-    # get_local_path() inherits from StorageBackend base which raises
-    # NotImplementedError — no override needed.
+    def get_local_path(self, path: str) -> Path:
+        """Download from S3 to a local cache and return the local path.
+
+        Used by DuckDB which requires filesystem paths for CSV ingestion.
+        Files are cached in a temp directory and only re-downloaded if missing.
+        """
+        local = Path(_S3_CACHE_DIR) / path
+        if not local.exists():
+            local.parent.mkdir(parents=True, exist_ok=True)
+            data = self.read(path)
+            local.write_bytes(data)
+        return local

@@ -268,7 +268,14 @@ class TestDeleteTree:
 
 
 class TestGetLocalPath:
-    def test_raises_not_implemented(self, s3_backend):
-        """get_local_path() raises NotImplementedError for S3."""
-        with pytest.raises(NotImplementedError, match="does not support local file paths"):
-            s3_backend.get_local_path("charts/a.json")
+    def test_downloads_to_local_cache(self, s3_backend):
+        """get_local_path() downloads from S3 to a local temp file."""
+        body_mock = MagicMock()
+        body_mock.read.return_value = b"a,b\n1,2\n"
+        s3_backend._mock_client.get_object.return_value = {"Body": body_mock}
+
+        local = s3_backend.get_local_path("uploads/abc123/data.csv")
+        assert local.exists()
+        assert local.read_bytes() == b"a,b\n1,2\n"
+        # Cleanup
+        local.unlink(missing_ok=True)
