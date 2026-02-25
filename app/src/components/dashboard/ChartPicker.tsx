@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { authFetch } from '../../utils/authFetch'
 
 interface PickerChart {
   id: string
@@ -36,7 +37,7 @@ export function ChartPicker({ excludeIds, onAdd, onCreateNew, onClose }: ChartPi
 
   useEffect(() => {
     const abortController = new AbortController()
-    fetch('/api/v2/charts/', { signal: abortController.signal })
+    authFetch('/api/v2/charts/', { signal: abortController.signal })
       .then((res) => {
         if (!res.ok) throw new Error(`Charts fetch failed: ${res.status}`)
         return res.json()

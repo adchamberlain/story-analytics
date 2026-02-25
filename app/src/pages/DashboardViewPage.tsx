@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { useParams, Link } from 'react-router-dom'
+import { authFetch } from '../utils/authFetch'
 import { DashboardGrid } from '../components/dashboard/DashboardGrid'
 import { ShareModal } from '../components/sharing/ShareModal'
 import { ThemeToggle } from '../components/layout/ThemeToggle'
@@ -81,7 +82,7 @@ export function DashboardViewPage() {
     }
 
     try {
-      const res = await fetch(`/api/v2/dashboards/${dashboardId}`)
+      const res = await authFetch(`/api/v2/dashboards/${dashboardId}`)
       if (!res.ok) {
         const body = await res.json().catch(() => ({ detail: res.statusText }))
         throw new Error(body.detail ?? `Failed to load dashboard: ${res.status}`)

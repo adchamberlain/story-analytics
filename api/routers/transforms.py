@@ -5,8 +5,10 @@ import csv
 import io
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
+
+from ..auth_simple import get_current_user
 
 from ..services.duckdb_service import get_duckdb_service, _SAFE_SOURCE_ID_RE
 from ..services.storage import get_storage
@@ -111,7 +113,7 @@ def _reingest_and_preview(source_id: str, path: Path, limit: int = 50) -> dict:
 # -- Endpoints ----------------------------------------------------------------
 
 @router.post("/{source_id}/transform/transpose")
-async def transpose(source_id: str):
+async def transpose(source_id: str, user: dict = Depends(get_current_user)):
     """Transpose the data: rows become columns and columns become rows."""
     path, key = _get_source_info(source_id)
     columns, rows = _read_csv(key)
@@ -135,7 +137,7 @@ async def transpose(source_id: str):
 
 
 @router.post("/{source_id}/transform/rename-column")
-async def rename_column(source_id: str, req: RenameColumnRequest):
+async def rename_column(source_id: str, req: RenameColumnRequest, user: dict = Depends(get_current_user)):
     """Rename a single column."""
     path, key = _get_source_info(source_id)
     columns, rows = _read_csv(key)
@@ -152,7 +154,7 @@ async def rename_column(source_id: str, req: RenameColumnRequest):
 
 
 @router.post("/{source_id}/transform/delete-column")
-async def delete_column(source_id: str, req: DeleteColumnRequest):
+async def delete_column(source_id: str, req: DeleteColumnRequest, user: dict = Depends(get_current_user)):
     """Delete a column from the dataset."""
     path, key = _get_source_info(source_id)
     columns, rows = _read_csv(key)
@@ -166,7 +168,7 @@ async def delete_column(source_id: str, req: DeleteColumnRequest):
 
 
 @router.post("/{source_id}/transform/reorder-columns")
-async def reorder_columns(source_id: str, req: ReorderColumnsRequest):
+async def reorder_columns(source_id: str, req: ReorderColumnsRequest, user: dict = Depends(get_current_user)):
     """Reorder columns to match the provided order."""
     path, key = _get_source_info(source_id)
     columns, rows = _read_csv(key)
@@ -180,7 +182,7 @@ async def reorder_columns(source_id: str, req: ReorderColumnsRequest):
 
 
 @router.post("/{source_id}/transform/round")
-async def round_column(source_id: str, req: RoundRequest):
+async def round_column(source_id: str, req: RoundRequest, user: dict = Depends(get_current_user)):
     """Round numeric values in a column to N decimal places."""
     path, key = _get_source_info(source_id)
     columns, rows = _read_csv(key)
@@ -197,7 +199,7 @@ async def round_column(source_id: str, req: RoundRequest):
 
 
 @router.post("/{source_id}/transform/prepend-append")
-async def prepend_append(source_id: str, req: PrependAppendRequest):
+async def prepend_append(source_id: str, req: PrependAppendRequest, user: dict = Depends(get_current_user)):
     """Prepend and/or append text to all values in a column."""
     path, key = _get_source_info(source_id)
     columns, rows = _read_csv(key)
@@ -212,7 +214,7 @@ async def prepend_append(source_id: str, req: PrependAppendRequest):
 
 
 @router.post("/{source_id}/transform/edit-cell")
-async def edit_cell(source_id: str, req: EditCellRequest):
+async def edit_cell(source_id: str, req: EditCellRequest, user: dict = Depends(get_current_user)):
     """Edit a single cell value by row index and column name."""
     path, key = _get_source_info(source_id)
     columns, rows = _read_csv(key)
@@ -227,7 +229,7 @@ async def edit_cell(source_id: str, req: EditCellRequest):
 
 
 @router.post("/{source_id}/transform/cast-type")
-async def cast_type(source_id: str, req: CastTypeRequest):
+async def cast_type(source_id: str, req: CastTypeRequest, user: dict = Depends(get_current_user)):
     """Cast a column to a different type (text, number, date)."""
     path, key = _get_source_info(source_id)
     columns, rows = _read_csv(key)

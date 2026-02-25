@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
+import { authFetch } from '../utils/authFetch'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { useChartThemeStore } from '../stores/chartThemeStore'
 import { CHART_THEMES } from '../themes/chartThemes'
@@ -48,7 +49,7 @@ export function SettingsPage() {
 
   // Load settings on mount
   useEffect(() => {
-    fetch('/api/settings/')
+    authFetch('/api/settings/')
       .then((res) => {
         if (!res.ok) throw new Error(`Settings fetch failed: ${res.status}`)
         return res.json()
@@ -67,7 +68,7 @@ export function SettingsPage() {
 
   // Load data sources on mount
   useEffect(() => {
-    fetch('/api/settings/sources')
+    authFetch('/api/settings/sources')
       .then((res) => {
         if (!res.ok) throw new Error(`Sources fetch failed: ${res.status}`)
         return res.json()
@@ -107,7 +108,7 @@ export function SettingsPage() {
     }
 
     try {
-      const res = await fetch('/api/settings/', {
+      const res = await authFetch('/api/settings/', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -400,7 +401,7 @@ function ApiKeyManager() {
   const [creating, setCreating] = useState(false)
 
   useEffect(() => {
-    fetch('/api/api-keys/')
+    authFetch('/api/api-keys/')
       .then((r) => r.ok ? r.json() : [])
       .then(setKeys)
       .catch(() => {})
@@ -410,7 +411,7 @@ function ApiKeyManager() {
     if (!newKeyName.trim()) return
     setCreating(true)
     try {
-      const res = await fetch('/api/api-keys/', {
+      const res = await authFetch('/api/api-keys/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: newKeyName.trim() }),
@@ -420,7 +421,7 @@ function ApiKeyManager() {
       setCreatedKey(data.key)
       setNewKeyName('')
       // Refresh list
-      const listRes = await fetch('/api/api-keys/')
+      const listRes = await authFetch('/api/api-keys/')
       if (listRes.ok) setKeys(await listRes.json())
     } catch {
       // ignore
@@ -433,7 +434,7 @@ function ApiKeyManager() {
 
   const handleRevoke = useCallback(async () => {
     if (!revokeKeyId) return
-    await fetch(`/api/api-keys/${revokeKeyId}`, { method: 'DELETE' })
+    await authFetch(`/api/api-keys/${revokeKeyId}`, { method: 'DELETE' })
     setKeys((prev) => prev.filter((k) => k.id !== revokeKeyId))
     setRevokeKeyId(null)
   }, [revokeKeyId])
@@ -533,7 +534,7 @@ function TeamManager() {
   const [creating, setCreating] = useState(false)
 
   useEffect(() => {
-    fetch('/api/teams/')
+    authFetch('/api/teams/')
       .then((r) => r.ok ? r.json() : [])
       .then(setTeams)
       .catch(() => {})
@@ -543,14 +544,14 @@ function TeamManager() {
     if (!newTeamName.trim()) return
     setCreating(true)
     try {
-      const res = await fetch('/api/teams/', {
+      const res = await authFetch('/api/teams/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: newTeamName.trim() }),
       })
       if (!res.ok) throw new Error('Failed')
       setNewTeamName('')
-      const listRes = await fetch('/api/teams/')
+      const listRes = await authFetch('/api/teams/')
       if (listRes.ok) setTeams(await listRes.json())
     } catch { /* ignore */ } finally { setCreating(false) }
   }
@@ -559,7 +560,7 @@ function TeamManager() {
 
   const handleDelete = useCallback(async () => {
     if (!deleteTeamId) return
-    await fetch(`/api/teams/${deleteTeamId}`, { method: 'DELETE' })
+    await authFetch(`/api/teams/${deleteTeamId}`, { method: 'DELETE' })
     setTeams((prev) => prev.filter((t) => t.id !== deleteTeamId))
     setDeleteTeamId(null)
   }, [deleteTeamId])

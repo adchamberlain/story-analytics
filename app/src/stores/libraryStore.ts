@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { authFetch } from '../utils/authFetch'
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -61,7 +62,7 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
     set({ loading: true, error: null })
     try {
       const { archiveFilter } = get()
-      const res = await fetch(`/api/v2/charts/?status=${archiveFilter}`)
+      const res = await authFetch(`/api/v2/charts/?status=${archiveFilter}`)
       if (!res.ok) throw new Error(`Failed to load charts: ${res.statusText}`)
       const charts: LibraryChart[] = await res.json()
       set({ charts, loading: false })
@@ -72,7 +73,7 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
 
   deleteChart: async (id: string) => {
     try {
-      const res = await fetch(`/api/v2/charts/${id}`, { method: 'DELETE' })
+      const res = await authFetch(`/api/v2/charts/${id}`, { method: 'DELETE' })
       if (!res.ok) throw new Error(`Delete failed: ${res.statusText}`)
       set((state) => ({ charts: state.charts.filter((c) => c.id !== id) }))
     } catch (e) {
@@ -82,7 +83,7 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
 
   moveToFolder: async (chartId, folderId) => {
     try {
-      const res = await fetch(`/api/v2/charts/${chartId}`, {
+      const res = await authFetch(`/api/v2/charts/${chartId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ folder_id: folderId }),
@@ -100,7 +101,7 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
 
   duplicateChart: async (id: string) => {
     try {
-      const res = await fetch(`/api/v2/charts/${id}/duplicate`, { method: 'POST' })
+      const res = await authFetch(`/api/v2/charts/${id}/duplicate`, { method: 'POST' })
       if (!res.ok) throw new Error(`Duplicate failed: ${res.statusText}`)
       const newChart: LibraryChart = await res.json()
       set((state) => ({ charts: [newChart, ...state.charts] }))
@@ -113,7 +114,7 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
 
   archiveChart: async (id: string) => {
     try {
-      const res = await fetch(`/api/v2/charts/${id}/archive`, { method: 'PUT' })
+      const res = await authFetch(`/api/v2/charts/${id}/archive`, { method: 'PUT' })
       if (!res.ok) throw new Error(`Archive failed: ${res.statusText}`)
       // Remove from current view (since active view won't show archived)
       set((state) => ({ charts: state.charts.filter((c) => c.id !== id) }))
@@ -124,7 +125,7 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
 
   restoreChart: async (id: string) => {
     try {
-      const res = await fetch(`/api/v2/charts/${id}/restore`, { method: 'PUT' })
+      const res = await authFetch(`/api/v2/charts/${id}/restore`, { method: 'PUT' })
       if (!res.ok) throw new Error(`Restore failed: ${res.statusText}`)
       // Remove from current view (since archived view won't show active)
       set((state) => ({ charts: state.charts.filter((c) => c.id !== id) }))

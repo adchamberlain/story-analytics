@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { authFetch } from '../utils/authFetch'
 
 export interface Comment {
   id: string
@@ -32,7 +33,7 @@ export const useCommentStore = create<CommentState>((set, get) => ({
       const params = new URLSearchParams()
       if (chartId) params.set('chart_id', chartId)
       if (dashboardId) params.set('dashboard_id', dashboardId)
-      const res = await fetch(`/api/comments/?${params}`)
+      const res = await authFetch(`/api/comments/?${params}`)
       if (!res.ok) throw new Error('Failed to fetch comments')
       const data = await res.json()
       set({ comments: data, loading: false })
@@ -43,7 +44,7 @@ export const useCommentStore = create<CommentState>((set, get) => ({
 
   addComment: async (chartId, dashboardId, body, parentId) => {
     try {
-      const res = await fetch('/api/comments/', {
+      const res = await authFetch('/api/comments/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ chart_id: chartId, dashboard_id: dashboardId, body, parent_id: parentId ?? null }),
@@ -58,7 +59,7 @@ export const useCommentStore = create<CommentState>((set, get) => ({
 
   deleteComment: async (commentId) => {
     try {
-      await fetch(`/api/comments/${commentId}`, { method: 'DELETE' })
+      await authFetch(`/api/comments/${commentId}`, { method: 'DELETE' })
       set({ comments: get().comments.filter((c) => c.id !== commentId) })
     } catch (e) {
       set({ error: e instanceof Error ? e.message : String(e) })

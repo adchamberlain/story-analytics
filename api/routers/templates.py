@@ -2,9 +2,10 @@
 Templates router: CRUD for chart templates.
 """
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
+from ..auth_simple import get_current_user
 from ..services.template_storage import (
     save_template, load_template, list_templates, update_template, delete_template,
 )
@@ -55,13 +56,13 @@ def _to_response(t) -> TemplateResponse:
 
 
 @router.get("/", response_model=list[TemplateResponse])
-async def list_all():
+async def list_all(user: dict = Depends(get_current_user)):
     """List all saved templates."""
     return [_to_response(t) for t in list_templates()]
 
 
 @router.get("/{template_id}", response_model=TemplateResponse)
-async def get_template(template_id: str):
+async def get_template(template_id: str, user: dict = Depends(get_current_user)):
     """Get a single template."""
     t = load_template(template_id)
     if not t:
@@ -70,7 +71,7 @@ async def get_template(template_id: str):
 
 
 @router.post("/", response_model=TemplateResponse)
-async def create_template(request: CreateTemplateRequest):
+async def create_template(request: CreateTemplateRequest, user: dict = Depends(get_current_user)):
     """Create a new template."""
     t = save_template(
         name=request.name,
@@ -82,7 +83,7 @@ async def create_template(request: CreateTemplateRequest):
 
 
 @router.put("/{template_id}", response_model=TemplateResponse)
-async def update(template_id: str, request: UpdateTemplateRequest):
+async def update(template_id: str, request: UpdateTemplateRequest, user: dict = Depends(get_current_user)):
     """Update a template."""
     fields = request.model_dump(exclude_unset=True)
     if not fields:
@@ -94,7 +95,7 @@ async def update(template_id: str, request: UpdateTemplateRequest):
 
 
 @router.delete("/{template_id}")
-async def remove_template(template_id: str):
+async def remove_template(template_id: str, user: dict = Depends(get_current_user)):
     """Delete a template."""
     if not delete_template(template_id):
         raise HTTPException(status_code=404, detail="Template not found")

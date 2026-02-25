@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { authFetch } from '../utils/authFetch'
 
 interface DataSource {
   source_id: string
@@ -24,7 +25,7 @@ export function SourcesPage() {
   const [confirmId, setConfirmId] = useState<string | null>(null)
 
   const fetchSources = useCallback(() => {
-    fetch('/api/settings/sources')
+    authFetch('/api/settings/sources')
       .then((res) => {
         if (!res.ok) throw new Error(`Sources fetch failed: ${res.status}`)
         return res.json()
@@ -47,7 +48,7 @@ export function SourcesPage() {
         source.type === 'csv'
           ? `/api/data/sources/${source.source_id}`
           : `/api/connections/${source.source_id}`
-      const res = await fetch(url, { method: 'DELETE' })
+      const res = await authFetch(url, { method: 'DELETE' })
       if (res.ok) {
         setSources((prev) => prev.filter((s) => s.source_id !== source.source_id))
       }

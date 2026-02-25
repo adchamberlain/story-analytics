@@ -1,7 +1,9 @@
 """Folders API: create, list, get, update, delete folders for chart organization."""
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
+
+from ..auth_simple import get_current_user
 
 from ..services import folder_storage
 from ..services.chart_storage import list_charts
@@ -36,7 +38,7 @@ class FolderChartResponse(BaseModel):
 
 
 @router.post("/", response_model=FolderResponse)
-async def create_folder(request: CreateFolderRequest):
+async def create_folder(request: CreateFolderRequest, user: dict = Depends(get_current_user)):
     """Create a new folder for organizing charts."""
     name = request.name.strip()
     if not name:
@@ -53,7 +55,7 @@ async def create_folder(request: CreateFolderRequest):
 
 
 @router.get("/", response_model=list[FolderResponse])
-async def get_folders():
+async def get_folders(user: dict = Depends(get_current_user)):
     """List all folders."""
     folders = folder_storage.list_folders()
     return [
@@ -69,7 +71,7 @@ async def get_folders():
 
 
 @router.get("/{folder_id}", response_model=FolderResponse)
-async def get_folder(folder_id: str):
+async def get_folder(folder_id: str, user: dict = Depends(get_current_user)):
     """Get a folder by ID."""
     folder = folder_storage.load_folder(folder_id)
     if not folder:
@@ -84,7 +86,7 @@ async def get_folder(folder_id: str):
 
 
 @router.put("/{folder_id}", response_model=FolderResponse)
-async def update_folder(folder_id: str, request: UpdateFolderRequest):
+async def update_folder(folder_id: str, request: UpdateFolderRequest, user: dict = Depends(get_current_user)):
     """Update a folder's name or parent."""
     fields = {}
     if request.name is not None:
@@ -105,7 +107,7 @@ async def update_folder(folder_id: str, request: UpdateFolderRequest):
 
 
 @router.delete("/{folder_id}")
-async def delete_folder(folder_id: str):
+async def delete_folder(folder_id: str, user: dict = Depends(get_current_user)):
     """Delete a folder. Charts in the folder are not deleted."""
     if not folder_storage.delete_folder(folder_id):
         raise HTTPException(status_code=404, detail="Folder not found")
@@ -113,7 +115,7 @@ async def delete_folder(folder_id: str):
 
 
 @router.get("/{folder_id}/charts", response_model=list[FolderChartResponse])
-async def get_folder_charts(folder_id: str):
+async def get_folder_charts(folder_id: str, user: dict = Depends(get_current_user)):
     """List all charts assigned to this folder."""
     folder = folder_storage.load_folder(folder_id)
     if not folder:

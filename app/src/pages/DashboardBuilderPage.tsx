@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
+import { authFetch } from '../utils/authFetch'
 import {
   GridLayout,
   useContainerWidth,
@@ -100,7 +101,7 @@ export function DashboardBuilderPage() {
     const abortController = new AbortController()
 
     for (const ref of missing) {
-      fetch(`/api/v2/charts/${ref.chart_id}`, { signal: abortController.signal })
+      authFetch(`/api/v2/charts/${ref.chart_id}`, { signal: abortController.signal })
         .then((res) => {
           if (!res.ok) throw new Error(`Chart ${ref.chart_id} not found`)
           return res.json()
@@ -162,7 +163,7 @@ export function DashboardBuilderPage() {
     setDeleting(true)
     setDeleteError(null)
     try {
-      const res = await fetch(`/api/v2/dashboards/${dashboardId}`, { method: 'DELETE' })
+      const res = await authFetch(`/api/v2/dashboards/${dashboardId}`, { method: 'DELETE' })
       if (!res.ok) throw new Error('Delete failed')
       navigate('/dashboards')
     } catch {

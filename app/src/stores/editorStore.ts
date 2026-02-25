@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import type { ChartType, Annotations } from '../types/chart'
 import type { PaletteKey } from '../themes/plotTheme'
 import { buildDataSummary } from '../utils/dataSummary'
+import { authFetch } from '../utils/authFetch'
 
 // ── Editor Config ──────────────────────────────────────────────────────────
 
@@ -297,7 +298,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set({ loading: true, error: null, chartId })
 
     try {
-      const res = await fetch(`/api/v2/charts/${chartId}`)
+      const res = await authFetch(`/api/v2/charts/${chartId}`)
       if (!res.ok) {
         const body = await res.json().catch(() => ({ detail: res.statusText }))
         throw new Error(body.detail ?? `Load failed: ${res.status}`)
@@ -372,7 +373,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       // Fetch column types from schema
       let columnTypes: Record<string, string> = {}
       try {
-        const schemaRes = await fetch(`/api/data/schema/${chart.source_id}`)
+        const schemaRes = await authFetch(`/api/data/schema/${chart.source_id}`)
         if (schemaRes.ok) {
           const schemaData = await schemaRes.json()
           for (const col of schemaData.columns ?? []) {
@@ -418,7 +419,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set({ loading: true, error: null, chartId: null, sourceId, savedConfig: null })
 
     try {
-      const res = await fetch(`/api/data/schema/${sourceId}`)
+      const res = await authFetch(`/api/data/schema/${sourceId}`)
       if (!res.ok) {
         const body = await res.json().catch(() => ({ detail: res.statusText }))
         throw new Error(body.detail ?? `Schema fetch failed: ${res.status}`)
@@ -462,7 +463,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     if (config.chartType === 'BigValue') {
       if (!sourceId || !config.value) return
       try {
-        const res = await fetch('/api/data/query', {
+        const res = await authFetch('/api/data/query', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ source_id: sourceId, sql: 'SELECT * FROM data' }),
@@ -486,7 +487,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     if (!sourceId || !config.x) return
 
     try {
-      const res = await fetch('/api/v2/charts/build-query', {
+      const res = await authFetch('/api/v2/charts/build-query', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -528,7 +529,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set({ saving: true, error: null })
 
     try {
-      const res = await fetch('/api/v2/charts/save', {
+      const res = await authFetch('/api/v2/charts/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -653,7 +654,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       _idleVersionTimer = setTimeout(() => {
         const currentId = get().chartId
         if (currentId) {
-          fetch(`/api/v2/charts/${currentId}/versions`, {
+          authFetch(`/api/v2/charts/${currentId}/versions`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ trigger: 'auto', label: 'Idle auto-save' }),
@@ -688,7 +689,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       })
       // Restore original source columns, then validate x/y/series and rebuild query
       if (sourceId) {
-        fetch(`/api/data/schema/${sourceId}`)
+        authFetch(`/api/data/schema/${sourceId}`)
           .then((res) => res.ok ? res.json() : Promise.reject(res.statusText))
           .then((schema) => {
             const columns = (schema.columns ?? []).map((c: { name: string }) => c.name)
@@ -735,7 +736,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set({ sqlExecuting: true, sqlError: null })
 
     try {
-      const res = await fetch('/api/data/query-raw', {
+      const res = await authFetch('/api/data/query-raw', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sql: customSql }),
@@ -776,7 +777,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   fetchAvailableTables: async () => {
     try {
-      const res = await fetch('/api/data/tables')
+      const res = await authFetch('/api/data/tables')
       if (res.ok) {
         const tables = await res.json()
         set({ availableTables: tables })
@@ -822,7 +823,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set({ saving: true, error: null })
 
     try {
-      const res = await fetch(`/api/v2/charts/${chartId}`, {
+      const res = await authFetch(`/api/v2/charts/${chartId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -900,7 +901,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
       // Every Nth save, auto-create a version snapshot (fire and forget)
       if (newSaveCount % AUTO_VERSION_INTERVAL === 0 && chartId) {
-        fetch(`/api/v2/charts/${chartId}/versions`, {
+        authFetch(`/api/v2/charts/${chartId}/versions`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ trigger: 'auto', label: `Auto-save #${newSaveCount}` }),
@@ -962,7 +963,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     try {
       const dataSummary = data.length > 0 ? buildDataSummary(data, columns, columnTypes) : null
 
-      const res = await fetch('/api/v2/charts/edit', {
+      const res = await authFetch('/api/v2/charts/edit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1053,12 +1054,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const { chartId } = get()
     if (!chartId) return
     try {
-      const res = await fetch(`/api/v2/charts/${chartId}/publish`, { method: 'PUT' })
+      const res = await authFetch(`/api/v2/charts/${chartId}/publish`, { method: 'PUT' })
       if (res.ok) {
         set({ status: 'published' })
 
         // Auto-create a version snapshot on publish (fire and forget)
-        fetch(`/api/v2/charts/${chartId}/versions`, {
+        authFetch(`/api/v2/charts/${chartId}/versions`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ trigger: 'publish', label: 'Published' }),
@@ -1072,7 +1073,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
             const canvas = await svgToCanvas(svgEl, 2)
             canvas.toBlob(async (blob) => {
               if (blob) {
-                await fetch(`/api/v2/charts/${chartId}/snapshot`, {
+                await authFetch(`/api/v2/charts/${chartId}/snapshot`, {
                   method: 'POST',
                   body: blob,
                   headers: { 'Content-Type': 'image/png' },
@@ -1093,7 +1094,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const { chartId } = get()
     if (!chartId) return
     try {
-      const res = await fetch(`/api/v2/charts/${chartId}/unpublish`, { method: 'PUT' })
+      const res = await authFetch(`/api/v2/charts/${chartId}/unpublish`, { method: 'PUT' })
       if (res.ok) {
         set({ status: 'draft' })
       }
@@ -1106,7 +1107,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const { chartId } = get()
     if (!chartId) return
     try {
-      await fetch(`/api/v2/charts/${chartId}/versions`, {
+      await authFetch(`/api/v2/charts/${chartId}/versions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ trigger: 'manual', label: label || 'Manual save point' }),

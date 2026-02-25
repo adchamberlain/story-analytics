@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useEditorStore } from '../../stores/editorStore'
+import { authFetch } from '../../utils/authFetch'
 
 interface VersionMeta {
   version: number
@@ -62,7 +63,7 @@ export function VersionHistoryPanel() {
     if (!chartId) return
     setLoading(true)
     try {
-      const res = await fetch(`/api/v2/charts/${chartId}/versions`)
+      const res = await authFetch(`/api/v2/charts/${chartId}/versions`)
       if (res.ok) {
         setVersions(await res.json())
       }
@@ -81,7 +82,7 @@ export function VersionHistoryPanel() {
     if (!chartId) return
     setRestoring(version)
     try {
-      const res = await fetch(`/api/v2/charts/${chartId}/versions/${version}/restore`, {
+      const res = await authFetch(`/api/v2/charts/${chartId}/versions/${version}/restore`, {
         method: 'POST',
       })
       if (res.ok) {

@@ -2,9 +2,10 @@
 Theme CRUD API endpoints.
 """
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
+from ..auth_simple import get_current_user
 from ..services.theme_storage import (
     save_theme, load_theme, list_themes, update_theme, delete_theme,
 )
@@ -25,7 +26,7 @@ class ThemeUpdateRequest(BaseModel):
 
 
 @router.get("/")
-async def get_themes():
+async def get_themes(user: dict = Depends(get_current_user)):
     """List all custom themes."""
     themes = list_themes()
     return [
@@ -42,7 +43,7 @@ async def get_themes():
 
 
 @router.get("/{theme_id}")
-async def get_theme(theme_id: str):
+async def get_theme(theme_id: str, user: dict = Depends(get_current_user)):
     """Load a single theme."""
     theme = load_theme(theme_id)
     if not theme:
@@ -58,7 +59,7 @@ async def get_theme(theme_id: str):
 
 
 @router.post("/")
-async def create_theme(req: ThemeSaveRequest):
+async def create_theme(req: ThemeSaveRequest, user: dict = Depends(get_current_user)):
     """Create a new custom theme."""
     theme = save_theme(
         name=req.name,
@@ -76,7 +77,7 @@ async def create_theme(req: ThemeSaveRequest):
 
 
 @router.put("/{theme_id}")
-async def put_theme(theme_id: str, req: ThemeUpdateRequest):
+async def put_theme(theme_id: str, req: ThemeUpdateRequest, user: dict = Depends(get_current_user)):
     """Update an existing theme."""
     fields = {}
     if req.name is not None:
@@ -100,7 +101,7 @@ async def put_theme(theme_id: str, req: ThemeUpdateRequest):
 
 
 @router.delete("/{theme_id}")
-async def remove_theme(theme_id: str):
+async def remove_theme(theme_id: str, user: dict = Depends(get_current_user)):
     """Delete a theme."""
     deleted = delete_theme(theme_id)
     if not deleted:

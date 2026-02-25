@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { authFetch } from '../utils/authFetch'
 
 export interface Folder {
   id: string
@@ -27,7 +28,7 @@ export const useFolderStore = create<FolderState>((set) => ({
   loadFolders: async () => {
     set({ loading: true, error: null })
     try {
-      const res = await fetch('/api/folders/')
+      const res = await authFetch('/api/folders/')
       if (!res.ok) throw new Error(`Failed to load folders: ${res.statusText}`)
       const folders: Folder[] = await res.json()
       set({ folders, loading: false })
@@ -37,7 +38,7 @@ export const useFolderStore = create<FolderState>((set) => ({
   },
 
   createFolder: async (name, parentId) => {
-    const res = await fetch('/api/folders/', {
+    const res = await authFetch('/api/folders/', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name, parent_id: parentId }),
@@ -49,7 +50,7 @@ export const useFolderStore = create<FolderState>((set) => ({
   },
 
   renameFolder: async (id, name) => {
-    const res = await fetch(`/api/folders/${id}`, {
+    const res = await authFetch(`/api/folders/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name }),
@@ -62,7 +63,7 @@ export const useFolderStore = create<FolderState>((set) => ({
   },
 
   deleteFolder: async (id) => {
-    const res = await fetch(`/api/folders/${id}`, { method: 'DELETE' })
+    const res = await authFetch(`/api/folders/${id}`, { method: 'DELETE' })
     if (!res.ok) throw new Error('Failed to delete folder')
     set((state) => ({ folders: state.folders.filter((f) => f.id !== id) }))
   },

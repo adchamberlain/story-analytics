@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef } from 'react'
 import { useParams, useSearchParams, Link } from 'react-router-dom'
+import { authFetch } from '../utils/authFetch'
 import { ChartWrapper } from '../components/charts/ChartWrapper'
 import { ObservableChartFactory } from '../components/charts/ObservableChartFactory'
 import { SharePanel } from '../components/sharing/SharePanel'
@@ -45,7 +46,7 @@ export function ChartViewPage() {
     setError(null)
 
     const abortController = new AbortController()
-    fetch(`/api/v2/charts/${chartId}`, { signal: abortController.signal })
+    authFetch(`/api/v2/charts/${chartId}`, { signal: abortController.signal })
       .then(async (res) => {
         if (!res.ok) {
           const body = await res.json().catch(() => ({ detail: res.statusText }))

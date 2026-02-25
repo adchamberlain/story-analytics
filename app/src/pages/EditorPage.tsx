@@ -1,5 +1,6 @@
 import { useEffect, useCallback, useRef, useState } from 'react'
 import { useParams, useNavigate, useSearchParams, useLocation } from 'react-router-dom'
+import { authFetch } from '../utils/authFetch'
 import { useEditorStore } from '../stores/editorStore'
 import { useDataStore } from '../stores/dataStore'
 import { ChartWrapper } from '../components/charts/ChartWrapper'
@@ -37,7 +38,7 @@ export function EditorPage() {
       if (!templateApplied.current) {
         templateApplied.current = true
         store.reset()
-        fetch(`/api/v2/templates/${templateId}`)
+        authFetch(`/api/v2/templates/${templateId}`)
           .then((res) => {
             if (!res.ok) throw new Error('Template not found')
             return res.json()
@@ -166,7 +167,7 @@ export function EditorPage() {
     if (!store.chartId || isNew) return
     setSavingTemplate(true)
     try {
-      const res = await fetch(`/api/v2/charts/${store.chartId}/save-as-template`, {
+      const res = await authFetch(`/api/v2/charts/${store.chartId}/save-as-template`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

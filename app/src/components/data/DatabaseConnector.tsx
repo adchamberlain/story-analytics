@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { authFetch } from '../../utils/authFetch'
 
 type Step = 'closed' | 'pick' | 'form' | 'tables' | 'syncing'
 type DbType = 'snowflake' | 'postgres' | 'bigquery'
@@ -78,7 +79,7 @@ export function DatabaseConnector({ onSynced }: DatabaseConnectorProps) {
     if (step === 'pick') {
       setLoadingConnections(true)
       setError(null)
-      fetch('/api/connections/')
+      authFetch('/api/connections/')
         .then((res) => {
           if (!res.ok) throw new Error(`Connections fetch failed: ${res.status}`)
           return res.json()
@@ -152,7 +153,7 @@ export function DatabaseConnector({ onSynced }: DatabaseConnectorProps) {
 
     try {
       // Send empty credentials — server merges with saved config and env vars
-      const res = await fetch(`/api/connections/${conn.connection_id}/test`, {
+      const res = await authFetch(`/api/connections/${conn.connection_id}/test`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ credentials: {}, username: null }),
@@ -202,7 +203,7 @@ export function DatabaseConnector({ onSynced }: DatabaseConnectorProps) {
       let connectionId = activeConnectionId
 
       if (!connectionId) {
-        const createRes = await fetch('/api/connections/', {
+        const createRes = await authFetch('/api/connections/', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ name: name.trim(), db_type: dbType, config: buildConfig() }),
@@ -213,7 +214,7 @@ export function DatabaseConnector({ onSynced }: DatabaseConnectorProps) {
         setActiveConnectionId(connectionId)
       }
 
-      const testRes = await fetch(`/api/connections/${connectionId}/test`, {
+      const testRes = await authFetch(`/api/connections/${connectionId}/test`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ credentials: buildCredentials(), username: username || null }),
@@ -242,7 +243,7 @@ export function DatabaseConnector({ onSynced }: DatabaseConnectorProps) {
     setError(null)
 
     try {
-      const res = await fetch(`/api/connections/${activeConnectionId}/sync`, {
+      const res = await authFetch(`/api/connections/${activeConnectionId}/sync`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tables: [selectedTable], credentials: buildCredentials(), username: username || null }),
@@ -255,7 +256,7 @@ export function DatabaseConnector({ onSynced }: DatabaseConnectorProps) {
       const synced = data.synced_sources?.[0]
       if (!synced) { setError('Sync completed but no source returned'); setStep('tables'); return }
 
-      const schemaRes = await fetch(`/api/data/schema/${synced.source_id}`)
+      const schemaRes = await authFetch(`/api/data/schema/${synced.source_id}`)
       if (!schemaRes.ok) { setError('Failed to fetch schema after sync'); setStep('tables'); return }
       const schemaData = await schemaRes.json()
 

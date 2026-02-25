@@ -4,8 +4,10 @@ Settings router: LLM provider configuration and data sources overview.
 
 from __future__ import annotations
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
+
+from ..auth_simple import get_current_user
 
 from ..services.settings_storage import load_settings, save_settings, mask_key
 from ..services.duckdb_service import get_duckdb_service
@@ -43,7 +45,7 @@ class DataSourceInfo(BaseModel):
 # ── Endpoints ────────────────────────────────────────────────────────────────
 
 @router.get("/", response_model=SettingsResponse)
-async def get_settings():
+async def get_settings(user: dict = Depends(get_current_user)):
     """Return current settings with API keys masked."""
     s = load_settings()
     return SettingsResponse(
@@ -56,7 +58,7 @@ async def get_settings():
 
 
 @router.put("/", response_model=SettingsResponse)
-async def update_settings(request: UpdateSettingsRequest):
+async def update_settings(request: UpdateSettingsRequest, user: dict = Depends(get_current_user)):
     """Update provider and/or API keys. Returns masked keys."""
     fields = {k: v for k, v in request.model_dump().items() if v is not None}
     # Never accept masked or empty keys — they'd overwrite the real key
@@ -75,7 +77,7 @@ async def update_settings(request: UpdateSettingsRequest):
 
 
 @router.get("/sources", response_model=list[DataSourceInfo])
-async def list_data_sources():
+async def list_data_sources(user: dict = Depends(get_current_user)):
     """List all data sources: database connections first, then CSVs (most recent first)."""
     connections: list[DataSourceInfo] = []
     csvs: list[tuple[float, DataSourceInfo]] = []

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { authFetch } from '../../utils/authFetch'
 
 interface UrlSourceInputProps {
   onImport: (sourceId: string) => void
@@ -42,7 +43,7 @@ export function UrlSourceInput({ onImport, importing }: UrlSourceInputProps) {
         body.headers = headers
       }
 
-      const resp = await fetch('/api/data/import/url', {
+      const resp = await authFetch('/api/data/import/url', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),

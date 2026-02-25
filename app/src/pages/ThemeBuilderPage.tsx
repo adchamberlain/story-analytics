@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Link } from 'react-router-dom'
+import { authFetch } from '../utils/authFetch'
 import { CHART_THEMES, type ChartTheme } from '../themes/chartThemes'
 import { useChartThemeStore } from '../stores/chartThemeStore'
 import { FontPicker } from '../components/FontPicker'
@@ -46,7 +47,7 @@ export function ThemeBuilderPage() {
   // Load custom themes
   const fetchThemes = useCallback(async () => {
     try {
-      const res = await fetch('/api/themes/')
+      const res = await authFetch('/api/themes/')
       if (res.ok) setCustomThemes(await res.json())
     } catch { /* ignore */ }
     setLoading(false)
@@ -104,7 +105,7 @@ export function ThemeBuilderPage() {
     try {
       const url = editingId ? `/api/themes/${editingId}` : '/api/themes/'
       const method = editingId ? 'PUT' : 'POST'
-      const res = await fetch(url, {
+      const res = await authFetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -125,7 +126,7 @@ export function ThemeBuilderPage() {
 
   // Delete a custom theme
   const handleDelete = async (id: string) => {
-    await fetch(`/api/themes/${id}`, { method: 'DELETE' })
+    await authFetch(`/api/themes/${id}`, { method: 'DELETE' })
     if (editingId === id) {
       setEditing(null)
       setEditingId(null)
