@@ -273,17 +273,27 @@ export function RichDataTable({ data, config }: RichDataTableProps) {
                   const isNum = colTypes[col] === 'number'
                   const cfg = tableColConfig[col]
                   const align = cfg?.align ?? (isNum ? 'right' : 'left')
+                  const currentDir = sortCol === col ? sortDir : null
                   return (
                     <th
                       key={col}
                       onClick={() => handleSort(col)}
-                      className={`group cursor-pointer select-none px-3 py-2 border-b-2 border-border-default font-semibold text-text-primary whitespace-nowrap ${
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault()
+                          handleSort(col)
+                        }
+                      }}
+                      tabIndex={0}
+                      role="columnheader"
+                      aria-sort={currentDir === 'asc' ? 'ascending' : currentDir === 'desc' ? 'descending' : 'none'}
+                      className={`group cursor-pointer select-none px-3 py-2 border-b-2 border-border-default font-semibold text-text-primary whitespace-nowrap focus:outline-2 focus:outline-blue-500 focus:outline-offset-[-2px] ${
                         align === 'right' ? 'text-right' : align === 'center' ? 'text-center' : 'text-left'
                       }`}
                       style={{ fontSize: 12 }}
                     >
                       {col}
-                      <SortIcon dir={sortCol === col ? sortDir : null} />
+                      <SortIcon dir={currentDir} />
                     </th>
                   )
                 })}
