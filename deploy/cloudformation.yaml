@@ -1,7 +1,9 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Description: >
   Story Analytics — AI-native dashboard creation tool.
-  Provisions VPC, RDS PostgreSQL, S3, ECR, IAM roles, and App Runner service.
+  Provisions VPC, RDS PostgreSQL, S3, IAM roles, and App Runner service.
+  ECR repository is created separately by the deploy script (image must exist
+  before App Runner can start).
 
 # ---------------------------------------------------------------------------
 # Parameters
@@ -55,7 +57,7 @@ Parameters:
 Resources:
 
   # -------------------------------------------------------------------------
-  # VPC + Networking
+  # VPC + Networking (with NAT Gateway for internet access)
   # -------------------------------------------------------------------------
   VPC:
     Type: AWS::EC2::VPC
@@ -67,6 +69,70 @@ Resources:
         - Key: Name
           Value: !Sub "${AppName}-vpc"
 
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub "${AppName}-igw"
+
+  IGWAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref VPC
+      InternetGatewayId: !Ref InternetGateway
+
+  # Public subnet (for NAT Gateway only)
+  PublicSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: 10.0.0.0/24
+      AvailabilityZone: !Select [0, !GetAZs ""]
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub "${AppName}-public"
+
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub "${AppName}-public-rt"
+
+  PublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: IGWAttachment
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  PublicSubnetRTAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet
+      RouteTableId: !Ref PublicRouteTable
+
+  # NAT Gateway (allows private subnets to reach internet + S3)
+  NATElasticIP:
+    Type: AWS::EC2::EIP
+    DependsOn: IGWAttachment
+    Properties:
+      Domain: vpc
+
+  NATGateway:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt NATElasticIP.AllocationId
+      SubnetId: !Ref PublicSubnet
+      Tags:
+        - Key: Name
+          Value: !Sub "${AppName}-nat"
+
+  # Private subnets (for RDS + App Runner VPC egress)
   PrivateSubnetA:
     Type: AWS::EC2::Subnet
     Properties:
@@ -88,6 +154,33 @@ Resources:
       Tags:
         - Key: Name
           Value: !Sub "${AppName}-private-b"
+
+  PrivateRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub "${AppName}-private-rt"
+
+  PrivateRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NATGateway
+
+  PrivateSubnetARTAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnetA
+      RouteTableId: !Ref PrivateRouteTable
+
+  PrivateSubnetBRTAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnetB
+      RouteTableId: !Ref PrivateRouteTable
 
   RDSSecurityGroup:
     Type: AWS::EC2::SecurityGroup
@@ -156,18 +249,6 @@ Resources:
       Tags:
         - Key: Name
           Value: !Sub "${AppName}-data"
-
-  # -------------------------------------------------------------------------
-  # ECR Repository
-  # -------------------------------------------------------------------------
-  ECRRepository:
-    Type: AWS::ECR::Repository
-    Properties:
-      RepositoryName: !Ref AppName
-      ImageTagMutability: MUTABLE
-      Tags:
-        - Key: Name
-          Value: !Sub "${AppName}-ecr"
 
   # -------------------------------------------------------------------------
   # IAM — App Runner Access Role (ECR pull + S3)
@@ -277,6 +358,8 @@ Resources:
             RuntimeEnvironmentVariables:
               - Name: STORAGE_BACKEND
                 Value: s3
+              - Name: STORAGE_S3_BUCKET
+                Value: !Ref S3Bucket
               - Name: S3_BUCKET
                 Value: !Ref S3Bucket
               - Name: DATABASE_URL

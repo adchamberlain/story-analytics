@@ -18,6 +18,7 @@ from deploy.aws import (
     build_and_push_image,
     deploy_stack,
     destroy_stack,
+    ensure_ecr_repo,
     get_stack_status,
     validate_credentials,
 )
@@ -28,21 +29,27 @@ from deploy.aws import (
 # ---------------------------------------------------------------------------
 
 def cmd_deploy(args: argparse.Namespace) -> None:
-    """Full deploy: CloudFormation stack + Docker image build/push."""
+    """Full deploy: ECR + Docker image + CloudFormation stack."""
     print("Deploying Story Analytics to AWS...\n")
 
     # 1. Validate credentials
-    print("[1/4] Checking AWS credentials...")
+    print("[1/5] Checking AWS credentials...")
     if not validate_credentials():
         print("\nERROR: AWS credentials not configured.")
         print("  Run `aws configure` or export AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY.")
         sys.exit(1)
 
-    # 2. Generate or use provided DB password
-    db_password = args.db_password or secrets.token_urlsafe(16)
+    # 2. Create ECR repo (must exist before CloudFormation, which needs an image)
+    print("\n[2/5] Ensuring ECR repository exists...")
+    ecr_uri = ensure_ecr_repo(args.stack_name, args.region)
 
-    # 3. Deploy CloudFormation stack (creates ECR, S3, RDS, App Runner)
-    print("\n[2/4] Deploying CloudFormation stack...")
+    # 3. Build and push Docker image (must be in ECR before App Runner starts)
+    print("\n[3/5] Building and pushing Docker image...")
+    build_and_push_image(args.region, ecr_uri)
+
+    # 4. Deploy CloudFormation stack (S3, RDS, App Runner pointing at the image)
+    db_password = args.db_password or secrets.token_urlsafe(16)
+    print("\n[4/5] Deploying CloudFormation stack (this takes ~10 min for RDS)...")
     outputs = deploy_stack(
         args.stack_name,
         args.region,
@@ -56,21 +63,12 @@ def cmd_deploy(args: argparse.Namespace) -> None:
         print("\nERROR: Stack deployed but returned no outputs.")
         sys.exit(1)
 
-    ecr_uri = outputs.get("ECRRepositoryUri", "")
-    if not ecr_uri:
-        print("\nERROR: ECRRepositoryUri not found in stack outputs.")
-        sys.exit(1)
-
-    # 4. Build and push Docker image
-    print("\n[3/4] Building and pushing Docker image...")
-    build_and_push_image(args.region, ecr_uri)
-
     # 5. Print results
     app_url = outputs.get("AppUrl", "(unknown)")
     s3_bucket = outputs.get("S3BucketName", "(unknown)")
     rds_endpoint = outputs.get("RDSEndpoint", "(unknown)")
 
-    print("\n[4/4] Deployment complete!\n")
+    print("\n[5/5] Deployment complete!\n")
     print("  App URL      :", app_url)
     print("  S3 Bucket    :", s3_bucket)
     print("  RDS Endpoint :", rds_endpoint)

@@ -49,6 +49,32 @@ def _ecr_client(region: str):
     return boto3.client("ecr", region_name=region)
 
 
+def ensure_ecr_repo(repo_name: str, region: str) -> str:
+    """Create the ECR repository if it doesn't exist. Return the repo URI.
+
+    ECR is managed outside CloudFormation to avoid the chicken-and-egg
+    problem: App Runner needs an image in ECR before it can start, but
+    the image can't be pushed until ECR exists.
+    """
+    ecr = _ecr_client(region)
+    try:
+        resp = ecr.describe_repositories(repositoryNames=[repo_name])
+        uri = resp["repositories"][0]["repositoryUri"]
+        print(f"  ECR repo exists: {uri}")
+        return uri
+    except ClientError as exc:
+        if "RepositoryNotFoundException" not in str(exc):
+            raise
+    # Create it
+    resp = ecr.create_repository(
+        repositoryName=repo_name,
+        imageTagMutability="MUTABLE",
+    )
+    uri = resp["repository"]["repositoryUri"]
+    print(f"  ECR repo created: {uri}")
+    return uri
+
+
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
