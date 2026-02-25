@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, useSearchParams } from 'react-router-dom'
 import { DashboardGrid } from '../components/dashboard/DashboardGrid'
 
 interface ChartWithData {
@@ -44,9 +44,40 @@ interface DashboardData {
  */
 export function EmbedDashboardPage() {
   const { dashboardId } = useParams<{ dashboardId: string }>()
+  const [searchParams] = useSearchParams()
   const [dashboard, setDashboard] = useState<DashboardData | null>(null)
   const [error, setError] = useState<string | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
+
+  // Dark mode: ?theme=dark|light|auto (default: auto)
+  const themeParam = searchParams.get('theme') || 'auto'
+  const [isDark, setIsDark] = useState(() => {
+    if (themeParam === 'dark') return true
+    if (themeParam === 'light') return false
+    return window.matchMedia('(prefers-color-scheme: dark)').matches
+  })
+
+  // Listen for system theme changes when in auto mode
+  useEffect(() => {
+    if (themeParam !== 'auto') return
+    const mq = window.matchMedia('(prefers-color-scheme: dark)')
+    const handler = (e: MediaQueryListEvent) => setIsDark(e.matches)
+    mq.addEventListener('change', handler)
+    return () => mq.removeEventListener('change', handler)
+  }, [themeParam])
+
+  // Listen for parent PostMessage theme override
+  useEffect(() => {
+    const handler = (event: MessageEvent) => {
+      if (event.data?.type === 'sa-theme') {
+        const theme = event.data.theme
+        if (theme === 'dark') setIsDark(true)
+        else if (theme === 'light') setIsDark(false)
+      }
+    }
+    window.addEventListener('message', handler)
+    return () => window.removeEventListener('message', handler)
+  }, [])
 
   // Fetch dashboard data from public endpoint
   useEffect(() => {
@@ -96,14 +127,23 @@ export function EmbedDashboardPage() {
   }
 
   return (
-    <div ref={containerRef} style={{ padding: '16px 24px', fontFamily: 'system-ui' }}>
+    <div
+      ref={containerRef}
+      style={{
+        padding: '16px 24px',
+        fontFamily: 'system-ui',
+        backgroundColor: isDark ? '#0f172a' : undefined,
+        color: isDark ? '#e2e8f0' : undefined,
+      }}
+      data-theme={isDark ? 'dark' : 'light'}
+    >
       {dashboard.title && (
-        <h1 style={{ margin: '0 0 4px', fontSize: 20, fontWeight: 700, color: '#1a1a1a' }}>
+        <h1 style={{ margin: '0 0 4px', fontSize: 20, fontWeight: 700, color: isDark ? '#f1f5f9' : '#1a1a1a' }}>
           {dashboard.title}
         </h1>
       )}
       {dashboard.description && (
-        <p style={{ margin: '0 0 12px', fontSize: 14, color: '#666' }}>
+        <p style={{ margin: '0 0 12px', fontSize: 14, color: isDark ? '#94a3b8' : '#666' }}>
           {dashboard.description}
         </p>
       )}
