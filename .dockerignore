@@ -1,0 +1,49 @@
+# Dependencies
+node_modules/
+app/node_modules/
+
+# Git
+.git/
+.gitignore
+
+# Python caches
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.mypy_cache/
+
+# Test artifacts
+test-results/
+test_results/
+app/test-results/
+tasks/screenshots/
+qa_screenshots/
+
+# IDE / editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Environment / secrets
+.env
+.env.*
+
+# Build artifacts (we build inside Docker)
+app/dist/
+output/
+
+# Documentation (not needed in image)
+docs/
+tasks/
+*.md
+LICENSE
+
+# Dev tooling
+dev.sh
+docker-compose.yml
+Dockerfile.api
+scripts/
+tools/
+website/

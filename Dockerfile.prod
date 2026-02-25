@@ -1,0 +1,58 @@
+# Production multi-stage Dockerfile
+# Builds React frontend + Python API into a single image
+#
+# Usage:
+#   docker build -f Dockerfile.prod -t story-analytics .
+#   docker run -p 8000:8000 story-analytics
+#
+# NOTE: This is the PRODUCTION Dockerfile. For development, use Dockerfile.api.
+
+# ──────────────────────────────────────────────────────────────
+# Stage 1: Build React frontend
+# ──────────────────────────────────────────────────────────────
+FROM node:20-alpine AS frontend
+WORKDIR /app
+
+COPY app/package.json app/package-lock.json ./
+RUN npm ci
+
+COPY app/ ./
+RUN npm run build
+
+# ──────────────────────────────────────────────────────────────
+# Stage 2: Python API + built SPA
+# ──────────────────────────────────────────────────────────────
+FROM python:3.11-slim AS production
+WORKDIR /app
+
+# System deps (gcc for C extensions, libpq-dev for psycopg2)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc libpq-dev && \
+    rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Backend code
+COPY api/ ./api/
+COPY engine/ ./engine/
+
+# Config files
+COPY engine_config.yaml .
+COPY brand_config.yaml .
+
+# Built frontend (Vite outputs to dist/)
+COPY --from=frontend /app/dist ./static/
+
+# Seed data (for first-run / local mode)
+COPY data/seed/ ./data/seed/
+
+# Create data dir for local mode
+RUN mkdir -p /app/data
+
+# Default to local storage mode
+ENV STORAGE_BACKEND=local
+ENV DATABASE_URL=sqlite:///app/data/metadata.db
+
+EXPOSE 8000
+CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]
