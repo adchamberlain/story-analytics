@@ -1,0 +1,41 @@
+{
+  "id": "4f60c7927f6a",
+  "source_id": "86cb19906464",
+  "chart_type": "SmallMultiples",
+  "title": "Sales Trends by Region",
+  "subtitle": "Monthly revenue in millions, 2025",
+  "source": "Internal data",
+  "sql": "SELECT month, region, revenue FROM src_86cb19906464 ORDER BY region, month LIMIT 5000",
+  "x": "month",
+  "y": "revenue",
+  "series": "region",
+  "horizontal": false,
+  "sort": false,
+  "created_at": "2026-02-25T04:41:17.137478+00:00",
+  "updated_at": "2026-02-25T04:41:17.137478+00:00",
+  "reasoning": null,
+  "config": {
+    "stacked": false,
+    "showGrid": true,
+    "showLegend": true,
+    "showValues": false,
+    "palette": "default",
+    "xAxisTitle": "",
+    "yAxisTitle": "Revenue ($M)",
+    "aggregation": "none",
+    "timeGrain": "none",
+    "dataMode": "table",
+    "annotations": {
+      "lines": [],
+      "texts": [],
+      "ranges": []
+    },
+    "facetColumn": "region",
+    "chartSubtype": "line"
+  },
+  "connection_id": null,
+  "source_table": null,
+  "status": "draft",
+  "folder_id": null,
+  "archived_at": null
+}

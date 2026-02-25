@@ -1,0 +1,43 @@
+{
+  "id": "f533a82a0fad",
+  "source_id": "ccbce1a8ea08",
+  "chart_type": "AreaChart",
+  "title": "Streaming Wars: Subscriber Growth",
+  "subtitle": "Global subscribers in millions, 2024\u20132025",
+  "source": "Company earnings reports",
+  "sql": "SELECT date, metric_name, metric_value FROM (SELECT date, \"Netflix\", \"Disney+\", \"Max\" FROM src_ccbce1a8ea08) UNPIVOT (metric_value FOR metric_name IN (\"Netflix\", \"Disney+\", \"Max\")) ORDER BY date LIMIT 5000",
+  "x": "date",
+  "y": [
+    "Netflix",
+    "Disney+",
+    "Max"
+  ],
+  "series": null,
+  "horizontal": false,
+  "sort": false,
+  "created_at": "2026-02-25T04:41:16.965884+00:00",
+  "updated_at": "2026-02-25T05:36:04.051519+00:00",
+  "reasoning": null,
+  "config": {
+    "stacked": true,
+    "showGrid": true,
+    "showLegend": true,
+    "showValues": false,
+    "palette": "vivid",
+    "xAxisTitle": "",
+    "yAxisTitle": "Subscribers (M)",
+    "aggregation": "none",
+    "timeGrain": "none",
+    "dataMode": "table",
+    "annotations": {
+      "lines": [],
+      "texts": [],
+      "ranges": []
+    }
+  },
+  "connection_id": null,
+  "source_table": null,
+  "status": "draft",
+  "folder_id": null,
+  "archived_at": null
+}

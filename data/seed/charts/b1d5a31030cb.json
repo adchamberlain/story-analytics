@@ -1,0 +1,41 @@
+{
+  "id": "b1d5a31030cb",
+  "source_id": "c2403696d3e1",
+  "chart_type": "SplitBars",
+  "title": "Employee Survey: Response by Gender",
+  "subtitle": "% satisfied, male (left) vs female (right)",
+  "source": "Internal data",
+  "sql": "SELECT topic, male_pct, female_pct FROM src_c2403696d3e1 LIMIT 5000",
+  "x": "topic",
+  "y": null,
+  "series": null,
+  "horizontal": false,
+  "sort": false,
+  "created_at": "2026-02-25T04:41:17.107647+00:00",
+  "updated_at": "2026-02-25T04:41:17.107647+00:00",
+  "reasoning": null,
+  "config": {
+    "stacked": false,
+    "showGrid": true,
+    "showLegend": true,
+    "showValues": false,
+    "palette": "default",
+    "xAxisTitle": "",
+    "yAxisTitle": "",
+    "aggregation": "none",
+    "timeGrain": "none",
+    "dataMode": "table",
+    "annotations": {
+      "lines": [],
+      "texts": [],
+      "ranges": []
+    },
+    "leftColumn": "male_pct",
+    "rightColumn": "female_pct"
+  },
+  "connection_id": null,
+  "source_table": null,
+  "status": "draft",
+  "folder_id": null,
+  "archived_at": null
+}

@@ -1,0 +1,7 @@
+metric,actual,target
+Revenue,108.2,100
+Customers,112.7,100
+Retention,104.4,100
+NPS,113.3,100
+SLA,102.1,100
+Deploys,120.0,100

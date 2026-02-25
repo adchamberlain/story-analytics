@@ -1,0 +1,39 @@
+{
+  "id": "21c09cf010a3",
+  "source_id": "62b4b1a7c51d",
+  "chart_type": "Histogram",
+  "title": "API Response Time Distribution",
+  "subtitle": "Log-normal distribution, median \u2248 90ms",
+  "source": "Internal data",
+  "sql": "SELECT response_ms FROM src_62b4b1a7c51d LIMIT 5000",
+  "x": "response_ms",
+  "y": null,
+  "series": null,
+  "horizontal": false,
+  "sort": false,
+  "created_at": "2026-02-25T04:41:16.986192+00:00",
+  "updated_at": "2026-02-25T04:41:16.986192+00:00",
+  "reasoning": null,
+  "config": {
+    "stacked": false,
+    "showGrid": true,
+    "showLegend": true,
+    "showValues": false,
+    "palette": "default",
+    "xAxisTitle": "Response Time (ms)",
+    "yAxisTitle": "Frequency",
+    "aggregation": "none",
+    "timeGrain": "none",
+    "dataMode": "table",
+    "annotations": {
+      "lines": [],
+      "texts": [],
+      "ranges": []
+    }
+  },
+  "connection_id": null,
+  "source_table": null,
+  "status": "draft",
+  "folder_id": null,
+  "archived_at": null
+}

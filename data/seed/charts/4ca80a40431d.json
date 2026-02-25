@@ -1,0 +1,43 @@
+{
+  "id": "4ca80a40431d",
+  "source_id": "85e976b0a18b",
+  "chart_type": "ChoroplethMap",
+  "title": "U.S. Population by State",
+  "subtitle": "Millions of residents, 2025 estimate",
+  "source": "U.S. Census Bureau",
+  "sql": "SELECT state, population_m FROM src_85e976b0a18b LIMIT 5000",
+  "x": "state",
+  "y": "population_m",
+  "series": null,
+  "horizontal": false,
+  "sort": false,
+  "created_at": "2026-02-25T04:41:17.147933+00:00",
+  "updated_at": "2026-02-25T04:41:17.147933+00:00",
+  "reasoning": null,
+  "config": {
+    "stacked": false,
+    "showGrid": true,
+    "showLegend": true,
+    "showValues": false,
+    "palette": "default",
+    "xAxisTitle": "",
+    "yAxisTitle": "",
+    "aggregation": "none",
+    "timeGrain": "none",
+    "dataMode": "table",
+    "annotations": {
+      "lines": [],
+      "texts": [],
+      "ranges": []
+    },
+    "basemap": "us-states",
+    "geoJoinColumn": "state",
+    "geoValueColumn": "population_m",
+    "geoColorScale": "sequential"
+  },
+  "connection_id": null,
+  "source_table": null,
+  "status": "draft",
+  "folder_id": null,
+  "archived_at": null
+}

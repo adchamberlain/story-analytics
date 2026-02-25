@@ -1,0 +1,43 @@
+{
+  "id": "ce8d6fbd5d12",
+  "source_id": "2bce20d6e929",
+  "chart_type": "StackedColumn",
+  "title": "Revenue by Product Category",
+  "subtitle": "Software drives growth, services accelerating",
+  "source": "Internal data",
+  "sql": "SELECT quarter, metric_name, metric_value FROM (SELECT quarter, \"Hardware\", \"Software\", \"Services\" FROM src_2bce20d6e929) UNPIVOT (metric_value FOR metric_name IN (\"Hardware\", \"Software\", \"Services\")) ORDER BY quarter LIMIT 5000",
+  "x": "quarter",
+  "y": [
+    "Hardware",
+    "Software",
+    "Services"
+  ],
+  "series": null,
+  "horizontal": false,
+  "sort": false,
+  "created_at": "2026-02-25T04:41:16.996166+00:00",
+  "updated_at": "2026-02-25T04:41:16.996166+00:00",
+  "reasoning": null,
+  "config": {
+    "stacked": true,
+    "showGrid": true,
+    "showLegend": true,
+    "showValues": false,
+    "palette": "bold",
+    "xAxisTitle": "",
+    "yAxisTitle": "Revenue ($M)",
+    "aggregation": "none",
+    "timeGrain": "none",
+    "dataMode": "table",
+    "annotations": {
+      "lines": [],
+      "texts": [],
+      "ranges": []
+    }
+  },
+  "connection_id": null,
+  "source_table": null,
+  "status": "draft",
+  "folder_id": null,
+  "archived_at": null
+}

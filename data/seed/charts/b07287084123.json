@@ -1,0 +1,39 @@
+{
+  "id": "b07287084123",
+  "source_id": "27e4ae7cf09e",
+  "chart_type": "BarChart",
+  "title": "Top Programming Languages 2025",
+  "subtitle": "% of developers using each language",
+  "source": "Stack Overflow Developer Survey 2025",
+  "sql": "SELECT language, popularity FROM src_27e4ae7cf09e ORDER BY popularity DESC LIMIT 5000",
+  "x": "language",
+  "y": "popularity",
+  "series": null,
+  "horizontal": false,
+  "sort": true,
+  "created_at": "2026-02-25T04:41:16.954739+00:00",
+  "updated_at": "2026-02-25T04:41:16.954739+00:00",
+  "reasoning": null,
+  "config": {
+    "stacked": false,
+    "showGrid": true,
+    "showLegend": true,
+    "showValues": false,
+    "palette": "bold",
+    "xAxisTitle": "",
+    "yAxisTitle": "Popularity (%)",
+    "aggregation": "none",
+    "timeGrain": "none",
+    "dataMode": "table",
+    "annotations": {
+      "lines": [],
+      "texts": [],
+      "ranges": []
+    }
+  },
+  "connection_id": null,
+  "source_table": null,
+  "status": "draft",
+  "folder_id": null,
+  "archived_at": null
+}

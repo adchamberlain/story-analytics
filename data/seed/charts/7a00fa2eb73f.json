@@ -1,0 +1,53 @@
+{
+  "id": "7a00fa2eb73f",
+  "source_id": "1b207af6a509",
+  "chart_type": "LineChart",
+  "title": "S&P 500 Monthly Close",
+  "subtitle": "Steady growth with volatility, 2024\u20132025",
+  "source": "Dow Jones",
+  "sql": "SELECT date, sp500 FROM src_1b207af6a509 ORDER BY date LIMIT 5000",
+  "x": "date",
+  "y": "sp500",
+  "series": null,
+  "horizontal": false,
+  "sort": false,
+  "created_at": "2026-02-25T04:41:16.946454+00:00",
+  "updated_at": "2026-02-25T07:50:50.338143+00:00",
+  "reasoning": null,
+  "config": {
+    "stacked": false,
+    "showGrid": true,
+    "showLegend": true,
+    "showValues": false,
+    "palette": "default",
+    "xAxisTitle": "",
+    "yAxisTitle": "Index Value",
+    "aggregation": "none",
+    "timeGrain": "none",
+    "dataMode": "table",
+    "annotations": {
+      "lines": [
+        {
+          "id": "ann-1772005749499-bh6t",
+          "axis": "x",
+          "value": "2025-02-01",
+          "label": "A local max does not a global max make",
+          "color": "#e45756"
+        }
+      ],
+      "texts": [],
+      "ranges": []
+    },
+    "value": null,
+    "comparisonValue": null,
+    "comparisonLabel": "",
+    "positiveIsGood": true,
+    "metricLabel": null,
+    "unitColumn": null
+  },
+  "connection_id": null,
+  "source_table": null,
+  "status": "draft",
+  "folder_id": null,
+  "archived_at": null
+}

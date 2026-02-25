@@ -1,0 +1,39 @@
+{
+  "id": "8398f10fea34",
+  "source_id": "4b736d2ec25f",
+  "chart_type": "HeatMap",
+  "title": "Website Traffic Heatmap",
+  "subtitle": "Average visitors per 3-hour block",
+  "source": "Internal data",
+  "sql": "SELECT day, hour, visitors FROM src_4b736d2ec25f ORDER BY day_sort, hour_sort LIMIT 5000",
+  "x": "hour",
+  "y": "visitors",
+  "series": "day",
+  "horizontal": false,
+  "sort": false,
+  "created_at": "2026-02-25T04:41:17.031083+00:00",
+  "updated_at": "2026-02-25T05:36:04.085719+00:00",
+  "reasoning": null,
+  "config": {
+    "stacked": false,
+    "showGrid": true,
+    "showLegend": true,
+    "showValues": false,
+    "palette": "default",
+    "xAxisTitle": "Hour of Day",
+    "yAxisTitle": "Visitors",
+    "aggregation": "none",
+    "timeGrain": "none",
+    "dataMode": "table",
+    "annotations": {
+      "lines": [],
+      "texts": [],
+      "ranges": []
+    }
+  },
+  "connection_id": null,
+  "source_table": null,
+  "status": "draft",
+  "folder_id": null,
+  "archived_at": null
+}

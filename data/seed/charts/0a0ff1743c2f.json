@@ -1,0 +1,39 @@
+{
+  "id": "0a0ff1743c2f",
+  "source_id": "6d753eecce70",
+  "chart_type": "ElectionDonut",
+  "title": "Parliament Composition",
+  "subtitle": "485 total seats \u2014 no single majority",
+  "source": "Illustrative data",
+  "sql": "SELECT party, seats FROM src_6d753eecce70 LIMIT 5000",
+  "x": "party",
+  "y": "seats",
+  "series": null,
+  "horizontal": false,
+  "sort": false,
+  "created_at": "2026-02-25T04:41:17.116580+00:00",
+  "updated_at": "2026-02-25T04:41:17.116580+00:00",
+  "reasoning": null,
+  "config": {
+    "stacked": false,
+    "showGrid": true,
+    "showLegend": true,
+    "showValues": false,
+    "palette": "vivid",
+    "xAxisTitle": "",
+    "yAxisTitle": "",
+    "aggregation": "none",
+    "timeGrain": "none",
+    "dataMode": "table",
+    "annotations": {
+      "lines": [],
+      "texts": [],
+      "ranges": []
+    }
+  },
+  "connection_id": null,
+  "source_table": null,
+  "status": "draft",
+  "folder_id": null,
+  "archived_at": null
+}

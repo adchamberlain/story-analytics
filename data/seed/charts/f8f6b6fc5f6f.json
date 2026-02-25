@@ -1,0 +1,43 @@
+{
+  "id": "f8f6b6fc5f6f",
+  "source_id": "806120c8250d",
+  "chart_type": "LocatorMap",
+  "title": "Famous World Landmarks",
+  "subtitle": "10 iconic sites across the globe",
+  "source": "UNESCO World Heritage Centre",
+  "sql": "SELECT landmark, lat, lon FROM src_806120c8250d LIMIT 5000",
+  "x": null,
+  "y": null,
+  "series": null,
+  "horizontal": false,
+  "sort": false,
+  "created_at": "2026-02-25T04:41:17.169018+00:00",
+  "updated_at": "2026-02-25T04:41:17.169018+00:00",
+  "reasoning": null,
+  "config": {
+    "stacked": false,
+    "showGrid": true,
+    "showLegend": true,
+    "showValues": false,
+    "palette": "default",
+    "xAxisTitle": "",
+    "yAxisTitle": "",
+    "aggregation": "none",
+    "timeGrain": "none",
+    "dataMode": "table",
+    "annotations": {
+      "lines": [],
+      "texts": [],
+      "ranges": []
+    },
+    "basemap": "world",
+    "geoLatColumn": "lat",
+    "geoLonColumn": "lon",
+    "geoLabelColumn": "landmark"
+  },
+  "connection_id": null,
+  "source_table": null,
+  "status": "draft",
+  "folder_id": null,
+  "archived_at": null
+}
