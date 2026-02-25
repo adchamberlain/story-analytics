@@ -846,29 +846,34 @@ function buildSmallMultiplesMarks(
   const lineData = subtype === 'line' || subtype === 'area' ? maybeParseDates(data, x) : data
   const marks: Plot.Markish[] = []
 
+  // Map each facet value to its color so lines/bars match the legend
+  const facetValues = [...new Set(data.map((d) => String(d[facet] ?? '')))]
+  facetValues.sort()
+  const colorForFacet = (d: Record<string, unknown>) => colors[facetValues.indexOf(String(d[facet] ?? ''))] ?? colors[0]
+
   switch (subtype) {
     case 'bar':
       marks.push(
-        Plot.barY(lineData, { x, y, fill: colors[0], fy: facet }),
+        Plot.barY(lineData, { x, y, fill: colorForFacet, fy: facet }),
         Plot.tip(lineData, Plot.pointerX({ x, y, fy: facet, title: (d: Record<string, unknown>) => tipTitle(d, x, y, facet, config) })),
       )
       break
     case 'area':
       marks.push(
-        Plot.areaY(lineData, { x, y, fill: colors[0], fillOpacity: 0.3, fy: facet }),
-        Plot.lineY(lineData, { x, y, stroke: colors[0], strokeWidth: 2, fy: facet }),
+        Plot.areaY(lineData, { x, y, fill: colorForFacet, fillOpacity: 0.3, fy: facet }),
+        Plot.lineY(lineData, { x, y, stroke: colorForFacet, strokeWidth: 2, fy: facet }),
         Plot.tip(lineData, Plot.pointerX({ x, y, fy: facet, title: (d: Record<string, unknown>) => tipTitle(d, x, y, facet, config) })),
       )
       break
     case 'scatter':
       marks.push(
-        Plot.dot(lineData, { x, y, fill: colors[0], r: 4, fy: facet }),
+        Plot.dot(lineData, { x, y, fill: colorForFacet, r: 4, fy: facet }),
         Plot.tip(lineData, Plot.pointer({ x, y, fy: facet, title: (d: Record<string, unknown>) => tipTitle(d, x, y, facet, config) })),
       )
       break
     default: // 'line'
       marks.push(
-        Plot.lineY(lineData, { x, y, stroke: colors[0], strokeWidth: 2, fy: facet }),
+        Plot.lineY(lineData, { x, y, stroke: colorForFacet, strokeWidth: 2, fy: facet }),
         Plot.tip(lineData, Plot.pointerX({ x, y, fy: facet, title: (d: Record<string, unknown>) => tipTitle(d, x, y, facet, config) })),
       )
   }

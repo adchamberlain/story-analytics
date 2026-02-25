@@ -196,7 +196,7 @@ export function GeoPointMap({ data, config, height = 400, autoHeight = false, ma
         .attr('class', 'spike')
         .attr('d', (d) => {
           const h = d.sizeVal !== null ? heightScale(d.sizeVal) : 6
-          const w = Math.max(1, h * 0.04)
+          const w = Math.max(2, h * 0.08)
           return `M${d.x},${d.y} L${d.x - w},${d.y} L${d.x},${d.y - h} L${d.x + w},${d.y} Z`
         })
         .attr('fill', color)
