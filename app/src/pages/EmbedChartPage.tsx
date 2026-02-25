@@ -158,6 +158,22 @@ export function EmbedChartPage() {
     }
   }, [chartId])
 
+  // Set meta description from alt text for accessibility / SEO
+  const altText = chartData?.chart.config?.altText as string | undefined
+  useEffect(() => {
+    if (!altText) return
+    let meta = document.querySelector('meta[name="description"]') as HTMLMetaElement | null
+    if (!meta) {
+      meta = document.createElement('meta')
+      meta.setAttribute('name', 'description')
+      document.head.appendChild(meta)
+    }
+    meta.setAttribute('content', altText)
+    return () => {
+      meta?.remove()
+    }
+  }, [altText])
+
   if (error) {
     return (
       <div style={{ padding: 24, fontFamily: 'system-ui', color: '#666', fontSize: 14 }}>

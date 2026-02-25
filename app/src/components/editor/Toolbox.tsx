@@ -8,8 +8,10 @@ import { MultiColumnSelect } from './MultiColumnSelect'
 import { AnnotationEditor } from './AnnotationEditor'
 import type { ChartType } from '../../types/chart'
 import type { PaletteKey } from '../../themes/plotTheme'
+import { PALETTES } from '../../themes/plotTheme'
 import { loadCustomGeoJSON, BASEMAPS, PROJECTIONS } from '../../utils/geoUtils'
 import { SUPPORTED_LOCALES } from '../../stores/localeStore'
+import { ColorblindPreview } from './ColorblindPreview'
 import type { AggregationType, TimeGrain, DataMode, EditorConfig, TableInfoItem } from '../../stores/editorStore'
 
 function isDateColumn(type: string | undefined): boolean {
@@ -574,6 +576,19 @@ export function Toolbox() {
               placeholder="https://..."
             />
           )}
+          <div>
+            <label className="block text-xs font-medium text-text-secondary mb-1">Alt Text</label>
+            <textarea
+              value={config.altText}
+              onChange={(e) => updateConfig({ altText: e.target.value })}
+              placeholder="Describe the chart for screen readers..."
+              rows={2}
+              className="w-full px-2 py-1.5 text-sm border border-border-default rounded-md bg-surface text-text-primary placeholder:text-text-muted focus:outline-none focus:border-blue-400 resize-y"
+            />
+            <p className="text-[10px] text-text-muted mt-0.5">
+              Used by screen readers and search engines.
+            </p>
+          </div>
         </div>
       </Section>
 
@@ -583,6 +598,9 @@ export function Toolbox() {
           value={config.palette}
           onChange={(palette: PaletteKey) => updateConfig({ palette })}
         />
+        <div className="mt-3">
+          <ColorblindPreview colors={[...(PALETTES[config.palette] ?? PALETTES.default)]} />
+        </div>
       </Section>
 
       {/* Toggles */}

@@ -117,7 +117,7 @@ describe('ChartWrapper logo rendering', () => {
   it('sets the outer container to position:relative', () => {
     renderWrapper()
     // The outermost div should have position: relative for absolute logo positioning
-    const container = screen.getByText('Test Chart').closest('.rounded-2xl') as HTMLElement
+    const container = screen.getAllByText('Test Chart')[0].closest('.rounded-2xl') as HTMLElement
     expect(container).toBeTruthy()
     expect(container.style.position).toBe('relative')
   })

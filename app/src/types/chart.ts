@@ -280,6 +280,9 @@ export interface ChartConfig {
   /** Point map: [min, max] radius for symbol sizing */
   geoSizeRange?: [number, number]
 
+  /** Alt text for accessibility (screen readers) */
+  altText?: string
+
   /** Per-chart locale override (empty string = use global locale) */
   locale?: string
 
