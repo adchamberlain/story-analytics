@@ -16,15 +16,17 @@ export async function createTestChart(options?: {
 
   // First, ensure we have a data source — upload a small CSV
   const csvData = 'category,value\nA,10\nB,20\nC,30\nD,15'
+  const filename = `e2e-test-${Date.now()}.csv`
   const formData = new FormData()
-  formData.append('file', new Blob([csvData], { type: 'text/csv' }), 'test-data.csv')
+  formData.append('file', new Blob([csvData], { type: 'text/csv' }), filename)
 
   const uploadRes = await fetch(`${API_BASE}/api/data/upload`, {
     method: 'POST',
     body: formData,
   })
   const uploadResult = await uploadRes.json()
-  const sourceId = options?.sourceId ?? uploadResult.source_id
+  // Handle duplicate filename: use existing_source_id from error response
+  const sourceId = options?.sourceId ?? uploadResult.source_id ?? uploadResult.detail?.existing_source_id
 
   // Create the chart
   const res = await fetch(`${API_BASE}/api/v2/charts/save`, {

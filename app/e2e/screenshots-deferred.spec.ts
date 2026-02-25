@@ -65,9 +65,9 @@ test.describe('Deferred Screenshots', () => {
     })
     await waitForChart(page, 15000)
 
-    // Wait for SVG rect elements (bars) to be present
-    const barLocator = page.locator('figure svg rect').first()
-    await barLocator.waitFor({ state: 'visible', timeout: 10000 })
+    // Wait for SVG rect elements (bars) — Observable Plot wraps rects in <g> groups
+    const barLocator = page.locator('svg rect').first()
+    await barLocator.waitFor({ state: 'visible', timeout: 15000 })
 
     // Hover over the first bar to trigger tooltip
     await barLocator.hover({ force: true })
@@ -181,7 +181,7 @@ test.describe('Deferred Screenshots', () => {
     formData.append(
       'file',
       new Blob([csvData], { type: 'text/csv' }),
-      'rich-table-data.csv',
+      `rich-table-data-${Date.now()}.csv`,
     )
 
     const uploadRes = await fetch(`${API_BASE}/api/data/upload`, {
@@ -235,6 +235,7 @@ test.describe('Deferred Screenshots', () => {
   // ── 7. Map at Multiple Projections ────────────────────────────────────────
 
   test('07 — choropleth map at multiple projections', async ({ page }) => {
+    test.setTimeout(90000) // 3 projections with API calls + reloads
     // Create sample geo data (world countries with ISO numeric codes)
     const csvData = [
       'country_id,country_name,value',
@@ -254,7 +255,7 @@ test.describe('Deferred Screenshots', () => {
     formData.append(
       'file',
       new Blob([csvData], { type: 'text/csv' }),
-      'map-data.csv',
+      `map-data-${Date.now()}.csv`,
     )
 
     const uploadRes = await fetch(`${API_BASE}/api/data/upload`, {
@@ -329,7 +330,7 @@ test.describe('Deferred Screenshots', () => {
     usFormData.append(
       'file',
       new Blob([usCsvData], { type: 'text/csv' }),
-      'us-states-data.csv',
+      `us-states-data-${Date.now()}.csv`,
     )
     const usUploadRes = await fetch(`${API_BASE}/api/data/upload`, {
       method: 'POST',
@@ -365,7 +366,7 @@ test.describe('Deferred Screenshots', () => {
     formData.append(
       'file',
       new Blob([csvData], { type: 'text/csv' }),
-      'annotations-data.csv',
+      `annotations-data-${Date.now()}.csv`,
     )
 
     const uploadRes = await fetch(`${API_BASE}/api/data/upload`, {
