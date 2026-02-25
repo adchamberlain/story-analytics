@@ -1,5 +1,4 @@
 import { useState, useCallback } from 'react'
-import { ColorblindPreview } from './ColorblindPreview'
 
 interface PaletteBuilderProps {
   colors: string[]
@@ -118,8 +117,6 @@ export function PaletteBuilder({ colors, onChange }: PaletteBuilderProps) {
         </div>
       )}
 
-      {/* Colorblind preview */}
-      <ColorblindPreview colors={colors} />
     </div>
   )
 }

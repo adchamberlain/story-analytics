@@ -67,6 +67,13 @@ describe('exportPPTX', () => {
 
   it('positions chart image based on metadata presence', () => {
     // The y position varies depending on title and subtitle
-    expect(source).toContain("metadata?.title ? (metadata?.subtitle ? 1.3 : 1.0) : 0.5")
+    expect(source).toContain("metadata?.title ? (metadata?.subtitle ? 1.1 : 0.8) : 0.3")
+  })
+
+  it('keeps all elements within 5.625" slide height', () => {
+    // Source y-position must be below chart but within slide bounds (5.625")
+    expect(source).toContain('y: 5.25')
+    // Comment documents the constraint
+    expect(source).toContain('5.625')
   })
 })

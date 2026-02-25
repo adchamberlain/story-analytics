@@ -87,7 +87,7 @@ export function ElectionDonut({ data, config, height, autoHeight }: ElectionDonu
     const g = svg.append('g')
       .attr('transform', `translate(${width / 2},${effectiveHeight - legendHeight - 14})`)
 
-    const textColor = resolved === 'dark' ? '#e2e8f0' : '#374151'
+    const textColor = chartTheme.font.axis?.color || (resolved === 'dark' ? '#e2e8f0' : '#374151')
 
     // Build seat count by party for tooltips
     const seatsByParty = new Map<string, number>()
@@ -198,9 +198,9 @@ export function ElectionDonut({ data, config, height, autoHeight }: ElectionDonu
           left: tooltip.x,
           top: tooltip.y,
           transform: 'translateX(-50%)',
-          background: resolved === 'dark' ? '#1e293b' : '#fff',
-          color: resolved === 'dark' ? '#e2e8f0' : '#374151',
-          border: `1px solid ${resolved === 'dark' ? '#475569' : '#d1d5db'}`,
+          background: chartTheme.card.background || (resolved === 'dark' ? '#1e293b' : '#fff'),
+          color: chartTheme.font.axis?.color || (resolved === 'dark' ? '#e2e8f0' : '#374151'),
+          border: `1px solid ${chartTheme.card.borderColor || (resolved === 'dark' ? '#475569' : '#d1d5db')}`,
           borderRadius: 6,
           padding: '4px 8px',
           fontSize: 12,

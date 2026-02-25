@@ -96,10 +96,10 @@ export function ObservableChartFactory({
       const collapsed = shouldCollapseAnnotations(width)
 
       const marks = buildMarks(chartType, effectiveData, config, colors, chartTheme)
-      // Use CSS var() references so annotations automatically adapt to theme changes
-      // without depending on getComputedStyle timing.
-      const bgColor = 'var(--color-surface-raised, #1e293b)'
-      const textColor = 'var(--color-text-primary, #e2e8f0)'
+      // Use chart theme colors for annotations when available, falling back to CSS vars.
+      // This ensures annotations look correct in dark mode with themed cards (e.g. Economist).
+      const bgColor = chartTheme.plot.background || chartTheme.card.background || 'var(--color-surface-raised, #1e293b)'
+      const textColor = chartTheme.font.notes?.color || chartTheme.font.axis?.color || 'var(--color-text-primary, #e2e8f0)'
       const annotationMarks = buildAnnotationMarks(config.annotations, bgColor, textColor, chartTheme)
       const plotOptions = buildPlotOptions(chartType, effectiveData, config, colors, width, plotHeight, chartTheme)
       const plot = Plot.plot({ ...plotOptions, marks: [...marks, ...annotationMarks] })
@@ -2323,7 +2323,7 @@ function PieChartComponent({ data, config, height, autoHeight }: { data: Record<
         setTooltip(null)
       })
 
-    const textColor = resolved === 'dark' ? '#e2e8f0' : '#374151'
+    const textColor = chartTheme.font.axis?.color || (resolved === 'dark' ? '#e2e8f0' : '#374151')
 
     if (isExternal) {
       // External labels with connector polylines and dots
@@ -2416,9 +2416,9 @@ function PieChartComponent({ data, config, height, autoHeight }: { data: Record<
           left: tooltip.x,
           top: tooltip.y,
           transform: 'translateX(-50%)',
-          background: resolved === 'dark' ? '#1e293b' : '#fff',
-          color: resolved === 'dark' ? '#e2e8f0' : '#374151',
-          border: `1px solid ${resolved === 'dark' ? '#475569' : '#d1d5db'}`,
+          background: chartTheme.card.background || (resolved === 'dark' ? '#1e293b' : '#fff'),
+          color: chartTheme.font.axis?.color || (resolved === 'dark' ? '#e2e8f0' : '#374151'),
+          border: `1px solid ${chartTheme.card.borderColor || (resolved === 'dark' ? '#475569' : '#d1d5db')}`,
           borderRadius: 6,
           padding: '4px 8px',
           fontSize: 12,

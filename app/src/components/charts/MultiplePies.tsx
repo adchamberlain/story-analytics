@@ -80,8 +80,8 @@ export function MultiplePies({ data, config, height, autoHeight }: MultiplePiesP
     const colors = config.colorRange ? [...config.colorRange] : [...chartTheme.palette.colors]
     const colorScale = d3.scaleOrdinal(colors)
 
-    const textColor = resolved === 'dark' ? '#e2e8f0' : '#374151'
-    const bgColor = resolved === 'dark' ? '#1e293b' : '#ffffff'
+    const textColor = chartTheme.font.axis?.color || (resolved === 'dark' ? '#e2e8f0' : '#374151')
+    const bgColor = chartTheme.plot.background || chartTheme.card.background || (resolved === 'dark' ? '#1e293b' : '#ffffff')
 
     const svgHeight = effectiveHeight
     const svg = d3.select(el).append('svg')
