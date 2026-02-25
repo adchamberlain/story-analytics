@@ -5,6 +5,7 @@ import { ConfirmDialog } from '../components/ConfirmDialog'
 import { useChartThemeStore } from '../stores/chartThemeStore'
 import { CHART_THEMES } from '../themes/chartThemes'
 import { useLocaleStore, SUPPORTED_LOCALES } from '../stores/localeStore'
+import { useAuthStore } from '../stores/authStore'
 
 const PROVIDERS = [
   { id: 'anthropic', label: 'Anthropic', sublabel: 'Claude', keyField: 'anthropic_api_key' as const },
@@ -209,6 +210,9 @@ export function SettingsPage() {
             )}
           </div>
         </section>
+
+        {/* ── Account (Change Password) ─────────────────────────── */}
+        <ChangePasswordSection />
 
         {/* ── Chart Theme ──────────────────────────────────────────── */}
         <ChartThemeSelector />
@@ -528,10 +532,35 @@ function ApiKeyManager() {
 
 // ── Team Manager ────────────────────────────────────────────────────────────
 
+interface TeamMember {
+  id: string
+  team_id: string
+  user_id: string
+  role: string
+  email: string
+  display_name: string
+  joined_at: string
+}
+
+interface Team {
+  id: string
+  name: string
+  description: string | null
+  owner_id: string
+  created_at: string
+  members?: TeamMember[]
+}
+
 function TeamManager() {
-  const [teams, setTeams] = useState<{ id: string; name: string; description: string | null; owner_id: string; created_at: string }[]>([])
+  const { user } = useAuthStore()
+  const [teams, setTeams] = useState<Team[]>([])
   const [newTeamName, setNewTeamName] = useState('')
   const [creating, setCreating] = useState(false)
+  const [expandedTeamId, setExpandedTeamId] = useState<string | null>(null)
+  const [membersByTeam, setMembersByTeam] = useState<Record<string, TeamMember[]>>({})
+  const [inviteEmail, setInviteEmail] = useState('')
+  const [inviting, setInviting] = useState(false)
+  const [inviteError, setInviteError] = useState('')
 
   useEffect(() => {
     authFetch('/api/teams/')
@@ -539,6 +568,26 @@ function TeamManager() {
       .then(setTeams)
       .catch(() => {})
   }, [])
+
+  const loadMembers = async (teamId: string) => {
+    try {
+      const res = await authFetch(`/api/teams/${teamId}`)
+      if (!res.ok) return
+      const data = await res.json()
+      setMembersByTeam((prev) => ({ ...prev, [teamId]: data.members || [] }))
+    } catch { /* ignore */ }
+  }
+
+  const toggleExpand = (teamId: string) => {
+    if (expandedTeamId === teamId) {
+      setExpandedTeamId(null)
+    } else {
+      setExpandedTeamId(teamId)
+      setInviteEmail('')
+      setInviteError('')
+      if (!membersByTeam[teamId]) loadMembers(teamId)
+    }
+  }
 
   const handleCreate = async () => {
     if (!newTeamName.trim()) return
@@ -556,14 +605,61 @@ function TeamManager() {
     } catch { /* ignore */ } finally { setCreating(false) }
   }
 
+  const handleInvite = async (teamId: string) => {
+    if (!inviteEmail.trim()) return
+    setInviting(true)
+    setInviteError('')
+    try {
+      const res = await authFetch(`/api/teams/${teamId}/invite`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: inviteEmail.trim() }),
+      })
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({ detail: 'Failed to invite' }))
+        throw new Error(body.detail)
+      }
+      setInviteEmail('')
+      await loadMembers(teamId)
+    } catch (err) {
+      setInviteError(err instanceof Error ? err.message : 'Failed to invite')
+    } finally {
+      setInviting(false)
+    }
+  }
+
+  const handleRemoveMember = async (teamId: string, userId: string) => {
+    try {
+      const res = await authFetch(`/api/teams/${teamId}/members/${userId}`, { method: 'DELETE' })
+      if (!res.ok) return
+      setMembersByTeam((prev) => ({
+        ...prev,
+        [teamId]: (prev[teamId] || []).filter((m) => m.user_id !== userId),
+      }))
+    } catch { /* ignore */ }
+  }
+
   const [deleteTeamId, setDeleteTeamId] = useState<string | null>(null)
 
   const handleDelete = useCallback(async () => {
     if (!deleteTeamId) return
     await authFetch(`/api/teams/${deleteTeamId}`, { method: 'DELETE' })
     setTeams((prev) => prev.filter((t) => t.id !== deleteTeamId))
+    if (expandedTeamId === deleteTeamId) setExpandedTeamId(null)
     setDeleteTeamId(null)
-  }, [deleteTeamId])
+  }, [deleteTeamId, expandedTeamId])
+
+  const isAdmin = (teamId: string) => {
+    const members = membersByTeam[teamId]
+    if (!members || !user) return false
+    const me = members.find((m) => m.user_id === user.id)
+    return me?.role === 'admin'
+  }
+
+  const ROLE_BADGES: Record<string, string> = {
+    admin: 'bg-amber-500/15 text-amber-500',
+    member: 'bg-blue-500/15 text-blue-400',
+  }
 
   return (
     <section className="bg-surface-raised rounded-2xl shadow-card border border-border-default p-7">
@@ -592,17 +688,113 @@ function TeamManager() {
         <p className="text-[14px] text-text-muted py-2">No teams yet.</p>
       ) : (
         <div className="flex flex-col gap-2">
-          {teams.map((t) => (
-            <div key={t.id} className="flex items-center justify-between px-4 py-3 rounded-xl bg-surface-input border border-border-default">
-              <div>
-                <span className="text-[14px] text-text-primary font-medium">{t.name}</span>
-                {t.description && <p className="text-[12px] text-text-muted">{t.description}</p>}
+          {teams.map((t) => {
+            const expanded = expandedTeamId === t.id
+            const members = membersByTeam[t.id]
+            const admin = isAdmin(t.id)
+
+            return (
+              <div key={t.id} className="rounded-xl bg-surface-input border border-border-default overflow-hidden">
+                {/* Team header row */}
+                <div
+                  className="flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-surface-input/80 transition-colors"
+                  onClick={() => toggleExpand(t.id)}
+                >
+                  <div className="flex items-center gap-2.5">
+                    <svg
+                      className={`w-4 h-4 text-text-muted transition-transform ${expanded ? 'rotate-90' : ''}`}
+                      fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                    </svg>
+                    <span className="text-[14px] text-text-primary font-medium">{t.name}</span>
+                    {members && (
+                      <span className="text-[12px] text-text-muted bg-surface-raised px-2 py-0.5 rounded-full">
+                        {members.length} {members.length === 1 ? 'member' : 'members'}
+                      </span>
+                    )}
+                  </div>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setDeleteTeamId(t.id) }}
+                    className="text-[13px] text-red-500 hover:text-red-400 transition-colors"
+                  >
+                    Delete
+                  </button>
+                </div>
+
+                {/* Expanded member list */}
+                {expanded && (
+                  <div className="border-t border-border-default px-4 py-3">
+                    {!members ? (
+                      <p className="text-[13px] text-text-muted py-2">Loading members...</p>
+                    ) : members.length === 0 ? (
+                      <p className="text-[13px] text-text-muted py-2">No members.</p>
+                    ) : (
+                      <div className="flex flex-col gap-1.5 mb-3">
+                        {members.map((m) => {
+                          const isOwner = m.user_id === t.owner_id
+                          return (
+                            <div
+                              key={m.user_id}
+                              className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-surface-raised/50 transition-colors"
+                            >
+                              <div className="flex items-center gap-2.5">
+                                <span className="text-[14px] text-text-primary">{m.display_name}</span>
+                                <span className="text-[12px] text-text-muted">{m.email}</span>
+                                {isOwner ? (
+                                  <span className="text-[11px] font-semibold uppercase px-2 py-0.5 rounded-md bg-purple-500/15 text-purple-400">
+                                    Owner
+                                  </span>
+                                ) : (
+                                  <span className={`text-[11px] font-semibold uppercase px-2 py-0.5 rounded-md ${ROLE_BADGES[m.role] ?? ROLE_BADGES.member}`}>
+                                    {m.role}
+                                  </span>
+                                )}
+                              </div>
+                              {admin && !isOwner && (
+                                <button
+                                  onClick={() => handleRemoveMember(t.id, m.user_id)}
+                                  className="text-[12px] text-red-500 hover:text-red-400 transition-colors"
+                                >
+                                  Remove
+                                </button>
+                              )}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
+
+                    {/* Invite form (visible to admins) */}
+                    {admin && (
+                      <div className="pt-2 border-t border-border-default">
+                        <div className="flex gap-2">
+                          <input
+                            type="email"
+                            value={inviteEmail}
+                            onChange={(e) => { setInviteEmail(e.target.value); setInviteError('') }}
+                            placeholder="Email address"
+                            className="flex-1 px-3 py-2 text-[13px] rounded-lg bg-surface-raised border border-border-default text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+                            onKeyDown={(e) => e.key === 'Enter' && handleInvite(t.id)}
+                          />
+                          <button
+                            onClick={() => handleInvite(t.id)}
+                            disabled={inviting || !inviteEmail.trim()}
+                            className="px-3 py-2 text-[13px] font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-500 transition-colors disabled:opacity-50"
+                          >
+                            {inviting ? 'Inviting...' : 'Invite'}
+                          </button>
+                        </div>
+                        {inviteError && (
+                          <p className="text-[12px] text-red-400 mt-1.5">{inviteError}</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
-              <button onClick={() => setDeleteTeamId(t.id)} className="text-[13px] text-red-500 hover:text-red-400 transition-colors">
-                Delete
-              </button>
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
       {deleteTeamId && (
@@ -618,6 +810,133 @@ function TeamManager() {
     </section>
   )
 }
+
+// ── Change Password ─────────────────────────────────────────────────────────
+
+function ChangePasswordSection() {
+  const { authEnabled, user } = useAuthStore()
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [status, setStatus] = useState<'idle' | 'success' | 'error'>('idle')
+  const [errorMsg, setErrorMsg] = useState('')
+  const timer = useRef<ReturnType<typeof setTimeout>>()
+
+  useEffect(() => {
+    return () => clearTimeout(timer.current)
+  }, [])
+
+  if (!authEnabled) return null
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setStatus('idle')
+    setErrorMsg('')
+
+    if (newPassword.length < 6) {
+      setStatus('error')
+      setErrorMsg('New password must be at least 6 characters')
+      return
+    }
+    if (newPassword !== confirmPassword) {
+      setStatus('error')
+      setErrorMsg('New passwords do not match')
+      return
+    }
+
+    setSaving(true)
+    try {
+      const res = await authFetch('/api/auth/change-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          current_password: currentPassword,
+          new_password: newPassword,
+        }),
+      })
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({ detail: 'Failed to change password' }))
+        throw new Error(body.detail)
+      }
+      setStatus('success')
+      setCurrentPassword('')
+      setNewPassword('')
+      setConfirmPassword('')
+      clearTimeout(timer.current)
+      timer.current = setTimeout(() => setStatus('idle'), 3000)
+    } catch (err) {
+      setStatus('error')
+      setErrorMsg(err instanceof Error ? err.message : 'Failed to change password')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const inputClass =
+    'w-full px-4 py-3 text-[14px] rounded-xl bg-surface-input border border-border-strong text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition-all'
+
+  return (
+    <section className="bg-surface-raised rounded-2xl shadow-card border border-border-default p-7">
+      <h2 className="text-[17px] font-semibold text-text-primary mb-1.5">Account</h2>
+      <p className="text-[14px] text-text-muted mb-5">
+        Signed in as <span className="font-medium text-text-secondary">{user?.email}</span>
+      </p>
+
+      <form onSubmit={handleSubmit} className="space-y-4 max-w-sm">
+        <div>
+          <label className="text-sm font-medium text-text-secondary block mb-1.5">Current Password</label>
+          <input
+            type="password"
+            value={currentPassword}
+            onChange={(e) => { setCurrentPassword(e.target.value); setStatus('idle') }}
+            required
+            className={inputClass}
+          />
+        </div>
+        <div>
+          <label className="text-sm font-medium text-text-secondary block mb-1.5">New Password</label>
+          <input
+            type="password"
+            value={newPassword}
+            onChange={(e) => { setNewPassword(e.target.value); setStatus('idle') }}
+            required
+            minLength={6}
+            className={inputClass}
+          />
+        </div>
+        <div>
+          <label className="text-sm font-medium text-text-secondary block mb-1.5">Confirm New Password</label>
+          <input
+            type="password"
+            value={confirmPassword}
+            onChange={(e) => { setConfirmPassword(e.target.value); setStatus('idle') }}
+            required
+            minLength={6}
+            className={inputClass}
+          />
+        </div>
+
+        <div className="flex items-center gap-3 pt-1">
+          <button
+            type="submit"
+            disabled={saving || !currentPassword || !newPassword || !confirmPassword}
+            className="px-6 py-3 text-[14px] font-semibold rounded-xl bg-blue-600 text-white hover:bg-blue-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {saving ? 'Changing...' : 'Change Password'}
+          </button>
+          {status === 'success' && (
+            <span className="text-[14px] text-emerald-500 font-medium">Password changed</span>
+          )}
+          {status === 'error' && (
+            <span className="text-[14px] text-red-400 font-medium">{errorMsg}</span>
+          )}
+        </div>
+      </form>
+    </section>
+  )
+}
+
 
 // ── Locale Selector ─────────────────────────────────────────────────────────
 

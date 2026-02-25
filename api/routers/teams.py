@@ -7,6 +7,7 @@ from ..auth_simple import get_current_user
 from ..services.metadata_db import (
     create_team, list_teams, get_team, get_team_members,
     add_team_member, remove_team_member, delete_team,
+    get_user_by_email, get_team_member_role,
 )
 
 router = APIRouter(prefix="/teams", tags=["teams"])
@@ -22,6 +23,10 @@ class AddMemberRequest(BaseModel):
     role: str = Field("member", examples=["member", "admin"])
 
 
+class InviteRequest(BaseModel):
+    email: str = Field(..., examples=["user@example.com"])
+
+
 @router.post("/")
 async def create(request: CreateTeamRequest, user: dict = Depends(get_current_user)):
     """Create a new team. The creator becomes the team admin."""
@@ -35,27 +40,60 @@ async def list_user_teams(user: dict = Depends(get_current_user)):
 
 
 @router.get("/{team_id}")
-async def get_team_detail(team_id: str):
-    """Get team details."""
+async def get_team_detail(team_id: str, user: dict = Depends(get_current_user)):
+    """Get team details. Caller must be a team member."""
     team = get_team(team_id)
     if not team:
         raise HTTPException(status_code=404, detail="Team not found")
+    role = get_team_member_role(team_id, user["id"])
+    if role is None:
+        raise HTTPException(status_code=403, detail="Not a member of this team")
     team["members"] = get_team_members(team_id)
     return team
 
 
-@router.post("/{team_id}/members")
-async def add_member(team_id: str, request: AddMemberRequest, user: dict = Depends(get_current_user)):
-    """Add a member to a team."""
+@router.post("/{team_id}/invite")
+async def invite_member(team_id: str, request: InviteRequest, user: dict = Depends(get_current_user)):
+    """Invite a user to a team by email. Caller must be a team admin."""
     team = get_team(team_id)
     if not team:
         raise HTTPException(status_code=404, detail="Team not found")
+    caller_role = get_team_member_role(team_id, user["id"])
+    if caller_role != "admin":
+        raise HTTPException(status_code=403, detail="Only team admins can invite members")
+    target_user = get_user_by_email(request.email)
+    if not target_user:
+        raise HTTPException(status_code=404, detail="No user found with that email")
+    # Check if already a member
+    existing_role = get_team_member_role(team_id, target_user["id"])
+    if existing_role is not None:
+        raise HTTPException(status_code=409, detail="User is already a team member")
+    return add_team_member(team_id, target_user["id"], "member")
+
+
+@router.post("/{team_id}/members")
+async def add_member(team_id: str, request: AddMemberRequest, user: dict = Depends(get_current_user)):
+    """Add a member to a team. Caller must be a team admin."""
+    team = get_team(team_id)
+    if not team:
+        raise HTTPException(status_code=404, detail="Team not found")
+    caller_role = get_team_member_role(team_id, user["id"])
+    if caller_role != "admin":
+        raise HTTPException(status_code=403, detail="Only team admins can add members")
     return add_team_member(team_id, request.user_id, request.role)
 
 
 @router.delete("/{team_id}/members/{user_id}")
 async def remove_member(team_id: str, user_id: str, user: dict = Depends(get_current_user)):
-    """Remove a member from a team."""
+    """Remove a member from a team. Caller must be admin. Cannot remove the owner."""
+    team = get_team(team_id)
+    if not team:
+        raise HTTPException(status_code=404, detail="Team not found")
+    caller_role = get_team_member_role(team_id, user["id"])
+    if caller_role != "admin":
+        raise HTTPException(status_code=403, detail="Only team admins can remove members")
+    if user_id == team["owner_id"]:
+        raise HTTPException(status_code=403, detail="Cannot remove the team owner")
     removed = remove_team_member(team_id, user_id)
     if not removed:
         raise HTTPException(status_code=404, detail="Member not found")
