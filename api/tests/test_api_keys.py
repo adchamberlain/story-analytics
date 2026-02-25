@@ -1,7 +1,6 @@
 """
 Tests for API key generation, validation, and management endpoints.
 """
-import pytest
 from fastapi.testclient import TestClient
 from api.main import app
 from api.services.api_key_service import generate_api_key, verify_api_key

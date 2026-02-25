@@ -3,7 +3,6 @@ Tests for chart snapshot (static PNG fallback) endpoints.
 POST /v2/charts/{id}/snapshot — upload PNG blob
 GET  /v2/charts/{id}/snapshot.png — serve stored PNG
 """
-import pytest
 from fastapi.testclient import TestClient
 from api.main import app
 
@@ -34,9 +33,6 @@ def _create_chart(**overrides) -> dict:
 def _cleanup_chart(chart_id: str):
     client.delete(f"/api/v2/charts/{chart_id}")
     # Also clean up snapshot file if it exists
-    from pathlib import Path
-    snapshot_path = Path(__file__).parent.parent / "routers" / ".." / ".." / "data" / "snapshots" / f"{chart_id}.png"
-    # Use the same path as the router
     from api.routers.charts_v2 import SNAPSHOTS_DIR
     sp = SNAPSHOTS_DIR / f"{chart_id}.png"
     if sp.exists():

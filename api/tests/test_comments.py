@@ -2,7 +2,6 @@
 Tests for comments system (CRUD + threading).
 """
 import uuid
-import pytest
 from fastapi.testclient import TestClient
 from api.main import app
 

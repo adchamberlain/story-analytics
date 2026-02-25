@@ -4,7 +4,6 @@ Run after any feature change to catch regressions.
 
 Usage: python -m pytest api/tests/test_stress.py -x --tb=short -v
 """
-import pytest
 from fastapi.testclient import TestClient
 from api.main import app
 

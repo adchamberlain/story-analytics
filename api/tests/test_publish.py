@@ -2,7 +2,6 @@
 Tests for publish/unpublish workflow.
 Charts and dashboards have a status field: 'draft' | 'published'.
 """
-import pytest
 from fastapi.testclient import TestClient
 from api.main import app
 

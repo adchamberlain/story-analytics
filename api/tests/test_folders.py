@@ -1,6 +1,5 @@
 """Tests for folder CRUD and chart-folder association."""
 
-import pytest
 from fastapi.testclient import TestClient
 from api.main import app
 
