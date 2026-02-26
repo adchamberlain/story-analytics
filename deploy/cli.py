@@ -20,6 +20,7 @@ from deploy.aws import (
     destroy_stack,
     ensure_ecr_repo,
     get_stack_status,
+    trigger_apprunner_deploy,
     validate_credentials,
 )
 
@@ -98,10 +99,16 @@ def cmd_update(args: argparse.Namespace) -> None:
         sys.exit(1)
 
     # 3. Rebuild and push image
-    print("\n[3/3] Building and pushing Docker image...")
+    print("\n[3/4] Building and pushing Docker image...")
     build_and_push_image(args.region, ecr_uri)
 
-    print("\nImage pushed. App Runner will auto-deploy the new version.")
+    # 4. Trigger App Runner deployment
+    print("\n[4/4] Triggering App Runner deployment...")
+    trigger_apprunner_deploy(args.stack_name, args.region)
+
+    app_url = outputs.get("AppUrl", "(unknown)")
+    print(f"\nDeployment started. App Runner will roll out the new version in a few minutes.")
+    print(f"  App URL: {app_url}")
 
 
 def cmd_status(args: argparse.Namespace) -> None:
@@ -157,8 +164,8 @@ def build_parser() -> argparse.ArgumentParser:
         )
         sub.add_argument(
             "--region",
-            default="us-east-1",
-            help="AWS region (default: us-east-1)",
+            default="us-east-2",
+            help="AWS region (default: us-east-2)",
         )
 
     # deploy
