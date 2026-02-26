@@ -370,6 +370,12 @@ function buildMarks(
   const y = config.y as string | undefined
   const series = config.series
 
+  // Coerce numeric series values to strings so Observable Plot uses
+  // a categorical (ordinal) color scale instead of a continuous one.
+  if (series && data.length > 0 && typeof data[0][series] === 'number') {
+    data = data.map((d) => ({ ...d, [series]: String(d[series]) }))
+  }
+
   switch (chartType) {
     case 'LineChart':
       return buildLineMarks(data, x, y, series, config, colors)
