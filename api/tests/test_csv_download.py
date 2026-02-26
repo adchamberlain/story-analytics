@@ -5,6 +5,7 @@ Validates CSV download, allowDataDownload flag, and error handling.
 import csv
 import io
 
+import pytest
 from fastapi.testclient import TestClient
 from api.main import app
 
@@ -27,6 +28,16 @@ def _get_source_id() -> str:
     assert resp.status_code == 200
     _source_id = resp.json()["source_id"]
     return _source_id
+
+
+@pytest.fixture(autouse=True, scope="module")
+def _cleanup_source():
+    """Delete the shared test source after all tests in this module."""
+    global _source_id
+    yield
+    if _source_id:
+        client.delete(f"/api/data/sources/{_source_id}")
+        _source_id = None
 
 
 def _create_chart(**overrides) -> dict:
