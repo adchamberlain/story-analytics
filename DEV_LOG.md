@@ -2,6 +2,35 @@
 
 ## 2026-02-25
 
+### Session 6: Data Source Cleanup & E2E Leak Prevention
+
+**Problem:** E2E tests and Python scripts uploaded CSVs via `/api/data/upload` but never deleted them, accumulating hundreds of orphaned sources. User had already cleaned 482 `test.csv` and 32 `csv_dl_test.csv` files manually.
+
+**Dashboard data repair:**
+- 11 charts in the Perfect Dashboard had broken source references after the bulk cleanup
+- Ran `fix_perfect_dashboard_v2.py` to restore 8 charts, manually fixed remaining 3 (DataTable, SpikeMap, Website Traffic Heatmap)
+- Fixed `y`/`series` column mismatches on GroupedColumn and StackedColumn charts — UNPIVOT SQL outputs `metric_name`/`metric_value` but chart config referenced old column names
+
+**Cleanup to pristine 25-chart setup:**
+- Deleted 8 duplicate charts not referenced by the Perfect Dashboard
+- Removed 40 orphan upload directories
+- Final state: 25 charts ↔ 25 data sources ↔ 1 dashboard, zero orphans
+
+**Seed data refresh (`data/seed/`):**
+- Copied current working data into `data/seed/` so new clones get the Perfect Dashboard on first run
+- Verified integrity: all 25 dashboard chart refs → chart files → source uploads cross-referenced
+
+**E2E test leak prevention:**
+- `helpers.ts`: `createTestChart()` now returns `{ chartId, sourceId }` (was just `chartId`); added `deleteSource()` helper
+- `screenshots-deferred.spec.ts`: tracks `sourceIds` array, deletes in `afterEach` alongside charts; direct uploads in tests 06/07/08 also tracked
+- `chart-types.spec.ts`: tracks and deletes sourceIds in `afterAll`
+- `embed.spec.ts`: tracks and deletes sourceId in `afterAll`
+- `audit-templates.ts`: `uploadCsv()` pushes to `allSourceIds`; cleanup section deletes all sources
+
+**Python script old-source cleanup:**
+- `fix_perfect_dashboard_v2.py`: each fix function reads `old_source` before uploading, calls `delete_source()` after saving; added `delete_source()` helper; DataTable fix now uses hardcoded fallback data
+- `fix_perfect_dashboard_data.py`: `update_chart()` tracks old source and deletes it when replaced; added `delete_source()` helper
+
 ### Session 5: README & Website Update, Colorblind/Accessibility Removal, Theme Fixes
 
 **README.md and website/index.html updated to reflect current feature set:**
