@@ -49,6 +49,11 @@ def _ecr_client(region: str):
     return boto3.client("ecr", region_name=region)
 
 
+def _apprunner_client(region: str):
+    """Return an App Runner boto3 client for *region*."""
+    return boto3.client("apprunner", region_name=region)
+
+
 def ensure_ecr_repo(repo_name: str, region: str) -> str:
     """Create the ECR repository if it doesn't exist. Return the repo URI.
 
@@ -344,6 +349,40 @@ def _get_outputs(cfn, stack_name: str) -> dict[str, str]:
     resp = cfn.describe_stacks(StackName=stack_name)
     stack = resp["Stacks"][0]
     return {o["OutputKey"]: o["OutputValue"] for o in stack.get("Outputs", [])}
+
+
+def trigger_apprunner_deploy(stack_name: str, region: str) -> None:
+    """Explicitly trigger an App Runner deployment for the service.
+
+    Pushing the same ``latest`` tag to ECR does not reliably trigger
+    auto-deployment, so we call ``start_deployment`` directly.
+    """
+    ar = _apprunner_client(region)
+    # Find the service ARN by listing services and matching on name
+    service_name = f"{stack_name}-service"
+    service_arn = None
+    next_token = None
+    while True:
+        kwargs = {}
+        if next_token:
+            kwargs["NextToken"] = next_token
+        resp = ar.list_services(**kwargs)
+        for svc in resp.get("ServiceSummaryList", []):
+            if svc["ServiceName"] == service_name:
+                service_arn = svc["ServiceArn"]
+                break
+        if service_arn:
+            break
+        next_token = resp.get("NextToken")
+        if not next_token:
+            break
+
+    if not service_arn:
+        print(f"  WARNING: App Runner service '{service_name}' not found. Skipping deployment trigger.")
+        return
+
+    ar.start_deployment(ServiceArn=service_arn)
+    print(f"  Deployment triggered for {service_name}.")
 
 
 def _clean_ecr_images(stack_name: str, region: str) -> None:
