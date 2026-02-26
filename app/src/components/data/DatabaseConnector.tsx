@@ -404,7 +404,7 @@ export function DatabaseConnector({ onSynced }: DatabaseConnectorProps) {
           {/* Dynamic fields per DB type */}
           {dbType === 'snowflake' && (
             <div className="grid grid-cols-2" style={{ gap: '16px' }}>
-              <FormField label="Account" value={account} onChange={setAccount} placeholder="xy12345.us-east-1" hint="Admin → Accounts → Locator (e.g. xy12345.us-east-1)" />
+              <FormField label="Account" value={account} onChange={setAccount} placeholder="MYORG-MYACCOUNT" hint="Account Details → Account identifier (ORGNAME-ACCOUNTNAME)" />
               <FormField label="Warehouse" value={warehouse} onChange={setWarehouse} placeholder="COMPUTE_WH" hint="Admin → Warehouses → name of your warehouse" />
               <FormField label="Database" value={database} onChange={setDatabase} placeholder="MY_DATABASE" hint="Data → Databases → name of your database" />
               <FormField label="Schema" value={schema} onChange={setSchema} placeholder="PUBLIC" hint="Inside your database → Schemas (PUBLIC is the default)" />
