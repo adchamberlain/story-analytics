@@ -5,8 +5,6 @@ Uses tmp_path fixtures to isolate from production data directory.
 """
 from __future__ import annotations
 
-import json
-
 import pytest
 
 
@@ -31,8 +29,8 @@ class TestCredentialStoreRoundtrip:
         from api.services.credential_store import store_credentials, load_credentials
 
         creds = {"username": "alice", "password": "s3cret"}
-        store_credentials("conn1", creds)
-        loaded = load_credentials("conn1")
+        store_credentials("aaa111", creds)
+        loaded = load_credentials("aaa111")
         assert loaded == creds
 
     def test_roundtrip_complex(self, tmp_path):
@@ -45,8 +43,8 @@ class TestCredentialStoreRoundtrip:
             "password": "p@$$w0rd!",
             "options": {"ssl": True, "timeout": 30},
         }
-        store_credentials("conn2", creds)
-        loaded = load_credentials("conn2")
+        store_credentials("aaa222", creds)
+        loaded = load_credentials("aaa222")
         assert loaded == creds
 
 
@@ -56,7 +54,7 @@ class TestCredentialStoreLoadNonexistent:
     def test_load_nonexistent_returns_none(self):
         from api.services.credential_store import load_credentials
 
-        assert load_credentials("does_not_exist") is None
+        assert load_credentials("deadbeef") is None
 
 
 class TestCredentialStoreDelete:
@@ -69,16 +67,16 @@ class TestCredentialStoreDelete:
             delete_credentials,
         )
 
-        store_credentials("conn3", {"password": "abc"})
-        assert load_credentials("conn3") is not None
-        delete_credentials("conn3")
-        assert load_credentials("conn3") is None
+        store_credentials("aaa333", {"password": "abc"})
+        assert load_credentials("aaa333") is not None
+        delete_credentials("aaa333")
+        assert load_credentials("aaa333") is None
 
     def test_delete_nonexistent_no_error(self):
         from api.services.credential_store import delete_credentials
 
         # Should not raise
-        delete_credentials("nonexistent_id")
+        delete_credentials("bbb999")
 
 
 class TestCredentialStoreEncryption:
@@ -88,7 +86,7 @@ class TestCredentialStoreEncryption:
         from api.services.credential_store import store_credentials
 
         password = "super_secret_password_12345"
-        store_credentials("conn4", {"password": password})
+        store_credentials("aaa444", {"password": password})
 
         # Find the .enc file
         enc_files = list(tmp_path.glob("*.enc"))
@@ -107,7 +105,53 @@ class TestCredentialStoreOverwrite:
     def test_overwrite(self, tmp_path):
         from api.services.credential_store import store_credentials, load_credentials
 
-        store_credentials("conn5", {"password": "old"})
-        store_credentials("conn5", {"password": "new", "extra": "field"})
-        loaded = load_credentials("conn5")
+        store_credentials("aaa555", {"password": "old"})
+        store_credentials("aaa555", {"password": "new", "extra": "field"})
+        loaded = load_credentials("aaa555")
         assert loaded == {"password": "new", "extra": "field"}
+
+
+class TestCredentialStoreCorrupted:
+    """load_credentials returns None gracefully for corrupted .enc files."""
+
+    def test_corrupted_enc_file_returns_none(self, tmp_path):
+        from api.services.credential_store import store_credentials, load_credentials
+
+        # Store valid credentials first
+        store_credentials("aaa666", {"password": "valid"})
+
+        # Corrupt the .enc file with garbage bytes
+        enc_path = tmp_path / "aaa666.enc"
+        assert enc_path.exists()
+        enc_path.write_bytes(b"this is not valid fernet data at all")
+
+        # load_credentials should return None, not raise
+        assert load_credentials("aaa666") is None
+
+
+class TestCredentialStoreIdValidation:
+    """Invalid connection IDs are rejected to prevent path traversal."""
+
+    def test_store_rejects_path_traversal(self):
+        from api.services.credential_store import store_credentials
+
+        with pytest.raises(ValueError):
+            store_credentials("../etc/passwd", {"password": "bad"})
+
+    def test_load_rejects_path_traversal(self):
+        from api.services.credential_store import load_credentials
+
+        with pytest.raises(ValueError):
+            load_credentials("../etc/passwd")
+
+    def test_delete_rejects_path_traversal(self):
+        from api.services.credential_store import delete_credentials
+
+        with pytest.raises(ValueError):
+            delete_credentials("../etc/passwd")
+
+    def test_rejects_non_hex_id(self):
+        from api.services.credential_store import store_credentials
+
+        with pytest.raises(ValueError):
+            store_credentials("hello_world", {"password": "bad"})

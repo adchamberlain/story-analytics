@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from pathlib import Path
 
 from cryptography.fernet import Fernet
@@ -16,9 +17,16 @@ from cryptography.fernet import Fernet
 logger = logging.getLogger(__name__)
 
 _CREDENTIALS_DIR = Path(__file__).parent.parent.parent / "data" / "credentials"
+_SAFE_ID_RE = re.compile(r"^[a-f0-9]{1,32}$")
 
 # Lazily-initialized Fernet instance (reset in tests via monkeypatch)
 _fernet: Fernet | None = None
+
+
+def _validate_id(connection_id: str) -> None:
+    """Validate connection_id to prevent path traversal. Raises ValueError if invalid."""
+    if not _SAFE_ID_RE.match(connection_id):
+        raise ValueError(f"Invalid connection_id: {connection_id!r}")
 
 
 def _get_fernet() -> Fernet:
@@ -47,6 +55,7 @@ def _get_fernet() -> Fernet:
 
 def store_credentials(connection_id: str, credentials: dict) -> None:
     """Encrypt and persist credentials for a connection."""
+    _validate_id(connection_id)
     f = _get_fernet()
     plaintext = json.dumps(credentials).encode("utf-8")
     encrypted = f.encrypt(plaintext)
@@ -54,11 +63,16 @@ def store_credentials(connection_id: str, credentials: dict) -> None:
     _CREDENTIALS_DIR.mkdir(parents=True, exist_ok=True)
     enc_path = _CREDENTIALS_DIR / f"{connection_id}.enc"
     enc_path.write_bytes(encrypted)
+    try:
+        enc_path.chmod(0o600)
+    except OSError:
+        pass  # Windows or other OS may not support chmod
     logger.info("Stored encrypted credentials for connection %s", connection_id)
 
 
 def load_credentials(connection_id: str) -> dict | None:
     """Load and decrypt credentials for a connection. Returns None if not found."""
+    _validate_id(connection_id)
     enc_path = _CREDENTIALS_DIR / f"{connection_id}.enc"
     if not enc_path.exists():
         return None
@@ -75,6 +89,7 @@ def load_credentials(connection_id: str) -> dict | None:
 
 def delete_credentials(connection_id: str) -> None:
     """Delete stored credentials for a connection. No-op if not found."""
+    _validate_id(connection_id)
     enc_path = _CREDENTIALS_DIR / f"{connection_id}.enc"
     if enc_path.exists():
         enc_path.unlink()
