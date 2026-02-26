@@ -2,6 +2,32 @@
 
 ## 2026-02-25
 
+### Session 9: S3 Transform Cache Bug, Scatter Plot Fix, API Demo
+
+**Goal:** Fix scatter plots with numeric series, fix transforms broken on S3 deployments, demo API key usage.
+
+**API demo:**
+- Uploaded AI benchmarks CSV via API key, used AI proposer to create scatter plot, saved chart
+- Discovered S3 upload bug: `ingest_csv` called `get_local_path()` before `write()`, trying to download a non-existent file. Fixed by reordering operations in `api/services/duckdb_service.py`
+
+**Scatter plot numeric series fix (frontend):**
+- `app/src/components/charts/ObservableChartFactory.tsx`: Added numeric-to-string coercion in `buildMarks()` — when a series column contains numbers (e.g., `release_year`), Observable Plot treats `fill` as continuous, making dots invisible. Coercing to strings forces ordinal/categorical color scale. Applies to all chart types.
+
+**S3 transform cache bug (backend):**
+- **Root cause:** `_reingest_and_preview()` called `ingest_csv()` which re-uploaded the stale local cached file back to S3, overwriting the transform result. All 8 transform operations (rename, transpose, delete column, etc.) were silently broken on S3 deployments.
+- `api/services/duckdb_service.py`: New `reload_source()` method — invalidates local cache, re-downloads from S3, rebuilds DuckDB table without re-uploading
+- `api/services/storage/base.py`: New `invalidate_local_cache()` method (no-op for local)
+- `api/services/storage/s3.py`: Override deletes cached file so next `get_local_path()` re-fetches from S3
+- `api/routers/transforms.py`: `_reingest_and_preview()` now calls `reload_source()` instead of `ingest_csv()`
+
+**Seed data fix:** Renamed `field` back to `study_hours` on cloud deployment for the "More Hours, Better Scores" scatter chart (column had been corrupted by the transform bug)
+
+**Ruff linter fix:** Fixed F541 (f-strings without placeholders) in `api/email.py`, F401 (unused imports) in `teams.py`, `test_s3_storage.py`, `test_storage_backend.py`, `test_versions.py`
+
+**Tests:** 287 backend tests passing (17 transform tests pass with new reload_source path)
+
+---
+
 ### Session 8: Team Email Invites & Deploy Fix
 
 **Goal:** Allow team admins to invite anyone by email (not just registered users), and fix unreliable App Runner deployments.
