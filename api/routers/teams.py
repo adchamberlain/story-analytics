@@ -14,7 +14,7 @@ from ..services.metadata_db import (
     create_team, list_teams, get_team, get_team_members,
     add_team_member, remove_team_member, delete_team,
     get_user_by_email, get_team_member_role,
-    create_invite,
+    create_invite, get_pending_team_invites, delete_invite,
 )
 
 router = APIRouter(prefix="/teams", tags=["teams"])
@@ -133,6 +133,33 @@ async def remove_member(team_id: str, user_id: str, user: dict = Depends(get_cur
     if not removed:
         raise HTTPException(status_code=404, detail="Member not found")
     return {"status": "removed"}
+
+
+@router.get("/{team_id}/invites")
+async def list_invites(team_id: str, user: dict = Depends(get_current_user)):
+    """List pending invites for a team. Caller must be a team admin."""
+    team = get_team(team_id)
+    if not team:
+        raise HTTPException(status_code=404, detail="Team not found")
+    caller_role = get_team_member_role(team_id, user["id"])
+    if caller_role != "admin":
+        raise HTTPException(status_code=403, detail="Only team admins can view invites")
+    return get_pending_team_invites(team_id)
+
+
+@router.delete("/{team_id}/invites/{invite_id}")
+async def cancel_invite(team_id: str, invite_id: str, user: dict = Depends(get_current_user)):
+    """Cancel a pending invite. Caller must be a team admin."""
+    team = get_team(team_id)
+    if not team:
+        raise HTTPException(status_code=404, detail="Team not found")
+    caller_role = get_team_member_role(team_id, user["id"])
+    if caller_role != "admin":
+        raise HTTPException(status_code=403, detail="Only team admins can cancel invites")
+    deleted = delete_invite(invite_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Invite not found")
+    return {"status": "cancelled"}
 
 
 @router.delete("/{team_id}")
