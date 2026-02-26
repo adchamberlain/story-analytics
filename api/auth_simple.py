@@ -22,6 +22,7 @@ from .services.api_key_service import verify_api_key
 from .services.metadata_db import (
     create_user, get_user_by_email, get_user_by_id,
     ensure_default_user, update_user_password,
+    update_user_display_name,
     get_api_key_by_prefix, update_api_key_last_used,
 )
 
@@ -142,6 +143,7 @@ class RegisterRequest(BaseModel):
     email: str
     password: str
     display_name: str | None = None
+    invite_token: str | None = None
 
 
 class LoginRequest(BaseModel):
@@ -174,14 +176,38 @@ async def register(request: RegisterRequest):
     if not AUTH_ENABLED:
         raise HTTPException(status_code=400, detail="Auth is disabled. Set AUTH_ENABLED=true to enable.")
 
+    from .services.metadata_db import get_invite_by_token, mark_invite_used, get_admin_setting, update_user_role
+
+    invite = None
+    role_override = None
+
+    if request.invite_token:
+        invite = get_invite_by_token(request.invite_token)
+        if not invite:
+            raise HTTPException(status_code=400, detail="Invalid or expired invite link")
+        if invite["email"].lower() != request.email.lower():
+            raise HTTPException(status_code=400, detail="Email does not match invite")
+        role_override = invite["role"]
+    else:
+        open_reg = get_admin_setting("open_registration")
+        if open_reg != "true":
+            raise HTTPException(status_code=403, detail="Registration is by invitation only")
+
     existing = get_user_by_email(request.email)
     if existing:
         raise HTTPException(status_code=409, detail="Email already registered")
 
     password_hash = _hash_password(request.password)
     user = create_user(request.email, password_hash, request.display_name)
-    token = _create_token(user["id"])
 
+    if role_override:
+        update_user_role(user["id"], role_override)
+        user["role"] = role_override
+
+    if invite:
+        mark_invite_used(invite["id"])
+
+    token = _create_token(user["id"])
     return AuthResponse(token=token, user=user)
 
 
@@ -192,13 +218,25 @@ async def login(request: LoginRequest):
         raise HTTPException(status_code=400, detail="Auth is disabled. Set AUTH_ENABLED=true to enable.")
 
     user = get_user_by_email(request.email)
-    if not user or not _verify_password(request.password, user["password_hash"]):
+    if not user:
+        # Check if the user exists but is deactivated
+        from .services.metadata_db import _ensure_tables
+        from .services.db import get_db
+        _ensure_tables()
+        db = get_db()
+        inactive = db.fetchone(
+            "SELECT id FROM users WHERE email = ? AND is_active = 0",
+            (request.email,),
+        )
+        if inactive:
+            raise HTTPException(status_code=403, detail="Your account has been deactivated. Contact an administrator.")
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+
+    if not _verify_password(request.password, user["password_hash"]):
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
     token = _create_token(user["id"])
-    # Don't send password hash to client
     safe_user = {k: v for k, v in user.items() if k != "password_hash"}
-
     return AuthResponse(token=token, user=safe_user)
 
 
@@ -228,3 +266,22 @@ async def change_password(
     update_user_password(user["id"], new_hash)
 
     return {"message": "Password changed successfully"}
+
+
+class ProfileUpdate(BaseModel):
+    display_name: str
+
+
+@router.put("/profile")
+async def update_profile(
+    request: ProfileUpdate,
+    user: dict = Depends(get_current_user),
+):
+    """Update the current user's profile."""
+    if not request.display_name.strip():
+        raise HTTPException(status_code=400, detail="Display name cannot be empty")
+    success = update_user_display_name(user["id"], request.display_name.strip())
+    if not success:
+        raise HTTPException(status_code=404, detail="User not found")
+    updated = get_user_by_id(user["id"])
+    return updated
