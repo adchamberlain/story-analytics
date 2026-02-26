@@ -1,7 +1,11 @@
 """Teams endpoints for collaboration."""
 
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
+
+logger = logging.getLogger(__name__)
 
 from ..auth_simple import get_current_user
 from ..config import get_settings
@@ -80,7 +84,10 @@ async def invite_member(team_id: str, request: InviteRequest, user: dict = Depen
         if existing_role is not None:
             raise HTTPException(status_code=409, detail="User is already a team member")
         add_team_member(team_id, target_user["id"], "member")
-        send_team_added_email(request.email, team["name"], settings.frontend_base_url, inviter_name)
+        email_sent = send_team_added_email(request.email, team["name"], settings.frontend_base_url, inviter_name)
+        if not email_sent:
+            logger.error("Failed to send team-added notification email to %s for team %s", request.email, team_id)
+            raise HTTPException(status_code=502, detail="Member was added to the team but the notification email failed to send")
         return {"status": "added", "message": f"{request.email} has been added to the team"}
     else:
         # User is NOT registered — create invite token
@@ -92,7 +99,10 @@ async def invite_member(team_id: str, request: InviteRequest, user: dict = Depen
             team_role="member",
         )
         invite_url = f"{settings.frontend_base_url}/login?invite={invite['token']}"
-        send_team_invite_email(request.email, team["name"], invite_url, inviter_name)
+        email_sent = send_team_invite_email(request.email, team["name"], invite_url, inviter_name)
+        if not email_sent:
+            logger.error("Failed to send team invite email to %s for team %s", request.email, team_id)
+            raise HTTPException(status_code=502, detail="Invite was created but the email failed to send. Please try again.")
         return {"status": "invited", "message": f"Invite sent to {request.email}", "invite_url": invite_url}
 
 

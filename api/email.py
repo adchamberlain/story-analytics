@@ -2,11 +2,14 @@
 Email service for sending magic links.
 """
 
+import logging
 import os
 
 import resend
 
 from .config import get_settings
+
+logger = logging.getLogger(__name__)
 
 settings = get_settings()
 
@@ -222,7 +225,7 @@ def send_team_invite_email(
         })
         return True
     except Exception as e:
-        print(f"Failed to send team invite email: {e}")
+        logger.error("Failed to send team invite email to %s: %s", to_email, e)
         return False
 
 
@@ -284,5 +287,5 @@ def send_team_added_email(
         })
         return True
     except Exception as e:
-        print(f"Failed to send team added email: {e}")
+        logger.error("Failed to send team-added email to %s: %s", to_email, e)
         return False
