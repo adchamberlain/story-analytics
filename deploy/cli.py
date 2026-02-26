@@ -10,8 +10,10 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import os
 import secrets
 import sys
+from pathlib import Path
 
 from deploy.aws import (
     DEFAULT_STACK_NAME,
@@ -25,6 +27,23 @@ from deploy.aws import (
 )
 
 
+def _env_value(key: str) -> str:
+    """Read a value from environment or .env file."""
+    val = os.environ.get(key, "")
+    if val:
+        return val
+    env_path = Path(__file__).resolve().parent.parent / ".env"
+    if env_path.exists():
+        for line in env_path.read_text().splitlines():
+            line = line.strip()
+            if line.startswith("#") or "=" not in line:
+                continue
+            k, v = line.split("=", 1)
+            if k.strip() == key:
+                return v.strip()
+    return ""
+
+
 # ---------------------------------------------------------------------------
 # Commands
 # ---------------------------------------------------------------------------
@@ -34,23 +53,25 @@ def cmd_deploy(args: argparse.Namespace) -> None:
     print("Deploying Story Analytics to AWS...\n")
 
     # 1. Validate credentials
-    print("[1/6] Checking AWS credentials...")
+    print("[1/7] Checking AWS credentials...")
     if not validate_credentials():
         print("\nERROR: AWS credentials not configured.")
         print("  Run `aws configure` or export AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY.")
         sys.exit(1)
 
     # 2. Create ECR repo (must exist before CloudFormation, which needs an image)
-    print("\n[2/6] Ensuring ECR repository exists...")
+    print("\n[2/7] Ensuring ECR repository exists...")
     ecr_uri = ensure_ecr_repo(args.stack_name, args.region)
 
     # 3. Build and push Docker image (must be in ECR before App Runner starts)
-    print("\n[3/6] Building and pushing Docker image...")
+    print("\n[3/7] Building and pushing Docker image...")
     build_and_push_image(args.region, ecr_uri)
 
     # 4. Deploy CloudFormation stack (S3, RDS, App Runner pointing at the image)
     db_password = args.db_password or secrets.token_urlsafe(16)
-    print("\n[4/6] Deploying CloudFormation stack (this takes ~10 min for RDS)...")
+    resend_api_key = args.resend_api_key or _env_value("RESEND_API_KEY")
+    from_email = args.from_email or _env_value("FROM_EMAIL")
+    print("\n[4/7] Deploying CloudFormation stack (this takes ~10 min for RDS)...")
     outputs = deploy_stack(
         args.stack_name,
         args.region,
@@ -58,22 +79,41 @@ def cmd_deploy(args: argparse.Namespace) -> None:
         cpu=args.cpu,
         memory=args.memory,
         db_instance_class=args.db_instance_class,
+        resend_api_key=resend_api_key,
+        from_email=from_email,
     )
 
     if not outputs:
         print("\nERROR: Stack deployed but returned no outputs.")
         sys.exit(1)
 
-    # 5. Trigger App Runner deployment (ECR :latest push alone is unreliable)
-    print("\n[5/6] Triggering App Runner deployment...")
+    # 5. Set FRONTEND_BASE_URL now that we know the App URL
+    app_url = outputs.get("AppUrl", "")
+    if app_url:
+        print("\n[5/7] Setting FRONTEND_BASE_URL...")
+        deploy_stack(
+            args.stack_name,
+            args.region,
+            db_password,
+            cpu=args.cpu,
+            memory=args.memory,
+            db_instance_class=args.db_instance_class,
+            resend_api_key=resend_api_key,
+            from_email=from_email,
+            frontend_base_url=app_url,
+        )
+    else:
+        print("\n[5/7] WARNING: Could not determine App URL — FRONTEND_BASE_URL not set.")
+
+    # 6. Trigger App Runner deployment
+    print("\n[6/7] Triggering App Runner deployment...")
     trigger_apprunner_deploy(args.stack_name, args.region)
 
-    # 6. Print results
-    app_url = outputs.get("AppUrl", "(unknown)")
+    # 7. Print results
     s3_bucket = outputs.get("S3BucketName", "(unknown)")
     rds_endpoint = outputs.get("RDSEndpoint", "(unknown)")
 
-    print("\n[6/6] Deployment complete!\n")
+    print("\n[7/7] Deployment complete!\n")
     print("  App URL      :", app_url)
     print("  S3 Bucket    :", s3_bucket)
     print("  RDS Endpoint :", rds_endpoint)
@@ -186,6 +226,16 @@ def build_parser() -> argparse.ArgumentParser:
         "--db-instance-class",
         default="db.t4g.micro",
         help="RDS instance class (default: db.t4g.micro)",
+    )
+    p_deploy.add_argument(
+        "--resend-api-key",
+        default="",
+        help="Resend API key for emails (reads from .env if omitted)",
+    )
+    p_deploy.add_argument(
+        "--from-email",
+        default="",
+        help="Sender email address (reads from .env if omitted)",
     )
     p_deploy.set_defaults(func=cmd_deploy)
 

@@ -163,6 +163,9 @@ def deploy_stack(
     cpu: str = "1024",
     memory: str = "2048",
     db_instance_class: str = "db.t4g.micro",
+    resend_api_key: str = "",
+    from_email: str = "",
+    frontend_base_url: str = "",
 ) -> dict[str, str]:
     """Create or update the CloudFormation stack and return its outputs.
 
@@ -176,6 +179,12 @@ def deploy_stack(
         Master password for the RDS PostgreSQL instance.
     cpu, memory, db_instance_class : str
         Optional sizing overrides.
+    resend_api_key : str
+        Resend API key for outbound emails (optional).
+    from_email : str
+        Sender email address (optional).
+    frontend_base_url : str
+        Base URL for the frontend (set after initial deploy when App URL is known).
 
     Returns
     -------
@@ -192,6 +201,12 @@ def deploy_stack(
         {"ParameterKey": "AppRunnerCpu", "ParameterValue": cpu},
         {"ParameterKey": "AppRunnerMemory", "ParameterValue": memory},
     ]
+    if resend_api_key:
+        params.append({"ParameterKey": "ResendApiKey", "ParameterValue": resend_api_key})
+    if from_email:
+        params.append({"ParameterKey": "FromEmail", "ParameterValue": from_email})
+    if frontend_base_url:
+        params.append({"ParameterKey": "FrontendBaseUrl", "ParameterValue": frontend_base_url})
 
     # Decide create vs update
     action = _resolve_stack_action(cfn, stack_name)
