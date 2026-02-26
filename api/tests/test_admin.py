@@ -5,6 +5,8 @@ from api.main import app
 from api.services.metadata_db import (
     create_user, list_all_users, update_user_role,
     update_user_status, update_user_display_name, get_user_by_id,
+    create_invite, list_invites, get_invite_by_token, mark_invite_used, delete_invite,
+    get_admin_setting, set_admin_setting,
 )
 
 client = TestClient(app)
@@ -60,3 +62,52 @@ class TestUserManagementDB:
         assert result is True
         updated = get_user_by_id(user["id"])
         assert updated["display_name"] == "New Name"
+
+
+class TestInvitesDB:
+    def test_create_and_list_invites(self):
+        invite = create_invite("invite@test.com", "editor", "creator-id")
+        assert invite["email"] == "invite@test.com"
+        assert invite["role"] == "editor"
+        assert invite["token"]
+        invites = list_invites()
+        tokens = [i["token"] for i in invites]
+        assert invite["token"] in tokens
+
+    def test_get_invite_by_token(self):
+        invite = create_invite("token@test.com", "editor", "creator-id")
+        found = get_invite_by_token(invite["token"])
+        assert found is not None
+        assert found["email"] == "token@test.com"
+
+    def test_get_invite_by_token_expired(self):
+        invite = create_invite("expired@test.com", "editor", "creator-id")
+        from api.services.db import get_db
+        db = get_db()
+        db.execute(
+            "UPDATE invites SET expires_at = '2020-01-01T00:00:00' WHERE id = ?",
+            (invite["id"],),
+        )
+        assert get_invite_by_token(invite["token"]) is None
+
+    def test_mark_invite_used(self):
+        invite = create_invite("used@test.com", "editor", "creator-id")
+        mark_invite_used(invite["id"])
+        assert get_invite_by_token(invite["token"]) is None
+
+    def test_delete_invite(self):
+        invite = create_invite("delete@test.com", "editor", "creator-id")
+        result = delete_invite(invite["id"])
+        assert result is True
+        assert get_invite_by_token(invite["token"]) is None
+
+
+class TestAdminSettingsDB:
+    def test_default_open_registration(self):
+        val = get_admin_setting("open_registration")
+        assert val == "true"
+
+    def test_set_and_get_setting(self):
+        set_admin_setting("open_registration", "false")
+        assert get_admin_setting("open_registration") == "false"
+        set_admin_setting("open_registration", "true")
