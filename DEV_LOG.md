@@ -2,6 +2,28 @@
 
 ## 2026-02-25
 
+### Session 8: Team Email Invites & Deploy Fix
+
+**Goal:** Allow team admins to invite anyone by email (not just registered users), and fix unreliable App Runner deployments.
+
+**Deploy fix:**
+- `deploy/cli.py`: `cmd_deploy` now explicitly calls `trigger_apprunner_deploy()` after CloudFormation step. Root cause: pushing `:latest` to ECR doesn't reliably trigger App Runner auto-deployment, and CloudFormation returns "No updates to be performed" when only the image changed.
+
+**Team invites (6 commits):**
+- `api/services/metadata_db.py`: Added `team_id` and `team_role` columns to `invites` table with PostgreSQL-safe migration (`ADD COLUMN IF NOT EXISTS` for Postgres, try/except for SQLite). New function: `get_pending_team_invites()`
+- `api/email.py`: Two new email templates — `send_team_invite_email()` (unregistered users) and `send_team_added_email()` (registered users). Same dark theme as magic link emails.
+- `api/routers/teams.py`: Rewrote `POST /api/teams/{id}/invite` — registered users get added directly + notification email, unregistered users get invite token + invite email with registration link
+- `api/auth_simple.py`: Registration auto-joins team when invite token has `team_id`
+- `app/src/pages/SettingsPage.tsx`: Updated invite handler to show "Added to team" vs "Invite sent" with green success messages
+- 17 team tests passing, 28 admin tests passing (no regressions)
+
+**Bug found & fixed:** PostgreSQL migration crash — the try/except pattern for column detection poisons PostgreSQL transactions. Branched migration logic by DB type.
+
+**Design doc:** `docs/plans/2026-02-25-team-invites-design.md`
+**Implementation plan:** `docs/plans/2026-02-25-team-invites-plan.md`
+
+---
+
 ### Session 7: Admin User Management & Account Settings
 
 **Goal:** Transform the bare change-password Account section into a real admin panel with user lifecycle management, invite system, and role enforcement.
