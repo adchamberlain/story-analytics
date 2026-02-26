@@ -131,11 +131,15 @@ def _ensure_tables() -> None:
         );
     """)
     # Migrate invites table: add team columns if missing
-    try:
-        db.execute("SELECT team_id FROM invites LIMIT 0")
-    except Exception:
-        db.execute("ALTER TABLE invites ADD COLUMN team_id TEXT")
-        db.execute("ALTER TABLE invites ADD COLUMN team_role TEXT DEFAULT 'member'")
+    if db._is_postgres:
+        db.execute("ALTER TABLE invites ADD COLUMN IF NOT EXISTS team_id TEXT")
+        db.execute("ALTER TABLE invites ADD COLUMN IF NOT EXISTS team_role TEXT DEFAULT 'member'")
+    else:
+        try:
+            db.execute("SELECT team_id FROM invites LIMIT 0")
+        except Exception:
+            db.execute("ALTER TABLE invites ADD COLUMN team_id TEXT")
+            db.execute("ALTER TABLE invites ADD COLUMN team_role TEXT DEFAULT 'member'")
     _TABLES_CREATED = True
 
 
