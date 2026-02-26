@@ -10,27 +10,46 @@ Story Analytics is an open-source dashboarding tool that produces publication-re
 
 An AI assistant (Claude, GPT, or Gemini) is available to help write SQL, add calculated fields, and refine chart styling — but you're always in control.
 
+Ships with **The Perfect Dashboard** — a showcase of all 25 chart types with sample data, ready to explore the moment you start the app.
+
 ## Features
 
+### Charts & Visualization
 - **25 chart types** — Classic (bar, line, area, scatter, histogram, heatmap, box plot, pie, treemap, data table), Analytical (dot plot, range, bullet bar, small multiples, stacked/grouped column, split bars, arrow plot), Maps (choropleth, symbol, locator, spike), Specialty (KPI cards, election donut, multiple pies)
 - **Geographic maps** — 4 map types with basemap selection, zoom/pan, and label collision avoidance
 - **Observable Plot rendering** — Clean SVG output with publication-ready defaults
+- **Annotations** — Reference lines, text labels, and highlighted ranges with responsive scaling
+- **Custom themes** — 9 built-in themes, custom CSS, 50+ Google Fonts, and logo upload
+- **Color palettes** — Curated publication-ready palettes with professionally designed defaults
+
+### Editor & Data
 - **Visual chart editor** — Pick chart types, map columns, adjust colors and labels with instant live preview
 - **SQL workbench** — Write custom queries, see results in a data table, map columns to chart axes
-- **Drag-and-drop dashboards** — Responsive grid layout, drag to reposition, resize to adjust
-- **Any data source** — Snowflake, PostgreSQL, BigQuery, Google Sheets, or CSV upload
-- **AI assistant** — Claude, GPT, or Gemini helps with SQL, derived metrics, and chart refinement
-- **Export** — SVG, PNG, PDF, PowerPoint (PPTX), and CSV data download
-- **Portable HTML export** — Download a self-contained HTML dashboard you can host anywhere — GitHub Pages, Netlify, S3, or your own server
+- **Any data source** — Snowflake, PostgreSQL, BigQuery, Google Sheets, CSV upload, or paste data directly
 - **Data transforms** — Transpose, rename, delete, reorder, round, prepend/append, edit cells, cast types
 - **Version history** — Auto-save snapshots with one-click restore
-- **Annotations** — Reference lines, text labels, and highlighted ranges with responsive scaling
-- **API** — RESTful endpoints with key-based authentication
-- **Custom themes** — 9 built-in themes, custom CSS, 50+ Google Fonts, and logo upload
-- **KPI cards** — Single-number displays with comparison values, trend indicators, and color-coded deltas
-- **Color palettes** — Curated publication-ready palettes with professionally designed defaults
+- **Templates** — Save chart configurations as reusable templates
+- **Folders** — Organize charts and dashboards into folders
+
+### Dashboards & Export
+- **Drag-and-drop dashboards** — Responsive grid layout, drag to reposition, resize to adjust
+- **Export** — SVG, PNG, PDF, PowerPoint (PPTX), and CSV data download with embedded fonts for standalone rendering
+- **Portable HTML export** — Download a self-contained HTML dashboard you can host anywhere — GitHub Pages, Netlify, S3, or your own server
+
+### AI Assistant
+- **Multi-provider** — Claude, GPT, or Gemini helps with SQL, derived metrics, and chart refinement
+- **Natural language** — Ask the AI to write queries, add calculated fields, or adjust chart styling
+
+### Auth & Collaboration
+- **Authentication** — Email-based magic link login with automatic user creation
+- **Teams** — Create teams, add members, assign roles (admin/member)
+- **Comments** — Threaded comments on charts and dashboards
+- **API keys** — Generate scoped API keys for programmatic access
+
+### Deployment
+- **Local-first** — Run locally with file-based JSON storage, no cloud account required
+- **Cloud-ready** — Deploy to AWS with the included CloudFormation template, Docker images, and S3 storage backend
 - **Dark mode** — Full light/dark theme support
-- **Local-first** — All data stays on your machine, stored as JSON files
 
 ## Quick Start
 
@@ -51,15 +70,15 @@ cp .env.example .env
 ./dev.sh
 ```
 
-Open **http://localhost:3001** to start building.
+Open **http://localhost:3001** to start building. The Perfect Dashboard with 25 example charts loads automatically on first run.
 
 ## How It Works
 
-1. **Connect your data** — Upload a CSV or connect to Snowflake, PostgreSQL, or BigQuery. Data is ingested into a local DuckDB engine for fast queries.
+1. **Connect your data** — Upload a CSV, paste data, link a Google Sheet, or connect to Snowflake, PostgreSQL, or BigQuery. Data is ingested into a local DuckDB engine for fast queries.
 
 2. **Build your charts** — Use the visual editor to pick a chart type, map columns, and style your output. Switch to SQL mode for custom queries. The AI assistant can help write SQL and refine formatting.
 
-3. **Assemble dashboards** — Drag charts onto a responsive grid, arrange the layout, and save. Share via link or export as SVG, PNG, PDF, or PowerPoint.
+3. **Assemble dashboards** — Drag charts onto a responsive grid, arrange the layout, and save. Export as SVG, PNG, PDF, PowerPoint, or a portable HTML file you can host anywhere.
 
 ## AI Providers
 
@@ -77,6 +96,29 @@ The AI assistant helps with:
 - Adjusting chart configuration (axis labels, colors, formatting)
 - Suggesting chart improvements
 
+## Deployment
+
+### Local (default)
+
+Run locally with `./dev.sh`. All data stored as JSON files in `data/`.
+
+### Cloud (AWS)
+
+Deploy to AWS using the included infrastructure:
+
+```bash
+cd deploy && ./deploy.sh
+```
+
+See **[docs/deploy-aws.md](docs/deploy-aws.md)** for a step-by-step guide covering VPC, RDS PostgreSQL, S3 storage, ECR, and App Runner.
+
+### Docker
+
+```bash
+docker build -f Dockerfile.prod -t story-analytics .
+docker run -p 8000:8000 story-analytics
+```
+
 ## Architecture
 
 ```
@@ -88,16 +130,17 @@ story-analytics/
 │       ├── stores/         # Zustand state management
 │       └── types/          # TypeScript interfaces
 ├── api/                    # FastAPI backend
-│   ├── routers/            # REST endpoints
+│   ├── routers/            # REST endpoints (charts, data, auth, teams)
 │   └── services/           # Storage, DuckDB, connectors
 ├── engine/                 # LLM integration layer
 │   ├── v2/                 # Chart proposer and editor
 │   └── prompts/            # YAML prompt templates
+├── deploy/                 # AWS CloudFormation + deploy scripts
 ├── data/                   # Local data storage (gitignored)
+│   ├── seed/               # Example dashboard + charts (committed)
 │   ├── uploads/            # Uploaded CSV files
 │   ├── charts/             # Saved chart configs (JSON)
-│   ├── dashboards/         # Saved dashboard layouts (JSON)
-│   └── settings.json       # App settings (API keys, provider)
+│   └── dashboards/         # Saved dashboard layouts (JSON)
 └── website/                # Marketing site (storyanalytics.ai)
 ```
 
@@ -109,8 +152,11 @@ story-analytics/
 | Frontend | React 18, TypeScript, Tailwind CSS v4, Zustand |
 | Backend | FastAPI, Python |
 | SQL Engine | DuckDB (in-process) |
+| Database | SQLite (local) or PostgreSQL (cloud) |
+| Storage | Local filesystem or S3 |
 | Dashboards | react-grid-layout v2 |
-| Connectors | Snowflake, PostgreSQL, BigQuery |
+| Connectors | Snowflake, PostgreSQL, BigQuery, Google Sheets |
+| Deploy | Docker, AWS CloudFormation, App Runner |
 
 ## Requirements
 
