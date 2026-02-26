@@ -545,6 +545,14 @@ interface TeamMember {
   joined_at: string
 }
 
+interface TeamInvite {
+  id: string
+  email: string
+  team_role: string
+  created_by: string
+  expires_at: string
+}
+
 interface Team {
   id: string
   name: string
@@ -561,6 +569,7 @@ function TeamManager() {
   const [creating, setCreating] = useState(false)
   const [expandedTeamId, setExpandedTeamId] = useState<string | null>(null)
   const [membersByTeam, setMembersByTeam] = useState<Record<string, TeamMember[]>>({})
+  const [invitesByTeam, setInvitesByTeam] = useState<Record<string, TeamInvite[]>>({})
   const [inviteEmail, setInviteEmail] = useState('')
   const [inviting, setInviting] = useState(false)
   const [inviteError, setInviteError] = useState('')
@@ -581,6 +590,15 @@ function TeamManager() {
     } catch { /* ignore */ }
   }
 
+  const loadInvites = async (teamId: string) => {
+    try {
+      const res = await authFetch(`/api/teams/${teamId}/invites`)
+      if (!res.ok) return
+      const data = await res.json()
+      setInvitesByTeam((prev) => ({ ...prev, [teamId]: data }))
+    } catch { /* ignore */ }
+  }
+
   const toggleExpand = (teamId: string) => {
     if (expandedTeamId === teamId) {
       setExpandedTeamId(null)
@@ -589,6 +607,7 @@ function TeamManager() {
       setInviteEmail('')
       setInviteError('')
       if (!membersByTeam[teamId]) loadMembers(teamId)
+      loadInvites(teamId)
     }
   }
 
@@ -626,6 +645,8 @@ function TeamManager() {
       setInviteEmail('')
       if (data.status === 'added') {
         await loadMembers(teamId)
+      } else {
+        await loadInvites(teamId)
       }
       setInviteError(data.status === 'added' ? '✓ Added to team' : '✓ Invite sent')
       setTimeout(() => setInviteError(''), 3000)
@@ -643,6 +664,17 @@ function TeamManager() {
       setMembersByTeam((prev) => ({
         ...prev,
         [teamId]: (prev[teamId] || []).filter((m) => m.user_id !== userId),
+      }))
+    } catch { /* ignore */ }
+  }
+
+  const handleCancelInvite = async (teamId: string, inviteId: string) => {
+    try {
+      const res = await authFetch(`/api/teams/${teamId}/invites/${inviteId}`, { method: 'DELETE' })
+      if (!res.ok) return
+      setInvitesByTeam((prev) => ({
+        ...prev,
+        [teamId]: (prev[teamId] || []).filter((inv) => inv.id !== inviteId),
       }))
     } catch { /* ignore */ }
   }
@@ -770,6 +802,32 @@ function TeamManager() {
                             </div>
                           )
                         })}
+                      </div>
+                    )}
+
+                    {/* Pending invites (visible to admins) */}
+                    {admin && (invitesByTeam[t.id] || []).length > 0 && (
+                      <div className="flex flex-col gap-1.5 mb-3">
+                        <p className="text-[12px] text-text-muted uppercase tracking-wide font-medium mt-1">Pending Invites</p>
+                        {(invitesByTeam[t.id] || []).map((inv) => (
+                          <div
+                            key={inv.id}
+                            className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-surface-raised/50 transition-colors"
+                          >
+                            <div className="flex items-center gap-2.5">
+                              <span className="text-[14px] text-text-primary">{inv.email}</span>
+                              <span className="text-[11px] font-semibold uppercase px-2 py-0.5 rounded-md bg-yellow-500/15 text-yellow-400">
+                                Pending
+                              </span>
+                            </div>
+                            <button
+                              onClick={() => handleCancelInvite(t.id, inv.id)}
+                              className="text-[12px] text-red-500 hover:text-red-400 transition-colors"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        ))}
                       </div>
                     )}
 
