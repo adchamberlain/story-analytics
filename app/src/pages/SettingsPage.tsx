@@ -622,8 +622,13 @@ function TeamManager() {
         const body = await res.json().catch(() => ({ detail: 'Failed to invite' }))
         throw new Error(body.detail)
       }
+      const data = await res.json()
       setInviteEmail('')
-      await loadMembers(teamId)
+      if (data.status === 'added') {
+        await loadMembers(teamId)
+      }
+      setInviteError(data.status === 'added' ? '✓ Added to team' : '✓ Invite sent')
+      setTimeout(() => setInviteError(''), 3000)
     } catch (err) {
       setInviteError(err instanceof Error ? err.message : 'Failed to invite')
     } finally {
@@ -789,7 +794,7 @@ function TeamManager() {
                           </button>
                         </div>
                         {inviteError && (
-                          <p className="text-[12px] text-red-400 mt-1.5">{inviteError}</p>
+                          <p className={`text-[12px] mt-1.5 ${inviteError.startsWith('✓') ? 'text-green-400' : 'text-red-400'}`}>{inviteError}</p>
                         )}
                       </div>
                     )}
@@ -1141,7 +1146,7 @@ function AdminUsersSection() {
                 </div>
 
                 {inviteError && (
-                  <p className="text-[13px] text-red-400">{inviteError}</p>
+                  <p className={`text-[13px] ${inviteError.startsWith('✓') ? 'text-green-400' : 'text-red-400'}`}>{inviteError}</p>
                 )}
 
                 <div className="flex gap-2 pt-2">
