@@ -19,12 +19,35 @@ class ColumnInfo:
 
 
 @dataclass
+class SchemaColumn:
+    """Column metadata within a schema introspection result."""
+    name: str
+    type: str
+
+
+@dataclass
+class SchemaTable:
+    """Table metadata within a schema introspection result."""
+    name: str
+    columns: list[SchemaColumn]
+    row_count: int | None = None
+
+
+@dataclass
+class SchemaInfo:
+    """Schema (namespace) metadata containing its tables."""
+    name: str
+    tables: list[SchemaTable]
+
+
+@dataclass
 class ConnectorResult:
     """Result of a connector operation."""
     success: bool
     message: str = ""
     tables: list[str] = field(default_factory=list)
     columns: list[ColumnInfo] = field(default_factory=list)
+    schemas: list[SchemaInfo] = field(default_factory=list)
 
 
 class DatabaseConnector(ABC):
@@ -80,6 +103,16 @@ class DatabaseConnector(ABC):
 
         Returns:
             ConnectorResult with columns populated.
+        """
+        ...
+
+    @abstractmethod
+    def list_schemas(self, credentials: dict) -> ConnectorResult:
+        """
+        List all schemas with their tables and column metadata.
+
+        Returns:
+            ConnectorResult with schemas populated.
         """
         ...
 

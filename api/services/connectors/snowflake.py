@@ -8,7 +8,7 @@ import os
 import tempfile
 from pathlib import Path
 
-from .base import DatabaseConnector, ColumnInfo, ConnectorResult
+from .base import DatabaseConnector, ColumnInfo, ConnectorResult, SchemaColumn, SchemaTable, SchemaInfo
 
 
 class SnowflakeConnector(DatabaseConnector):
@@ -78,6 +78,49 @@ class SnowflakeConnector(DatabaseConnector):
     def _quote_identifier(name: str) -> str:
         """Quote a Snowflake identifier (table/column name) safely."""
         return '"' + name.replace('"', '""') + '"'
+
+    def list_schemas(self, credentials: dict) -> ConnectorResult:
+        conn = None
+        try:
+            import snowflake.connector
+            conn = snowflake.connector.connect(**self._get_connect_kwargs(credentials))
+            cursor = conn.cursor()
+
+            # Get all schemas in the database
+            cursor.execute("SHOW SCHEMAS")
+            schema_names = [row[1] for row in cursor.fetchall()]
+
+            schemas: list[SchemaInfo] = []
+            for schema_name in schema_names:
+                # Get tables in this schema (row count is at index 8)
+                cursor.execute(f"SHOW TABLES IN SCHEMA {self._quote_identifier(schema_name)}")
+                table_rows = cursor.fetchall()
+
+                tables: list[SchemaTable] = []
+                for trow in table_rows:
+                    table_name = trow[1]
+                    row_count = trow[8] if len(trow) > 8 else None
+
+                    # Get columns for this table
+                    cursor.execute(
+                        f"DESCRIBE TABLE {self._quote_identifier(schema_name)}"
+                        f".{self._quote_identifier(table_name)}"
+                    )
+                    columns = [
+                        SchemaColumn(name=crow[0], type=crow[1])
+                        for crow in cursor.fetchall()
+                    ]
+                    tables.append(SchemaTable(name=table_name, columns=columns, row_count=row_count))
+
+                schemas.append(SchemaInfo(name=schema_name, tables=tables))
+
+            cursor.close()
+            return ConnectorResult(success=True, schemas=schemas)
+        except Exception as e:
+            return ConnectorResult(success=False, message=f"Failed to list schemas: {e}")
+        finally:
+            if conn:
+                conn.close()
 
     def get_table_schema(self, table: str, credentials: dict) -> ConnectorResult:
         conn = None

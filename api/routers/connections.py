@@ -3,11 +3,14 @@ Connections router: database connection management and data sync.
 Supports Snowflake, PostgreSQL, and BigQuery via pluggable connectors.
 """
 
+import calendar
+import json
 import os
+import time
 import traceback
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from ..auth_simple import get_current_user
@@ -30,6 +33,10 @@ from ..services.duckdb_service import get_duckdb_service
 router = APIRouter(prefix="/connections", tags=["connections"])
 
 CACHE_DIR = Path(__file__).parent.parent.parent / "data" / "snowflake_saas"
+_SCHEMA_CACHE_DIR = Path(__file__).parent.parent.parent / "data" / "schema_cache"
+
+# Schema cache staleness threshold (1 hour)
+_SCHEMA_CACHE_MAX_AGE_SECONDS = 3600
 
 
 # ── Request / Response Schemas ───────────────────────────────────────────────
@@ -81,6 +88,25 @@ class SyncResponse(BaseModel):
 
 class ConnectorTypesResponse(BaseModel):
     types: list[dict]
+
+
+class SchemaColumnResponse(BaseModel):
+    name: str
+    type: str
+
+class SchemaTableResponse(BaseModel):
+    name: str
+    columns: list[SchemaColumnResponse]
+    row_count: int | None = None
+
+class SchemaInfoResponse(BaseModel):
+    name: str
+    tables: list[SchemaTableResponse]
+
+class SchemaResponse(BaseModel):
+    schemas: list[SchemaInfoResponse]
+    cached_at: str
+    stale: bool = False
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
@@ -355,4 +381,100 @@ async def sync_tables(connection_id: str, request: SyncRequest, user: dict = Dep
             )
             for r in sync_results
         ]
+    )
+
+
+@router.post("/{connection_id}/schema", response_model=SchemaResponse)
+async def get_schema(
+    connection_id: str,
+    refresh: bool = Query(False, description="Force re-fetch from database"),
+    user: dict = Depends(get_current_user),
+):
+    """
+    Get full schema introspection (schemas, tables, columns) for a connection.
+
+    Returns cached data if available. Set refresh=true to force re-fetch.
+    Cached data older than 1 hour is marked stale but still returned.
+    """
+    conn = load_connection(connection_id)
+    if not conn:
+        raise HTTPException(status_code=404, detail="Connection not found")
+
+    cache_file = _SCHEMA_CACHE_DIR / f"{connection_id}.json"
+
+    # Return cached data if available and not forcing refresh
+    if not refresh and cache_file.exists():
+        try:
+            cached = json.loads(cache_file.read_text())
+            cached_at = cached.get("cached_at", "")
+
+            # Determine staleness
+            stale = False
+            if cached_at:
+                try:
+                    cached_ts = calendar.timegm(time.strptime(cached_at, "%Y-%m-%dT%H:%M:%SZ"))
+                    stale = (time.time() - cached_ts) > _SCHEMA_CACHE_MAX_AGE_SECONDS
+                except (ValueError, OverflowError):
+                    stale = True
+
+            return SchemaResponse(
+                schemas=[SchemaInfoResponse(**s) for s in cached["schemas"]],
+                cached_at=cached_at,
+                stale=stale,
+            )
+        except (json.JSONDecodeError, KeyError):
+            pass  # Corrupted cache — fall through to re-fetch
+
+    # Fetch fresh schema from database
+    try:
+        connector = get_connector(conn.db_type)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    # Build credentials from stored + config
+    creds = {**conn.config}
+    stored = load_credentials(connection_id)
+    if stored:
+        creds.update(stored)
+
+    try:
+        result = connector.list_schemas(creds)
+    except ImportError as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Required library not installed for {conn.db_type}: {e}",
+        )
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Schema introspection failed: {e}")
+
+    if not result.success:
+        raise HTTPException(status_code=500, detail=result.message)
+
+    # Build response
+    cached_at = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    schema_dicts = [
+        {
+            "name": s.name,
+            "tables": [
+                {
+                    "name": t.name,
+                    "columns": [{"name": c.name, "type": c.type} for c in t.columns],
+                    "row_count": t.row_count,
+                }
+                for t in s.tables
+            ],
+        }
+        for s in result.schemas
+    ]
+
+    # Cache to disk
+    _SCHEMA_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    cache_data = {"schemas": schema_dicts, "cached_at": cached_at}
+    cache_file.write_text(json.dumps(cache_data, indent=2))
+
+    return SchemaResponse(
+        schemas=[SchemaInfoResponse(**s) for s in schema_dicts],
+        cached_at=cached_at,
+        stale=False,
     )
