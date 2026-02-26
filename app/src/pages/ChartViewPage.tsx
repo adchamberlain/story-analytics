@@ -3,7 +3,7 @@ import { useParams, useSearchParams, Link } from 'react-router-dom'
 import { authFetch } from '../utils/authFetch'
 import { ChartWrapper } from '../components/charts/ChartWrapper'
 import { ObservableChartFactory } from '../components/charts/ObservableChartFactory'
-import { SharePanel } from '../components/sharing/SharePanel'
+import { ChartShareModal } from '../components/sharing/ChartShareModal'
 import { ThemeToggle } from '../components/layout/ThemeToggle'
 import { buildChartConfig } from '../utils/buildChartConfig'
 import type { ChartType } from '../types/chart'
@@ -38,6 +38,7 @@ export function ChartViewPage() {
   const [chartData, setChartData] = useState<ChartData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [showShareModal, setShowShareModal] = useState(false)
 
   useEffect(() => {
     if (!chartId) return
@@ -115,6 +116,12 @@ export function ChartViewPage() {
           </Link>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowShareModal(true)}
+            className="text-sm px-3 py-1.5 rounded border border-border-default text-text-on-surface hover:bg-surface-secondary transition-colors"
+          >
+            Share
+          </button>
           <Link
             to={`/editor/${chartId}`}
             className="text-sm px-3 py-1.5 rounded border border-border-default text-text-on-surface hover:bg-surface-secondary transition-colors"
@@ -145,14 +152,20 @@ export function ChartViewPage() {
           </ChartWrapper>
         </div>
 
-        {/* Sharing controls */}
-        <div className="mt-4 flex justify-end">
-          <SharePanel
-            chartId={chart.id}
-            published={chart.status === 'published'}
-          />
-        </div>
       </main>
+
+      {showShareModal && (
+        <ChartShareModal
+          chartId={chart.id}
+          status={chart.status}
+          onClose={() => setShowShareModal(false)}
+          onStatusChange={(newStatus) => {
+            setChartData((prev) =>
+              prev ? { ...prev, chart: { ...prev.chart, status: newStatus } } : prev
+            )
+          }}
+        />
+      )}
     </div>
   )
 }
