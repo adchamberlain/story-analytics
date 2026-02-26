@@ -9,7 +9,7 @@ from pathlib import Path
 
 import re as _re
 
-from .base import DatabaseConnector, ColumnInfo, ConnectorResult
+from .base import DatabaseConnector, ColumnInfo, ConnectorResult, SchemaColumn, SchemaTable, SchemaInfo
 
 _SAFE_SCHEMA_RE = _re.compile(r'^[a-zA-Z_][a-zA-Z0-9_$]*$')
 
@@ -77,6 +77,68 @@ class PostgresConnector(DatabaseConnector):
             return ConnectorResult(success=True, tables=tables)
         except Exception as e:
             return ConnectorResult(success=False, message=f"Failed to list tables: {e}")
+        finally:
+            if conn:
+                conn.close()
+
+    def list_schemas(self, credentials: dict) -> ConnectorResult:
+        conn = None
+        try:
+            conn = self._connect(credentials)
+            cursor = conn.cursor()
+
+            # Get all user-visible schemas (exclude system schemas)
+            cursor.execute(
+                "SELECT schema_name FROM information_schema.schemata "
+                "WHERE schema_name NOT LIKE 'pg_%' "
+                "AND schema_name != 'information_schema' "
+                "ORDER BY schema_name"
+            )
+            schema_names = [row[0] for row in cursor.fetchall()]
+
+            schemas: list[SchemaInfo] = []
+            for schema_name in schema_names:
+                # Get tables in this schema
+                cursor.execute(
+                    "SELECT table_name FROM information_schema.tables "
+                    "WHERE table_schema = %s AND table_type = 'BASE TABLE' "
+                    "ORDER BY table_name",
+                    (schema_name,),
+                )
+                table_names = [row[0] for row in cursor.fetchall()]
+
+                tables: list[SchemaTable] = []
+                for table_name in table_names:
+                    # Get columns for this table
+                    cursor.execute(
+                        "SELECT column_name, data_type FROM information_schema.columns "
+                        "WHERE table_schema = %s AND table_name = %s "
+                        "ORDER BY ordinal_position",
+                        (schema_name, table_name),
+                    )
+                    columns = [
+                        SchemaColumn(name=row[0], type=row[1])
+                        for row in cursor.fetchall()
+                    ]
+                    tables.append(SchemaTable(name=table_name, columns=columns))
+
+                # Get approximate row counts for all tables in this schema (fast)
+                cursor.execute(
+                    "SELECT relname, n_live_tup FROM pg_stat_user_tables "
+                    "WHERE schemaname = %s",
+                    (schema_name,),
+                )
+                row_counts = {row[0]: row[1] for row in cursor.fetchall()}
+
+                for table in tables:
+                    table.row_count = row_counts.get(table.name)
+
+                schemas.append(SchemaInfo(name=schema_name, tables=tables))
+
+            cursor.close()
+            return ConnectorResult(success=True, schemas=schemas)
+        except Exception as e:
+            return ConnectorResult(success=False, message=f"Failed to list schemas: {e}")
         finally:
             if conn:
                 conn.close()
