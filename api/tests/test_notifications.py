@@ -14,6 +14,14 @@ class TestNotifications:
         """Ensure default user exists for FK constraints."""
         self.user_id = ensure_default_user()
 
+    def teardown_method(self):
+        """Clean up test notifications to avoid polluting the default user's inbox."""
+        db = get_db()
+        db.execute(
+            "DELETE FROM notifications WHERE user_id = ? AND type != 'onboarding_tip'",
+            (self.user_id,),
+        )
+
     def test_create_notification(self):
         notif = create_notification(self.user_id, "comment", {"message": "New comment on your chart"})
         assert notif["type"] == "comment"
@@ -68,14 +76,14 @@ class TestOnboardingTips:
         seed_onboarding_tips(self.user_id)
         notifs = list_notifications(self.user_id)
         tips = [n for n in notifs if n["type"] == "onboarding_tip"]
-        assert len(tips) == 5
+        assert len(tips) == 10  # 14 when AUTH_ENABLED=true (cloud deploy)
 
     def test_seed_is_idempotent(self):
         seed_onboarding_tips(self.user_id)
         seed_onboarding_tips(self.user_id)
         notifs = list_notifications(self.user_id)
         tips = [n for n in notifs if n["type"] == "onboarding_tip"]
-        assert len(tips) == 5
+        assert len(tips) == 10  # 14 when AUTH_ENABLED=true (cloud deploy)
 
     def test_tips_have_action_urls(self):
         seed_onboarding_tips(self.user_id)
@@ -90,9 +98,9 @@ class TestOnboardingTips:
         notifs = list_notifications(self.user_id)
         tips = [n for n in notifs if n["type"] == "onboarding_tip"]
         timestamps = [t["created_at"] for t in tips]
-        assert len(set(timestamps)) == 5
+        assert len(set(timestamps)) == 10  # 14 when AUTH_ENABLED=true
 
     def test_tips_are_unread(self):
         seed_onboarding_tips(self.user_id)
         count = get_unread_count(self.user_id)
-        assert count >= 5
+        assert count >= 10

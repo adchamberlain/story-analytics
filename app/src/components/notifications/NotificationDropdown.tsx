@@ -8,6 +8,15 @@ const ICON_MAP: Record<string, string> = {
   chart: '\u{1F4CA}',
   dashboard: '\u{1F4CB}',
   palette: '\u{1F3A8}',
+  key: '\u{1F511}',
+  brain: '\u{1F9E0}',
+  sparkles: '\u{2728}',
+  types: '\u{1F4C8}',
+  transform: '\u{1F504}',
+  download: '\u{1F4E5}',
+  share: '\u{1F517}',
+  team: '\u{1F465}',
+  globe: '\u{1F30D}',
 }
 
 interface NotificationDropdownProps {

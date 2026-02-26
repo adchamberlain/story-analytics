@@ -7,6 +7,7 @@ import { CHART_THEMES } from '../themes/chartThemes'
 import { useLocaleStore, SUPPORTED_LOCALES } from '../stores/localeStore'
 import { useAuthStore } from '../stores/authStore'
 import { useNotificationStore } from '../stores/notificationStore'
+import { DeployTeaser } from '../components/DeployPrompt'
 
 const PROVIDERS = [
   { id: 'anthropic', label: 'Anthropic', sublabel: 'Claude', keyField: 'anthropic_api_key' as const },
@@ -345,6 +346,13 @@ interface ApiKey {
 }
 
 function ApiKeyManager() {
+  const { authEnabled } = useAuthStore()
+  if (!authEnabled) return (
+    <DeployTeaser
+      title="API Keys"
+      description="Generate API keys to build charts programmatically with Claude Code or integrate Story Analytics into your workflow."
+    />
+  )
   const [keys, setKeys] = useState<ApiKey[]>([])
   const [newKeyName, setNewKeyName] = useState('')
   const [createdKey, setCreatedKey] = useState<string | null>(null)
@@ -507,7 +515,12 @@ interface Team {
 
 function TeamManager() {
   const { authEnabled, user } = useAuthStore()
-  if (!authEnabled) return null
+  if (!authEnabled) return (
+    <DeployTeaser
+      title="Teams"
+      description="Create teams, invite collaborators, and manage member roles. Coordinate on dashboards and charts together."
+    />
+  )
   const [teams, setTeams] = useState<Team[]>([])
   const [newTeamName, setNewTeamName] = useState('')
   const [creating, setCreating] = useState(false)
@@ -897,7 +910,12 @@ function AdminUsersSection() {
     }).catch(() => setLoading(false))
   }, [isAdmin])
 
-  if (!isAdmin) return null
+  if (!isAdmin) return (
+    <DeployTeaser
+      title="User Management"
+      description="Invite users, manage roles and permissions, and control registration settings for your organization."
+    />
+  )
 
   const handleRoleChange = async (userId: string, newRole: string) => {
     const res = await authFetch(`/api/admin/users/${userId}/role`, {

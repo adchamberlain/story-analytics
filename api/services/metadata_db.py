@@ -744,6 +744,8 @@ def mark_notification_read(notification_id: str, user_id: str) -> bool:
 
 def seed_onboarding_tips(user_id: str) -> None:
     """Seed onboarding tips for a new user. Idempotent — skips if already seeded."""
+    import os
+
     _ensure_tables()
     db = get_db()
     row = db.fetchone(
@@ -752,6 +754,8 @@ def seed_onboarding_tips(user_id: str) -> None:
     )
     if row and row["cnt"] > 0:
         return
+
+    auth_enabled = os.environ.get("AUTH_ENABLED", "false").lower() == "true"
 
     tips = [
         {
@@ -779,8 +783,54 @@ def seed_onboarding_tips(user_id: str) -> None:
             "action_url": "/settings/themes",
             "icon": "palette",
         },
+        {
+            "message": "Add your AI provider keys. Connect Anthropic, OpenAI, or Gemini to power AI-generated charts.",
+            "action_url": "/settings",
+            "icon": "brain",
+        },
+        {
+            "message": "Try AI chart suggestions. Describe what you want to see in plain English and let AI build the chart.",
+            "action_url": "/editor/new/source",
+            "icon": "sparkles",
+        },
+        {
+            "message": "Explore 25 chart types. Try a treemap, scatter plot, area chart, and more.",
+            "action_url": "/editor/new/source",
+            "icon": "types",
+        },
+        {
+            "message": "Transform your data. Sort, filter, pivot, and aggregate right in the editor — no code needed.",
+            "action_url": "/editor/new/source",
+            "icon": "transform",
+        },
+        {
+            "message": "Export and download. Save any chart as PNG, PDF, or PowerPoint. Export data as CSV.",
+            "action_url": "/dashboards",
+            "icon": "download",
+        },
     ]
-    offsets = [0, 2, 5, 10, 20]
+    if auth_enabled:
+        tips.append({
+            "message": "Create an API key and use Claude Code to build charts programmatically.",
+            "action_url": "/settings",
+            "icon": "key",
+        })
+        tips.append({
+            "message": "Share your work. Embed a chart with an iframe or send a dashboard link to a friend.",
+            "action_url": "/dashboards",
+            "icon": "share",
+        })
+        tips.append({
+            "message": "Invite your team. Add collaborators to view, comment, or edit your dashboards.",
+            "action_url": "/settings",
+            "icon": "team",
+        })
+        tips.append({
+            "message": "Set a locale. Publishing for an international audience? Set number and date formats for your region.",
+            "action_url": "/settings",
+            "icon": "globe",
+        })
+    offsets = [0, 2, 5, 10, 20, 30, 45, 60, 90, 120, 180, 240, 360, 480][:len(tips)]
     now = datetime.now(timezone.utc)
     for tip, offset_min in zip(tips, offsets):
         notif_id = uuid.uuid4().hex[:12]

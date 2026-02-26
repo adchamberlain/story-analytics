@@ -710,7 +710,7 @@ function ChartCard({
       <div className="flex-1" />
 
       {/* Actions */}
-      <div className="flex items-center gap-3" style={{ marginTop: '24px', paddingTop: '20px', borderTop: '1px solid var(--color-border-subtle)' }}>
+      <div className="flex items-center gap-3 flex-wrap" style={{ marginTop: '24px', paddingTop: '20px', borderTop: '1px solid var(--color-border-subtle)' }}>
         {isArchived ? (
           /* Archived card actions: Restore + Delete */
           <>
@@ -721,9 +721,8 @@ function ChartCard({
             >
               {archiving ? 'Restoring...' : 'Restore'}
             </button>
-            <div className="flex-1" />
             {confirming ? (
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-[13px] text-red-400 font-medium">Delete?</span>
                 <button
                   onClick={(e) => { e.preventDefault(); e.stopPropagation(); onConfirmDelete() }}
@@ -749,7 +748,7 @@ function ChartCard({
             )}
           </>
         ) : (
-          /* Active card actions: Edit, Move, Duplicate, Archive, Delete */
+          /* Active card actions: Edit, Duplicate, Move, Archive, Delete */
           <>
             <Link
               to={`/editor/${chart.id}`}
@@ -758,11 +757,18 @@ function ChartCard({
             >
               Edit
             </Link>
+            <button
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDuplicate() }}
+              disabled={duplicating}
+              className="text-[13px] px-4 py-2 rounded-lg border border-border-default text-text-on-surface hover:bg-surface-secondary transition-colors font-medium disabled:opacity-50"
+            >
+              {duplicating ? 'Duplicating...' : 'Duplicate'}
+            </button>
             {/* Move to folder */}
             <div className="relative">
               <button
                 onClick={(e) => { e.preventDefault(); e.stopPropagation(); onToggleMoveMenu() }}
-                className="text-[13px] px-3 py-2 rounded-lg text-text-muted hover:text-text-secondary transition-colors font-medium"
+                className="text-[13px] px-4 py-2 rounded-lg border border-border-default text-text-on-surface hover:bg-surface-secondary transition-colors font-medium"
                 title="Move to folder"
               >
                 Move
@@ -796,13 +802,6 @@ function ChartCard({
               )}
             </div>
             <button
-              onClick={(e) => { e.preventDefault(); e.stopPropagation(); onDuplicate() }}
-              disabled={duplicating}
-              className="text-[13px] px-4 py-2 rounded-lg border border-border-default text-text-on-surface hover:bg-surface-secondary transition-colors font-medium disabled:opacity-50"
-            >
-              {duplicating ? 'Duplicating...' : 'Duplicate'}
-            </button>
-            <button
               onClick={(e) => { e.preventDefault(); e.stopPropagation(); onArchive() }}
               disabled={archiving}
               className="text-[13px] px-3 py-2 rounded-lg text-amber-500 hover:text-amber-400 transition-colors font-medium disabled:opacity-50"
@@ -810,7 +809,6 @@ function ChartCard({
             >
               {archiving ? 'Archiving...' : 'Archive'}
             </button>
-            <div className="flex-1" />
             {confirming ? (
               <div className="flex items-center gap-2">
                 <span className="text-[13px] text-red-400 font-medium">Delete?</span>
