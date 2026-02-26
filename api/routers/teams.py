@@ -10,7 +10,7 @@ from ..services.metadata_db import (
     create_team, list_teams, get_team, get_team_members,
     add_team_member, remove_team_member, delete_team,
     get_user_by_email, get_team_member_role,
-    create_invite, get_pending_team_invites,
+    create_invite,
 )
 
 router = APIRouter(prefix="/teams", tags=["teams"])
