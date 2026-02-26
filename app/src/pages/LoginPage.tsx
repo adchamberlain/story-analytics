@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuthStore } from '../stores/authStore'
 import { LogoMark } from '../components/brand/Logo'
 
@@ -8,6 +8,8 @@ import { LogoMark } from '../components/brand/Logo'
  */
 export function LoginPage() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const inviteToken = searchParams.get('invite')
   const { login, register, user, checkStatus } = useAuthStore()
 
   // Redirect to home if already logged in
@@ -19,7 +21,7 @@ export function LoginPage() {
     if (user) navigate('/', { replace: true })
   }, [user, navigate])
 
-  const [mode, setMode] = useState<'login' | 'register'>('login')
+  const [mode, setMode] = useState<'login' | 'register'>(inviteToken ? 'register' : 'login')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [displayName, setDisplayName] = useState('')
@@ -35,7 +37,7 @@ export function LoginPage() {
       if (mode === 'login') {
         await login(email, password)
       } else {
-        await register(email, password, displayName || undefined)
+        await register(email, password, displayName || undefined, inviteToken || undefined)
       }
       navigate('/')
     } catch (err) {
@@ -62,6 +64,11 @@ export function LoginPage() {
 
         {/* Form Card */}
         <div className="bg-surface rounded-2xl shadow-lg border border-border-default px-10 pt-10 pb-8">
+          {inviteToken && mode === 'register' && (
+            <div className="mb-6 px-4 py-3.5 rounded-xl bg-blue-500/10 border border-blue-500/30 text-sm text-blue-400">
+              You've been invited to join. Create your account below.
+            </div>
+          )}
           {error && (
             <div className="mb-8 px-4 py-3.5 rounded-xl bg-red-500/10 border border-red-500/30 text-sm text-red-400">
               {error}
