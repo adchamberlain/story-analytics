@@ -404,13 +404,16 @@ export function DatabaseConnector({ onSynced }: DatabaseConnectorProps) {
           {/* Dynamic fields per DB type */}
           {dbType === 'snowflake' && (
             <div className="grid grid-cols-2" style={{ gap: '16px' }}>
-              <FormField label="Account" value={account} onChange={setAccount} placeholder="abc12345.us-east-1" />
-              <FormField label="Warehouse" value={warehouse} onChange={setWarehouse} placeholder="COMPUTE_WH" />
-              <FormField label="Database" value={database} onChange={setDatabase} placeholder="ANALYTICS_POC" />
-              <FormField label="Schema" value={schema} onChange={setSchema} placeholder="SAAS_DEMO" />
+              <FormField label="Account" value={account} onChange={setAccount} placeholder="xy12345.us-east-1" hint="Admin → Accounts → Locator (e.g. xy12345.us-east-1)" />
+              <FormField label="Warehouse" value={warehouse} onChange={setWarehouse} placeholder="COMPUTE_WH" hint="Admin → Warehouses → name of your warehouse" />
+              <FormField label="Database" value={database} onChange={setDatabase} placeholder="MY_DATABASE" hint="Data → Databases → name of your database" />
+              <FormField label="Schema" value={schema} onChange={setSchema} placeholder="PUBLIC" hint="Inside your database → Schemas (PUBLIC is the default)" />
               <div className="col-span-2 border-t border-border-subtle" style={{ paddingTop: '16px' }}>
-                <p className="text-[13px] text-text-muted" style={{ marginBottom: '12px' }}>Username falls back to .env if blank.</p>
-                <FormField label="Username (optional)" value={username} onChange={setUsername} placeholder="From .env if blank" />
+                <p className="text-[13px] text-text-muted" style={{ marginBottom: '12px' }}>Falls back to .env if blank (SNOWFLAKE_PAT or SNOWFLAKE_USERNAME).</p>
+                <div className="grid grid-cols-2" style={{ gap: '16px' }}>
+                  <FormField label="Username" value={username} onChange={setUsername} placeholder="jane.doe" hint="Admin → Users → your login name" />
+                  <FormField label="Password" value={password} onChange={setPassword} placeholder="" type="password" hint="Your Snowflake password" />
+                </div>
               </div>
             </div>
           )}
@@ -560,12 +563,14 @@ function FormField({
   onChange,
   placeholder,
   type = 'text',
+  hint,
 }: {
   label: string
   value: string
   onChange: (v: string) => void
   placeholder?: string
   type?: string
+  hint?: string
 }) {
   return (
     <div>
@@ -578,6 +583,7 @@ function FormField({
         className="w-full text-[15px] border border-border-default rounded-xl bg-surface text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors"
         style={{ padding: '11px 16px' }}
       />
+      {hint && <p className="text-[11px] text-text-muted" style={{ marginTop: '4px' }}>{hint}</p>}
     </div>
   )
 }
