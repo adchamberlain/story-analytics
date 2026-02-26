@@ -223,16 +223,17 @@ async def test_connection(connection_id: str, request: TestConnectionRequest, us
     try:
         result = connector.test_connection(creds)
         if result.success:
-            # Save credentials if requested
+            # Save credentials if requested — store ONLY what the user provided
             if request.save_credentials:
-                # Store only secret fields (exclude config keys already in conn.config)
-                secrets_to_store = {k: v for k, v in creds.items() if k not in conn.config}
+                secrets = {}
                 if request.credentials:
-                    secrets_to_store.update(request.credentials)
+                    secrets.update(request.credentials)
+                if request.username:
+                    secrets["username"] = request.username
                 if request.password:
-                    secrets_to_store["password"] = request.password
-                if secrets_to_store:
-                    store_credentials(connection_id, secrets_to_store)
+                    secrets["password"] = request.password
+                if secrets:
+                    store_credentials(connection_id, secrets)
 
             # Also list tables on successful test
             tables_result = connector.list_tables(creds)
