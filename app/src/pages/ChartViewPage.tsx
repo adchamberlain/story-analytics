@@ -41,16 +41,23 @@ export function ChartViewPage() {
   const [error, setError] = useState<string | null>(null)
   const [showShareModal, setShowShareModal] = useState(false)
   const [showDeployPrompt, setShowDeployPrompt] = useState(false)
-  const { authEnabled } = useAuthStore()
+  const { authEnabled, user, loading: authLoading, checkStatus } = useAuthStore()
+
+  // Resolve auth state (page is outside AuthGate)
+  useEffect(() => { checkStatus() }, [checkStatus])
 
   useEffect(() => {
-    if (!chartId) return
+    if (!chartId || authLoading) return
 
     setLoading(true)
     setError(null)
 
     const abortController = new AbortController()
-    authFetch(`/api/v2/charts/${chartId}`, { signal: abortController.signal })
+    const fetchFn = user
+      ? authFetch(`/api/v2/charts/${chartId}`, { signal: abortController.signal })
+      : fetch(`/api/v2/charts/${chartId}`, { signal: abortController.signal })
+
+    fetchFn
       .then(async (res) => {
         if (!res.ok) {
           const body = await res.json().catch(() => ({ detail: res.statusText }))
@@ -68,7 +75,7 @@ export function ChartViewPage() {
         setLoading(false)
       })
     return () => abortController.abort()
-  }, [chartId])
+  }, [chartId, user, authLoading])
 
   if (loading) {
     return (
@@ -108,35 +115,41 @@ export function ChartViewPage() {
     <div className="min-h-screen bg-surface-secondary">
       {/* Header */}
       <header className="bg-surface border-b border-border-default px-6 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          {dashboardId && (
-            <Link to={`/dashboard/${dashboardId}`} className="text-sm text-text-secondary hover:text-text-on-surface transition-colors">
-              &larr; Dashboard
+        {user ? (
+          <div className="flex items-center gap-4">
+            {dashboardId && (
+              <Link to={`/dashboard/${dashboardId}`} className="text-sm text-text-secondary hover:text-text-on-surface transition-colors">
+                &larr; Dashboard
+              </Link>
+            )}
+            <Link to="/library" className="text-sm text-text-secondary hover:text-text-on-surface transition-colors">
+              {dashboardId ? 'Library' : <>&larr; Library</>}
             </Link>
-          )}
-          <Link to="/library" className="text-sm text-text-secondary hover:text-text-on-surface transition-colors">
-            {dashboardId ? 'Library' : <>&larr; Library</>}
-          </Link>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="relative">
-            <button
-              onClick={() => authEnabled ? setShowShareModal(true) : setShowDeployPrompt(p => !p)}
+          </div>
+        ) : (
+          <span />
+        )}
+        {user && (
+          <div className="flex items-center gap-2">
+            <div className="relative">
+              <button
+                onClick={() => authEnabled ? setShowShareModal(true) : setShowDeployPrompt(p => !p)}
+                className="text-sm px-3 py-1.5 rounded border border-border-default text-text-on-surface hover:bg-surface-secondary transition-colors"
+              >
+                Share
+              </button>
+              {showDeployPrompt && (
+                <DeployPopover onClose={() => setShowDeployPrompt(false)} />
+              )}
+            </div>
+            <Link
+              to={`/editor/${chartId}`}
               className="text-sm px-3 py-1.5 rounded border border-border-default text-text-on-surface hover:bg-surface-secondary transition-colors"
             >
-              Share
-            </button>
-            {showDeployPrompt && (
-              <DeployPopover onClose={() => setShowDeployPrompt(false)} />
-            )}
+              Edit
+            </Link>
           </div>
-          <Link
-            to={`/editor/${chartId}`}
-            className="text-sm px-3 py-1.5 rounded border border-border-default text-text-on-surface hover:bg-surface-secondary transition-colors"
-          >
-            Edit
-          </Link>
-        </div>
+        )}
       </header>
 
       {/* Chart */}

@@ -68,10 +68,12 @@ export function DashboardViewPage() {
     setIsPinned(localStorage.getItem('pinnedDashboardId') === dashboardId)
   }, [dashboardId])
 
-  // Share modal state
-  const { authEnabled } = useAuthStore()
+  // Auth state — resolve before fetching (page is outside AuthGate)
+  const { authEnabled, user, loading: authLoading, checkStatus } = useAuthStore()
   const [showShareModal, setShowShareModal] = useState(false)
   const [showDeployPrompt, setShowDeployPrompt] = useState(false)
+
+  useEffect(() => { checkStatus() }, [checkStatus])
 
   const fetchDashboard = useCallback(async (isRefresh: boolean) => {
     if (!dashboardId) return
@@ -85,9 +87,15 @@ export function DashboardViewPage() {
     }
 
     try {
-      const res = await authFetch(`/api/v2/dashboards/${dashboardId}`)
+      // Authenticated users use authFetch (regular endpoint); anonymous users use /public endpoint
+      const res = user
+        ? await authFetch(`/api/v2/dashboards/${dashboardId}`)
+        : await fetch(`/api/v2/dashboards/${dashboardId}/public`)
       if (!res.ok) {
         const body = await res.json().catch(() => ({ detail: res.statusText }))
+        if (res.status === 403) {
+          throw new Error('__private__')
+        }
         throw new Error(body.detail ?? `Failed to load dashboard: ${res.status}`)
       }
       const data: DashboardData = await res.json()
@@ -108,12 +116,12 @@ export function DashboardViewPage() {
     } finally {
       if (isRefresh) setRefreshing(false)
     }
-  }, [dashboardId])
+  }, [dashboardId, user])
 
-  // Initial load
+  // Initial load — wait for auth to resolve first
   useEffect(() => {
-    fetchDashboard(false)
-  }, [fetchDashboard])
+    if (!authLoading) fetchDashboard(false)
+  }, [fetchDashboard, authLoading])
 
   // Tick every 30s to keep timestamp display fresh
   useEffect(() => {
@@ -165,6 +173,18 @@ export function DashboardViewPage() {
   }
 
   if (error || !dashboard) {
+    // Private dashboard — show friendly message with login link
+    if (error === '__private__') {
+      return (
+        <div className="min-h-screen bg-surface-secondary flex items-center justify-center">
+          <div className="bg-amber-50 border border-amber-200 rounded-lg px-6 py-4 max-w-md text-center">
+            <p className="text-sm text-amber-700 font-medium">This dashboard is private</p>
+            <p className="text-sm text-amber-600 mt-2">You need to be logged in to view this dashboard.</p>
+            <a href="/login" className="text-sm text-blue-600 underline mt-3 inline-block">Log in</a>
+          </div>
+        </div>
+      )
+    }
     return (
       <div className="min-h-screen bg-surface-secondary flex items-center justify-center">
         <div className="bg-red-50 border border-red-200 rounded-lg px-6 py-4 max-w-md text-center">
@@ -179,89 +199,95 @@ export function DashboardViewPage() {
     <div className="min-h-screen bg-surface-secondary">
       {/* Header */}
       <header className="bg-surface border-b border-border-default shadow-sm px-4 sm:px-16 py-4 flex items-center justify-between gap-2">
-        <Link to="/dashboards" className="text-[14px] text-text-secondary hover:text-text-primary transition-colors inline-flex items-center gap-2">
-          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
-          </svg>
-          Dashboards
-        </Link>
-        <div className="flex items-center gap-2 flex-wrap justify-end">
-          <div className="relative">
+        {user ? (
+          <Link to="/dashboards" className="text-[14px] text-text-secondary hover:text-text-primary transition-colors inline-flex items-center gap-2">
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+            </svg>
+            Dashboards
+          </Link>
+        ) : (
+          <span />
+        )}
+        {user && (
+          <div className="flex items-center gap-2 flex-wrap justify-end">
+            <div className="relative">
+              <button
+                onClick={() => authEnabled ? setShowShareModal(true) : setShowDeployPrompt(p => !p)}
+                className="text-[14px] px-4 py-2 rounded-xl border border-border-default text-text-on-surface hover:bg-surface-secondary transition-colors flex items-center gap-1.5"
+              >
+                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                </svg>
+                Share
+              </button>
+              {showDeployPrompt && (
+                <DeployPopover onClose={() => setShowDeployPrompt(false)} />
+              )}
+            </div>
             <button
-              onClick={() => authEnabled ? setShowShareModal(true) : setShowDeployPrompt(p => !p)}
+              onClick={async () => {
+                try {
+                  const res = await authFetch(`/api/v2/dashboards/${dashboardId}/export/html`)
+                  if (!res.ok) return
+                  const blob = await res.blob()
+                  const disposition = res.headers.get('Content-Disposition') || ''
+                  const match = disposition.match(/filename="?([^"]+)"?/)
+                  const filename = match?.[1] || 'dashboard.html'
+                  const url = URL.createObjectURL(blob)
+                  const a = document.createElement('a')
+                  a.href = url
+                  a.download = filename
+                  a.click()
+                  URL.revokeObjectURL(url)
+                } catch { /* silent */ }
+              }}
               className="text-[14px] px-4 py-2 rounded-xl border border-border-default text-text-on-surface hover:bg-surface-secondary transition-colors flex items-center gap-1.5"
             >
               <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
               </svg>
-              Share
+              Export HTML
             </button>
-            {showDeployPrompt && (
-              <DeployPopover onClose={() => setShowDeployPrompt(false)} />
-            )}
-          </div>
-          <button
-            onClick={async () => {
-              try {
-                const res = await authFetch(`/api/v2/dashboards/${dashboardId}/export/html`)
-                if (!res.ok) return
-                const blob = await res.blob()
-                const disposition = res.headers.get('Content-Disposition') || ''
-                const match = disposition.match(/filename="?([^"]+)"?/)
-                const filename = match?.[1] || 'dashboard.html'
-                const url = URL.createObjectURL(blob)
-                const a = document.createElement('a')
-                a.href = url
-                a.download = filename
-                a.click()
-                URL.revokeObjectURL(url)
-              } catch { /* silent */ }
-            }}
-            className="text-[14px] px-4 py-2 rounded-xl border border-border-default text-text-on-surface hover:bg-surface-secondary transition-colors flex items-center gap-1.5"
-          >
-            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-            </svg>
-            Export HTML
-          </button>
-          <button
-            onClick={handleRefresh}
-            disabled={refreshing}
-            className="text-[14px] px-4 py-2 rounded-xl border border-border-default text-text-on-surface hover:bg-surface-secondary transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
-          >
-            <svg
-              className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin' : ''}`}
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth="2"
+            <button
+              onClick={handleRefresh}
+              disabled={refreshing}
+              className="text-[14px] px-4 py-2 rounded-xl border border-border-default text-text-on-surface hover:bg-surface-secondary transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
             >
-              <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h5M20 20v-5h-5M5.5 15.5A7.5 7.5 0 0118 7.05M18.5 8.5A7.5 7.5 0 016 16.95" />
-            </svg>
-            Refresh
-          </button>
-          <button
-            onClick={handleTogglePin}
-            className={`text-[14px] px-4 py-2 rounded-xl border transition-colors flex items-center gap-1.5 ${
-              isPinned
-                ? 'border-blue-300 text-blue-600 bg-blue-50 hover:bg-blue-100'
-                : 'border-border-default text-text-on-surface hover:bg-surface-secondary'
-            }`}
-            title={isPinned ? 'Unpin from home' : 'Pin as home dashboard'}
-          >
-            <svg className="h-3.5 w-3.5" fill={isPinned ? 'currentColor' : 'none'} viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 3.75V16.5L12 14.25 7.5 16.5V3.75m9 0H18A2.25 2.25 0 0120.25 6v12A2.25 2.25 0 0118 20.25H6A2.25 2.25 0 013.75 18V6A2.25 2.25 0 016 3.75h1.5m9 0h-9" />
-            </svg>
-            {isPinned ? 'Pinned' : 'Pin'}
-          </button>
-          <Link
-            to={`/dashboard/${dashboardId}/edit`}
-            className="text-[14px] px-4 py-2 rounded-xl border border-border-default text-text-on-surface hover:bg-surface-secondary transition-colors"
-          >
-            Edit
-          </Link>
-        </div>
+              <svg
+                className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin' : ''}`}
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h5M20 20v-5h-5M5.5 15.5A7.5 7.5 0 0118 7.05M18.5 8.5A7.5 7.5 0 016 16.95" />
+              </svg>
+              Refresh
+            </button>
+            <button
+              onClick={handleTogglePin}
+              className={`text-[14px] px-4 py-2 rounded-xl border transition-colors flex items-center gap-1.5 ${
+                isPinned
+                  ? 'border-blue-300 text-blue-600 bg-blue-50 hover:bg-blue-100'
+                  : 'border-border-default text-text-on-surface hover:bg-surface-secondary'
+              }`}
+              title={isPinned ? 'Unpin from home' : 'Pin as home dashboard'}
+            >
+              <svg className="h-3.5 w-3.5" fill={isPinned ? 'currentColor' : 'none'} viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 3.75V16.5L12 14.25 7.5 16.5V3.75m9 0H18A2.25 2.25 0 0120.25 6v12A2.25 2.25 0 0118 20.25H6A2.25 2.25 0 013.75 18V6A2.25 2.25 0 016 3.75h1.5m9 0h-9" />
+              </svg>
+              {isPinned ? 'Pinned' : 'Pin'}
+            </button>
+            <Link
+              to={`/dashboard/${dashboardId}/edit`}
+              className="text-[14px] px-4 py-2 rounded-xl border border-border-default text-text-on-surface hover:bg-surface-secondary transition-colors"
+            >
+              Edit
+            </Link>
+          </div>
+        )}
       </header>
 
       <main className="px-4 sm:px-16 py-6 sm:py-12">
