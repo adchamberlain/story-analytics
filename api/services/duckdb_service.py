@@ -127,10 +127,9 @@ class DuckDBService:
         if not safe_filename:
             safe_filename = "upload.csv"
         storage_key = f"uploads/{source_id}/{safe_filename}"
+        # Write to storage first (so S3 has the file before get_local_path tries to read it)
+        self._storage.write(storage_key, file_path.read_bytes())
         stored_path = self._storage.get_local_path(storage_key)
-        if file_path != stored_path:
-            # Write the uploaded file contents into storage
-            self._storage.write(storage_key, file_path.read_bytes())
 
         table_name = f"src_{source_id}"
 
