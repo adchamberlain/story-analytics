@@ -4,10 +4,13 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from ..auth_simple import get_current_user
+from ..config import get_settings
+from ..email import send_team_invite_email, send_team_added_email
 from ..services.metadata_db import (
     create_team, list_teams, get_team, get_team_members,
     add_team_member, remove_team_member, delete_team,
     get_user_by_email, get_team_member_role,
+    create_invite, get_pending_team_invites,
 )
 
 router = APIRouter(prefix="/teams", tags=["teams"])
@@ -54,21 +57,43 @@ async def get_team_detail(team_id: str, user: dict = Depends(get_current_user)):
 
 @router.post("/{team_id}/invite")
 async def invite_member(team_id: str, request: InviteRequest, user: dict = Depends(get_current_user)):
-    """Invite a user to a team by email. Caller must be a team admin."""
+    """Invite a user to a team by email.
+
+    - If the user is already registered, add them directly and send a notification email.
+    - If the user is not registered, create an invite token and send an invite email.
+    Caller must be a team admin.
+    """
     team = get_team(team_id)
     if not team:
         raise HTTPException(status_code=404, detail="Team not found")
     caller_role = get_team_member_role(team_id, user["id"])
     if caller_role != "admin":
         raise HTTPException(status_code=403, detail="Only team admins can invite members")
+
     target_user = get_user_by_email(request.email)
-    if not target_user:
-        raise HTTPException(status_code=404, detail="No user found with that email")
-    # Check if already a member
-    existing_role = get_team_member_role(team_id, target_user["id"])
-    if existing_role is not None:
-        raise HTTPException(status_code=409, detail="User is already a team member")
-    return add_team_member(team_id, target_user["id"], "member")
+    settings = get_settings()
+    inviter_name = user.get("display_name") or user.get("email", "A team admin")
+
+    if target_user:
+        # User is registered — add directly
+        existing_role = get_team_member_role(team_id, target_user["id"])
+        if existing_role is not None:
+            raise HTTPException(status_code=409, detail="User is already a team member")
+        add_team_member(team_id, target_user["id"], "member")
+        send_team_added_email(request.email, team["name"], settings.frontend_base_url, inviter_name)
+        return {"status": "added", "message": f"{request.email} has been added to the team"}
+    else:
+        # User is NOT registered — create invite token
+        invite = create_invite(
+            email=request.email,
+            role="editor",
+            created_by=user["id"],
+            team_id=team_id,
+            team_role="member",
+        )
+        invite_url = f"{settings.frontend_base_url}/login?invite={invite['token']}"
+        send_team_invite_email(request.email, team["name"], invite_url, inviter_name)
+        return {"status": "invited", "message": f"Invite sent to {request.email}", "invite_url": invite_url}
 
 
 @router.post("/{team_id}/members")
