@@ -15,7 +15,7 @@ interface AuthState {
 
   checkStatus: () => Promise<void>
   login: (email: string, password: string) => Promise<void>
-  register: (email: string, password: string, displayName?: string) => Promise<void>
+  register: (email: string, password: string, displayName?: string, inviteToken?: string) => Promise<void>
   logout: () => void
 }
 
@@ -65,11 +65,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({ token: data.token, user: data.user })
   },
 
-  register: async (email: string, password: string, displayName?: string) => {
+  register: async (email: string, password: string, displayName?: string, inviteToken?: string) => {
     const res = await fetch('/api/auth/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password, display_name: displayName }),
+      body: JSON.stringify({ email, password, display_name: displayName, invite_token: inviteToken }),
     })
     if (!res.ok) {
       const body = await res.json().catch(() => ({ detail: 'Registration failed' }))
