@@ -128,7 +128,19 @@ function generateLayout(charts: ChartWithData[]): Layout {
  */
 export function DashboardGrid({ charts, dashboardId, editable = false, onLayoutChange, embedFlags }: DashboardGridProps) {
   const { width, containerRef, mounted } = useContainerWidth()
+  const isMobile = width > 0 && width < 640
+  const cols = isMobile ? 1 : 2
   const layout = useMemo(() => generateLayout(charts), [charts])
+  // On mobile, force all items to single column full-width
+  const responsiveLayout = useMemo(() => {
+    if (!isMobile) return layout
+    let y = 0
+    return layout.map((item) => {
+      const mapped = { ...item, x: 0, w: 1, y }
+      y += item.h
+      return mapped
+    })
+  }, [layout, isMobile])
 
   if (charts.length === 0) {
     return (
@@ -145,12 +157,12 @@ export function DashboardGrid({ charts, dashboardId, editable = false, onLayoutC
           className="dashboard-grid"
           width={width}
           gridConfig={{
-            cols: 2,
+            cols,
             rowHeight: 60,
-            margin: [24, 24] as [number, number],
+            margin: isMobile ? [16, 16] as [number, number] : [24, 24] as [number, number],
             containerPadding: [0, 0] as [number, number],
           }}
-          layout={layout}
+          layout={responsiveLayout}
           dragConfig={{ enabled: editable, handle: '.drag-handle' }}
           resizeConfig={{ enabled: editable, handles: editable ? ['se'] : [] }}
           onLayoutChange={(currentLayout: Layout) => {

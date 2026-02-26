@@ -104,7 +104,7 @@ export function PublicChartPage() {
           />
         </ChartWrapper>
         <p className="text-center text-xs text-gray-400 mt-6">
-          Created with Story Analytics
+          Created with <a href="https://storyanalytics.ai" target="_blank" rel="noopener noreferrer" className="underline hover:text-gray-300">Story Analytics</a>
         </p>
       </div>
     </div>

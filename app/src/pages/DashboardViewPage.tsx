@@ -175,14 +175,14 @@ export function DashboardViewPage() {
   return (
     <div className="min-h-screen bg-surface-secondary">
       {/* Header */}
-      <header className="bg-surface border-b border-border-default shadow-sm px-16 py-4 flex items-center justify-between">
+      <header className="bg-surface border-b border-border-default shadow-sm px-4 sm:px-16 py-4 flex items-center justify-between gap-2">
         <Link to="/dashboards" className="text-[14px] text-text-secondary hover:text-text-primary transition-colors inline-flex items-center gap-2">
           <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
           </svg>
           Dashboards
         </Link>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap justify-end">
           <button
             onClick={() => setShowShareModal(true)}
             className="text-[14px] px-4 py-2 rounded-xl border border-border-default text-text-on-surface hover:bg-surface-secondary transition-colors flex items-center gap-1.5"
@@ -243,7 +243,7 @@ export function DashboardViewPage() {
         </div>
       </header>
 
-      <main className="px-16 py-12">
+      <main className="px-4 sm:px-16 py-6 sm:py-12">
         {/* Title + description */}
         <div className="mb-2">
           <h1 className="text-[28px] font-bold text-text-primary">
@@ -317,6 +317,10 @@ export function DashboardViewPage() {
             <DashboardShareLinks dashboardId={dashboardId} />
           </div>
         )}
+
+        <p className="text-center text-xs text-gray-400 mt-6">
+          Created with <a href="https://storyanalytics.ai" target="_blank" rel="noopener noreferrer" className="underline hover:text-gray-300">Story Analytics</a>
+        </p>
       </main>
 
       {/* Share modal */}

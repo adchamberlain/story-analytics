@@ -4,7 +4,7 @@ Deploy your own Story Analytics instance to Amazon Web Services. This guide assu
 
 ## What You'll Get
 
-- A live Story Analytics app at a public URL (e.g. `https://abc123.us-east-1.awsapprunner.com`)
+- A live Story Analytics app at a public URL (e.g. `https://abc123.us-east-2.awsapprunner.com`)
 - PostgreSQL database for metadata
 - S3 storage for chart data and files
 - User authentication enabled by default
@@ -137,11 +137,11 @@ It will ask for four things:
 ```
 AWS Access Key ID: [paste your access key]
 AWS Secret Access Key: [paste your secret key]
-Default region name: us-east-1
+Default region name: us-east-2
 Default output format: json
 ```
 
-> **Which region?** `us-east-1` (N. Virginia) is a good default — it has the most services and often the lowest prices. You can use any region, but be consistent throughout this guide.
+> **Which region?** `us-east-2` (N. Virginia) is a good default — it has the most services and often the lowest prices. You can use any region, but be consistent throughout this guide.
 
 Verify your credentials work:
 
@@ -177,7 +177,7 @@ pip3 install boto3
 One command does everything:
 
 ```bash
-python3 -m deploy.cli deploy --region us-east-1
+python3 -m deploy.cli deploy --region us-east-2
 ```
 
 You'll see five steps:
@@ -190,7 +190,7 @@ Deploying Story Analytics to AWS...
   User/Role   : arn:aws:iam::123456789012:user/your-name
 
 [2/5] Ensuring ECR repository exists...
-  ECR repo created: 123456789012.dkr.ecr.us-east-1.amazonaws.com/story-analytics
+  ECR repo created: 123456789012.dkr.ecr.us-east-2.amazonaws.com/story-analytics
 
 [3/5] Building and pushing Docker image...
   Building Docker image...
@@ -200,14 +200,14 @@ Deploying Story Analytics to AWS...
   Image pushed successfully.
 
 [4/5] Deploying CloudFormation stack (this takes ~10 min for RDS)...
-  Creating stack 'story-analytics' in us-east-1...
+  Creating stack 'story-analytics' in us-east-2...
   Waiting................ done.
 
 [5/5] Deployment complete!
 
-  App URL      : https://abc123xyz.us-east-1.awsapprunner.com
+  App URL      : https://abc123xyz.us-east-2.awsapprunner.com
   S3 Bucket    : story-analytics-data-123456789012
-  RDS Endpoint : story-analytics-db.xxxx.us-east-1.rds.amazonaws.com
+  RDS Endpoint : story-analytics-db.xxxx.us-east-2.rds.amazonaws.com
   DB Password  : xK9_mN2pLqRs7vW   (save this!)
 ```
 
@@ -235,7 +235,7 @@ When you pull new code and want to deploy it:
 
 ```bash
 git pull
-python3 -m deploy.cli update --region us-east-1
+python3 -m deploy.cli update --region us-east-2
 ```
 
 This rebuilds the Docker image and pushes it to ECR. App Runner automatically detects the new image and redeploys (~2–5 minutes).
@@ -247,7 +247,7 @@ This rebuilds the Docker image and pushes it to ECR. App Runner automatically de
 See your current deployment info:
 
 ```bash
-python3 -m deploy.cli status --region us-east-1
+python3 -m deploy.cli status --region us-east-2
 ```
 
 Output shows the stack status, App URL, S3 bucket, and RDS endpoint.
@@ -259,7 +259,7 @@ Output shows the stack status, App URL, S3 bucket, and RDS endpoint.
 To permanently delete all AWS resources:
 
 ```bash
-python3 -m deploy.cli destroy --region us-east-1
+python3 -m deploy.cli destroy --region us-east-2
 ```
 
 You'll be asked to type `yes` to confirm. This deletes:
@@ -275,7 +275,7 @@ You'll be asked to type `yes` to confirm. This deletes:
 To skip the confirmation prompt (e.g. in scripts):
 
 ```bash
-python3 -m deploy.cli destroy --region us-east-1 --yes
+python3 -m deploy.cli destroy --region us-east-2 --yes
 ```
 
 ---
@@ -373,7 +373,7 @@ Commands:
   destroy   Tear down all AWS resources
 
 Common options:
-  --region REGION          AWS region (default: us-east-1)
+  --region REGION          AWS region (default: us-east-2)
   --stack-name NAME        CloudFormation stack name (default: story-analytics)
 
 Deploy options:

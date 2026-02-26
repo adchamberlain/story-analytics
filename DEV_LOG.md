@@ -1,5 +1,23 @@
 # Dev Log
 
+## 2026-02-26
+
+### Session 10: Chart Share Modal, Email Error Surfacing
+
+**Goal:** Add proper share modal for charts, fix silent email failures in team invites.
+
+**Chart share modal (PR #12, frontend):**
+- New `app/src/components/sharing/ChartShareModal.tsx`: Modal with private/public visibility toggle that calls chart publish/unpublish API. Shows share link (`/public/chart/:id`) and embed code (`<iframe>`) only when set to Public. Includes clipboard copy with "Copied!" feedback.
+- `app/src/pages/ChartViewPage.tsx`: Replaced old inline `SharePanel` with Share button that opens the modal. Modal syncs status back to page state via `onStatusChange` callback.
+- `app/src/pages/EditorPage.tsx`: Added Share button to editor header (next to Publish/Republish). Modal syncs status back to Zustand editor store.
+
+**Email error surfacing (PR #11, backend):**
+- **Bug:** `api/routers/teams.py` `invite_member` endpoint ignored the boolean return value of `send_team_invite_email()` and `send_team_added_email()`, always returning 200 even when email delivery failed silently.
+- **Fix:** Now checks return value and raises HTTP 502 with actionable error message ("email failed to send") so the frontend can inform the user.
+- `api/email.py`: Replaced bare `print()` calls with `logging.getLogger(__name__)` for both `send_team_invite_email` and `send_team_added_email` error paths.
+
+---
+
 ## 2026-02-25
 
 ### Session 9: S3 Transform Cache Bug, Scatter Plot Fix, API Docs
