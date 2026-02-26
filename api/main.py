@@ -2,7 +2,9 @@
 FastAPI application entry point.
 """
 
+import os
 from pathlib import Path
+
 from dotenv import load_dotenv
 
 # Load .env file before any other imports
@@ -10,6 +12,8 @@ load_dotenv(Path(__file__).parent.parent / ".env")
 
 from fastapi import FastAPI  # noqa: E402
 from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
+from fastapi.responses import FileResponse  # noqa: E402
+from fastapi.staticfiles import StaticFiles  # noqa: E402
 from starlette.middleware.base import BaseHTTPMiddleware  # noqa: E402
 from starlette.requests import Request  # noqa: E402
 
@@ -187,7 +191,6 @@ async def root():
         os.path.dirname(__file__), "..", "static", "index.html"
     )
     if os.path.isfile(_static_index):
-        from fastapi.responses import FileResponse
         return FileResponse(_static_index)
     return {
         "name": "Story Analytics API",
@@ -217,10 +220,6 @@ async def list_providers():
 # ---------------------------------------------------------------------------
 # Serve built React SPA in production (when static/ dir exists)
 # ---------------------------------------------------------------------------
-import os
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
-
 _static_dir = os.path.join(os.path.dirname(__file__), "..", "static")
 if os.path.isdir(_static_dir):
     # Serve embed.html for embed routes (separate entry point)
