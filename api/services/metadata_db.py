@@ -120,7 +120,9 @@ def _ensure_tables() -> None:
             token TEXT UNIQUE NOT NULL,
             created_by TEXT NOT NULL,
             expires_at TEXT NOT NULL,
-            used_at TEXT
+            used_at TEXT,
+            team_id TEXT,
+            team_role TEXT DEFAULT 'member'
         );
 
         CREATE TABLE IF NOT EXISTS admin_settings (
@@ -128,6 +130,12 @@ def _ensure_tables() -> None:
             value TEXT NOT NULL
         );
     """)
+    # Migrate invites table: add team columns if missing
+    try:
+        db.execute("SELECT team_id FROM invites LIMIT 0")
+    except Exception:
+        db.execute("ALTER TABLE invites ADD COLUMN team_id TEXT")
+        db.execute("ALTER TABLE invites ADD COLUMN team_role TEXT DEFAULT 'member'")
     _TABLES_CREATED = True
 
 
@@ -252,8 +260,8 @@ def update_user_display_name(user_id: str, display_name: str) -> bool:
 
 # ── Invites ───────────────────────────────────────────────────────────────────
 
-def create_invite(email: str, role: str, created_by: str) -> dict:
-    """Create an invite token. Expires in 7 days."""
+def create_invite(email: str, role: str, created_by: str, *, team_id: str | None = None, team_role: str | None = None) -> dict:
+    """Create an invite token. Expires in 7 days. If team_id is set, auto-joins team on registration."""
     _ensure_tables()
     db = get_db()
     invite_id = uuid.uuid4().hex[:12]
@@ -261,14 +269,15 @@ def create_invite(email: str, role: str, created_by: str) -> dict:
     now = datetime.now(timezone.utc)
     expires_at = (now + timedelta(days=7)).isoformat()
     db.execute(
-        "INSERT INTO invites (id, email, role, token, created_by, expires_at) "
-        "VALUES (?, ?, ?, ?, ?, ?)",
-        (invite_id, email, role, token, created_by, expires_at),
+        "INSERT INTO invites (id, email, role, token, created_by, expires_at, team_id, team_role) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        (invite_id, email, role, token, created_by, expires_at, team_id, team_role),
     )
     return {
         "id": invite_id, "email": email, "role": role,
         "token": token, "created_by": created_by,
         "expires_at": expires_at, "used_at": None,
+        "team_id": team_id, "team_role": team_role,
     }
 
 
@@ -278,7 +287,7 @@ def list_invites() -> list[dict]:
     db = get_db()
     now = datetime.now(timezone.utc).isoformat()
     return db.fetchall(
-        "SELECT id, email, role, token, created_by, expires_at "
+        "SELECT id, email, role, token, created_by, expires_at, team_id, team_role "
         "FROM invites WHERE used_at IS NULL AND expires_at > ? "
         "ORDER BY expires_at",
         (now,),
@@ -310,6 +319,19 @@ def delete_invite(invite_id: str) -> bool:
     db = get_db()
     count = db.execute("DELETE FROM invites WHERE id = ?", (invite_id,))
     return count > 0
+
+
+def get_pending_team_invites(team_id: str) -> list[dict]:
+    """List pending invites for a specific team."""
+    _ensure_tables()
+    db = get_db()
+    now = datetime.now(timezone.utc).isoformat()
+    return db.fetchall(
+        "SELECT id, email, team_role, created_by, expires_at "
+        "FROM invites WHERE team_id = ? AND used_at IS NULL AND expires_at > ? "
+        "ORDER BY expires_at",
+        (team_id, now),
+    )
 
 
 # ── Admin Settings ────────────────────────────────────────────────────────────
