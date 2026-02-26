@@ -156,10 +156,8 @@ class BigQueryConnector(DatabaseConnector):
 
         client = self._get_client(credentials)
 
-        # Wrap in LIMIT subquery if not already limited
-        exec_sql = sql
-        if "LIMIT" not in sql.upper():
-            exec_sql = f"SELECT * FROM ({sql}) _q LIMIT {limit}"
+        # Always wrap in LIMIT subquery (database optimizes away redundant LIMIT)
+        exec_sql = f"SELECT * FROM ({sql}) _q LIMIT {limit}"
 
         job_config = bigquery.QueryJobConfig(
             use_legacy_sql=False,

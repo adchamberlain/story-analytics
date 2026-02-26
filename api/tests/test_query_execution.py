@@ -331,10 +331,12 @@ class TestPostgresExecuteQuery:
                 timeout=15,
             )
 
-        # First execute call should set statement_timeout
+        # First execute call should set statement_timeout (parameterized)
         calls = mock_cursor.execute.call_args_list
         assert "statement_timeout" in calls[0][0][0]
-        assert "15000" in calls[0][0][0]
+        assert calls[0][0][1] == (15000,)
+        # Connection should be set to read-only mode
+        mock_conn.set_session.assert_called_once_with(readonly=True)
 
     def test_execute_rejects_drop(self):
         from api.services.connectors.postgres import PostgresConnector
@@ -596,4 +598,5 @@ class TestQueryEndpoint:
         assert resp.status_code == 200
         # Verify defaults were passed
         call_kwargs = mock_connector.execute_query.call_args
-        assert call_kwargs[1]["limit"] == 10000 or call_kwargs[0][2] == 10000 if len(call_kwargs[0]) > 2 else True
+        assert call_kwargs.kwargs["limit"] == 10000
+        assert call_kwargs.kwargs["timeout"] == 30
