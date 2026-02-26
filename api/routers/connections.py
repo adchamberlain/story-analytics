@@ -400,7 +400,7 @@ async def get_schema(
     if not conn:
         raise HTTPException(status_code=404, detail="Connection not found")
 
-    cache_file = _SCHEMA_CACHE_DIR / f"{connection_id}.json"
+    cache_file = _SCHEMA_CACHE_DIR / f"{conn.connection_id}.json"
 
     # Return cached data if available and not forcing refresh
     if not refresh and cache_file.exists():

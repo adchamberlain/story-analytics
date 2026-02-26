@@ -92,14 +92,14 @@ class SnowflakeConnector(DatabaseConnector):
 
             schemas: list[SchemaInfo] = []
             for schema_name in schema_names:
-                # Get tables in this schema (row count is at index 8)
+                # Get tables in this schema (row count is at index 7)
                 cursor.execute(f"SHOW TABLES IN SCHEMA {self._quote_identifier(schema_name)}")
                 table_rows = cursor.fetchall()
 
                 tables: list[SchemaTable] = []
                 for trow in table_rows:
                     table_name = trow[1]
-                    row_count = trow[8] if len(trow) > 8 else None
+                    row_count = trow[7] if len(trow) > 7 else None
 
                     # Get columns for this table
                     cursor.execute(
