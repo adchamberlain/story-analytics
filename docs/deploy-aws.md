@@ -141,7 +141,7 @@ Default region name: us-east-2
 Default output format: json
 ```
 
-> **Which region?** `us-east-2` (N. Virginia) is a good default — it has the most services and often the lowest prices. You can use any region, but be consistent throughout this guide.
+> **Which region?** `us-east-2` (Ohio) is a good default. `us-east-1` (N. Virginia) is also popular and has the most services. You can use any region, but be consistent throughout this guide.
 
 Verify your credentials work:
 
@@ -180,30 +180,34 @@ One command does everything:
 python3 -m deploy.cli deploy --region us-east-2
 ```
 
-You'll see five steps:
+You'll see seven steps:
 
 ```
 Deploying Story Analytics to AWS...
 
-[1/5] Checking AWS credentials...
+[1/7] Checking AWS credentials...
   AWS Account : 123456789012
   User/Role   : arn:aws:iam::123456789012:user/your-name
 
-[2/5] Ensuring ECR repository exists...
+[2/7] Ensuring ECR repository exists...
   ECR repo created: 123456789012.dkr.ecr.us-east-2.amazonaws.com/story-analytics
 
-[3/5] Building and pushing Docker image...
+[3/7] Building and pushing Docker image...
   Building Docker image...
   Logging in to ECR...
   Tagging image...
   Pushing image to ECR...
   Image pushed successfully.
 
-[4/5] Deploying CloudFormation stack (this takes ~10 min for RDS)...
+[4/7] Deploying CloudFormation stack (this takes ~10 min for RDS)...
   Creating stack 'story-analytics' in us-east-2...
   Waiting................ done.
 
-[5/5] Deployment complete!
+[5/7] Setting FRONTEND_BASE_URL...
+
+[6/7] Triggering App Runner deployment...
+
+[7/7] Deployment complete!
 
   App URL      : https://abc123xyz.us-east-2.awsapprunner.com
   S3 Bucket    : story-analytics-data-123456789012
@@ -239,6 +243,31 @@ python3 -m deploy.cli update --region us-east-2
 ```
 
 This rebuilds the Docker image and pushes it to ECR. App Runner automatically detects the new image and redeploys (~2–5 minutes).
+
+---
+
+## Setting Up Email (Optional)
+
+Story Analytics can send email notifications for team invites. **Email is optional** — if not configured, invite links are shown directly in the UI for admins to copy and share manually.
+
+To enable email delivery:
+
+1. Sign up for a free account at [resend.com](https://resend.com/)
+2. Create an API key in the Resend dashboard
+3. Redeploy with the key:
+
+```bash
+python3 -m deploy.cli deploy --region us-east-2 --resend-api-key re_xxxxx --from-email "Your App <you@yourdomain.com>"
+```
+
+Or add to your `.env` file (in the project root) before deploying:
+
+```
+RESEND_API_KEY=re_xxxxx
+FROM_EMAIL=Your App <you@yourdomain.com>
+```
+
+> **Note:** The default sender (`onboarding@resend.dev`) works for testing but emails may go to spam. For production, verify your own domain in the Resend dashboard.
 
 ---
 
@@ -381,6 +410,8 @@ Deploy options:
   --cpu CPU                App Runner CPU units: 256, 512, 1024, 2048, 4096 (default: 1024)
   --memory MEMORY          App Runner memory in MB: 512–12288 (default: 2048)
   --db-instance-class CLS  RDS instance type (default: db.t4g.micro)
+  --resend-api-key KEY     Resend API key for emails (reads from .env if omitted)
+  --from-email EMAIL       Sender email address (reads from .env if omitted)
 
 Destroy options:
   --yes, -y                Skip confirmation prompt

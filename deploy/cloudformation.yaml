@@ -51,6 +51,24 @@ Parameters:
       - "12288"
     Description: App Runner memory in MB (2048 = 2 GB).
 
+  ResendApiKey:
+    Type: String
+    Default: ""
+    NoEcho: true
+    Description: Resend API key for sending emails (optional — emails disabled if empty).
+
+  FromEmail:
+    Type: String
+    Default: "Story Analytics <onboarding@resend.dev>"
+    Description: Sender email address for outbound emails.
+
+  FrontendBaseUrl:
+    Type: String
+    Default: ""
+    Description: >-
+      Base URL for the frontend (e.g. https://abc123.us-east-2.awsapprunner.com).
+      Set automatically by the deploy script after initial stack creation.
+
 # ---------------------------------------------------------------------------
 # Resources
 # ---------------------------------------------------------------------------
@@ -368,6 +386,14 @@ Resources:
                 Value: "true"
               - Name: JWT_SECRET
                 Value: !Sub "${DBPassword}-jwt-${AWS::StackName}"
+              - Name: RESEND_API_KEY
+                Value: !Ref ResendApiKey
+              - Name: FROM_EMAIL
+                Value: !Ref FromEmail
+              - Name: FRONTEND_BASE_URL
+                Value: !Ref FrontendBaseUrl
+              - Name: API_BASE_URL
+                Value: !Ref FrontendBaseUrl
       InstanceConfiguration:
         Cpu: !Ref AppRunnerCpu
         Memory: !Ref AppRunnerMemory

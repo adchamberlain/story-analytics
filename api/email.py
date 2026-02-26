@@ -52,7 +52,8 @@ def send_magic_link_email(
     if not init_resend():
         # No Resend configured, link already printed above if localhost
         if not is_localhost:
-            print(f"[No Resend API key] Magic link for {to_email}: {magic_link_url}")
+            logger.warning("[No Resend API key] Magic link for %s: %s", to_email, magic_link_url)
+            return False
         return True
 
     subject = "Sign in to Story Analytics" if not is_new_user else "Welcome to Story Analytics"
@@ -180,7 +181,8 @@ def send_team_invite_email(
 
     if not init_resend():
         if not is_localhost:
-            print(f"[No Resend API key] Team invite for {to_email}: {invite_url}")
+            logger.warning("[No Resend API key] Team invite for %s: %s", to_email, invite_url)
+            return False
         return True
 
     html_content = f"""
@@ -247,7 +249,8 @@ def send_team_added_email(
 
     if not init_resend():
         if not is_localhost:
-            print(f"[No Resend API key] Team added notification for {to_email}: {team_name}")
+            logger.warning("[No Resend API key] Team added notification for %s: %s", to_email, team_name)
+            return False
         return True
 
     html_content = f"""

@@ -20,16 +20,8 @@ interface Settings {
   google_api_key: string
 }
 
-interface DataSource {
-  source_id: string
-  name: string
-  type: string
-  row_count: number
-  column_count: number
-}
-
 export function SettingsPage() {
-  const navigate = useNavigate()
+  const { authEnabled } = useAuthStore()
 
   // Settings state
   const [settings, setSettings] = useState<Settings | null>(null)
@@ -43,10 +35,6 @@ export function SettingsPage() {
   useEffect(() => {
     return () => clearTimeout(saveTimer.current)
   }, [])
-
-  // Data sources state
-  const [sources, setSources] = useState<DataSource[]>([])
-  const [sourcesLoading, setSourcesLoading] = useState(true)
 
   // Load settings on mount
   useEffect(() => {
@@ -65,20 +53,6 @@ export function SettingsPage() {
         }
       })
       .catch(() => {})
-  }, [])
-
-  // Load data sources on mount
-  useEffect(() => {
-    authFetch('/api/settings/sources')
-      .then((res) => {
-        if (!res.ok) throw new Error(`Sources fetch failed: ${res.status}`)
-        return res.json()
-      })
-      .then((data: DataSource[]) => {
-        setSources(data)
-        setSourcesLoading(false)
-      })
-      .catch(() => setSourcesLoading(false))
   }, [])
 
   // When provider changes, update the key field display
@@ -133,18 +107,35 @@ export function SettingsPage() {
   const inputClass =
     'w-full px-4 py-3.5 text-[15px] rounded-xl bg-surface-input border border-border-strong text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition-all'
 
-  const TYPE_BADGES: Record<string, string> = {
-    csv: 'bg-emerald-500/15 text-emerald-500',
-    snowflake: 'bg-sky-500/15 text-sky-400',
-    postgres: 'bg-blue-500/15 text-blue-400',
-    bigquery: 'bg-amber-500/15 text-amber-500',
-  }
-
   return (
     <div className="px-12 py-12 max-w-[900px]">
       <h1 className="text-[28px] font-bold text-text-primary tracking-tight mb-10">Settings</h1>
 
       <div className="flex flex-col gap-8">
+        {/* ── Deploy nudge (local only) ────────────────────────────── */}
+        {!authEnabled && (
+          <section className="rounded-2xl border border-blue-500/20 bg-blue-500/5 p-7">
+            <h2 className="text-[17px] font-semibold text-text-primary mb-1.5">Unlock the Full Experience</h2>
+            <p className="text-[14px] text-text-secondary leading-relaxed mb-4">
+              Deploy to AWS to enable team collaboration, chart sharing and embedding, and password-protected login.
+            </p>
+            <a
+              href="https://github.com/adchamberlain/story-analytics/blob/main/docs/deploy-aws.md"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-block px-5 py-2.5 text-[14px] font-medium rounded-xl bg-blue-600 text-white hover:bg-blue-500 transition-colors"
+            >
+              Deploy to AWS
+            </a>
+          </section>
+        )}
+
+        {/* ── Account ──────────────────────────────────────────────── */}
+        <ChangePasswordSection />
+
+        {/* ── Teams ────────────────────────────────────────────────── */}
+        <TeamManager />
+
         {/* ── AI Provider ──────────────────────────────────────────── */}
         <section className="bg-surface-raised rounded-2xl shadow-card border border-border-default p-7">
           <h2 className="text-[17px] font-semibold text-text-primary mb-1.5">AI Provider</h2>
@@ -211,9 +202,6 @@ export function SettingsPage() {
           </div>
         </section>
 
-        {/* ── Account (Change Password) ─────────────────────────── */}
-        <ChangePasswordSection />
-
         {/* ── User Management (Admin) ─────────────────────── */}
         <AdminUsersSection />
 
@@ -225,55 +213,6 @@ export function SettingsPage() {
 
         {/* ── API Keys ──────────────────────────────────────────── */}
         <ApiKeyManager />
-
-        {/* ── Teams ────────────────────────────────────────────────── */}
-        <TeamManager />
-
-        {/* ── Data Sources ─────────────────────────────────────────── */}
-        <section className="bg-surface-raised rounded-2xl shadow-card border border-border-default p-7">
-          <div className="flex items-center justify-between mb-5">
-            <div>
-              <h2 className="text-[17px] font-semibold text-text-primary mb-1">Data Sources</h2>
-              <p className="text-[14px] text-text-muted">Uploaded files and database connections.</p>
-            </div>
-            <button
-              onClick={() => navigate('/sources')}
-              className="px-4 py-2.5 text-[14px] font-medium rounded-xl border border-border-default text-text-secondary hover:bg-surface-input transition-colors"
-            >
-              Manage Sources
-            </button>
-          </div>
-
-          {sourcesLoading ? (
-            <p className="text-[14px] text-text-muted py-4">Loading...</p>
-          ) : sources.length === 0 ? (
-            <p className="text-[14px] text-text-muted py-4">No data sources yet.</p>
-          ) : (
-            <div className="flex flex-col gap-2">
-              {sources.map((s) => (
-                <div
-                  key={s.source_id}
-                  className="flex items-center justify-between px-4 py-3 rounded-xl bg-surface-input border border-border-default"
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <span
-                      className={`text-[12px] font-semibold uppercase px-2 py-0.5 rounded-md shrink-0 ${
-                        TYPE_BADGES[s.type] ?? 'bg-gray-500/15 text-gray-400'
-                      }`}
-                    >
-                      {s.type}
-                    </span>
-                    <span className="text-[14px] text-text-primary font-medium truncate">{s.name}</span>
-                  </div>
-                  <div className="flex items-center gap-4 text-[13px] text-text-muted shrink-0">
-                    {s.row_count > 0 && <span>{s.row_count.toLocaleString()} rows</span>}
-                    {s.column_count > 0 && <span>{s.column_count} cols</span>}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
 
         {/* ── About ────────────────────────────────────────────────── */}
         <section className="bg-surface-raised rounded-2xl shadow-card border border-border-default p-7">
@@ -563,7 +502,8 @@ interface Team {
 }
 
 function TeamManager() {
-  const { user } = useAuthStore()
+  const { authEnabled, user } = useAuthStore()
+  if (!authEnabled) return null
   const [teams, setTeams] = useState<Team[]>([])
   const [newTeamName, setNewTeamName] = useState('')
   const [creating, setCreating] = useState(false)
@@ -573,6 +513,7 @@ function TeamManager() {
   const [inviteEmail, setInviteEmail] = useState('')
   const [inviting, setInviting] = useState(false)
   const [inviteError, setInviteError] = useState('')
+  const [inviteResult, setInviteResult] = useState<{ url: string; emailSent: boolean; email: string } | null>(null)
 
   useEffect(() => {
     authFetch('/api/teams/')
@@ -606,6 +547,7 @@ function TeamManager() {
       setExpandedTeamId(teamId)
       setInviteEmail('')
       setInviteError('')
+      setInviteResult(null)
       if (!membersByTeam[teamId]) loadMembers(teamId)
       loadInvites(teamId)
     }
@@ -631,6 +573,7 @@ function TeamManager() {
     if (!inviteEmail.trim()) return
     setInviting(true)
     setInviteError('')
+    setInviteResult(null)
     try {
       const res = await authFetch(`/api/teams/${teamId}/invite`, {
         method: 'POST',
@@ -642,14 +585,23 @@ function TeamManager() {
         throw new Error(body.detail)
       }
       const data = await res.json()
+      const sentEmail = inviteEmail.trim()
       setInviteEmail('')
       if (data.status === 'added') {
         await loadMembers(teamId)
+        setInviteResult(null)
+        setInviteError('✓ Added to team')
+        setTimeout(() => setInviteError(''), 3000)
       } else {
         await loadInvites(teamId)
+        if (data.email_sent === false) {
+          setInviteResult({ url: data.invite_url, emailSent: false, email: sentEmail })
+        } else {
+          setInviteResult(null)
+          setInviteError('✓ Invite sent')
+          setTimeout(() => setInviteError(''), 3000)
+        }
       }
-      setInviteError(data.status === 'added' ? '✓ Added to team' : '✓ Invite sent')
-      setTimeout(() => setInviteError(''), 3000)
     } catch (err) {
       setInviteError(err instanceof Error ? err.message : 'Failed to invite')
     } finally {
@@ -853,6 +805,22 @@ function TeamManager() {
                         </div>
                         {inviteError && (
                           <p className={`text-[12px] mt-1.5 ${inviteError.startsWith('✓') ? 'text-green-400' : 'text-red-400'}`}>{inviteError}</p>
+                        )}
+                        {inviteResult && !inviteResult.emailSent && (
+                          <div className="mt-2 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
+                            <p className="text-[12px] text-yellow-400 mb-1.5">
+                              Email could not be sent. Share this invite link with <span className="font-medium">{inviteResult.email}</span>:
+                            </p>
+                            <div className="flex items-center gap-2">
+                              <code className="flex-1 text-[12px] text-text-primary break-all select-all bg-surface-raised px-2 py-1.5 rounded">{inviteResult.url}</code>
+                              <button
+                                onClick={() => navigator.clipboard.writeText(inviteResult.url)}
+                                className="shrink-0 px-2.5 py-1.5 text-[12px] font-medium rounded-md bg-yellow-600 text-white hover:bg-yellow-500 transition-colors"
+                              >
+                                Copy link
+                              </button>
+                            </div>
+                          </div>
                         )}
                       </div>
                     )}
@@ -1248,6 +1216,7 @@ function ChangePasswordSection() {
   const [displayName, setDisplayName] = useState(user?.display_name || '')
   const [editingName, setEditingName] = useState(false)
   const [savingName, setSavingName] = useState(false)
+  const [showPasswordForm, setShowPasswordForm] = useState(false)
 
   useEffect(() => {
     return () => clearTimeout(timer.current)
@@ -1399,58 +1368,72 @@ function ChangePasswordSection() {
         </div>
       </div>
 
-      {/* Change password form */}
-      <h3 className="text-[15px] font-medium text-text-secondary mb-4">Change Password</h3>
-      <form onSubmit={handleSubmit} className="space-y-4 max-w-sm">
-        <div>
-          <label className="text-sm font-medium text-text-secondary block mb-1.5">Current Password</label>
-          <input
-            type="password"
-            value={currentPassword}
-            onChange={(e) => { setCurrentPassword(e.target.value); setStatus('idle') }}
-            required
-            className={inputClass}
-          />
-        </div>
-        <div>
-          <label className="text-sm font-medium text-text-secondary block mb-1.5">New Password</label>
-          <input
-            type="password"
-            value={newPassword}
-            onChange={(e) => { setNewPassword(e.target.value); setStatus('idle') }}
-            required
-            minLength={6}
-            className={inputClass}
-          />
-        </div>
-        <div>
-          <label className="text-sm font-medium text-text-secondary block mb-1.5">Confirm New Password</label>
-          <input
-            type="password"
-            value={confirmPassword}
-            onChange={(e) => { setConfirmPassword(e.target.value); setStatus('idle') }}
-            required
-            minLength={6}
-            className={inputClass}
-          />
-        </div>
+      {/* Change password toggle */}
+      <button
+        onClick={() => setShowPasswordForm(!showPasswordForm)}
+        className="flex items-center gap-2 text-[14px] text-text-secondary hover:text-text-primary transition-colors"
+      >
+        <svg
+          className={`w-4 h-4 transition-transform ${showPasswordForm ? 'rotate-90' : ''}`}
+          fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+        </svg>
+        Change Password
+      </button>
 
-        <div className="flex items-center gap-3 pt-1">
-          <button
-            type="submit"
-            disabled={saving || !currentPassword || !newPassword || !confirmPassword}
-            className="px-6 py-3 text-[14px] font-semibold rounded-xl bg-blue-600 text-white hover:bg-blue-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {saving ? 'Changing...' : 'Change Password'}
-          </button>
-          {status === 'success' && (
-            <span className="text-[14px] text-emerald-500 font-medium">Password changed</span>
-          )}
-          {status === 'error' && (
-            <span className="text-[14px] text-red-400 font-medium">{errorMsg}</span>
-          )}
-        </div>
-      </form>
+      {showPasswordForm && (
+        <form onSubmit={handleSubmit} className="space-y-4 max-w-sm mt-4">
+          <div>
+            <label className="text-sm font-medium text-text-secondary block mb-1.5">Current Password</label>
+            <input
+              type="password"
+              value={currentPassword}
+              onChange={(e) => { setCurrentPassword(e.target.value); setStatus('idle') }}
+              required
+              className={inputClass}
+            />
+          </div>
+          <div>
+            <label className="text-sm font-medium text-text-secondary block mb-1.5">New Password</label>
+            <input
+              type="password"
+              value={newPassword}
+              onChange={(e) => { setNewPassword(e.target.value); setStatus('idle') }}
+              required
+              minLength={6}
+              className={inputClass}
+            />
+          </div>
+          <div>
+            <label className="text-sm font-medium text-text-secondary block mb-1.5">Confirm New Password</label>
+            <input
+              type="password"
+              value={confirmPassword}
+              onChange={(e) => { setConfirmPassword(e.target.value); setStatus('idle') }}
+              required
+              minLength={6}
+              className={inputClass}
+            />
+          </div>
+
+          <div className="flex items-center gap-3 pt-1">
+            <button
+              type="submit"
+              disabled={saving || !currentPassword || !newPassword || !confirmPassword}
+              className="px-6 py-3 text-[14px] font-semibold rounded-xl bg-blue-600 text-white hover:bg-blue-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {saving ? 'Changing...' : 'Change Password'}
+            </button>
+            {status === 'success' && (
+              <span className="text-[14px] text-emerald-500 font-medium">Password changed</span>
+            )}
+            {status === 'error' && (
+              <span className="text-[14px] text-red-400 font-medium">{errorMsg}</span>
+            )}
+          </div>
+        </form>
+      )}
     </section>
   )
 }

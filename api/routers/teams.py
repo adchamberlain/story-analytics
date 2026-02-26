@@ -101,9 +101,13 @@ async def invite_member(team_id: str, request: InviteRequest, user: dict = Depen
         invite_url = f"{settings.frontend_base_url}/login?invite={invite['token']}"
         email_sent = send_team_invite_email(request.email, team["name"], invite_url, inviter_name)
         if not email_sent:
-            logger.error("Failed to send team invite email to %s for team %s", request.email, team_id)
-            raise HTTPException(status_code=502, detail="Invite was created but the email failed to send. Please try again.")
-        return {"status": "invited", "message": f"Invite sent to {request.email}", "invite_url": invite_url}
+            logger.warning("Email not sent for team invite to %s (team %s) — returning link for manual sharing", request.email, team_id)
+        return {
+            "status": "invited",
+            "message": f"Invite sent to {request.email}" if email_sent else f"Invite created for {request.email}",
+            "invite_url": invite_url,
+            "email_sent": email_sent,
+        }
 
 
 @router.post("/{team_id}/members")
