@@ -5,8 +5,6 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-logger = logging.getLogger(__name__)
-
 from ..auth_simple import get_current_user
 from ..config import get_settings
 from ..email import send_team_invite_email, send_team_added_email
@@ -16,6 +14,8 @@ from ..services.metadata_db import (
     get_user_by_email, get_team_member_role,
     create_invite, get_pending_team_invites, delete_invite,
 )
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/teams", tags=["teams"])
 
