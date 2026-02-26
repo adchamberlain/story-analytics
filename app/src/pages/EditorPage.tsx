@@ -12,6 +12,7 @@ import { VersionHistoryPanel } from '../components/editor/VersionHistoryPanel'
 import { DataTransformGrid } from '../components/editor/DataTransformGrid'
 import { PALETTES } from '../themes/plotTheme'
 import { ConfirmDialog } from '../components/ConfirmDialog'
+import { ChartShareModal } from '../components/sharing/ChartShareModal'
 import type { ChartConfig } from '../types/chart'
 
 export function EditorPage() {
@@ -121,6 +122,7 @@ export function EditorPage() {
   const [rightTab, setRightTab] = useState<'chat' | 'comments'>('chat')
   const [centerView, setCenterView] = useState<'chart' | 'transform'>('chart')
   const [savingTemplate, setSavingTemplate] = useState(false)
+  const [showShareModal, setShowShareModal] = useState(false)
   const dataStore = useDataStore()
 
   // Load full preview for the transform grid when switching to transform view
@@ -380,6 +382,15 @@ export function EditorPage() {
           )}
           {store.chartId && !isNew && (
             <button
+              onClick={() => setShowShareModal(true)}
+              className="px-3 py-2 text-xs rounded-lg border border-border-default text-text-on-surface hover:bg-surface-secondary transition-colors font-medium"
+              title="Share chart"
+            >
+              Share
+            </button>
+          )}
+          {store.chartId && !isNew && (
+            <button
               onClick={handleSaveAsTemplate}
               disabled={savingTemplate}
               className="px-3 py-2 text-xs rounded-lg border border-border-default text-text-on-surface hover:bg-surface-secondary transition-colors font-medium disabled:opacity-50"
@@ -537,6 +548,17 @@ export function EditorPage() {
           destructive
           onConfirm={() => { setShowBackConfirm(false); doBack() }}
           onCancel={() => setShowBackConfirm(false)}
+        />
+      )}
+      {showShareModal && store.chartId && (
+        <ChartShareModal
+          chartId={store.chartId}
+          status={store.status}
+          onClose={() => setShowShareModal(false)}
+          onStatusChange={(newStatus) => {
+            // Sync store state — the modal already called the publish/unpublish API
+            useEditorStore.setState({ status: newStatus })
+          }}
         />
       )}
     </div>
