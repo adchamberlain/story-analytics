@@ -90,3 +90,71 @@ class TestTeamsCRUD:
         admin_members = [m for m in members if m["role"] == "admin"]
         assert len(admin_members) >= 1
         client.delete(f"/api/teams/{team_id}")
+
+
+class TestTeamInviteDB:
+    def test_create_invite_with_team_id(self):
+        from api.services.metadata_db import create_invite, get_invite_by_token
+        invite = create_invite(
+            email="teaminvite@test.com",
+            role="editor",
+            created_by="default-user",
+            team_id="team-abc",
+            team_role="member",
+        )
+        assert invite["team_id"] == "team-abc"
+        assert invite["team_role"] == "member"
+        fetched = get_invite_by_token(invite["token"])
+        assert fetched is not None
+        assert fetched["team_id"] == "team-abc"
+        assert fetched["team_role"] == "member"
+
+    def test_create_invite_without_team_id_defaults_null(self):
+        from api.services.metadata_db import create_invite
+        invite = create_invite(
+            email="admininvite@test.com",
+            role="editor",
+            created_by="default-user",
+        )
+        assert invite.get("team_id") is None
+        assert invite.get("team_role") is None
+
+    def test_get_pending_team_invites(self):
+        from api.services.metadata_db import create_invite, get_pending_team_invites
+        team_id = f"team-pending-{uuid.uuid4().hex[:8]}"
+        create_invite("pending1@test.com", "editor", "default-user", team_id=team_id)
+        create_invite("pending2@test.com", "editor", "default-user", team_id=team_id)
+        create_invite("admin@test.com", "editor", "default-user")
+        pending = get_pending_team_invites(team_id)
+        assert len(pending) == 2
+        emails = [p["email"] for p in pending]
+        assert "pending1@test.com" in emails
+        assert "pending2@test.com" in emails
+
+
+class TestTeamEmails:
+    def test_send_team_invite_email_no_resend(self):
+        """Without RESEND_API_KEY, prints to console and returns True."""
+        import os
+        os.environ.pop("RESEND_API_KEY", None)
+        from api.email import send_team_invite_email
+        result = send_team_invite_email(
+            to_email="newuser@test.com",
+            team_name="Data Team",
+            invite_url="http://localhost:3001/login?invite=abc123",
+            inviter_name="Admin User",
+        )
+        assert result is True
+
+    def test_send_team_added_email_no_resend(self):
+        """Without RESEND_API_KEY, prints to console and returns True."""
+        import os
+        os.environ.pop("RESEND_API_KEY", None)
+        from api.email import send_team_added_email
+        result = send_team_added_email(
+            to_email="existing@test.com",
+            team_name="Data Team",
+            app_url="http://localhost:3001",
+            inviter_name="Admin User",
+        )
+        assert result is True
