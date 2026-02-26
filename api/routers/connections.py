@@ -109,6 +109,20 @@ class SchemaResponse(BaseModel):
     stale: bool = False
 
 
+class ExecuteQueryRequest(BaseModel):
+    sql: str
+    limit: int = 10000
+    timeout: int = 30
+
+class QueryResponse(BaseModel):
+    columns: list[str]
+    column_types: list[str]
+    rows: list[list]
+    row_count: int
+    truncated: bool
+    execution_time_ms: int
+
+
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
 def _build_credentials(conn_config: dict, db_type: str, request, connection_id: str | None = None) -> dict:
@@ -477,4 +491,54 @@ async def get_schema(
         schemas=[SchemaInfoResponse(**s) for s in schema_dicts],
         cached_at=cached_at,
         stale=False,
+    )
+
+
+@router.post("/{connection_id}/query", response_model=QueryResponse)
+async def execute_query(connection_id: str, request: ExecuteQueryRequest, user: dict = Depends(get_current_user)):
+    """Execute a read-only SQL query against the connected warehouse."""
+    conn = load_connection(connection_id)
+    if not conn:
+        raise HTTPException(status_code=404, detail="Connection not found")
+
+    # Load stored credentials — required for query execution
+    stored_creds = load_credentials(connection_id)
+    if not stored_creds:
+        raise HTTPException(
+            status_code=400,
+            detail="No stored credentials found for this connection. "
+                   "Test the connection with save_credentials=true first.",
+        )
+
+    # Merge connection config with stored credentials
+    creds = {**conn.config, **stored_creds}
+
+    try:
+        connector = get_connector(conn.db_type)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    start_ms = time.monotonic_ns() // 1_000_000
+    try:
+        result = connector.execute_query(
+            sql=request.sql,
+            credentials=creds,
+            limit=request.limit,
+            timeout=request.timeout,
+        )
+    except ValueError as e:
+        # SQL validation errors
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Query execution failed: {e}")
+
+    elapsed_ms = (time.monotonic_ns() // 1_000_000) - start_ms
+
+    return QueryResponse(
+        columns=result.columns,
+        column_types=result.column_types,
+        rows=result.rows,
+        row_count=result.row_count,
+        truncated=result.truncated,
+        execution_time_ms=elapsed_ms,
     )

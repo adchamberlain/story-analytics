@@ -9,6 +9,7 @@ from .base import (
     DatabaseConnector,
     ColumnInfo as ColumnInfo,
     ConnectorResult as ConnectorResult,
+    QueryResult as QueryResult,
     SchemaColumn as SchemaColumn,
     SchemaTable as SchemaTable,
     SchemaInfo as SchemaInfo,
