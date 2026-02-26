@@ -8,7 +8,7 @@ import os
 import tempfile
 from pathlib import Path
 
-from .base import DatabaseConnector, ColumnInfo, ConnectorResult, SchemaColumn, SchemaTable, SchemaInfo
+from .base import DatabaseConnector, ColumnInfo, ConnectorResult, QueryResult, SchemaColumn, SchemaTable, SchemaInfo
 
 
 class SnowflakeConnector(DatabaseConnector):
@@ -189,3 +189,41 @@ class SnowflakeConnector(DatabaseConnector):
             conn.close()
 
         return results
+
+    def execute_query(self, sql: str, credentials: dict, limit: int = 10000, timeout: int = 30) -> QueryResult:
+        """Execute a read-only SQL query against Snowflake and return results."""
+        self.validate_sql(sql)
+
+        import snowflake.connector
+
+        kwargs = self._get_connect_kwargs(credentials)
+        kwargs["network_timeout"] = timeout
+
+        conn = snowflake.connector.connect(**kwargs)
+        try:
+            cursor = conn.cursor()
+
+            # Wrap in LIMIT subquery if not already limited
+            exec_sql = sql
+            if "LIMIT" not in sql.upper():
+                exec_sql = f"SELECT * FROM ({sql}) _q LIMIT {limit}"
+
+            cursor.execute(exec_sql)
+
+            columns = [desc[0] for desc in cursor.description]
+            column_types = [str(desc[1]) for desc in cursor.description]
+
+            raw_rows = cursor.fetchmany(limit)
+            rows = [list(row) for row in raw_rows]
+            truncated = len(rows) >= limit
+
+            cursor.close()
+            return QueryResult(
+                columns=columns,
+                column_types=column_types,
+                rows=rows,
+                row_count=len(rows),
+                truncated=truncated,
+            )
+        finally:
+            conn.close()

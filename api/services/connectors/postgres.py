@@ -9,7 +9,7 @@ from pathlib import Path
 
 import re as _re
 
-from .base import DatabaseConnector, ColumnInfo, ConnectorResult, SchemaColumn, SchemaTable, SchemaInfo
+from .base import DatabaseConnector, ColumnInfo, ConnectorResult, QueryResult, SchemaColumn, SchemaTable, SchemaInfo
 
 _SAFE_SCHEMA_RE = _re.compile(r'^[a-zA-Z_][a-zA-Z0-9_$]*$')
 
@@ -218,3 +218,39 @@ class PostgresConnector(DatabaseConnector):
             conn.close()
 
         return results
+
+    def execute_query(self, sql: str, credentials: dict, limit: int = 10000, timeout: int = 30) -> QueryResult:
+        """Execute a read-only SQL query against PostgreSQL and return results."""
+        self.validate_sql(sql)
+
+        conn = self._connect(credentials)
+        try:
+            cursor = conn.cursor()
+
+            # Set statement timeout (in milliseconds)
+            cursor.execute(f"SET statement_timeout = {timeout * 1000}")
+
+            # Wrap in LIMIT subquery if not already limited
+            exec_sql = sql
+            if "LIMIT" not in sql.upper():
+                exec_sql = f"SELECT * FROM ({sql}) _q LIMIT {limit}"
+
+            cursor.execute(exec_sql)
+
+            columns = [desc[0] for desc in cursor.description]
+            column_types = [str(desc[1]) for desc in cursor.description]
+
+            raw_rows = cursor.fetchmany(limit)
+            rows = [list(row) for row in raw_rows]
+            truncated = len(rows) >= limit
+
+            cursor.close()
+            return QueryResult(
+                columns=columns,
+                column_types=column_types,
+                rows=rows,
+                row_count=len(rows),
+                truncated=truncated,
+            )
+        finally:
+            conn.close()
