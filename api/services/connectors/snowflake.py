@@ -8,7 +8,7 @@ import os
 import tempfile
 from pathlib import Path
 
-from .base import DatabaseConnector, ColumnInfo, ConnectorResult
+from .base import DatabaseConnector, ColumnInfo, ConnectorResult, QueryResult, SchemaColumn, SchemaTable, SchemaInfo
 
 
 class SnowflakeConnector(DatabaseConnector):
@@ -79,6 +79,49 @@ class SnowflakeConnector(DatabaseConnector):
         """Quote a Snowflake identifier (table/column name) safely."""
         return '"' + name.replace('"', '""') + '"'
 
+    def list_schemas(self, credentials: dict) -> ConnectorResult:
+        conn = None
+        try:
+            import snowflake.connector
+            conn = snowflake.connector.connect(**self._get_connect_kwargs(credentials))
+            cursor = conn.cursor()
+
+            # Get all schemas in the database
+            cursor.execute("SHOW SCHEMAS")
+            schema_names = [row[1] for row in cursor.fetchall()]
+
+            schemas: list[SchemaInfo] = []
+            for schema_name in schema_names:
+                # Get tables in this schema (row count is at index 7)
+                cursor.execute(f"SHOW TABLES IN SCHEMA {self._quote_identifier(schema_name)}")
+                table_rows = cursor.fetchall()
+
+                tables: list[SchemaTable] = []
+                for trow in table_rows:
+                    table_name = trow[1]
+                    row_count = trow[7] if len(trow) > 7 else None
+
+                    # Get columns for this table
+                    cursor.execute(
+                        f"DESCRIBE TABLE {self._quote_identifier(schema_name)}"
+                        f".{self._quote_identifier(table_name)}"
+                    )
+                    columns = [
+                        SchemaColumn(name=crow[0], type=crow[1])
+                        for crow in cursor.fetchall()
+                    ]
+                    tables.append(SchemaTable(name=table_name, columns=columns, row_count=row_count))
+
+                schemas.append(SchemaInfo(name=schema_name, tables=tables))
+
+            cursor.close()
+            return ConnectorResult(success=True, schemas=schemas)
+        except Exception as e:
+            return ConnectorResult(success=False, message=f"Failed to list schemas: {e}")
+        finally:
+            if conn:
+                conn.close()
+
     def get_table_schema(self, table: str, credentials: dict) -> ConnectorResult:
         conn = None
         try:
@@ -146,3 +189,39 @@ class SnowflakeConnector(DatabaseConnector):
             conn.close()
 
         return results
+
+    def execute_query(self, sql: str, credentials: dict, limit: int = 10000, timeout: int = 30) -> QueryResult:
+        """Execute a read-only SQL query against Snowflake and return results."""
+        self.validate_sql(sql)
+
+        import snowflake.connector
+
+        kwargs = self._get_connect_kwargs(credentials)
+        kwargs["network_timeout"] = timeout
+
+        conn = snowflake.connector.connect(**kwargs)
+        try:
+            cursor = conn.cursor()
+
+            # Always wrap in LIMIT subquery (database optimizes away redundant LIMIT)
+            exec_sql = f"SELECT * FROM ({sql}) _q LIMIT {limit}"
+
+            cursor.execute(exec_sql)
+
+            columns = [desc[0] for desc in cursor.description]
+            column_types = [str(desc[1]) for desc in cursor.description]
+
+            raw_rows = cursor.fetchmany(limit)
+            rows = [list(row) for row in raw_rows]
+            truncated = len(rows) >= limit
+
+            cursor.close()
+            return QueryResult(
+                columns=columns,
+                column_types=column_types,
+                rows=rows,
+                row_count=len(rows),
+                truncated=truncated,
+            )
+        finally:
+            conn.close()
