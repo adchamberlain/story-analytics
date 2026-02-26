@@ -158,3 +158,72 @@ class TestTeamEmails:
             inviter_name="Admin User",
         )
         assert result is True
+
+
+class TestTeamInviteEndpoint:
+    def test_invite_registered_user_adds_directly(self):
+        """Inviting a registered user adds them to the team immediately."""
+        from api.services.metadata_db import create_user
+        email = f"registered_{uuid.uuid4().hex[:8]}@test.com"
+        user = create_user(email, "hash123", "Reg User")
+        r = client.post("/api/teams/", json={"name": "Invite Reg Team"})
+        team_id = r.json()["id"]
+        resp = client.post(f"/api/teams/{team_id}/invite", json={"email": email})
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["status"] == "added"
+        detail = client.get(f"/api/teams/{team_id}").json()
+        member_ids = [m["user_id"] for m in detail["members"]]
+        assert user["id"] in member_ids
+        client.delete(f"/api/teams/{team_id}")
+
+    def test_invite_unregistered_user_creates_invite(self):
+        """Inviting an unregistered email creates a pending invite."""
+        r = client.post("/api/teams/", json={"name": "Invite Unreg Team"})
+        team_id = r.json()["id"]
+        email = f"notyet_{uuid.uuid4().hex[:8]}@test.com"
+        resp = client.post(f"/api/teams/{team_id}/invite", json={"email": email})
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["status"] == "invited"
+        assert "invite_url" in data
+        from api.services.metadata_db import get_pending_team_invites
+        pending = get_pending_team_invites(team_id)
+        assert any(p["email"] == email for p in pending)
+        client.delete(f"/api/teams/{team_id}")
+
+    def test_invite_already_member_returns_409(self):
+        """Inviting someone who's already a member returns 409."""
+        from api.services.metadata_db import create_user
+        email = f"already_{uuid.uuid4().hex[:8]}@test.com"
+        user = create_user(email, "hash123", "Already Member")
+        r = client.post("/api/teams/", json={"name": "Already Team"})
+        team_id = r.json()["id"]
+        client.post(f"/api/teams/{team_id}/members", json={"user_id": user["id"]})
+        resp = client.post(f"/api/teams/{team_id}/invite", json={"email": email})
+        assert resp.status_code == 409
+        client.delete(f"/api/teams/{team_id}")
+
+
+class TestRegistrationAutoJoinsTeam:
+    def test_register_with_team_invite_joins_team(self):
+        """Registering via a team invite auto-adds user to the team."""
+        import os
+        if os.environ.get("AUTH_ENABLED", "").lower() != "true":
+            return  # This test requires auth enabled
+        from api.services.metadata_db import create_invite, get_team_members, create_team, delete_team
+        team = create_team("Auto Join Team", "default-user")
+        team_id = team["id"]
+        email = f"newreg_{uuid.uuid4().hex[:8]}@test.com"
+        invite = create_invite(email, "editor", "default-user", team_id=team_id, team_role="member")
+        resp = client.post("/api/auth/register", json={
+            "email": email,
+            "password": "testpass123",
+            "invite_token": invite["token"],
+        })
+        assert resp.status_code == 200
+        user_data = resp.json()["user"]
+        members = get_team_members(team_id)
+        member_ids = [m["user_id"] for m in members]
+        assert user_data["id"] in member_ids
+        delete_team(team_id, "default-user")

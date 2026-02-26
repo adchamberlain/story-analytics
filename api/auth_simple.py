@@ -176,7 +176,7 @@ async def register(request: RegisterRequest):
     if not AUTH_ENABLED:
         raise HTTPException(status_code=400, detail="Auth is disabled. Set AUTH_ENABLED=true to enable.")
 
-    from .services.metadata_db import get_invite_by_token, mark_invite_used, get_admin_setting, update_user_role
+    from .services.metadata_db import get_invite_by_token, mark_invite_used, get_admin_setting, update_user_role, add_team_member
 
     invite = None
     role_override = None
@@ -206,6 +206,9 @@ async def register(request: RegisterRequest):
 
     if invite:
         mark_invite_used(invite["id"])
+        # Auto-join team if this was a team invite
+        if invite.get("team_id"):
+            add_team_member(invite["team_id"], user["id"], invite.get("team_role", "member"))
 
     token = _create_token(user["id"])
     return AuthResponse(token=token, user=user)
