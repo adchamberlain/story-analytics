@@ -71,6 +71,14 @@ class StorageBackend(ABC):
             "Use read() to get file contents."
         )
 
+    def invalidate_local_cache(self, path: str) -> None:
+        """Remove any locally cached copy of a storage path.
+
+        No-op for local backends (the file IS the storage). S3 backends
+        override this to delete the cached download so the next
+        get_local_path() re-fetches from S3.
+        """
+
     # ── Convenience helpers (non-abstract) ──────────────────────────
 
     def read_text(self, path: str) -> str:

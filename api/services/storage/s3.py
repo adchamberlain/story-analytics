@@ -97,3 +97,9 @@ class S3StorageBackend(StorageBackend):
             data = self.read(path)
             local.write_bytes(data)
         return local
+
+    def invalidate_local_cache(self, path: str) -> None:
+        """Delete the locally cached copy so the next get_local_path re-downloads."""
+        local = Path(_S3_CACHE_DIR) / path
+        if local.exists():
+            local.unlink()

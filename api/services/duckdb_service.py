@@ -356,6 +356,41 @@ class DuckDBService:
         table_name = f"src_{source_id}"
         return self.execute_query(f"SELECT * FROM {table_name} LIMIT {limit}", source_id)
 
+    def reload_source(self, source_id: str) -> None:
+        """Re-create a DuckDB table from the CSV in storage (without re-uploading).
+
+        Used after transforms modify the CSV in-place so the DuckDB table
+        reflects the updated file without overwriting it with a stale local cache.
+        """
+        if not _SAFE_SOURCE_ID_RE.match(source_id):
+            raise ValueError(f"Invalid source_id: {source_id}")
+
+        # Find the CSV in storage
+        prefix = f"uploads/{source_id}/"
+        all_files = self._storage.list(prefix)
+        csv_path = next(
+            (f for f in all_files if f.lower().endswith(".csv")), None
+        )
+        if not csv_path:
+            raise FileNotFoundError(f"No CSV found for source {source_id}")
+
+        # Invalidate stale local cache so S3 backend re-downloads the updated file
+        self._storage.invalidate_local_cache(csv_path)
+        local_path = self._storage.get_local_path(csv_path)
+        table_name = f"src_{source_id}"
+        delimiter = self._detect_delimiter(local_path)
+        with self._lock:
+            self._conn.execute(f"""
+                CREATE OR REPLACE TABLE {table_name} AS
+                SELECT * FROM read_csv_auto(
+                    '{_sql_string(str(local_path))}', delim='{delimiter}', header=true
+                )
+            """)
+        self._sources[source_id] = SourceMeta(
+            path=local_path,
+            ingested_at=datetime.now(timezone.utc),
+        )
+
     @staticmethod
     def _is_read_only_sql(sql: str) -> bool:
         """Check whether *sql* is a read-only statement (SELECT / WITH / EXPLAIN).
