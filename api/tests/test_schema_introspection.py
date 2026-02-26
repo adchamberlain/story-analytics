@@ -114,12 +114,12 @@ class TestSnowflakeListSchemas:
         fetchall_responses = iter([
             # SHOW SCHEMAS -> 2 schemas
             [("", "PUBLIC", "", "", "", ""), ("", "ANALYTICS", "", "", "", "")],
-            # SHOW TABLES IN SCHEMA "PUBLIC" -> 1 table with row_count at index 8
-            [("", "USERS", "", "", "", "", "", "", 500, "")],
+            # SHOW TABLES IN SCHEMA "PUBLIC" -> 1 table with row_count at index 7
+            [("", "USERS", "", "", "", "", "", 500, "", "")],
             # DESCRIBE TABLE "PUBLIC"."USERS" -> 2 columns
             [("ID", "NUMBER(38,0)"), ("NAME", "VARCHAR(100)")],
             # SHOW TABLES IN SCHEMA "ANALYTICS" -> 1 table
-            [("", "EVENTS", "", "", "", "", "", "", 2000, "")],
+            [("", "EVENTS", "", "", "", "", "", 2000, "", "")],
             # DESCRIBE TABLE "ANALYTICS"."EVENTS" -> 2 columns
             [("EVENT_ID", "NUMBER(38,0)"), ("TIMESTAMP", "TIMESTAMP_NTZ")],
         ])
