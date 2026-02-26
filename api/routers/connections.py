@@ -6,6 +6,7 @@ Supports Snowflake, PostgreSQL, and BigQuery via pluggable connectors.
 import calendar
 import json
 import os
+import tempfile
 import time
 import traceback
 from pathlib import Path
@@ -121,6 +122,15 @@ class QueryResponse(BaseModel):
     row_count: int
     truncated: bool
     execution_time_ms: int
+
+
+class QuerySyncRequest(BaseModel):
+    sql: str = Field(..., max_length=100000)
+    source_name: str = Field(default="Query Result", max_length=200)
+
+class QuerySyncResponse(BaseModel):
+    source_id: str
+    row_count: int
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
@@ -541,4 +551,79 @@ async def execute_query(connection_id: str, request: ExecuteQueryRequest, user: 
         row_count=result.row_count,
         truncated=result.truncated,
         execution_time_ms=elapsed_ms,
+    )
+
+
+@router.post("/{connection_id}/sync-query", response_model=QuerySyncResponse)
+async def sync_query_result(connection_id: str, request: QuerySyncRequest, user: dict = Depends(get_current_user)):
+    """Sync arbitrary query results into DuckDB as a new source.
+
+    Executes the SQL against the connected warehouse, converts the results
+    to a parquet file, and ingests it into the local DuckDB instance.
+    Used by the "Chart this" flow in the SQL workbench.
+    """
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+
+    conn = load_connection(connection_id)
+    if not conn:
+        raise HTTPException(status_code=404, detail="Connection not found")
+
+    # Load stored credentials — required for query execution
+    stored_creds = load_credentials(connection_id)
+    if not stored_creds:
+        raise HTTPException(
+            status_code=400,
+            detail="No stored credentials found for this connection. "
+                   "Test the connection with save_credentials=true first.",
+        )
+
+    # Merge connection config with stored credentials
+    creds = {**conn.config, **stored_creds}
+
+    try:
+        connector = get_connector(conn.db_type)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    # Execute the query against the warehouse
+    try:
+        result = connector.execute_query(
+            sql=request.sql,
+            credentials=creds,
+            limit=10000,
+            timeout=30,
+        )
+    except ValueError as e:
+        # SQL validation errors (INSERT, DELETE, etc.)
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Query execution failed: {e}")
+
+    if not result.columns or not result.rows:
+        raise HTTPException(status_code=400, detail="Query returned no data")
+
+    # Convert QueryResult rows to a pyarrow Table
+    # Transpose row-major data to column-major for Arrow
+    col_data = {
+        col: [row[i] for row in result.rows]
+        for i, col in enumerate(result.columns)
+    }
+    arrow_table = pa.table(col_data)
+
+    # Write to temp parquet file, ingest into DuckDB, clean up
+    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".parquet")
+    pq_path = Path(tmp.name)
+    tmp.close()
+
+    try:
+        pq.write_table(arrow_table, str(pq_path))
+        db = get_duckdb_service()
+        schema = db.ingest_parquet(pq_path, request.source_name)
+    finally:
+        pq_path.unlink(missing_ok=True)
+
+    return QuerySyncResponse(
+        source_id=schema.source_id,
+        row_count=schema.row_count,
     )
