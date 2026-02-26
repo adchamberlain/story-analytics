@@ -19,6 +19,11 @@ from ..services.connection_service import (
     delete_connection,
 )
 from ..services.connectors import get_connector, CONNECTOR_REGISTRY
+from ..services.credential_store import (
+    store_credentials,
+    load_credentials,
+    delete_credentials,
+)
 from ..services.duckdb_service import get_duckdb_service
 
 
@@ -45,6 +50,7 @@ class TestConnectionRequest(BaseModel):
     username: str | None = None
     password: str | None = None
     credentials: dict | None = None  # Generic credentials for any connector
+    save_credentials: bool = False   # Persist encrypted credentials on successful test
 
 class TestConnectionResponse(BaseModel):
     success: bool
@@ -79,20 +85,28 @@ class ConnectorTypesResponse(BaseModel):
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
-def _build_credentials(conn_config: dict, db_type: str, request) -> dict:
+def _build_credentials(conn_config: dict, db_type: str, request, connection_id: str | None = None) -> dict:
     """
     Build a unified credentials dict from connection config + request params.
 
-    For Snowflake: merges connection config with username from .env fallback.
-    For Postgres/BigQuery: merges connection config with provided credentials.
+    Priority (highest to lowest):
+      1. Explicit request params (username, password, credentials dict)
+      2. Stored encrypted credentials (if connection_id provided)
+      3. Environment variable fallbacks (.env)
     """
     creds = {**conn_config}
 
-    # If the request provides a generic credentials dict, merge it
+    # Fallback: merge stored encrypted credentials (lowest priority, under request params)
+    if connection_id:
+        stored = load_credentials(connection_id)
+        if stored:
+            creds.update(stored)
+
+    # If the request provides a generic credentials dict, merge it (overrides stored)
     if hasattr(request, 'credentials') and request.credentials:
         creds.update(request.credentials)
 
-    # Legacy Snowflake compat: merge username/password from request
+    # Legacy Snowflake compat: merge username/password from request (overrides stored)
     if request.username:
         creds["username"] = request.username
     if hasattr(request, 'password') and request.password:
@@ -185,9 +199,10 @@ async def get_connection(connection_id: str, user: dict = Depends(get_current_us
 
 @router.delete("/{connection_id}")
 async def remove_connection(connection_id: str, user: dict = Depends(get_current_user)):
-    """Delete a connection."""
+    """Delete a connection and its stored credentials."""
     if not delete_connection(connection_id):
         raise HTTPException(status_code=404, detail="Connection not found")
+    delete_credentials(connection_id)
     return {"deleted": True}
 
 
@@ -203,11 +218,22 @@ async def test_connection(connection_id: str, request: TestConnectionRequest, us
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-    creds = _build_credentials(conn.config, conn.db_type, request)
+    creds = _build_credentials(conn.config, conn.db_type, request, connection_id)
 
     try:
         result = connector.test_connection(creds)
         if result.success:
+            # Save credentials if requested
+            if request.save_credentials:
+                # Store only secret fields (exclude config keys already in conn.config)
+                secrets_to_store = {k: v for k, v in creds.items() if k not in conn.config}
+                if request.credentials:
+                    secrets_to_store.update(request.credentials)
+                if request.password:
+                    secrets_to_store["password"] = request.password
+                if secrets_to_store:
+                    store_credentials(connection_id, secrets_to_store)
+
             # Also list tables on successful test
             tables_result = connector.list_tables(creds)
             return TestConnectionResponse(
@@ -238,7 +264,7 @@ async def list_tables(connection_id: str, request: ListTablesRequest, user: dict
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-    creds = _build_credentials(conn.config, conn.db_type, request)
+    creds = _build_credentials(conn.config, conn.db_type, request, connection_id)
 
     try:
         result = connector.list_tables(creds)
@@ -275,7 +301,7 @@ async def sync_tables(connection_id: str, request: SyncRequest, user: dict = Dep
         raise HTTPException(status_code=400, detail=str(e))
 
     db = get_duckdb_service()
-    creds = _build_credentials(conn.config, conn.db_type, request)
+    creds = _build_credentials(conn.config, conn.db_type, request, connection_id)
 
     # Determine cache dir (only for Snowflake for backward compat)
     cache_dir = CACHE_DIR if conn.db_type == "snowflake" else None
