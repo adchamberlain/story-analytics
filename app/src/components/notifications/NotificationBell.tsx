@@ -3,15 +3,16 @@ import { useNotificationStore } from '../../stores/notificationStore'
 import { NotificationDropdown } from './NotificationDropdown'
 
 export function NotificationBell() {
-  const { unreadCount, fetchUnreadCount } = useNotificationStore()
+  const { unreadCount, fetchUnreadCount, muted, setMuted } = useNotificationStore()
   const [open, setOpen] = useState(false)
 
-  // Poll unread count every 60s
+  // Poll unread count every 60s (skip when muted)
   useEffect(() => {
+    if (muted) return
     fetchUnreadCount()
     const timer = setInterval(fetchUnreadCount, 60_000)
     return () => clearInterval(timer)
-  }, [fetchUnreadCount])
+  }, [fetchUnreadCount, muted])
 
   return (
     <div className="relative">
@@ -23,7 +24,7 @@ export function NotificationBell() {
         <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" />
         </svg>
-        {unreadCount > 0 && (
+        {!muted && unreadCount > 0 && (
           <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] flex items-center justify-center text-[10px] font-bold bg-red-500 text-white rounded-full px-1">
             {unreadCount > 99 ? '99+' : unreadCount}
           </span>
@@ -34,7 +35,21 @@ export function NotificationBell() {
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
           <div className="absolute right-0 top-full mt-2 w-80 z-50">
-            <NotificationDropdown onClose={() => setOpen(false)} />
+            {muted ? (
+              <div className="bg-surface-raised border border-border-default rounded-xl shadow-lg overflow-hidden">
+                <div className="px-4 py-6 text-center">
+                  <p className="text-sm text-text-muted mb-3">Notifications are muted</p>
+                  <button
+                    onClick={() => setMuted(false)}
+                    className="text-sm text-blue-500 hover:text-blue-400 font-medium transition-colors"
+                  >
+                    Unmute
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <NotificationDropdown onClose={() => setOpen(false)} />
+            )}
           </div>
         </>
       )}

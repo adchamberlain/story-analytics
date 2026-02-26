@@ -6,6 +6,7 @@ import { useChartThemeStore } from '../stores/chartThemeStore'
 import { CHART_THEMES } from '../themes/chartThemes'
 import { useLocaleStore, SUPPORTED_LOCALES } from '../stores/localeStore'
 import { useAuthStore } from '../stores/authStore'
+import { useNotificationStore } from '../stores/notificationStore'
 
 const PROVIDERS = [
   { id: 'anthropic', label: 'Anthropic', sublabel: 'Claude', keyField: 'anthropic_api_key' as const },
@@ -213,6 +214,9 @@ export function SettingsPage() {
 
         {/* ── API Keys ──────────────────────────────────────────── */}
         <ApiKeyManager />
+
+        {/* ── Notifications ──────────────────────────────────────── */}
+        <NotificationPreferences />
 
         {/* ── About ────────────────────────────────────────────────── */}
         <section className="bg-surface-raised rounded-2xl shadow-card border border-border-default p-7">
@@ -1482,6 +1486,32 @@ function LocaleSelector() {
           )
         })}
       </div>
+    </section>
+  )
+}
+
+// ── Notification Preferences ─────────────────────────────────────────────────
+
+function NotificationPreferences() {
+  const { muted, setMuted } = useNotificationStore()
+
+  return (
+    <section className="bg-surface-raised rounded-2xl shadow-card border border-border-default p-7">
+      <h2 className="text-[17px] font-semibold text-text-primary mb-1">Notifications</h2>
+      <p className="text-[14px] text-text-muted mb-5">
+        When muted, the notification bell will not show badges or fetch new notifications.
+      </p>
+      <label className="flex items-center gap-3 cursor-pointer">
+        <button
+          role="switch"
+          aria-checked={muted}
+          onClick={() => setMuted(!muted)}
+          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${muted ? 'bg-blue-500' : 'bg-gray-600'}`}
+        >
+          <span className={`inline-block h-4 w-4 rounded-full bg-white transition-transform ${muted ? 'translate-x-6' : 'translate-x-1'}`} />
+        </button>
+        <span className="text-[15px] text-text-primary">Mute all notifications</span>
+      </label>
     </section>
   )
 }
