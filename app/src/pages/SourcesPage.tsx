@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { authFetch } from '../utils/authFetch'
+import { SqlWorkbenchPanel } from '../components/data/SqlWorkbenchPanel'
 
 interface DataSource {
   source_id: string
@@ -23,6 +24,7 @@ export function SourcesPage() {
   const [loading, setLoading] = useState(true)
   const [deleting, setDeleting] = useState<string | null>(null)
   const [confirmId, setConfirmId] = useState<string | null>(null)
+  const [openConnection, setOpenConnection] = useState<DataSource | null>(null)
 
   const fetchSources = useCallback(() => {
     authFetch('/api/settings/sources')
@@ -111,6 +113,7 @@ export function SourcesPage() {
             onConfirm={setConfirmId}
             onCancel={() => setConfirmId(null)}
             onDelete={handleDelete}
+            onRowClick={(source) => setOpenConnection(source)}
           />
 
           {/* Uploaded Files */}
@@ -127,6 +130,13 @@ export function SourcesPage() {
           />
         </div>
       )}
+
+      <SqlWorkbenchPanel
+        connectionId={openConnection?.source_id ?? null}
+        connectionName={openConnection?.name ?? ''}
+        dbType={openConnection?.type ?? ''}
+        onClose={() => setOpenConnection(null)}
+      />
     </div>
   )
 }
@@ -141,6 +151,7 @@ function SourceSection({
   onConfirm,
   onCancel,
   onDelete,
+  onRowClick,
 }: {
   title: string
   subtitle: string
@@ -151,6 +162,7 @@ function SourceSection({
   onConfirm: (id: string) => void
   onCancel: () => void
   onDelete: (source: DataSource) => void
+  onRowClick?: (source: DataSource) => void
 }) {
   return (
     <section className="bg-surface-raised rounded-2xl shadow-card border border-border-default p-7">
@@ -166,7 +178,10 @@ function SourceSection({
           {items.map((s) => (
             <div
               key={s.source_id}
-              className="flex items-center justify-between px-4 py-3 rounded-xl bg-surface-input border border-border-default"
+              className={`flex items-center justify-between px-4 py-3 rounded-xl bg-surface-input border border-border-default${
+                onRowClick ? ' cursor-pointer hover:bg-surface-secondary/50 transition-colors' : ''
+              }`}
+              onClick={onRowClick ? () => onRowClick(s) : undefined}
             >
               <div className="flex items-center gap-3 min-w-0">
                 <span
@@ -178,7 +193,7 @@ function SourceSection({
                 </span>
                 <span className="text-[14px] text-text-primary font-medium truncate">{s.name}</span>
               </div>
-              <div className="flex items-center gap-4 shrink-0">
+              <div className="flex items-center gap-4 shrink-0" onClick={(e) => e.stopPropagation()}>
                 <div className="flex items-center gap-4 text-[13px] text-text-muted">
                   {s.row_count > 0 && <span>{s.row_count.toLocaleString()} rows</span>}
                   {s.column_count > 0 && <span>{s.column_count} cols</span>}

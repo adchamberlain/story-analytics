@@ -8,7 +8,7 @@ import json
 import tempfile
 from pathlib import Path
 
-from .base import DatabaseConnector, ColumnInfo, ConnectorResult
+from .base import DatabaseConnector, ColumnInfo, ConnectorResult, QueryResult, SchemaColumn, SchemaTable, SchemaInfo
 
 
 class BigQueryConnector(DatabaseConnector):
@@ -56,6 +56,43 @@ class BigQueryConnector(DatabaseConnector):
             return ConnectorResult(success=True, tables=tables)
         except Exception as e:
             return ConnectorResult(success=False, message=f"Failed to list tables: {e}")
+
+    def list_schemas(self, credentials: dict) -> ConnectorResult:
+        try:
+            client = self._get_client(credentials)
+            project_id = credentials["project_id"]
+
+            # In BigQuery, datasets = schemas
+            datasets = list(client.list_datasets())
+
+            schemas: list[SchemaInfo] = []
+            for dataset in datasets:
+                dataset_id = dataset.dataset_id
+                dataset_ref = f"{project_id}.{dataset_id}"
+
+                # List tables in this dataset
+                table_refs = list(client.list_tables(dataset_ref))
+
+                tables: list[SchemaTable] = []
+                for table_ref in table_refs:
+                    full_ref = f"{project_id}.{dataset_id}.{table_ref.table_id}"
+                    bq_table = client.get_table(full_ref)
+
+                    columns = [
+                        SchemaColumn(name=f.name, type=f.field_type)
+                        for f in bq_table.schema
+                    ]
+                    tables.append(SchemaTable(
+                        name=table_ref.table_id,
+                        columns=columns,
+                        row_count=bq_table.num_rows,
+                    ))
+
+                schemas.append(SchemaInfo(name=dataset_id, tables=tables))
+
+            return ConnectorResult(success=True, schemas=schemas)
+        except Exception as e:
+            return ConnectorResult(success=False, message=f"Failed to list schemas: {e}")
 
     def get_table_schema(self, table: str, credentials: dict) -> ConnectorResult:
         try:
@@ -110,3 +147,39 @@ class BigQueryConnector(DatabaseConnector):
                     pq_path.unlink(missing_ok=True)
 
         return results
+
+    def execute_query(self, sql: str, credentials: dict, limit: int = 10000, timeout: int = 30) -> QueryResult:
+        """Execute a read-only SQL query against BigQuery and return results."""
+        self.validate_sql(sql)
+
+        from google.cloud import bigquery
+
+        client = self._get_client(credentials)
+
+        # Always wrap in LIMIT subquery (database optimizes away redundant LIMIT)
+        exec_sql = f"SELECT * FROM ({sql}) _q LIMIT {limit}"
+
+        job_config = bigquery.QueryJobConfig(
+            use_legacy_sql=False,
+        )
+        query_job = client.query(exec_sql, job_config=job_config)
+        result_iter = query_job.result(timeout=timeout)
+
+        columns = [field.name for field in result_iter.schema]
+        column_types = [field.field_type for field in result_iter.schema]
+
+        rows = []
+        for i, row in enumerate(result_iter):
+            if i >= limit:
+                break
+            rows.append(list(row.values()))
+
+        truncated = len(rows) >= limit
+
+        return QueryResult(
+            columns=columns,
+            column_types=column_types,
+            rows=rows,
+            row_count=len(rows),
+            truncated=truncated,
+        )
