@@ -154,6 +154,9 @@ export function EmbedDashboardPage() {
       <div style={flags.static ? { pointerEvents: 'none' } : undefined}>
         <DashboardGrid charts={dashboard.charts} embedFlags={flags} />
       </div>
+      <p style={{ textAlign: 'center', fontSize: 12, color: isDark ? '#64748b' : '#9ca3af', marginTop: 24 }}>
+        Created with <a href="https://storyanalytics.ai" target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'underline' }}>Story Analytics</a>
+      </p>
     </div>
   )
 }
