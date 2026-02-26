@@ -214,6 +214,9 @@ export function SettingsPage() {
         {/* ── Account (Change Password) ─────────────────────────── */}
         <ChangePasswordSection />
 
+        {/* ── User Management (Admin) ─────────────────────── */}
+        <AdminUsersSection />
+
         {/* ── Chart Theme ──────────────────────────────────────────── */}
         <ChartThemeSelector />
 
@@ -811,10 +814,365 @@ function TeamManager() {
   )
 }
 
+// ── Admin User Management ────────────────────────────────────────────────────
+
+interface AdminUser {
+  id: string
+  email: string
+  display_name: string | null
+  role: string
+  created_at: string
+  is_active: number
+}
+
+interface Invite {
+  id: string
+  email: string
+  role: string
+  token: string
+  expires_at: string
+}
+
+function AdminUsersSection() {
+  const { authEnabled, user } = useAuthStore()
+  const [users, setUsers] = useState<AdminUser[]>([])
+  const [invites, setInvites] = useState<Invite[]>([])
+  const [loading, setLoading] = useState(true)
+  const [showInviteModal, setShowInviteModal] = useState(false)
+  const [inviteEmail, setInviteEmail] = useState('')
+  const [inviteRole, setInviteRole] = useState('editor')
+  const [inviteUrl, setInviteUrl] = useState<string | null>(null)
+  const [creating, setCreating] = useState(false)
+  const [inviteError, setInviteError] = useState('')
+  const [settings, setSettings] = useState<{ open_registration: string }>({ open_registration: 'true' })
+
+  const isAdmin = authEnabled && user?.role === 'admin'
+
+  useEffect(() => {
+    if (!isAdmin) return
+    Promise.all([
+      authFetch('/api/admin/users').then(r => r.ok ? r.json() : []),
+      authFetch('/api/admin/invites').then(r => r.ok ? r.json() : []),
+      authFetch('/api/admin/settings').then(r => r.ok ? r.json() : { open_registration: 'true' }),
+    ]).then(([usersData, invitesData, settingsData]) => {
+      setUsers(usersData)
+      setInvites(invitesData)
+      setSettings(settingsData)
+      setLoading(false)
+    }).catch(() => setLoading(false))
+  }, [isAdmin])
+
+  if (!isAdmin) return null
+
+  const handleRoleChange = async (userId: string, newRole: string) => {
+    const res = await authFetch(`/api/admin/users/${userId}/role`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ role: newRole }),
+    })
+    if (res.ok) {
+      setUsers(prev => prev.map(u => u.id === userId ? { ...u, role: newRole } : u))
+    }
+  }
+
+  const handleStatusChange = async (userId: string, active: boolean) => {
+    const res = await authFetch(`/api/admin/users/${userId}/status`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ active }),
+    })
+    if (res.ok) {
+      setUsers(prev => prev.map(u => u.id === userId ? { ...u, is_active: active ? 1 : 0 } : u))
+    }
+  }
+
+  const handleCreateInvite = async () => {
+    if (!inviteEmail.trim()) return
+    setCreating(true)
+    setInviteError('')
+    try {
+      const res = await authFetch('/api/admin/invites', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: inviteEmail.trim(), role: inviteRole }),
+      })
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({ detail: 'Failed to create invite' }))
+        throw new Error(body.detail)
+      }
+      const data = await res.json()
+      setInviteUrl(data.invite_url)
+      const invRes = await authFetch('/api/admin/invites')
+      if (invRes.ok) setInvites(await invRes.json())
+    } catch (err) {
+      setInviteError(err instanceof Error ? err.message : 'Failed')
+    } finally {
+      setCreating(false)
+    }
+  }
+
+  const handleDeleteInvite = async (inviteId: string) => {
+    await authFetch(`/api/admin/invites/${inviteId}`, { method: 'DELETE' })
+    setInvites(prev => prev.filter(i => i.id !== inviteId))
+  }
+
+  const handleToggleOpenRegistration = async () => {
+    const newValue = settings.open_registration === 'true' ? 'false' : 'true'
+    const res = await authFetch('/api/admin/settings', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ open_registration: newValue }),
+    })
+    if (res.ok) {
+      setSettings(await res.json())
+    }
+  }
+
+  const ROLE_COLORS: Record<string, string> = {
+    admin: 'bg-amber-500/15 text-amber-500',
+    editor: 'bg-blue-500/15 text-blue-400',
+  }
+
+  const formatDate = (dateStr: string) => {
+    const date = new Date(dateStr)
+    const now = new Date()
+    const diffMs = now.getTime() - date.getTime()
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+    if (diffDays === 0) return 'Today'
+    if (diffDays === 1) return 'Yesterday'
+    if (diffDays < 30) return `${diffDays}d ago`
+    return date.toLocaleDateString()
+  }
+
+  return (
+    <section className="bg-surface-raised rounded-2xl shadow-card border border-border-default p-7">
+      <div className="flex items-center justify-between mb-5">
+        <div>
+          <h2 className="text-[17px] font-semibold text-text-primary mb-1">User Management</h2>
+          <p className="text-[14px] text-text-muted">Manage users, roles, and invitations.</p>
+        </div>
+        <button
+          onClick={() => { setShowInviteModal(true); setInviteEmail(''); setInviteRole('editor'); setInviteUrl(null); setInviteError('') }}
+          className="px-4 py-2.5 text-[14px] font-medium rounded-xl bg-blue-600 text-white hover:bg-blue-500 transition-colors"
+        >
+          Invite User
+        </button>
+      </div>
+
+      {/* Open registration toggle */}
+      <div className="flex items-center gap-3 mb-5 px-4 py-3 rounded-xl bg-surface-input border border-border-default">
+        <label className="flex items-center gap-2.5 cursor-pointer flex-1">
+          <input
+            type="checkbox"
+            checked={settings.open_registration === 'true'}
+            onChange={handleToggleOpenRegistration}
+            className="w-4 h-4 rounded accent-blue-500"
+          />
+          <span className="text-[14px] text-text-primary font-medium">Allow open registration</span>
+        </label>
+        <span className="text-[13px] text-text-muted">
+          {settings.open_registration === 'true' ? 'Anyone can create an account' : 'Invite-only'}
+        </span>
+      </div>
+
+      {loading ? (
+        <p className="text-[14px] text-text-muted py-4">Loading users...</p>
+      ) : (
+        <>
+          {/* Users table */}
+          <div className="flex flex-col gap-1.5">
+            {users.map((u) => {
+              const isSelf = u.id === user?.id
+              const inactive = !u.is_active
+              return (
+                <div
+                  key={u.id}
+                  className={`flex items-center justify-between px-4 py-3 rounded-xl border border-border-default ${
+                    inactive ? 'bg-surface-input/50 opacity-60' : 'bg-surface-input'
+                  }`}
+                >
+                  <div className="flex flex-col gap-0.5 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[14px] text-text-primary font-medium truncate">
+                        {u.display_name || u.email}
+                      </span>
+                      <span className={`text-[11px] font-semibold uppercase px-2 py-0.5 rounded-md ${ROLE_COLORS[u.role] || ROLE_COLORS.editor}`}>
+                        {u.role}
+                      </span>
+                      {inactive && (
+                        <span className="text-[11px] font-semibold uppercase px-2 py-0.5 rounded-md bg-red-500/15 text-red-400">
+                          Inactive
+                        </span>
+                      )}
+                      {isSelf && (
+                        <span className="text-[11px] text-text-muted">(you)</span>
+                      )}
+                    </div>
+                    <span className="text-[12px] text-text-muted">{u.email}</span>
+                  </div>
+
+                  <div className="flex items-center gap-3 shrink-0">
+                    <span className="text-[12px] text-text-muted">{formatDate(u.created_at)}</span>
+
+                    {!isSelf && (
+                      <>
+                        <select
+                          value={u.role}
+                          onChange={(e) => handleRoleChange(u.id, e.target.value)}
+                          className="text-[12px] bg-surface-raised border border-border-default rounded-lg px-2 py-1 text-text-secondary cursor-pointer"
+                        >
+                          <option value="editor">Editor</option>
+                          <option value="admin">Admin</option>
+                        </select>
+
+                        <button
+                          onClick={() => handleStatusChange(u.id, !u.is_active)}
+                          className={`text-[12px] font-medium transition-colors ${
+                            u.is_active
+                              ? 'text-red-500 hover:text-red-400'
+                              : 'text-emerald-500 hover:text-emerald-400'
+                          }`}
+                        >
+                          {u.is_active ? 'Deactivate' : 'Reactivate'}
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+
+          {/* Pending invites */}
+          {invites.length > 0 && (
+            <div className="mt-5 pt-5 border-t border-border-default">
+              <h3 className="text-[14px] font-medium text-text-secondary mb-3">Pending Invites</h3>
+              <div className="flex flex-col gap-1.5">
+                {invites.map((inv) => (
+                  <div
+                    key={inv.id}
+                    className="flex items-center justify-between px-4 py-2.5 rounded-xl bg-surface-input border border-border-default"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <span className="text-[14px] text-text-primary">{inv.email}</span>
+                      <span className={`text-[11px] font-semibold uppercase px-2 py-0.5 rounded-md ${ROLE_COLORS[inv.role] || ROLE_COLORS.editor}`}>
+                        {inv.role}
+                      </span>
+                      <span className="text-[12px] text-text-muted">
+                        Expires {formatDate(inv.expires_at)}
+                      </span>
+                    </div>
+                    <button
+                      onClick={() => handleDeleteInvite(inv.id)}
+                      className="text-[12px] text-red-500 hover:text-red-400 transition-colors"
+                    >
+                      Revoke
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Invite modal */}
+      {showInviteModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setShowInviteModal(false)}>
+          <div className="bg-surface rounded-2xl shadow-xl border border-border-default w-full max-w-md p-7" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-[17px] font-semibold text-text-primary mb-5">
+              {inviteUrl ? 'Invite Created' : 'Invite User'}
+            </h3>
+
+            {inviteUrl ? (
+              <div>
+                <p className="text-[14px] text-text-secondary mb-3">
+                  Share this link with <span className="font-medium">{inviteEmail}</span>:
+                </p>
+                <div className="bg-surface-input border border-border-default rounded-xl p-3 mb-4">
+                  <code className="text-[13px] text-text-primary break-all select-all block">{inviteUrl}</code>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => { navigator.clipboard.writeText(inviteUrl); setShowInviteModal(false) }}
+                    className="flex-1 px-4 py-2.5 text-[14px] font-medium rounded-xl bg-blue-600 text-white hover:bg-blue-500 transition-colors"
+                  >
+                    Copy & Close
+                  </button>
+                  <button
+                    onClick={() => setShowInviteModal(false)}
+                    className="px-4 py-2.5 text-[14px] font-medium rounded-xl border border-border-default text-text-secondary hover:bg-surface-input transition-colors"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div>
+                  <label className="text-sm font-medium text-text-secondary block mb-1.5">Email</label>
+                  <input
+                    type="email"
+                    value={inviteEmail}
+                    onChange={(e) => { setInviteEmail(e.target.value); setInviteError('') }}
+                    placeholder="user@example.com"
+                    className="w-full px-4 py-3 text-[14px] rounded-xl bg-surface-input border border-border-strong text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+                    autoFocus
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-text-secondary block mb-1.5">Role</label>
+                  <div className="flex gap-2">
+                    {(['editor', 'admin'] as const).map((r) => (
+                      <button
+                        key={r}
+                        type="button"
+                        onClick={() => setInviteRole(r)}
+                        className={`flex-1 py-2.5 text-[14px] font-medium rounded-xl border-2 transition-all ${
+                          inviteRole === r
+                            ? 'border-blue-500 bg-blue-500/10 text-text-primary'
+                            : 'border-border-default text-text-secondary hover:border-border-strong'
+                        }`}
+                      >
+                        {r.charAt(0).toUpperCase() + r.slice(1)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {inviteError && (
+                  <p className="text-[13px] text-red-400">{inviteError}</p>
+                )}
+
+                <div className="flex gap-2 pt-2">
+                  <button
+                    onClick={handleCreateInvite}
+                    disabled={creating || !inviteEmail.trim()}
+                    className="flex-1 px-4 py-2.5 text-[14px] font-medium rounded-xl bg-blue-600 text-white hover:bg-blue-500 transition-colors disabled:opacity-50"
+                  >
+                    {creating ? 'Creating...' : 'Create Invite Link'}
+                  </button>
+                  <button
+                    onClick={() => setShowInviteModal(false)}
+                    className="px-4 py-2.5 text-[14px] font-medium rounded-xl border border-border-default text-text-secondary hover:bg-surface-input transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </section>
+  )
+}
+
 // ── Change Password ─────────────────────────────────────────────────────────
 
 function ChangePasswordSection() {
-  const { authEnabled, user } = useAuthStore()
+  const { authEnabled, user, logout } = useAuthStore()
+  const navigate = useNavigate()
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -823,11 +1181,43 @@ function ChangePasswordSection() {
   const [errorMsg, setErrorMsg] = useState('')
   const timer = useRef<ReturnType<typeof setTimeout>>()
 
+  // Profile editing
+  const [displayName, setDisplayName] = useState(user?.display_name || '')
+  const [editingName, setEditingName] = useState(false)
+  const [savingName, setSavingName] = useState(false)
+
   useEffect(() => {
     return () => clearTimeout(timer.current)
   }, [])
 
+  useEffect(() => {
+    setDisplayName(user?.display_name || '')
+  }, [user?.display_name])
+
   if (!authEnabled) return null
+
+  const handleSaveName = async () => {
+    if (!displayName.trim()) return
+    setSavingName(true)
+    try {
+      const res = await authFetch('/api/auth/profile', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ display_name: displayName.trim() }),
+      })
+      if (!res.ok) throw new Error('Failed to update')
+      setEditingName(false)
+    } catch {
+      // ignore
+    } finally {
+      setSavingName(false)
+    }
+  }
+
+  const handleLogout = () => {
+    logout()
+    navigate('/login')
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -876,13 +1266,78 @@ function ChangePasswordSection() {
   const inputClass =
     'w-full px-4 py-3 text-[14px] rounded-xl bg-surface-input border border-border-strong text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition-all'
 
+  const ROLE_COLORS: Record<string, string> = {
+    admin: 'bg-amber-500/15 text-amber-500',
+    editor: 'bg-blue-500/15 text-blue-400',
+  }
+
   return (
     <section className="bg-surface-raised rounded-2xl shadow-card border border-border-default p-7">
-      <h2 className="text-[17px] font-semibold text-text-primary mb-1.5">Account</h2>
-      <p className="text-[14px] text-text-muted mb-5">
-        Signed in as <span className="font-medium text-text-secondary">{user?.email}</span>
-      </p>
+      <div className="flex items-center justify-between mb-5">
+        <h2 className="text-[17px] font-semibold text-text-primary">Account</h2>
+        <button
+          onClick={handleLogout}
+          className="px-4 py-2 text-[14px] font-medium rounded-xl border border-border-default text-text-secondary hover:bg-red-500/10 hover:text-red-400 hover:border-red-500/30 transition-colors"
+        >
+          Log Out
+        </button>
+      </div>
 
+      {/* Profile info */}
+      <div className="flex flex-col gap-3 mb-6 pb-6 border-b border-border-default">
+        <div className="flex items-center gap-3">
+          {editingName ? (
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
+                className="px-3 py-1.5 text-[15px] rounded-lg bg-surface-input border border-border-strong text-text-primary focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleSaveName()
+                  if (e.key === 'Escape') { setEditingName(false); setDisplayName(user?.display_name || '') }
+                }}
+                autoFocus
+              />
+              <button
+                onClick={handleSaveName}
+                disabled={savingName || !displayName.trim()}
+                className="text-[13px] text-blue-400 hover:text-blue-300 font-medium disabled:opacity-50"
+              >
+                {savingName ? 'Saving...' : 'Save'}
+              </button>
+              <button
+                onClick={() => { setEditingName(false); setDisplayName(user?.display_name || '') }}
+                className="text-[13px] text-text-muted hover:text-text-secondary"
+              >
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <span className="text-[16px] font-medium text-text-primary">{user?.display_name || user?.email}</span>
+              <button
+                onClick={() => setEditingName(true)}
+                className="text-[12px] text-text-muted hover:text-text-secondary transition-colors"
+              >
+                Edit
+              </button>
+            </div>
+          )}
+        </div>
+
+        <div className="flex items-center gap-3">
+          <span className="text-[14px] text-text-muted">{user?.email}</span>
+          {user?.role && (
+            <span className={`text-[11px] font-semibold uppercase px-2 py-0.5 rounded-md ${ROLE_COLORS[user.role] || ROLE_COLORS.editor}`}>
+              {user.role}
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Change password form */}
+      <h3 className="text-[15px] font-medium text-text-secondary mb-4">Change Password</h3>
       <form onSubmit={handleSubmit} className="space-y-4 max-w-sm">
         <div>
           <label className="text-sm font-medium text-text-secondary block mb-1.5">Current Password</label>
