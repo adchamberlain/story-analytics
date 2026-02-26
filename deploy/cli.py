@@ -68,10 +68,13 @@ def cmd_deploy(args: argparse.Namespace) -> None:
     build_and_push_image(args.region, ecr_uri)
 
     # 4. Deploy CloudFormation stack (S3, RDS, App Runner pointing at the image)
-    db_password = args.db_password or secrets.token_urlsafe(16)
+    # Only generate a new DB password on first deploy. On updates, pass empty
+    # string so deploy_stack() uses UsePreviousValue to keep the existing password.
+    is_new = not get_stack_status(args.stack_name, args.region, quiet=True)
+    db_password = args.db_password or (secrets.token_urlsafe(16) if is_new else "")
     resend_api_key = args.resend_api_key or _env_value("RESEND_API_KEY")
     from_email = args.from_email or _env_value("FROM_EMAIL")
-    print("\n[4/7] Deploying CloudFormation stack (this takes ~10 min for RDS)...")
+    print("\n[4/6] Deploying CloudFormation stack (this takes ~10 min for RDS)...")
     outputs = deploy_stack(
         args.stack_name,
         args.region,
@@ -90,7 +93,7 @@ def cmd_deploy(args: argparse.Namespace) -> None:
     # 5. Set FRONTEND_BASE_URL now that we know the App URL
     app_url = outputs.get("AppUrl", "")
     if app_url:
-        print("\n[5/7] Setting FRONTEND_BASE_URL...")
+        print("\n[5/6] Setting FRONTEND_BASE_URL...")
         deploy_stack(
             args.stack_name,
             args.region,
@@ -102,22 +105,17 @@ def cmd_deploy(args: argparse.Namespace) -> None:
             from_email=from_email,
             frontend_base_url=app_url,
         )
-    else:
-        print("\n[5/7] WARNING: Could not determine App URL — FRONTEND_BASE_URL not set.")
 
-    # 6. Trigger App Runner deployment
-    print("\n[6/7] Triggering App Runner deployment...")
-    trigger_apprunner_deploy(args.stack_name, args.region)
-
-    # 7. Print results
+    # 6. Print results
     s3_bucket = outputs.get("S3BucketName", "(unknown)")
     rds_endpoint = outputs.get("RDSEndpoint", "(unknown)")
 
-    print("\n[7/7] Deployment complete!\n")
-    print("  App URL      :", app_url)
+    print("\n[6/6] Deployment complete!\n")
+    print("  App URL      :", app_url or "(unknown)")
     print("  S3 Bucket    :", s3_bucket)
     print("  RDS Endpoint :", rds_endpoint)
-    print("  DB Password  :", db_password, " (save this!)")
+    if db_password:
+        print("  DB Password  :", db_password, " (save this!)")
     print()
     print("  Note: App Runner may take a few minutes to start the first time.")
     print("  Visit the App URL above once the service is healthy.")

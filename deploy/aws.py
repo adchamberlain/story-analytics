@@ -194,22 +194,27 @@ def deploy_stack(
     cfn = _cfn_client(region)
     template_body = TEMPLATE_PATH.read_text()
 
+    # Decide create vs update first — determines how we handle the DB password
+    action = _resolve_stack_action(cfn, stack_name)
+
     params = [
         {"ParameterKey": "AppName", "ParameterValue": stack_name},
-        {"ParameterKey": "DBPassword", "ParameterValue": db_password},
         {"ParameterKey": "DBInstanceClass", "ParameterValue": db_instance_class},
         {"ParameterKey": "AppRunnerCpu", "ParameterValue": cpu},
         {"ParameterKey": "AppRunnerMemory", "ParameterValue": memory},
     ]
+    # On updates, keep the existing DB password to avoid breaking RDS connectivity.
+    # Only set a new password on initial creation or when explicitly provided.
+    if action == "create" or db_password:
+        params.append({"ParameterKey": "DBPassword", "ParameterValue": db_password})
+    else:
+        params.append({"ParameterKey": "DBPassword", "UsePreviousValue": True})
     if resend_api_key:
         params.append({"ParameterKey": "ResendApiKey", "ParameterValue": resend_api_key})
     if from_email:
         params.append({"ParameterKey": "FromEmail", "ParameterValue": from_email})
     if frontend_base_url:
         params.append({"ParameterKey": "FrontendBaseUrl", "ParameterValue": frontend_base_url})
-
-    # Decide create vs update
-    action = _resolve_stack_action(cfn, stack_name)
 
     try:
         if action == "create":
@@ -244,8 +249,13 @@ def deploy_stack(
     return _get_outputs(cfn, stack_name)
 
 
-def get_stack_status(stack_name: str, region: str) -> dict[str, str]:
+def get_stack_status(stack_name: str, region: str, *, quiet: bool = False) -> dict[str, str]:
     """Return the current stack outputs (or exit with an error message).
+
+    Parameters
+    ----------
+    quiet : bool
+        If True, return empty dict instead of exiting on missing stack.
 
     Returns
     -------
@@ -256,6 +266,8 @@ def get_stack_status(stack_name: str, region: str) -> dict[str, str]:
     try:
         resp = cfn.describe_stacks(StackName=stack_name)
     except ClientError:
+        if quiet:
+            return {}
         print(f"ERROR: Stack '{stack_name}' not found in {region}.")
         sys.exit(1)
 
