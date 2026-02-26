@@ -96,13 +96,20 @@ export function ObservableChartFactory({
       setChartWidth(width)
       const collapsed = shouldCollapseAnnotations(width)
 
-      const marks = buildMarks(chartType, effectiveData, config, colors, chartTheme)
+      // Coerce numeric series values to strings so both marks and plot options
+      // use the same categorical (ordinal) values for the color scale.
+      const series = config.series
+      const chartData = (series && effectiveData.length > 0 && typeof effectiveData[0][series] === 'number')
+        ? effectiveData.map((d) => ({ ...d, [series]: String(d[series]) }))
+        : effectiveData
+
+      const marks = buildMarks(chartType, chartData, config, colors, chartTheme)
       // Use chart theme colors for annotations when available, falling back to CSS vars.
       // This ensures annotations look correct in dark mode with themed cards (e.g. Economist).
       const bgColor = chartTheme.plot.background || chartTheme.card.background || 'var(--color-surface-raised, #1e293b)'
       const textColor = chartTheme.font.notes?.color || chartTheme.font.axis?.color || 'var(--color-text-primary, #e2e8f0)'
       const annotationMarks = buildAnnotationMarks(config.annotations, bgColor, textColor, chartTheme)
-      const plotOptions = buildPlotOptions(chartType, effectiveData, config, colors, width, plotHeight, chartTheme)
+      const plotOptions = buildPlotOptions(chartType, chartData, config, colors, width, plotHeight, chartTheme)
       const plot = Plot.plot({ ...plotOptions, marks: [...marks, ...annotationMarks] })
 
       // Store plot ref for scale inversion in click handler
@@ -369,12 +376,6 @@ function buildMarks(
   const x = config.x
   const y = config.y as string | undefined
   const series = config.series
-
-  // Coerce numeric series values to strings so Observable Plot uses
-  // a categorical (ordinal) color scale instead of a continuous one.
-  if (series && data.length > 0 && typeof data[0][series] === 'number') {
-    data = data.map((d) => ({ ...d, [series]: String(d[series]) }))
-  }
 
   switch (chartType) {
     case 'LineChart':
