@@ -2,6 +2,29 @@
 
 ## 2026-02-26
 
+### Session 11: Invite Link Fallback + Deploy Docs Fix
+
+**Goal:** Make team invites work without Resend email configured; fix deploy docs inaccuracies.
+
+**Backend — invite link fallback (`api/routers/teams.py`, `api/email.py`):**
+- Previously, when `RESEND_API_KEY` wasn't configured on AWS, the invite endpoint returned HTTP 502 even though the invite was created in the DB. Now returns 200 with `email_sent: false` and `invite_url`, so the frontend can show the link for manual sharing.
+- `api/email.py`: Email functions now return `False` on non-localhost when no Resend key is set (previously returned `True`, hiding the failure).
+
+**Frontend — copy invite link UI (`app/src/pages/SettingsPage.tsx`):**
+- Added `inviteResult` state. When `email_sent` is false, shows a yellow notification box with the invite URL and a "Copy link" button. Clears on new invite or team switch.
+
+**Deploy docs fixes (`docs/deploy-aws.md`):**
+- Step count: 5 → 7 (matching actual CLI which has "Setting FRONTEND_BASE_URL" and "Triggering App Runner deployment" steps)
+- Region: `us-east-2` is Ohio, not N. Virginia (`us-east-1` is N. Virginia)
+- Added `--resend-api-key` and `--from-email` to CLI Reference table
+- New "Setting Up Email (Optional)" section explaining Resend signup and configuration
+
+**CloudFormation + deploy script (`deploy/cloudformation.yaml`, `deploy/aws.py`, `deploy/cli.py`):**
+- Added `FrontendBaseUrl` parameter and `FRONTEND_BASE_URL` + `API_BASE_URL` env vars to App Runner service, so invite links point to the correct host instead of `localhost:3001`.
+- Deploy script does a stack update after initial creation (step 5/7) to set the URL once the App Runner service URL is known — avoids circular reference in CloudFormation.
+
+---
+
 ### Session 10: Chart Share Modal, Email Error Surfacing
 
 **Goal:** Add proper share modal for charts, fix silent email failures in team invites.
