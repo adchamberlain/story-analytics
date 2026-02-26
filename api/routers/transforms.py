@@ -98,10 +98,14 @@ def _write_csv(storage_key: str, columns: list[str], rows: list[dict[str, str]])
     storage.write(storage_key, buf.getvalue().encode("utf-8"))
 
 
-def _reingest_and_preview(source_id: str, path: Path, limit: int = 50) -> dict:
-    """Re-ingest CSV into DuckDB and return updated preview."""
+def _reingest_and_preview(source_id: str, path: Path | None = None, limit: int = 50) -> dict:
+    """Re-ingest CSV into DuckDB from storage and return updated preview.
+
+    Uses reload_source() instead of ingest_csv() to avoid re-uploading the
+    stale local cache back to storage (which would overwrite the transform).
+    """
     svc = get_duckdb_service()
-    svc.ingest_csv(path, path.name, source_id=source_id)
+    svc.reload_source(source_id)
     result = svc.get_preview(source_id, limit)
     return {
         "columns": result.columns,
