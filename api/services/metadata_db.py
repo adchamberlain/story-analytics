@@ -189,6 +189,51 @@ def get_user_by_id(user_id: str) -> dict | None:
     )
 
 
+# ── User Management ──────────────────────────────────────────────────────────
+
+def list_all_users() -> list[dict]:
+    """List all real users (excluding default user), without password hashes."""
+    _ensure_tables()
+    db = get_db()
+    return db.fetchall(
+        "SELECT id, email, display_name, role, created_at, is_active "
+        "FROM users WHERE id != ? ORDER BY created_at",
+        (DEFAULT_USER_ID,),
+    )
+
+
+def update_user_role(user_id: str, role: str) -> bool:
+    """Update a user's role. Returns True if valid and updated."""
+    if role not in ("admin", "editor"):
+        return False
+    _ensure_tables()
+    db = get_db()
+    count = db.execute("UPDATE users SET role = ? WHERE id = ?", (role, user_id))
+    return count > 0
+
+
+def update_user_status(user_id: str, active: bool) -> bool:
+    """Activate or deactivate a user. Returns True if updated."""
+    _ensure_tables()
+    db = get_db()
+    count = db.execute(
+        "UPDATE users SET is_active = ? WHERE id = ?",
+        (1 if active else 0, user_id),
+    )
+    return count > 0
+
+
+def update_user_display_name(user_id: str, display_name: str) -> bool:
+    """Update a user's display name. Returns True if updated."""
+    _ensure_tables()
+    db = get_db()
+    count = db.execute(
+        "UPDATE users SET display_name = ? WHERE id = ? AND is_active = 1",
+        (display_name, user_id),
+    )
+    return count > 0
+
+
 # ── Dashboard Metadata ───────────────────────────────────────────────────────
 
 def set_dashboard_meta(dashboard_id: str, owner_id: str, visibility: str = "private") -> None:
