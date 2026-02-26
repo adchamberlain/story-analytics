@@ -25,6 +25,9 @@ export function TopNav() {
           <NavLink to="/library" className={linkClass}>
             Library
           </NavLink>
+          <NavLink to="/sources" className={linkClass}>
+            Data
+          </NavLink>
         </div>
       </div>
 
