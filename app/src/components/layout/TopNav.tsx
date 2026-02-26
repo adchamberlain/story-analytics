@@ -1,6 +1,7 @@
 import { NavLink, Link } from 'react-router-dom'
 import { LogoMark } from '../brand/Logo'
 import { ThemeToggle } from './ThemeToggle'
+import { ChartThemePicker } from './ChartThemePicker'
 import { NotificationBell } from '../notifications/NotificationBell'
 
 export function TopNav() {
@@ -46,6 +47,9 @@ export function TopNav() {
 
         {/* Theme toggle */}
         <ThemeToggle />
+
+        {/* Chart theme picker */}
+        <ChartThemePicker />
 
         <NavLink
           to="/settings"
