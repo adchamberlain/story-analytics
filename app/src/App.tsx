@@ -36,13 +36,11 @@ function App() {
         <Route path="/sources" element={<SourcesPage />} />
         <Route path="/dashboard/new" element={<DashboardBuilderPage />} />
         <Route path="/dashboard/:dashboardId/edit" element={<DashboardBuilderPage />} />
+        <Route path="/dashboard/:dashboardId" element={<DashboardViewPage />} />
+        <Route path="/editor/new/source" element={<SourcePickerPage />} />
+        <Route path="/editor/:chartId" element={<EditorPage />} />
+        <Route path="/chart/:chartId" element={<ChartViewPage />} />
       </Route>
-
-      {/* Protected full-screen routes (own headers, no top nav) */}
-      <Route path="/dashboard/:dashboardId" element={<AuthGate><DashboardViewPage /></AuthGate>} />
-      <Route path="/editor/new/source" element={<AuthGate><SourcePickerPage /></AuthGate>} />
-      <Route path="/editor/:chartId" element={<AuthGate><EditorPage /></AuthGate>} />
-      <Route path="/chart/:chartId" element={<AuthGate><ChartViewPage /></AuthGate>} />
 
       {/* Catch-all */}
       <Route path="*" element={<Navigate to="/" replace />} />
