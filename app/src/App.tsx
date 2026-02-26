@@ -26,6 +26,10 @@ function App() {
       <Route path="/embed/chart/:chartId" element={<EmbedChartPage />} />
       <Route path="/embed/dashboard/:dashboardId" element={<EmbedDashboardPage />} />
 
+      {/* View routes — accessible without auth (pages handle dual fetch internally) */}
+      <Route path="/dashboard/:dashboardId" element={<DashboardViewPage />} />
+      <Route path="/chart/:chartId" element={<ChartViewPage />} />
+
       {/* Protected routes with top nav (AppShell) */}
       <Route element={<AuthGate><AppShell /></AuthGate>}>
         <Route path="/" element={<HomeRedirect />} />
@@ -36,10 +40,8 @@ function App() {
         <Route path="/sources" element={<SourcesPage />} />
         <Route path="/dashboard/new" element={<DashboardBuilderPage />} />
         <Route path="/dashboard/:dashboardId/edit" element={<DashboardBuilderPage />} />
-        <Route path="/dashboard/:dashboardId" element={<DashboardViewPage />} />
         <Route path="/editor/new/source" element={<SourcePickerPage />} />
         <Route path="/editor/:chartId" element={<EditorPage />} />
-        <Route path="/chart/:chartId" element={<ChartViewPage />} />
       </Route>
 
       {/* Catch-all */}

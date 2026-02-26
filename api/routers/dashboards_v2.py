@@ -544,12 +544,15 @@ async def remove_dashboard(dashboard_id: str, user: dict = Depends(get_current_u
 
 @router.get("/{dashboard_id}/public", response_model=DashboardWithDataResponse)
 async def get_public_dashboard(dashboard_id: str):
-    """Get a published dashboard (no auth). Returns 403 for drafts."""
+    """Get a public dashboard (no auth). Returns 403 for non-public dashboards."""
     dashboard = load_dashboard(dashboard_id)
     if not dashboard:
         raise HTTPException(status_code=404, detail="Dashboard not found")
-    if dashboard.status != "published":
-        raise HTTPException(status_code=403, detail="Dashboard is not published")
+    # Check metadata visibility (set by ShareModal), with status fallback for backward compat
+    meta = get_dashboard_meta(dashboard_id)
+    is_public = (meta and meta["visibility"] == "public") or dashboard.status == "published"
+    if not is_public:
+        raise HTTPException(status_code=403, detail="Dashboard is not public")
     # Reuse get_dashboard logic to load chart data
     return await get_dashboard(dashboard_id)
 
