@@ -11,8 +11,9 @@ and all dashboards are effectively public.
 from __future__ import annotations
 
 import json as _json
+import secrets
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from api.services.db import get_db
 
@@ -110,6 +111,21 @@ def _ensure_tables() -> None:
             read_at TEXT,
             created_at TEXT NOT NULL,
             FOREIGN KEY (user_id) REFERENCES users(id)
+        );
+
+        CREATE TABLE IF NOT EXISTS invites (
+            id TEXT PRIMARY KEY,
+            email TEXT NOT NULL,
+            role TEXT NOT NULL DEFAULT 'editor',
+            token TEXT UNIQUE NOT NULL,
+            created_by TEXT NOT NULL,
+            expires_at TEXT NOT NULL,
+            used_at TEXT
+        );
+
+        CREATE TABLE IF NOT EXISTS admin_settings (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL
         );
     """)
     _TABLES_CREATED = True
@@ -232,6 +248,92 @@ def update_user_display_name(user_id: str, display_name: str) -> bool:
         (display_name, user_id),
     )
     return count > 0
+
+
+# ── Invites ───────────────────────────────────────────────────────────────────
+
+def create_invite(email: str, role: str, created_by: str) -> dict:
+    """Create an invite token. Expires in 7 days."""
+    _ensure_tables()
+    db = get_db()
+    invite_id = uuid.uuid4().hex[:12]
+    token = secrets.token_urlsafe(32)
+    now = datetime.now(timezone.utc)
+    expires_at = (now + timedelta(days=7)).isoformat()
+    db.execute(
+        "INSERT INTO invites (id, email, role, token, created_by, expires_at) "
+        "VALUES (?, ?, ?, ?, ?, ?)",
+        (invite_id, email, role, token, created_by, expires_at),
+    )
+    return {
+        "id": invite_id, "email": email, "role": role,
+        "token": token, "created_by": created_by,
+        "expires_at": expires_at, "used_at": None,
+    }
+
+
+def list_invites() -> list[dict]:
+    """List all pending (unused, unexpired) invites."""
+    _ensure_tables()
+    db = get_db()
+    now = datetime.now(timezone.utc).isoformat()
+    return db.fetchall(
+        "SELECT id, email, role, token, created_by, expires_at "
+        "FROM invites WHERE used_at IS NULL AND expires_at > ? "
+        "ORDER BY expires_at",
+        (now,),
+    )
+
+
+def get_invite_by_token(token: str) -> dict | None:
+    """Get a valid (unused, unexpired) invite by token."""
+    _ensure_tables()
+    db = get_db()
+    now = datetime.now(timezone.utc).isoformat()
+    return db.fetchone(
+        "SELECT * FROM invites WHERE token = ? AND used_at IS NULL AND expires_at > ?",
+        (token, now),
+    )
+
+
+def mark_invite_used(invite_id: str) -> None:
+    """Mark an invite as used."""
+    _ensure_tables()
+    db = get_db()
+    now = datetime.now(timezone.utc).isoformat()
+    db.execute("UPDATE invites SET used_at = ? WHERE id = ?", (now, invite_id))
+
+
+def delete_invite(invite_id: str) -> bool:
+    """Delete an invite. Returns True if deleted."""
+    _ensure_tables()
+    db = get_db()
+    count = db.execute("DELETE FROM invites WHERE id = ?", (invite_id,))
+    return count > 0
+
+
+# ── Admin Settings ────────────────────────────────────────────────────────────
+
+def get_admin_setting(key: str) -> str:
+    """Get an admin setting value. Returns default for known keys."""
+    _ensure_tables()
+    db = get_db()
+    defaults = {"open_registration": "true"}
+    row = db.fetchone("SELECT value FROM admin_settings WHERE key = ?", (key,))
+    if row:
+        return row["value"]
+    return defaults.get(key, "")
+
+
+def set_admin_setting(key: str, value: str) -> None:
+    """Set an admin setting."""
+    _ensure_tables()
+    db = get_db()
+    db.execute(
+        "INSERT INTO admin_settings (key, value) VALUES (?, ?) "
+        "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+        (key, value),
+    )
 
 
 # ── Dashboard Metadata ───────────────────────────────────────────────────────
