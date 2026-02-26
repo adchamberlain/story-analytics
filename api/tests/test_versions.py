@@ -1,8 +1,6 @@
 """
 Tests for version history: CRUD, restore, auto-prune at 50, 404s.
 """
-import json
-from pathlib import Path
 
 from fastapi.testclient import TestClient
 from api.main import app

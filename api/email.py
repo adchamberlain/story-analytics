@@ -168,7 +168,7 @@ def send_team_invite_email(
     is_localhost = "localhost" in invite_url
     if is_localhost:
         print(f"\n{'='*60}")
-        print(f"TEAM INVITE (use this for local dev)")
+        print("TEAM INVITE (use this for local dev)")
         print(f"{'='*60}")
         print(f"Email: {to_email}")
         print(f"Team:  {team_name}")
@@ -236,7 +236,7 @@ def send_team_added_email(
     is_localhost = "localhost" in app_url
     if is_localhost:
         print(f"\n{'='*60}")
-        print(f"TEAM ADDED (notification)")
+        print("TEAM ADDED (notification)")
         print(f"{'='*60}")
         print(f"Email: {to_email}")
         print(f"Team:  {team_name}")

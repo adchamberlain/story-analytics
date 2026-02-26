@@ -6,7 +6,6 @@ list with prefix, subdirectory creation, atomic write integrity,
 copy, rename, delete_tree, and convenience text helpers.
 """
 
-import os
 import threading
 from pathlib import Path
 

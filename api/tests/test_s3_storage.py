@@ -6,7 +6,7 @@ exists (true + false), list (with results + empty), copy, rename (copy + delete)
 delete_tree, and get_local_path raises NotImplementedError.
 """
 
-from unittest.mock import MagicMock, call, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
