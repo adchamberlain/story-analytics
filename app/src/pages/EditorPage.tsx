@@ -13,6 +13,8 @@ import { DataTransformGrid } from '../components/editor/DataTransformGrid'
 import { PALETTES } from '../themes/plotTheme'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { ChartShareModal } from '../components/sharing/ChartShareModal'
+import { DeployPopover } from '../components/DeployPrompt'
+import { useAuthStore } from '../stores/authStore'
 import type { ChartConfig } from '../types/chart'
 
 export function EditorPage() {
@@ -123,6 +125,8 @@ export function EditorPage() {
   const [centerView, setCenterView] = useState<'chart' | 'transform'>('chart')
   const [savingTemplate, setSavingTemplate] = useState(false)
   const [showShareModal, setShowShareModal] = useState(false)
+  const [showDeployPrompt, setShowDeployPrompt] = useState(false)
+  const { authEnabled } = useAuthStore()
   const dataStore = useDataStore()
 
   // Load full preview for the transform grid when switching to transform view
@@ -304,7 +308,7 @@ export function EditorPage() {
   const showEmptyState = isNew && store.data.length === 0
 
   return (
-    <div className="h-screen flex flex-col bg-surface-secondary">
+    <div className="h-[calc(100vh-72px)] flex flex-col bg-surface-secondary">
       {/* Header */}
       <header className="bg-surface border-b border-border-default shadow-sm px-5 py-4 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
@@ -381,13 +385,18 @@ export function EditorPage() {
             </button>
           )}
           {store.chartId && !isNew && (
-            <button
-              onClick={() => setShowShareModal(true)}
-              className="px-3 py-2 text-xs rounded-lg border border-border-default text-text-on-surface hover:bg-surface-secondary transition-colors font-medium"
-              title="Share chart"
-            >
-              Share
-            </button>
+            <div className="relative">
+              <button
+                onClick={() => authEnabled ? setShowShareModal(true) : setShowDeployPrompt(p => !p)}
+                className="px-3 py-2 text-xs rounded-lg border border-border-default text-text-on-surface hover:bg-surface-secondary transition-colors font-medium"
+                title="Share chart"
+              >
+                Share
+              </button>
+              {showDeployPrompt && (
+                <DeployPopover onClose={() => setShowDeployPrompt(false)} />
+              )}
+            </div>
           )}
           {store.chartId && !isNew && (
             <button

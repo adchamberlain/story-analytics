@@ -4,7 +4,8 @@ import { authFetch } from '../utils/authFetch'
 import { ChartWrapper } from '../components/charts/ChartWrapper'
 import { ObservableChartFactory } from '../components/charts/ObservableChartFactory'
 import { ChartShareModal } from '../components/sharing/ChartShareModal'
-import { ThemeToggle } from '../components/layout/ThemeToggle'
+import { DeployPopover } from '../components/DeployPrompt'
+import { useAuthStore } from '../stores/authStore'
 import { buildChartConfig } from '../utils/buildChartConfig'
 import type { ChartType } from '../types/chart'
 
@@ -39,6 +40,8 @@ export function ChartViewPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [showShareModal, setShowShareModal] = useState(false)
+  const [showDeployPrompt, setShowDeployPrompt] = useState(false)
+  const { authEnabled } = useAuthStore()
 
   useEffect(() => {
     if (!chartId) return
@@ -116,19 +119,23 @@ export function ChartViewPage() {
           </Link>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => setShowShareModal(true)}
-            className="text-sm px-3 py-1.5 rounded border border-border-default text-text-on-surface hover:bg-surface-secondary transition-colors"
-          >
-            Share
-          </button>
+          <div className="relative">
+            <button
+              onClick={() => authEnabled ? setShowShareModal(true) : setShowDeployPrompt(p => !p)}
+              className="text-sm px-3 py-1.5 rounded border border-border-default text-text-on-surface hover:bg-surface-secondary transition-colors"
+            >
+              Share
+            </button>
+            {showDeployPrompt && (
+              <DeployPopover onClose={() => setShowDeployPrompt(false)} />
+            )}
+          </div>
           <Link
             to={`/editor/${chartId}`}
             className="text-sm px-3 py-1.5 rounded border border-border-default text-text-on-surface hover:bg-surface-secondary transition-colors"
           >
             Edit
           </Link>
-          <ThemeToggle />
         </div>
       </header>
 
