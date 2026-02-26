@@ -4,8 +4,9 @@ Tests for notification system.
 from api.services.metadata_db import (
     create_notification, list_notifications, get_unread_count,
     mark_notification_read, mark_all_notifications_read,
-    ensure_default_user,
+    ensure_default_user, seed_onboarding_tips,
 )
+from api.services.db import get_db
 
 
 class TestNotifications:
@@ -51,3 +52,47 @@ class TestNotifications:
         mark_all_notifications_read(self.user_id)
         count = get_unread_count(self.user_id)
         assert count == 0
+
+
+class TestOnboardingTips:
+    def setup_method(self):
+        """Clean up onboarding tips and ensure default user."""
+        self.user_id = ensure_default_user()
+        db = get_db()
+        db.execute(
+            "DELETE FROM notifications WHERE user_id = ? AND type = 'onboarding_tip'",
+            (self.user_id,),
+        )
+
+    def test_seed_creates_five_tips(self):
+        seed_onboarding_tips(self.user_id)
+        notifs = list_notifications(self.user_id)
+        tips = [n for n in notifs if n["type"] == "onboarding_tip"]
+        assert len(tips) == 5
+
+    def test_seed_is_idempotent(self):
+        seed_onboarding_tips(self.user_id)
+        seed_onboarding_tips(self.user_id)
+        notifs = list_notifications(self.user_id)
+        tips = [n for n in notifs if n["type"] == "onboarding_tip"]
+        assert len(tips) == 5
+
+    def test_tips_have_action_urls(self):
+        seed_onboarding_tips(self.user_id)
+        notifs = list_notifications(self.user_id)
+        tips = [n for n in notifs if n["type"] == "onboarding_tip"]
+        for tip in tips:
+            assert "action_url" in tip["payload"]
+            assert tip["payload"]["action_url"].startswith("/")
+
+    def test_tips_are_staggered(self):
+        seed_onboarding_tips(self.user_id)
+        notifs = list_notifications(self.user_id)
+        tips = [n for n in notifs if n["type"] == "onboarding_tip"]
+        timestamps = [t["created_at"] for t in tips]
+        assert len(set(timestamps)) == 5
+
+    def test_tips_are_unread(self):
+        seed_onboarding_tips(self.user_id)
+        count = get_unread_count(self.user_id)
+        assert count >= 5

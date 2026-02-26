@@ -1,16 +1,35 @@
 import { useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useNotificationStore, type Notification } from '../../stores/notificationStore'
+
+const ICON_MAP: Record<string, string> = {
+  rocket: '\u{1F680}',
+  upload: '\u{1F4C1}',
+  chart: '\u{1F4CA}',
+  dashboard: '\u{1F4CB}',
+  palette: '\u{1F3A8}',
+}
 
 interface NotificationDropdownProps {
   onClose: () => void
 }
 
-export function NotificationDropdown({ onClose: _onClose }: NotificationDropdownProps) {
+export function NotificationDropdown({ onClose }: NotificationDropdownProps) {
   const { notifications, loading, fetchNotifications, markRead, markAllRead } = useNotificationStore()
+  const navigate = useNavigate()
 
   useEffect(() => {
     fetchNotifications()
   }, [fetchNotifications])
+
+  const handleClick = (notif: Notification) => {
+    if (!notif.read_at) markRead(notif.id)
+    const payload = notif.payload as Record<string, string>
+    if (payload.action_url) {
+      navigate(payload.action_url)
+      onClose()
+    }
+  }
 
   return (
     <div className="bg-surface-raised border border-border-default rounded-xl shadow-lg overflow-hidden">
@@ -30,7 +49,7 @@ export function NotificationDropdown({ onClose: _onClose }: NotificationDropdown
           <p className="text-sm text-text-muted text-center py-6">No notifications yet.</p>
         ) : (
           notifications.slice(0, 20).map((notif) => (
-            <NotificationItem key={notif.id} notification={notif} onRead={markRead} />
+            <NotificationItem key={notif.id} notification={notif} onClick={handleClick} />
           ))
         )}
       </div>
@@ -38,19 +57,22 @@ export function NotificationDropdown({ onClose: _onClose }: NotificationDropdown
   )
 }
 
-function NotificationItem({ notification, onRead }: { notification: Notification; onRead: (id: string) => void }) {
+function NotificationItem({ notification, onClick }: { notification: Notification; onClick: (n: Notification) => void }) {
   const isUnread = !notification.read_at
   const payload = notification.payload as Record<string, string>
   const message = payload.message || `${notification.type} notification`
   const timeAgo = formatTimeAgo(notification.created_at)
+  const icon = payload.icon ? ICON_MAP[payload.icon] : null
+  const hasAction = !!payload.action_url
 
   return (
     <button
-      onClick={() => { if (isUnread) onRead(notification.id) }}
-      className={`w-full text-left px-4 py-3 border-b border-border-default hover:bg-surface-secondary transition-colors ${isUnread ? 'bg-blue-50/50 dark:bg-blue-900/10' : ''}`}
+      onClick={() => onClick(notification)}
+      className={`w-full text-left px-4 py-3 border-b border-border-default hover:bg-surface-secondary transition-colors ${hasAction ? 'cursor-pointer' : ''} ${isUnread ? 'bg-blue-50/50 dark:bg-blue-900/10' : ''}`}
     >
       <div className="flex items-start gap-2">
         {isUnread && <div className="w-2 h-2 rounded-full bg-blue-500 mt-1.5 shrink-0" />}
+        {icon && <span className="text-base mt-0.5 shrink-0">{icon}</span>}
         <div className="flex-1 min-w-0">
           <p className={`text-sm ${isUnread ? 'text-text-primary font-medium' : 'text-text-secondary'}`}>{message}</p>
           <p className="text-xs text-text-muted mt-0.5">{timeAgo}</p>

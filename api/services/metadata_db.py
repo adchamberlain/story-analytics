@@ -161,6 +161,7 @@ def ensure_default_user() -> str:
             "VALUES (?, ?, ?, ?, ?, ?)",
             (DEFAULT_USER_ID, DEFAULT_USER_EMAIL, "", "Default User", "admin", now),
         )
+        seed_onboarding_tips(DEFAULT_USER_ID)
     return DEFAULT_USER_ID
 
 
@@ -739,6 +740,55 @@ def mark_notification_read(notification_id: str, user_id: str) -> bool:
         (now, notification_id, user_id),
     )
     return count > 0
+
+
+def seed_onboarding_tips(user_id: str) -> None:
+    """Seed onboarding tips for a new user. Idempotent — skips if already seeded."""
+    _ensure_tables()
+    db = get_db()
+    row = db.fetchone(
+        "SELECT COUNT(*) AS cnt FROM notifications WHERE user_id = ? AND type = 'onboarding_tip'",
+        (user_id,),
+    )
+    if row and row["cnt"] > 0:
+        return
+
+    tips = [
+        {
+            "message": "Welcome to Story Analytics! Explore the demo dashboard to see what's possible.",
+            "action_url": "/dashboards",
+            "icon": "rocket",
+        },
+        {
+            "message": "Upload your data. Drop a CSV or connect a database to start building charts.",
+            "action_url": "/sources",
+            "icon": "upload",
+        },
+        {
+            "message": "Create your first chart. Pick a data source and let AI suggest the best visualization.",
+            "action_url": "/editor/new/source",
+            "icon": "chart",
+        },
+        {
+            "message": "Build a dashboard. Combine multiple charts into a shareable, embeddable page.",
+            "action_url": "/dashboard/new",
+            "icon": "dashboard",
+        },
+        {
+            "message": "Customize your theme. Match your brand colors and typography in settings.",
+            "action_url": "/settings/themes",
+            "icon": "palette",
+        },
+    ]
+    offsets = [0, 2, 5, 10, 20]
+    now = datetime.now(timezone.utc)
+    for tip, offset_min in zip(tips, offsets):
+        notif_id = uuid.uuid4().hex[:12]
+        created_at = (now - timedelta(minutes=offset_min)).isoformat()
+        db.execute(
+            "INSERT INTO notifications (id, user_id, type, payload, created_at) VALUES (?, ?, ?, ?, ?)",
+            (notif_id, user_id, "onboarding_tip", _json.dumps(tip), created_at),
+        )
 
 
 def mark_all_notifications_read(user_id: str) -> int:
