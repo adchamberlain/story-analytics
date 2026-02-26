@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Story Analytics - Publication-ready dashboards from any data source</title>
-    <meta name="description" content="Open-source dashboarding tool with 25 chart types and 4 map types. Connect to Snowflake, Postgres, BigQuery, Google Sheets, or CSV. Build publication-ready charts with a visual editor and AI assistant. Export to SVG, PNG, PDF, or PowerPoint.">
+    <meta name="description" content="Open-source dashboarding tool with 25 chart types and 4 map types. Connect to Snowflake, Postgres, BigQuery, Google Sheets, or CSV. Build publication-ready charts with a visual editor and AI assistant. Export to SVG, PNG, PDF, or PowerPoint. Deploy locally or to AWS.">
 
     <!-- Favicon -->
     <link rel="icon" href="favicon.ico" sizes="32x32">
@@ -14,14 +14,14 @@
     <!-- OpenGraph -->
     <meta property="og:type" content="website">
     <meta property="og:title" content="Story Analytics - Publication-ready dashboards from any data source">
-    <meta property="og:description" content="Open-source dashboarding tool with 25 chart types and maps. Visual chart editor, SQL workbench, AI assistant, and export to SVG/PNG/PDF/PPTX. Connect to any database.">
+    <meta property="og:description" content="Open-source dashboarding tool with 25 chart types, maps, teams, and cloud deployment. Visual chart editor, SQL workbench, AI assistant, and export to SVG/PNG/PDF/PPTX.">
     <meta property="og:url" content="https://storyanalytics.ai">
     <meta property="og:site_name" content="Story Analytics">
 
     <!-- Twitter Card -->
     <meta name="twitter:card" content="summary">
     <meta name="twitter:title" content="Story Analytics - Publication-ready dashboards">
-    <meta name="twitter:description" content="Open-source dashboarding tool with 25 chart types and maps. Visual chart editor, SQL workbench, AI assistant, and export to SVG/PNG/PDF/PPTX.">
+    <meta name="twitter:description" content="Open-source dashboarding tool with 25 chart types, maps, teams, and cloud deployment. Visual editor, SQL workbench, AI assistant, and export to SVG/PNG/PDF/PPTX.">
 
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -57,7 +57,7 @@
                 <h1 class="hero-title">Publication-ready dashboards<br>from any data source</h1>
                 <p class="hero-subtitle">
                     Connect to your database. Build charts with a visual editor and built-in SQL workbench.
-                    Get publication-ready output you can export to SVG, PNG, PDF, or PowerPoint.
+                    Export to SVG, PNG, PDF, or PowerPoint. Deploy locally or to the cloud.
                 </p>
                 <div class="hero-actions">
                     <a href="https://github.com/adchamberlain/story-analytics" class="btn btn-primary">Get Started</a>
@@ -81,7 +81,7 @@
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
                     </div>
                     <h3>Any Data Source</h3>
-                    <p>Connect to Snowflake, PostgreSQL, BigQuery, or Google Sheets. Or just drag and drop a CSV. Your data stays local.</p>
+                    <p>Connect to Snowflake, PostgreSQL, BigQuery, or Google Sheets. Upload a CSV or paste data directly. Run locally or deploy to AWS.</p>
                 </div>
                 <div class="value-card">
                     <div class="value-icon">
@@ -114,35 +114,19 @@
                     </div>
                     <div class="feature">
                         <h4>Publication-Ready Export</h4>
-                        <p>Export individual charts as SVG, PNG, PDF, or PowerPoint (PPTX). Download underlying data as CSV. Clean vector output ready for reports and presentations.</p>
-                    </div>
-                    <div class="feature">
-                        <h4>Annotations</h4>
-                        <p>Add reference lines, text labels, and highlighted ranges with responsive scaling to tell the story behind your data.</p>
-                    </div>
-                    <div class="feature">
-                        <h4>Color Palettes</h4>
-                        <p>Curated palettes following publication-ready conventions. Professionally designed defaults out of the box.</p>
-                    </div>
-                    <div class="feature">
-                        <h4>KPI Cards</h4>
-                        <p>Single-number displays with comparison values, trend indicators, and color-coded deltas. Track actuals vs. goals at a glance.</p>
-                    </div>
-                    <div class="feature">
-                        <h4>Dark Mode</h4>
-                        <p>Full light and dark theme support. Toggle in the UI or follow your system preference.</p>
-                    </div>
-                    <div class="feature">
-                        <h4>Local-First</h4>
-                        <p>All data stays on your machine. Charts and dashboards stored as JSON files. No cloud account required.</p>
-                    </div>
-                    <div class="feature">
-                        <h4>Portable HTML Export</h4>
-                        <p>Download a self-contained HTML dashboard you can host anywhere — GitHub Pages, Netlify, S3, or your own server.</p>
+                        <p>Export as SVG, PNG, PDF, or PowerPoint (PPTX) with embedded fonts for standalone rendering. Download data as CSV. Portable HTML dashboards for hosting anywhere.</p>
                     </div>
                     <div class="feature">
                         <h4>Geographic Maps</h4>
                         <p>Choropleth, symbol, locator, and spike maps with zoom/pan and smart label placement. Built-in basemap selection.</p>
+                    </div>
+                    <div class="feature">
+                        <h4>Teams &amp; Auth</h4>
+                        <p>Magic link authentication, team management with roles, threaded comments on charts, and scoped API keys for programmatic access.</p>
+                    </div>
+                    <div class="feature">
+                        <h4>Annotations</h4>
+                        <p>Add reference lines, text labels, and highlighted ranges with responsive scaling to tell the story behind your data.</p>
                     </div>
                     <div class="feature">
                         <h4>Data Transforms</h4>
@@ -150,7 +134,19 @@
                     </div>
                     <div class="feature">
                         <h4>Version History</h4>
-                        <p>Auto-save snapshots of every chart edit with one-click restore. Never lose work again.</p>
+                        <p>Auto-save snapshots of every chart edit with one-click restore. Save chart configs as reusable templates.</p>
+                    </div>
+                    <div class="feature">
+                        <h4>Cloud Deployment</h4>
+                        <p>Run locally or deploy to AWS with the included CloudFormation template, Docker images, and S3 storage backend. Step-by-step guide included.</p>
+                    </div>
+                    <div class="feature">
+                        <h4>Custom Themes</h4>
+                        <p>9 built-in themes, custom CSS, 50+ Google Fonts, and curated publication-ready color palettes. Full light and dark mode support.</p>
+                    </div>
+                    <div class="feature">
+                        <h4>Example Dashboard</h4>
+                        <p>Ships with The Perfect Dashboard — a showcase of all 25 chart types with sample data, ready to explore the moment you start the app.</p>
                     </div>
                 </div>
             </div>
@@ -166,7 +162,7 @@
                     <div class="step">
                         <div class="step-number">1</div>
                         <h4>Connect your data</h4>
-                        <p>Upload a CSV or connect to Snowflake, PostgreSQL, or BigQuery. Story ingests your data into a local DuckDB engine for fast queries.</p>
+                        <p>Upload a CSV, paste data, link a Google Sheet, or connect to Snowflake, PostgreSQL, or BigQuery. Data is ingested into a local DuckDB engine for fast queries.</p>
                     </div>
                     <div class="step">
                         <div class="step-number">2</div>
@@ -176,7 +172,7 @@
                     <div class="step">
                         <div class="step-number">3</div>
                         <h4>Assemble and share</h4>
-                        <p>Drag charts onto a dashboard, arrange the layout, and export. Share via link or download as SVG, PNG, PDF, or PowerPoint.</p>
+                        <p>Drag charts onto a dashboard, arrange the layout, and export. Download as SVG, PNG, PDF, PowerPoint, or a portable HTML file you can host anywhere.</p>
                     </div>
                 </div>
             </div>
@@ -204,12 +200,12 @@
                         <span>Python backend</span>
                     </div>
                     <div class="tech-item">
-                        <strong>Tailwind CSS</strong>
-                        <span>Styling</span>
+                        <strong>AWS</strong>
+                        <span>Cloud deployment</span>
                     </div>
                     <div class="tech-item">
-                        <strong>Zustand</strong>
-                        <span>State management</span>
+                        <strong>Docker</strong>
+                        <span>Containerization</span>
                     </div>
                 </div>
             </div>
@@ -219,7 +215,7 @@
         <section class="cta">
             <div class="cta-inner">
                 <h2>Your data has a story.</h2>
-                <p>Story Analytics is free, open source, and runs locally. Clone the repo, connect your data, and start building.</p>
+                <p>Story Analytics is free and open source. Clone the repo, explore the example dashboard, connect your data, and start building. Deploy locally or to the cloud.</p>
                 <a href="https://github.com/adchamberlain/story-analytics" class="btn btn-primary">View on GitHub</a>
             </div>
         </section>
