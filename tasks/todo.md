@@ -370,6 +370,18 @@
 
 ---
 
+## Bug Fix: Team Invite Email Silent Failure
+
+### Root Cause
+`teams.py:83,95` — `send_team_invite_email()` and `send_team_added_email()` return bool success/failure, but the invite endpoint ignores the return value and always reports success.
+
+### Fix
+- [x] Check email send return value in `invite_member()` endpoint
+- [x] Log email send failures with `logging` module
+- [x] Return 502 error to frontend when email fails (so user knows to retry)
+
+---
+
 ## Test Summary (Phase 8 Complete)
 
 | Suite | Count |
