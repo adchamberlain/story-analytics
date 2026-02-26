@@ -2,16 +2,12 @@
 
 ## 2026-02-25
 
-### Session 9: S3 Transform Cache Bug, Scatter Plot Fix, API Demo
+### Session 9: S3 Transform Cache Bug, Scatter Plot Fix, API Docs
 
-**Goal:** Fix scatter plots with numeric series, fix transforms broken on S3 deployments, demo API key usage.
-
-**API demo:**
-- Uploaded AI benchmarks CSV via API key, used AI proposer to create scatter plot, saved chart
-- Discovered S3 upload bug: `ingest_csv` called `get_local_path()` before `write()`, trying to download a non-existent file. Fixed by reordering operations in `api/services/duckdb_service.py`
+**Goal:** Fix scatter plots with numeric series, fix transforms broken on S3 deployments, write API documentation.
 
 **Scatter plot numeric series fix (frontend):**
-- `app/src/components/charts/ObservableChartFactory.tsx`: Added numeric-to-string coercion in `buildMarks()` — when a series column contains numbers (e.g., `release_year`), Observable Plot treats `fill` as continuous, making dots invisible. Coercing to strings forces ordinal/categorical color scale. Applies to all chart types.
+- `app/src/components/charts/ObservableChartFactory.tsx`: Numeric series columns (e.g., `release_year`) made scatter dots invisible — Observable Plot treated `fill` as continuous. Fix: coerce numeric series to strings upstream of both `buildMarks()` and `buildPlotOptions()` so the color domain and dot fill values match. Initial fix only coerced in `buildMarks`, causing a domain mismatch (numbers vs strings) that still hid dots.
 
 **S3 transform cache bug (backend):**
 - **Root cause:** `_reingest_and_preview()` called `ingest_csv()` which re-uploaded the stale local cached file back to S3, overwriting the transform result. All 8 transform operations (rename, transpose, delete column, etc.) were silently broken on S3 deployments.
@@ -20,7 +16,9 @@
 - `api/services/storage/s3.py`: Override deletes cached file so next `get_local_path()` re-fetches from S3
 - `api/routers/transforms.py`: `_reingest_and_preview()` now calls `reload_source()` instead of `ingest_csv()`
 
-**Seed data fix:** Renamed `field` back to `study_hours` on cloud deployment for the "More Hours, Better Scores" scatter chart (column had been corrupted by the transform bug)
+**Seed data fix:** Renamed `field` back to `study_hours` on cloud via the now-working transform API for the "More Hours, Better Scores" scatter chart
+
+**API documentation:** `docs/API.md` — comprehensive reference covering auth (API key, JWT, no-auth), quick start, data sources, transforms, charts (CRUD + AI + versioning), dashboards, folders, teams, connections, themes, error codes, and limits
 
 **Ruff linter fix:** Fixed F541 (f-strings without placeholders) in `api/email.py`, F401 (unused imports) in `teams.py`, `test_s3_storage.py`, `test_storage_backend.py`, `test_versions.py`
 
