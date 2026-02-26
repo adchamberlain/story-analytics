@@ -1,9 +1,13 @@
 """Tests for data transform endpoints."""
 
+import pytest
 from fastapi.testclient import TestClient
 from api.main import app
 
 client = TestClient(app)
+
+# Track source IDs created during tests for cleanup
+_created_sources: list[str] = []
 
 
 def _upload_csv(csv_text: str, filename: str = "test.csv") -> str:
@@ -13,7 +17,19 @@ def _upload_csv(csv_text: str, filename: str = "test.csv") -> str:
         json={"data": csv_text, "name": filename},
     )
     assert resp.status_code == 200, resp.text
-    return resp.json()["source_id"]
+    sid = resp.json()["source_id"]
+    _created_sources.append(sid)
+    return sid
+
+
+@pytest.fixture(autouse=True)
+def _cleanup_sources():
+    """Delete all sources created during each test."""
+    _created_sources.clear()
+    yield
+    for sid in _created_sources:
+        client.delete(f"/api/data/sources/{sid}")
+    _created_sources.clear()
 
 
 class TestTransposeTransform:
