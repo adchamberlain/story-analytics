@@ -195,3 +195,29 @@ class TestAdminEndpoints:
         resp2 = client.get("/api/admin/settings")
         assert resp2.json()["open_registration"] == "false"
         client.put("/api/admin/settings", json={"open_registration": "true"})
+
+
+class TestProfileAndAuth:
+    def test_update_profile_display_name(self):
+        resp = client.put("/api/auth/profile", json={"display_name": "New Display Name"})
+        assert resp.status_code == 200
+        assert resp.json()["display_name"] == "New Display Name"
+
+    def test_update_profile_empty_name_rejected(self):
+        resp = client.put("/api/auth/profile", json={"display_name": ""})
+        assert resp.status_code == 400
+
+
+class TestRegistrationWithInvites:
+    def test_register_with_valid_invite_token(self):
+        """Test the invite token flow at the DB level (AUTH_ENABLED=false in test env)."""
+        inv = client.post("/api/admin/invites", json={
+            "email": "invited@test.com", "role": "editor"
+        })
+        token = inv.json()["token"]
+        from api.services.metadata_db import get_invite_by_token, mark_invite_used
+        invite = get_invite_by_token(token)
+        assert invite is not None
+        assert invite["email"] == "invited@test.com"
+        mark_invite_used(invite["id"])
+        assert get_invite_by_token(token) is None
