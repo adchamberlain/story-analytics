@@ -110,9 +110,9 @@ class SchemaResponse(BaseModel):
 
 
 class ExecuteQueryRequest(BaseModel):
-    sql: str
-    limit: int = 10000
-    timeout: int = 30
+    sql: str = Field(..., max_length=100000)
+    limit: int = Field(default=10000, ge=1, le=100000)
+    timeout: int = Field(default=30, ge=1, le=300)
 
 class QueryResponse(BaseModel):
     columns: list[str]
