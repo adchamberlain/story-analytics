@@ -2,6 +2,28 @@
 
 ## 2026-02-25
 
+### Session 7: Admin User Management & Account Settings
+
+**Goal:** Transform the bare change-password Account section into a real admin panel with user lifecycle management, invite system, and role enforcement.
+
+**Backend (5 commits):**
+- `api/services/metadata_db.py`: Added `invites` and `admin_settings` tables, plus 11 new functions: `list_all_users`, `update_user_role`, `update_user_status`, `update_user_display_name`, `create_invite`, `list_invites`, `get_invite_by_token`, `mark_invite_used`, `delete_invite`, `get_admin_setting`, `set_admin_setting`
+- `api/routers/admin.py`: New admin router with `require_admin` dependency (403 for non-admins). Endpoints: `GET/PUT /admin/users/{id}/role`, `GET/PUT /admin/users/{id}/status`, `POST/GET/DELETE /admin/invites`, `GET/PUT /admin/settings`
+- `api/auth_simple.py`: Added `PUT /auth/profile` (edit display name), deactivated account detection on login (403 with specific message), invite token support in registration, `open_registration` admin setting check
+- 28 new backend tests covering all DB functions and endpoints
+
+**Frontend (2 commits):**
+- **Account section** expanded: editable display name, email display, role badge (admin/editor), **logout button**, change password form
+- **User Management section** (admin-only): user table with role dropdowns and activate/deactivate toggles, invite modal (generates copyable registration link), pending invites list with revoke, open registration toggle
+- **Login page**: handles `?invite=<token>` query param — auto-switches to register mode with invite banner
+
+**Linter fix:** Moved `import os`, `StaticFiles`, `FileResponse` to top-level imports in `api/main.py` to fix pre-existing ruff E402 errors in CI.
+
+**Design doc:** `docs/plans/2026-02-25-admin-user-management-design.md`
+**Implementation plan:** `docs/plans/2026-02-25-admin-user-management-plan.md`
+
+---
+
 ### Session 6: Data Source Cleanup & E2E Leak Prevention
 
 **Problem:** E2E tests and Python scripts uploaded CSVs via `/api/data/upload` but never deleted them, accumulating hundreds of orphaned sources. User had already cleaned 482 `test.csv` and 32 `csv_dl_test.csv` files manually.
