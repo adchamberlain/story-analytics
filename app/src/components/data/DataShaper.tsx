@@ -309,14 +309,14 @@ export function DataShaper({ sourceId, tableName, rowCount, columns, onApprove, 
           onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#2563eb' }}
           onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#3b82f6' }}
         >
-          Use this data
+          Use reshaped data
         </button>
         <button
           onClick={onSkip}
           className="text-[15px] font-medium text-text-secondary hover:text-text-primary rounded-lg border border-border-default hover:border-border-hover transition-colors"
           style={{ padding: '10px 24px' }}
         >
-          Use all data
+          Skip
         </button>
       </div>
     </div>
