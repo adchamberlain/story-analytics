@@ -44,6 +44,7 @@ export function SqlWorkbenchPanel({
   // Schema state
   const [schemas, setSchemas] = useState<SchemaData[]>([])
   const [schemaLoading, setSchemaLoading] = useState(false)
+  const [schemaError, setSchemaError] = useState<string | null>(null)
 
   // Query state
   const [queryResult, setQueryResult] = useState<QueryResultData | null>(null)
@@ -85,6 +86,7 @@ export function SqlWorkbenchPanel({
   const fetchSchema = useCallback(async () => {
     if (!connectionId) return
     setSchemaLoading(true)
+    setSchemaError(null)
     try {
       const res = await authFetch(`/api/connections/${connectionId}/schema`, {
         method: 'POST',
@@ -92,9 +94,12 @@ export function SqlWorkbenchPanel({
       if (res.ok) {
         const data = await res.json()
         setSchemas(data.schemas ?? data ?? [])
+      } else {
+        const errData = await res.json().catch(() => null)
+        setSchemaError(errData?.detail ?? `Schema fetch failed (${res.status})`)
       }
     } catch {
-      // Schema fetch failed silently; user can retry via refresh button
+      setSchemaError('Network error fetching schema')
     } finally {
       setSchemaLoading(false)
     }
@@ -118,6 +123,7 @@ export function SqlWorkbenchPanel({
     if (connectionId) {
       // Reset state
       setSchemas([])
+      setSchemaError(null)
       setQueryResult(null)
       setQueryError(null)
       setCurrentSql(initialSql || '')
@@ -331,12 +337,16 @@ export function SqlWorkbenchPanel({
             <div className="px-3 py-2 border-b border-border-default bg-surface-secondary text-xs font-semibold text-text-muted uppercase tracking-wider">
               Schema
             </div>
-            <SchemaTree
-              schemas={schemas}
-              loading={schemaLoading}
-              onSelectTable={handleSelectTable}
-              onInsertColumn={handleInsertColumn}
-            />
+            {schemaError ? (
+              <div className="px-3 py-3 text-[13px] text-red-400">{schemaError}</div>
+            ) : (
+              <SchemaTree
+                schemas={schemas}
+                loading={schemaLoading}
+                onSelectTable={handleSelectTable}
+                onInsertColumn={handleInsertColumn}
+              />
+            )}
           </div>
 
           {/* SQL Editor */}

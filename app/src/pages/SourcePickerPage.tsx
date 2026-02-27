@@ -142,10 +142,26 @@ export function SourcePickerPage() {
   }, [])
 
   const handleImportSource = useCallback(
-    (sourceId: string, _rowCount: number) => {
+    async (sourceId: string, rowCount: number) => {
+      // Route through DataShaper instead of navigating directly to editor
+      try {
+        const schemaRes = await authFetch(`/api/data/schema/${sourceId}`)
+        if (schemaRes.ok) {
+          const schemaData = await schemaRes.json()
+          handleSynced({
+            sourceId,
+            tableName: 'Query Result',
+            rowCount: schemaData.row_count ?? rowCount,
+            columns: schemaData.columns,
+          })
+          return
+        }
+      } catch {
+        // Fall through to direct navigation
+      }
       handleSelectSource(sourceId)
     },
-    [handleSelectSource],
+    [handleSynced, handleSelectSource],
   )
 
   // Deduplicate sources by name, keeping only the most recent (last in the list)

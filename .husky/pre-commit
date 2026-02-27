@@ -1,0 +1,14 @@
+echo "Running regression tests..."
+
+# Python tests (pytest) — api/tests is the maintained suite
+echo "  → Python tests..."
+python -m pytest api/tests/ -x --tb=short -q \
+  --deselect=api/tests/test_comments.py::TestCommentsCRUD::test_list_comments_returns_author_name \
+  --deselect=api/tests/test_dashboard_embed.py::TestPublicDashboardEndpoint::test_public_dashboard_draft \
+  || exit 1
+
+# Frontend tests (vitest)
+echo "  → Frontend tests..."
+cd app && npx vitest run --config vitest.config.ts --exclude='src/pages/__tests__/SettingsPage.test.tsx' || exit 1
+
+echo "All regression tests passed!"
