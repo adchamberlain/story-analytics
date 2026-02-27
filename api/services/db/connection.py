@@ -59,7 +59,7 @@ class DatabaseConnection:
                 "Install it with: pip install psycopg2-binary"
             ) from exc
 
-        self._conn = psycopg2.connect(url)
+        self._conn = psycopg2.connect(url, connect_timeout=10)
         self._conn.autocommit = False
         # Store cursor factory for dict rows
         self._cursor_factory = psycopg2.extras.RealDictCursor

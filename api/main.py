@@ -170,11 +170,14 @@ async def startup():
     max_retries = 5
     for attempt in range(1, max_retries + 1):
         try:
+            logger.info(f"Startup attempt {attempt}/{max_retries}: connecting to database...")
             # metadata_db._ensure_tables() creates all needed tables
             from .services.metadata_db import ensure_default_user
             ensure_default_user()
+            logger.info("Database connected, seeding data if needed...")
             # Seed example dashboard on first run
             _seed_data_if_empty()
+            logger.info("Startup complete.")
             return
         except Exception as e:
             if attempt < max_retries:
