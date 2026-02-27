@@ -412,7 +412,7 @@ def get_admin_setting(key: str) -> str:
     """Get an admin setting value. Returns default for known keys."""
     _ensure_tables()
     db = get_db()
-    defaults = {"open_registration": "true"}
+    defaults = {"open_registration": "false"}
     row = db.fetchone("SELECT value FROM admin_settings WHERE key = ?", (key,))
     if row:
         return row["value"]

@@ -177,7 +177,7 @@ async def register(request: RegisterRequest):
     if not AUTH_ENABLED:
         raise HTTPException(status_code=400, detail="Auth is disabled. Set AUTH_ENABLED=true to enable.")
 
-    from .services.metadata_db import get_invite_by_token, mark_invite_used, get_admin_setting, update_user_role, add_team_member, seed_onboarding_tips
+    from .services.metadata_db import get_invite_by_token, mark_invite_used, get_admin_setting, update_user_role, add_team_member, seed_onboarding_tips, list_all_users
 
     invite = None
     role_override = None
@@ -190,9 +190,12 @@ async def register(request: RegisterRequest):
             raise HTTPException(status_code=400, detail="Email does not match invite")
         role_override = invite["role"]
     else:
-        open_reg = get_admin_setting("open_registration")
-        if open_reg != "true":
-            raise HTTPException(status_code=403, detail="Registration is by invitation only")
+        # Allow first user to register without invite (bootstrap), then require invite
+        has_users = len(list_all_users()) > 0
+        if has_users:
+            open_reg = get_admin_setting("open_registration")
+            if open_reg != "true":
+                raise HTTPException(status_code=403, detail="Registration is by invitation only")
 
     existing = get_user_by_email(request.email)
     if existing:
