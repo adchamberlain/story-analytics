@@ -6,7 +6,6 @@ Uses mocks for actual database calls. Uses tmp_path fixtures for isolation.
 """
 from __future__ import annotations
 
-import time
 from unittest.mock import MagicMock, patch
 
 import pytest

@@ -127,6 +127,7 @@ export function SourcesPage() {
             onConfirm={setConfirmId}
             onCancel={() => setConfirmId(null)}
             onDelete={handleDelete}
+            onRowClick={(source) => setOpenConnection(source)}
           />
         </div>
       )}

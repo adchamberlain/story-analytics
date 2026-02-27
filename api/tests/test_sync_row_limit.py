@@ -3,7 +3,7 @@ Tests for max_rows limit enforcement in sync_to_duckdb().
 """
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock, patch
 
 import pytest
 

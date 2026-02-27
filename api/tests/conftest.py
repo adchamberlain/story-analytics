@@ -10,8 +10,6 @@ import tempfile
 import shutil
 from pathlib import Path
 
-import pytest
-
 
 # Create a session-wide temp directory for all test data
 _session_tmp: Path | None = None
