@@ -1,13 +1,40 @@
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Link } from 'react-router-dom'
-import { CHART_THEMES } from '../../themes/chartThemes'
+import { CHART_THEMES, type ChartTheme } from '../../themes/chartThemes'
 import { useChartThemeStore } from '../../stores/chartThemeStore'
+import { authFetch } from '../../utils/authFetch'
 
-const themes = Object.values(CHART_THEMES)
+interface SavedThemeResponse {
+  id: string
+  name: string
+  description: string
+  theme_data: ChartTheme
+}
+
+const builtinThemes = Object.values(CHART_THEMES)
 
 export function ChartThemePicker() {
   const [open, setOpen] = useState(false)
   const { themeId, setChartTheme } = useChartThemeStore()
+  const [customThemes, setCustomThemes] = useState<SavedThemeResponse[]>([])
+
+  const fetchCustomThemes = useCallback(async () => {
+    try {
+      const res = await authFetch('/api/themes/')
+      if (res.ok) {
+        const themes: SavedThemeResponse[] = await res.json()
+        setCustomThemes(themes)
+        // Register custom themes in the runtime registry so the store can resolve them
+        for (const t of themes) {
+          CHART_THEMES[`custom_${t.id}`] = t.theme_data
+        }
+      }
+    } catch { /* ignore */ }
+  }, [])
+
+  // Fetch custom themes on mount (so active custom theme resolves) and when dropdown opens
+  useEffect(() => { fetchCustomThemes() }, [fetchCustomThemes])
+  useEffect(() => { if (open) fetchCustomThemes() }, [open, fetchCustomThemes])
 
   return (
     <div className="relative">
@@ -30,7 +57,7 @@ export function ChartThemePicker() {
             </div>
 
             <div className="py-1 max-h-80 overflow-y-auto">
-              {themes.map((t) => (
+              {builtinThemes.map((t) => (
                 <button
                   key={t.id}
                   onClick={() => { setChartTheme(t.id); setOpen(false) }}
@@ -55,6 +82,43 @@ export function ChartThemePicker() {
                   )}
                 </button>
               ))}
+
+              {customThemes.length > 0 && (
+                <>
+                  <div className="px-3 py-1.5 border-t border-border-default mt-1">
+                    <span className="text-[10px] font-semibold text-text-muted uppercase tracking-wider">Custom</span>
+                  </div>
+                  {customThemes.map((ct) => {
+                    const customId = `custom_${ct.id}`
+                    const colors = ct.theme_data?.palette?.colors || []
+                    return (
+                      <button
+                        key={ct.id}
+                        onClick={() => { setChartTheme(customId); setOpen(false) }}
+                        className={`w-full flex items-center gap-3 px-3 py-2 text-left transition-colors hover:bg-surface-secondary ${
+                          customId === themeId ? 'bg-surface-inset' : ''
+                        }`}
+                      >
+                        <div className="flex items-center gap-0.5 shrink-0">
+                          {colors.slice(0, 5).map((color: string, i: number) => (
+                            <span
+                              key={i}
+                              className="inline-block rounded-full"
+                              style={{ width: 14, height: 14, backgroundColor: color }}
+                            />
+                          ))}
+                        </div>
+                        <span className="text-sm font-medium text-text-primary truncate">{ct.name}</span>
+                        {customId === themeId && (
+                          <svg className="h-4 w-4 ml-auto shrink-0 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                          </svg>
+                        )}
+                      </button>
+                    )
+                  })}
+                </>
+              )}
             </div>
 
             <div className="border-t border-border-default px-3 py-2">

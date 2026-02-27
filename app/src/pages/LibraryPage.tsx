@@ -148,7 +148,9 @@ export function LibraryPage() {
   }, [])
 
   const charts = store.filteredCharts()
-  const chartTypes = [...new Set(store.charts.map((c) => c.chart_type))].sort()
+  const chartTypes = [...new Set(store.charts.map((c) => c.chart_type))].sort((a, b) =>
+    (CHART_TYPE_META[a]?.label ?? a).localeCompare(CHART_TYPE_META[b]?.label ?? b)
+  )
 
   const toggleSelect = (id: string) => {
     setSelectedIds((prev) => {
