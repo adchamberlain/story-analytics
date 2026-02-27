@@ -226,7 +226,7 @@ Deploying Story Analytics to AWS...
 1. Copy the **App URL** from the deploy output
 2. Open it in your browser
 3. You may need to wait 2–3 minutes after deploy completes for App Runner to finish starting
-4. Register your first user account (authentication is enabled by default)
+4. Register your first user account — this becomes the **admin**. Registration is closed after the first user; additional users must be invited.
 5. Start creating charts!
 
 > **If you see a "Service Unavailable" error:** Wait a few more minutes. App Runner needs time to start the container and pass health checks. Refresh after 2–3 minutes.
@@ -273,7 +273,7 @@ RESEND_API_KEY=re_xxxxx
 FROM_EMAIL=Your App <you@yourdomain.com>
 ```
 
-> **Note:** The default sender (`onboarding@resend.dev`) works for testing but emails may go to spam. For production, verify your own domain in the Resend dashboard.
+> **Important:** The default sender (`onboarding@resend.dev`) can **only send emails to the Resend account owner's email address**. Emails to other recipients will fail (the app falls back to showing a shareable invite link). For production use, verify your own domain at [resend.com/domains](https://resend.com/domains) and use a `--from-email` on that domain.
 
 ---
 
