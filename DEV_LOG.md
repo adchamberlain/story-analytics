@@ -30,6 +30,32 @@
 
 **Commits:** `5bcdc31`–`29ca3fd` (6 commits total)
 
+### Session 14b: SQL Workbench UX Polish
+
+**Goal:** Fix SQL workbench bugs and improve UX of AI assistant, editor, and query flow.
+
+**Semicolon handling (all connectors):**
+- User SQL with trailing `;` broke queries — connectors wrap SQL in `SELECT * FROM (...) _q LIMIT N`, so semicolons inside the subquery cause syntax errors.
+- Added `sql.replace(";", "").strip()` in Snowflake, Postgres, and BigQuery `execute_query()` methods.
+- Also strip leading SQL comments (`--`, `/* */`) in `validate_sql()` so commented queries pass validation.
+
+**AI Assistant redesign (`AiSqlAssistant.tsx`):**
+- Shows active LLM provider in header (e.g. "AI Assistant (Claude)").
+- Removed empty "Ask me to write SQL..." panel — chat area only shows when messages exist.
+- Input changed from 3-row textarea to auto-expanding single-line (grows with content, max ~5 lines).
+- Fixed "Fix with AI" button — was no-op because effect only fired on error null→string transition. Now uses counter-based trigger that fires on every click.
+
+**SQL Editor fixes (`SqlEditor.tsx`):**
+- Cmd+Enter now works — moved `runKeymap` before `defaultKeymap` in extension order (CodeMirror uses first-match-wins).
+- Editor preserves SQL content across schema/theme reloads — saves `currentDoc` before recreating.
+- Used ref pattern for `onRun` callback to avoid stale closure issues.
+
+**Layout:** Moved Query Results above AI Assistant (standard SQL editor pattern: editor → results → assistant).
+
+**DataShaper:** Renamed buttons to "Use reshaped data" / "Skip" for clarity.
+
+**Commits:** `abb404a`
+
 ---
 
 ### Session 13: AWS Redeployment + Deploy Script Fix
