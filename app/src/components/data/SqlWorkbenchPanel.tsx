@@ -20,6 +20,7 @@ interface SqlWorkbenchPanelProps {
 }
 
 const TYPE_BADGES: Record<string, string> = {
+  csv: 'bg-emerald-500/15 text-emerald-500',
   snowflake: 'bg-sky-500/15 text-sky-400',
   postgres: 'bg-blue-500/15 text-blue-400',
   bigquery: 'bg-amber-500/15 text-amber-500',
@@ -65,8 +66,9 @@ export function SqlWorkbenchPanel({
   const [autoExpandWithError, setAutoExpandWithError] = useState(false)
   const [fixErrorTrigger, setFixErrorTrigger] = useState(0)
 
-  // Panel open/close animation
+  // Panel open/close animation — keep panel mounted during slide-out
   const [visible, setVisible] = useState(false)
+  const [mounted, setMounted] = useState(false)
 
   // ---------- Build auto-complete map from schemas ----------
   const schemaCompletions = useMemo(() => {
@@ -97,22 +99,55 @@ export function SqlWorkbenchPanel({
     setSchemaLoading(true)
     setSchemaError(null)
     try {
-      const res = await authFetch(`/api/connections/${connectionId}/schema`, {
-        method: 'POST',
-      })
-      if (res.ok) {
-        const data = await res.json()
-        setSchemas(data.schemas ?? data ?? [])
+      let schemasResult: SchemaData[]
+
+      if (dbType === 'csv') {
+        // CSV sources: fetch schema from DuckDB data endpoint
+        const res = await authFetch(`/api/data/schema/${connectionId}`)
+        if (res.ok) {
+          const data = await res.json()
+          // Transform CSV schema into SchemaData[] format
+          const tableName = `src_${connectionId}`
+          schemasResult = [{
+            name: data.filename ?? 'uploaded_data',
+            tables: [{
+              name: tableName,
+              columns: (data.columns ?? []).map((c: { name: string; type: string }) => ({
+                name: c.name,
+                type: c.type,
+              })),
+              row_count: data.row_count ?? null,
+            }],
+          }]
+        } else {
+          const errData = await res.json().catch(() => null)
+          setSchemaError(errData?.detail ?? `Schema fetch failed (${res.status})`)
+          setSchemaLoading(false)
+          return
+        }
       } else {
-        const errData = await res.json().catch(() => null)
-        setSchemaError(errData?.detail ?? `Schema fetch failed (${res.status})`)
+        // External DB connections: fetch schema from connections endpoint
+        const res = await authFetch(`/api/connections/${connectionId}/schema`, {
+          method: 'POST',
+        })
+        if (res.ok) {
+          const data = await res.json()
+          schemasResult = data.schemas ?? data ?? []
+        } else {
+          const errData = await res.json().catch(() => null)
+          setSchemaError(errData?.detail ?? `Schema fetch failed (${res.status})`)
+          setSchemaLoading(false)
+          return
+        }
       }
+
+      setSchemas(schemasResult)
     } catch {
       setSchemaError('Network error fetching schema')
     } finally {
       setSchemaLoading(false)
     }
-  }, [connectionId])
+  }, [connectionId, dbType])
 
   // ---------- Check AI configuration ----------
   const checkAiConfig = useCallback(async () => {
@@ -152,9 +187,11 @@ export function SqlWorkbenchPanel({
         }, 100)
       }
 
-      // Trigger slide-in animation
+      // Mount immediately, then trigger slide-in animation
+      setMounted(true)
       requestAnimationFrame(() => setVisible(true))
     } else {
+      // Slide out first, then unmount after transition
       setVisible(false)
     }
   }, [connectionId, fetchSchema, checkAiConfig])
@@ -181,20 +218,57 @@ export function SqlWorkbenchPanel({
       setQueryError(null)
       setAutoExpandWithError(false)
 
+      const startMs = performance.now()
+
       try {
-        const res = await authFetch(`/api/connections/${connectionId}/query`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ sql: sqlText }),
-        })
-        if (res.ok) {
-          const data = await res.json()
-          setQueryResult(data)
-          setQueryError(null)
+        if (dbType === 'csv') {
+          // CSV sources: query DuckDB directly
+          const res = await authFetch('/api/data/query-raw', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sql: sqlText }),
+          })
+          if (res.ok) {
+            const data = await res.json()
+            if (data.success) {
+              // Transform dict rows to array rows for QueryResultData
+              const rows = (data.rows ?? []).map((row: Record<string, unknown>) =>
+                data.columns.map((col: string) => row[col] ?? null),
+              )
+              setQueryResult({
+                columns: data.columns ?? [],
+                column_types: data.column_types ?? [],
+                rows,
+                row_count: data.row_count ?? rows.length,
+                truncated: data.row_count >= 10000,
+                execution_time_ms: Math.round(performance.now() - startMs),
+              })
+              setQueryError(null)
+            } else {
+              setQueryError(data.error ?? 'Query failed')
+              setQueryResult(null)
+            }
+          } else {
+            const errData = await res.json().catch(() => null)
+            setQueryError(errData?.detail ?? `Query failed (${res.status})`)
+            setQueryResult(null)
+          }
         } else {
-          const errData = await res.json().catch(() => null)
-          setQueryError(errData?.detail ?? `Query failed (${res.status})`)
-          setQueryResult(null)
+          // External DB connections
+          const res = await authFetch(`/api/connections/${connectionId}/query`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sql: sqlText }),
+          })
+          if (res.ok) {
+            const data = await res.json()
+            setQueryResult(data)
+            setQueryError(null)
+          } else {
+            const errData = await res.json().catch(() => null)
+            setQueryError(errData?.detail ?? `Query failed (${res.status})`)
+            setQueryResult(null)
+          }
         }
       } catch {
         setQueryError('Network error running query')
@@ -203,18 +277,21 @@ export function SqlWorkbenchPanel({
         setQueryLoading(false)
       }
     },
-    [connectionId, currentSql],
+    [connectionId, currentSql, dbType],
   )
 
   // ---------- Schema tree interactions ----------
   const handleSelectTable = useCallback(
     (schema: string, table: string) => {
-      const sql = `SELECT * FROM ${schema}.${table} LIMIT 10`
+      // CSV sources: table is already the DuckDB table name (src_xxx), no schema prefix
+      const sql = dbType === 'csv'
+        ? `SELECT * FROM ${table} LIMIT 10`
+        : `SELECT * FROM ${schema}.${table} LIMIT 10`
       setCurrentSql(sql)
       editorRef.current?.setValue(sql)
       runQuery(sql)
     },
-    [runQuery],
+    [runQuery, dbType],
   )
 
   const handleInsertColumn = useCallback(
@@ -265,6 +342,12 @@ export function SqlWorkbenchPanel({
   const handleChartThis = useCallback(async () => {
     if (!connectionId || !currentSql.trim()) return
 
+    if (dbType === 'csv') {
+      // CSV data is already in DuckDB — navigate directly
+      navigate(`/editor/new?sourceId=${connectionId}`)
+      return
+    }
+
     try {
       const res = await authFetch(`/api/connections/${connectionId}/sync-query`, {
         method: 'POST',
@@ -280,10 +363,10 @@ export function SqlWorkbenchPanel({
     } catch {
       // sync-query not yet available
     }
-  }, [connectionId, currentSql, navigate])
+  }, [connectionId, currentSql, navigate, dbType])
 
-  // ---------- Render nothing when closed ----------
-  if (!connectionId) return null
+  // ---------- Render nothing when fully closed ----------
+  if (!mounted) return null
 
   return (
     <>
@@ -301,6 +384,9 @@ export function SqlWorkbenchPanel({
         className={`fixed inset-y-0 right-0 z-50 w-[60%] max-w-[1200px] min-w-[480px] flex flex-col bg-surface border-l border-border-default shadow-2xl transition-transform duration-300 ease-out ${
           visible ? 'translate-x-0' : 'translate-x-full'
         }`}
+        onTransitionEnd={() => {
+          if (!visible) setMounted(false)
+        }}
       >
         {/* ---- Header ---- */}
         <div className="flex items-center gap-3 px-5 py-3.5 border-b border-border-default bg-surface-secondary shrink-0">
@@ -406,7 +492,7 @@ export function SqlWorkbenchPanel({
 
           {/* AI SQL Assistant */}
           <AiSqlAssistant
-            dialect={dbType}
+            dialect={dbType === 'csv' ? 'duckdb' : dbType}
             schemaContext={schemaContext}
             currentSql={currentSql}
             errorMessage={queryError}
