@@ -287,11 +287,14 @@ def get_stack_status(stack_name: str, region: str, *, quiet: bool = False) -> di
 
 
 def destroy_stack(stack_name: str, region: str) -> None:
-    """Delete the CloudFormation stack and clean up ECR images."""
+    """Delete the CloudFormation stack and clean up ECR images + S3."""
     cfn = _cfn_client(region)
 
     # Clean up ECR images first (so stack delete doesn't fail on non-empty repo)
     _clean_ecr_images(stack_name, region)
+
+    # Empty S3 bucket (versioned buckets can't be deleted by CloudFormation)
+    _empty_s3_bucket(stack_name, region)
 
     print(f"\n  Deleting stack '{stack_name}' in {region}...")
     try:
@@ -410,6 +413,40 @@ def trigger_apprunner_deploy(stack_name: str, region: str) -> None:
 
     ar.start_deployment(ServiceArn=service_arn)
     print(f"  Deployment triggered for {service_name}.")
+
+
+def _empty_s3_bucket(stack_name: str, region: str) -> None:
+    """Empty the S3 data bucket (including versioned objects) before stack delete.
+
+    CloudFormation cannot delete non-empty S3 buckets, especially with
+    versioning enabled.  This deletes all objects, versions, and delete markers.
+    """
+    s3 = boto3.client("s3", region_name=region)
+    # Derive bucket name from stack outputs or convention
+    sts = boto3.client("sts", region_name=region)
+    account_id = sts.get_caller_identity()["Account"]
+    bucket_name = f"{stack_name}-data-{account_id}"
+
+    try:
+        s3.head_bucket(Bucket=bucket_name)
+    except ClientError:
+        return  # Bucket doesn't exist — nothing to do
+
+    print(f"  Emptying S3 bucket '{bucket_name}'...")
+
+    # Delete all object versions and delete markers
+    paginator = s3.get_paginator("list_object_versions")
+    for page in paginator.paginate(Bucket=bucket_name):
+        to_delete = []
+        for version in page.get("Versions", []):
+            to_delete.append({"Key": version["Key"], "VersionId": version["VersionId"]})
+        for marker in page.get("DeleteMarkers", []):
+            to_delete.append({"Key": marker["Key"], "VersionId": marker["VersionId"]})
+        if to_delete:
+            s3.delete_objects(Bucket=bucket_name, Delete={"Objects": to_delete, "Quiet": True})
+            print(f"    Deleted {len(to_delete)} object version(s)")
+
+    print("  S3 bucket emptied.")
 
 
 def _clean_ecr_images(stack_name: str, region: str) -> None:

@@ -1,6 +1,88 @@
 # Dev Log
 
+## 2026-02-27
+
+### Session 18: SQL Editor for CSV Sources + Panel Animation
+
+**Goal:** Enable the SQL workbench for uploaded CSV sources (not just database connections), and polish panel animations.
+
+**Changes:**
+- `SourcesPage.tsx`: Added `onRowClick` to the Uploaded Files section so CSV rows open the SQL workbench
+- `SqlWorkbenchPanel.tsx`: Made workbench CSV-aware:
+  - Schema fetched from `/api/data/schema/{sourceId}` (DuckDB) instead of external DB endpoint
+  - Queries run via `/api/data/query-raw` (DuckDB) with dict→array row transformation
+  - Auto-complete uses bare DuckDB table name (`src_xxx`) instead of `filename.src_xxx`
+  - "Chart this" navigates directly (data already in DuckDB, no sync needed)
+  - AI assistant uses "duckdb" dialect for CSV sources
+- Panel slide-in/out animation: kept panel mounted during slide-out via `onTransitionEnd` unmount; double `requestAnimationFrame` for slide-in to ensure browser paints off-screen state first
+- Fixed 3 unused Python imports flagged by ruff linter
+
+**Commits:** `6ebe10e`, `1d758ed`, `3f5385a`
+
+---
+
+### Session 17b: AWS Deployment Fix + Documentation Overhaul
+
+**Problem:** AWS App Runner entered a rollback loop (6+ consecutive rollbacks) after RDS was recreated on Feb 26. Root causes:
+1. RDS PostgreSQL 16 defaults to `rds.force_ssl=1` — connections without `?sslmode=require` fail
+2. RDS password changed multiple times via `aws rds modify-db-instance` — went out of sync with App Runner's DATABASE_URL
+3. App Runner rollback reverts both image AND env vars — creating a catch-22 where config fixes also get rolled back
+
+**Resolution:** Full destroy + fresh deploy (same as Feb 26). New App Runner URL: `https://uyezpksihv.us-east-2.awsapprunner.com`
+
+**Preventive changes:**
+- `deploy/cloudformation.yaml`: DATABASE_URL now includes `?sslmode=require` (committed earlier as `a769b7c`)
+- `deploy/aws.py`: `destroy_stack()` now empties S3 bucket (including versioned objects) before CloudFormation delete — fixes `S3Bucket DELETE_FAILED` on destroy
+- `docs/deploy-aws.md`: Added troubleshooting section for rollback loops, clarified `update` vs `deploy` behavior
+- `tasks/lessons.md`: Rewrote AWS Deployment Rules with comprehensive rules for the two deploy commands, SSL requirement, rollback catch-22 escape procedure, and documented common mistakes
+- `connection.py`: Already has `connect_timeout=10` (committed as `d6518e7`)
+
+**Key rule going forward:** NEVER use direct AWS CLI (`aws rds modify-db-instance`, `aws apprunner update-service`) to change config. Always use `deploy.cli deploy`. If in a rollback loop (2+ consecutive rollbacks), stop trying fixes and do full destroy + redeploy.
+
+---
+
+### Session 17: Password Reset / Forgot Password Flow
+
+**Goal:** Add forgot password flow so locked-out users can reset their password via email.
+
+**Backend changes:**
+- `metadata_db.py`: Added `password_resets` table + `create_password_reset()` (rate-limited 3/hr/email, invalidates old tokens), `get_valid_password_reset()`, `mark_password_reset_used()`
+- `email.py`: Added `send_password_reset_email()` using same dark HTML template as other emails, with localhost console fallback
+- `auth_simple.py`: Added `POST /auth/forgot-password` (timing-safe — always returns success regardless of whether email exists) and `POST /auth/reset-password` (validates token, sets new password, returns JWT for auto-login)
+
+**Frontend changes:**
+- `authStore.ts`: Added `forgotPassword()` and `resetPassword()` actions
+- `ForgotPasswordPage.tsx` (new): Email input form, shows success message after submit
+- `ResetPasswordPage.tsx` (new): New password + confirm form, reads `?token=` from URL, auto-logs in on success
+- `LoginPage.tsx`: Added "Forgot password?" link below password field (login mode only)
+- `App.tsx`: Registered `/forgot-password` and `/reset-password` as public routes
+
+**Security:** 30-minute token expiry, one-time use, 3 requests/email/hour rate limit, timing-safe (never reveals whether email exists), previous unused tokens invalidated on new request.
+
+**Commit:** `0e407ed`
+
+---
+
 ## 2026-02-26
+
+### Session 16: Map Projection Bug Fix in Editor
+
+**Goal:** Fix maps rendering with the wrong projection in the chart editor (correct in library view).
+
+**Root cause:** The editorStore defaulted `geoProjection` to `'geoEqualEarth'` for all maps. When a chart was saved, basemap-matching projections (e.g. `geoAlbersUsa` for US maps) were never persisted because the store never set them. On reload, the store filled in `'geoEqualEarth'` — a truthy value that short-circuited the basemap default fallback chain in map components. The library view worked because the saved config had no `geoProjection`, letting `config.geoProjection || basemapDefault` fall through correctly.
+
+**Fix (`editorStore.ts`):**
+- Chart load now derives projection from basemap default: `chart.config?.geoProjection ?? BASEMAPS.find(...)?.defaultProjection ?? 'geoEqualEarth'`
+- `updateConfig` auto-sets projection when basemap changes (e.g. switching to US States sets `geoAlbersUsa`)
+
+**Map rendering refactor (`useGeoMap.ts`, `ChoroplethMap.tsx`, `GeoPointMap.tsx`):**
+- Extracted `buildProjection()` helper — consumers compute projection inside their own effects by reading SVG dimensions directly from the DOM, eliminating async state timing mismatches between hook state and consumer render.
+- Added `mapVersion` counter (increments on SVG recreation) to replace `projectionFn`/`pathFn` state in the hook.
+- ResizeObserver guards against 0 width (matches ElectionDonut pattern), removed `loading` from deps.
+
+**Commit:** `80c00e7`
+
+---
 
 ### Session 15: SQL Editor Polish, Nav Bar Fix, Map Sizing, Source Naming
 
