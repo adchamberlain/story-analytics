@@ -46,6 +46,8 @@ export const SqlEditor = forwardRef<SqlEditorRef, SqlEditorProps>(
   ({ defaultValue = '', placeholder = 'Write SQL...', schema, onRun, onChange, className }, ref) => {
     const containerRef = useRef<HTMLDivElement>(null)
     const viewRef = useRef<EditorView | null>(null)
+    const onRunRef = useRef(onRun)
+    onRunRef.current = onRun
     const resolved = useThemeStore((s) => s.resolved)
 
     useImperativeHandle(ref, () => ({
@@ -83,23 +85,24 @@ export const SqlEditor = forwardRef<SqlEditorRef, SqlEditorProps>(
     useEffect(() => {
       if (!containerRef.current) return
 
-      const runKeymap = onRun
-        ? keymap.of([
-            {
-              key: 'Mod-Enter',
-              run: (view) => {
-                onRun(view.state.doc.toString())
-                return true
-              },
-            },
-          ])
-        : keymap.of([])
+      // Preserve current content when editor recreates (schema/theme change)
+      const currentDoc = viewRef.current?.state.doc.toString()
+
+      const runKeymap = keymap.of([
+        {
+          key: 'Mod-Enter',
+          run: (view) => {
+            onRunRef.current?.(view.state.doc.toString())
+            return true
+          },
+        },
+      ])
 
       const state = EditorState.create({
-        doc: defaultValue,
+        doc: currentDoc ?? defaultValue,
         extensions: [
-          keymap.of([...defaultKeymap, ...searchKeymap]),
           runKeymap,
+          keymap.of([...defaultKeymap, ...searchKeymap]),
           sql(),
           autocompletion({ override: schema ? [schemaCompletion] : undefined }),
           resolved === 'dark' ? oneDark : lightTheme,
@@ -110,7 +113,7 @@ export const SqlEditor = forwardRef<SqlEditorRef, SqlEditorProps>(
             }
           }),
           EditorView.theme({
-            '&': { fontSize: '13px', minHeight: '80px', maxHeight: '200px' },
+            '&': { fontSize: '13px', minHeight: '160px', maxHeight: '400px' },
             '.cm-scroller': { overflow: 'auto' },
             '.cm-content': { fontFamily: 'ui-monospace, monospace' },
           }),

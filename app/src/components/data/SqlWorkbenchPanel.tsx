@@ -54,7 +54,9 @@ export function SqlWorkbenchPanel({
   // Editor / AI state
   const [currentSql, setCurrentSql] = useState('')
   const [aiConfigured, setAiConfigured] = useState(true)
+  const [aiProvider, setAiProvider] = useState<string | null>(null)
   const [autoExpandWithError, setAutoExpandWithError] = useState(false)
+  const [fixErrorTrigger, setFixErrorTrigger] = useState(0)
 
   // Panel open/close animation
   const [visible, setVisible] = useState(false)
@@ -112,6 +114,7 @@ export function SqlWorkbenchPanel({
       if (res.ok) {
         const data = await res.json()
         setAiConfigured(!!data.ai_provider)
+        setAiProvider(data.ai_provider || null)
       }
     } catch {
       // Settings not available; default to configured
@@ -223,6 +226,7 @@ export function SqlWorkbenchPanel({
   // ---------- "Fix with AI" ----------
   const handleFixWithAi = useCallback(() => {
     setAutoExpandWithError(true)
+    setFixErrorTrigger((n) => n + 1)
   }, [])
 
   // ---------- "Import as Source" (import mode) ----------
@@ -382,17 +386,6 @@ export function SqlWorkbenchPanel({
             </div>
           </div>
 
-          {/* AI SQL Assistant */}
-          <AiSqlAssistant
-            dialect={dbType}
-            schemaContext={schemaContext}
-            currentSql={currentSql}
-            errorMessage={queryError}
-            onInsertSql={handleAiInsertSql}
-            aiConfigured={aiConfigured}
-            autoExpandWithError={autoExpandWithError}
-          />
-
           {/* Query Results */}
           <QueryResults
             data={queryResult}
@@ -402,6 +395,19 @@ export function SqlWorkbenchPanel({
             onFixWithAi={handleFixWithAi}
             actionLabel={onImportSource ? 'Import as Source' : undefined}
             actionLoading={importLoading}
+          />
+
+          {/* AI SQL Assistant */}
+          <AiSqlAssistant
+            dialect={dbType}
+            schemaContext={schemaContext}
+            currentSql={currentSql}
+            errorMessage={queryError}
+            onInsertSql={handleAiInsertSql}
+            aiConfigured={aiConfigured}
+            aiProvider={aiProvider}
+            autoExpandWithError={autoExpandWithError}
+            fixErrorTrigger={fixErrorTrigger}
           />
         </div>
       </div>

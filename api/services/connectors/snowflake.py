@@ -203,6 +203,7 @@ class SnowflakeConnector(DatabaseConnector):
     def execute_query(self, sql: str, credentials: dict, limit: int = 10000, timeout: int = 30) -> QueryResult:
         """Execute a read-only SQL query against Snowflake and return results."""
         self.validate_sql(sql)
+        sql = sql.replace(";", "").strip()
 
         import snowflake.connector
 

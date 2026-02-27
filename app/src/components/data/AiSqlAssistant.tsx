@@ -15,7 +15,9 @@ interface AiSqlAssistantProps {
   errorMessage: string | null
   onInsertSql: (sql: string) => void
   aiConfigured?: boolean
+  aiProvider?: string | null
   autoExpandWithError?: boolean
+  fixErrorTrigger?: number
 }
 
 /** Extract SQL code blocks from markdown-ish AI response text. */
@@ -44,6 +46,12 @@ function extractSqlBlocks(text: string): { type: 'text' | 'sql'; content: string
   return parts
 }
 
+const PROVIDER_LABELS: Record<string, string> = {
+  anthropic: 'Claude',
+  openai: 'GPT',
+  google: 'Gemini',
+}
+
 export function AiSqlAssistant({
   dialect,
   schemaContext,
@@ -51,7 +59,9 @@ export function AiSqlAssistant({
   errorMessage,
   onInsertSql,
   aiConfigured = true,
+  aiProvider = null,
   autoExpandWithError = false,
+  fixErrorTrigger = 0,
 }: AiSqlAssistantProps) {
   const [expanded, setExpanded] = useState(false)
   const [messages, setMessages] = useState<ChatMessage[]>([])
@@ -126,16 +136,23 @@ export function AiSqlAssistant({
   )
 
   useEffect(() => {
-    if (
-      autoExpandWithError &&
-      errorMessage !== null &&
-      prevErrorRef.current === null
-    ) {
-      setExpanded(true)
-      sendMessage(`Fix this SQL error: ${errorMessage}`)
+    if (autoExpandWithError && errorMessage !== null) {
+      // Fire when error transitions from null→string, OR when autoExpandWithError is toggled on with an existing error
+      if (prevErrorRef.current === null || prevErrorRef.current !== errorMessage) {
+        setExpanded(true)
+        sendMessage(`Fix this SQL error: ${errorMessage}`)
+      }
     }
     prevErrorRef.current = errorMessage
   }, [errorMessage, autoExpandWithError, sendMessage])
+
+  // "Fix with AI" button clicked — fixErrorTrigger increments each time
+  useEffect(() => {
+    if (fixErrorTrigger > 0 && errorMessage) {
+      setExpanded(true)
+      sendMessage(`Fix this SQL error: ${errorMessage}`)
+    }
+  }, [fixErrorTrigger]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSend = () => {
     const text = input.trim()
@@ -168,7 +185,7 @@ export function AiSqlAssistant({
           >
             <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
           </svg>
-          <span>AI Assistant</span>
+          <span>AI Assistant{aiConfigured && aiProvider ? ` (${PROVIDER_LABELS[aiProvider] ?? aiProvider})` : ''}</span>
           {!aiConfigured && (
             <span className="text-xs text-text-muted">
               {' \u2014 '}
@@ -188,13 +205,8 @@ export function AiSqlAssistant({
       {expanded && (
         <div className="border-t border-border-default">
           {/* Chat thread */}
+          {messages.length > 0 && (
           <div className="overflow-y-auto px-3 py-2 space-y-2" style={{ maxHeight: 200 }}>
-            {messages.length === 0 && !loading && (
-              <p className="text-xs text-text-muted text-center py-4">
-                Ask me to write SQL, explain queries, or fix errors.
-              </p>
-            )}
-
             {messages.map((msg) => (
               <div
                 key={msg.id}
@@ -240,17 +252,24 @@ export function AiSqlAssistant({
 
             <div ref={messagesEndRef} />
           </div>
+          )}
 
           {/* Input bar */}
           <div className="border-t border-border-default px-3 py-2">
-            <div className="flex gap-2">
-              <input
-                type="text"
+            <div className="flex gap-2 items-end">
+              <textarea
                 value={input}
-                onChange={(e) => setInput(e.target.value)}
+                onChange={(e) => {
+                  setInput(e.target.value)
+                  // Auto-expand: reset to 1 row then grow to scrollHeight
+                  e.target.style.height = 'auto'
+                  e.target.style.height = `${e.target.scrollHeight}px`
+                }}
                 onKeyDown={handleKeyDown}
-                placeholder="Describe the data you want..."
-                className="flex-1 px-2 py-1.5 text-sm border border-border-default rounded bg-surface text-text-primary focus:outline-none focus:border-blue-400"
+                placeholder="e.g. How many unique customer IDs are in this table?"
+                rows={1}
+                className="flex-1 px-2 py-1.5 text-sm border border-border-default rounded bg-surface text-text-primary focus:outline-none focus:border-blue-400 resize-none overflow-hidden"
+                style={{ maxHeight: 120 }}
               />
               <button
                 onClick={handleSend}

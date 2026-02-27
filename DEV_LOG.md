@@ -2,6 +2,84 @@
 
 ## 2026-02-26
 
+### Session 14: Multi-Table Import Safeguards + Test Isolation
+
+**Goal:** Enforce row limit safeguards on table imports, surface schema errors, and prevent tests from polluting production data.
+
+**One-at-a-time large table import (`DatabaseConnector.tsx`, `SourcePickerPage.tsx`):**
+- Tables >100K rows cannot be batch-imported — only "ok" status tables (<100K) are included in multi-select import.
+- Warning/blocked tables show "import with SQL" messaging, directing users to the SQL workbench for filtered/aggregated queries.
+- `handleImportSource` routes imported SQL query results through the DataShaper flow (schema fetch → column picker) instead of navigating directly to the editor.
+
+**Schema error visibility (`SqlWorkbenchPanel.tsx`):**
+- `fetchSchema` was silently swallowing errors, showing "No schemas found" instead of the actual error message.
+- Added `schemaError` state — now displays the real error (e.g., expired Snowflake token) in red text.
+
+**Test isolation (`api/tests/conftest.py` — new):**
+- Tests were writing connections, charts, dashboards, and CSVs directly to `data/`, polluting production data.
+- Created session-scoped isolation using `pytest_configure`/`pytest_unconfigure` hooks.
+- Redirects: `STORAGE_LOCAL_DIR` env var, `get_storage()` cache, all 9 module-level `_storage` references, `DuckDBService` singleton, `_CREDENTIALS_DIR`, `_SCHEMA_CACHE_DIR` — all point to a temp directory.
+- macOS fix: `.resolve()` on temp path to handle `/var` → `/private/var` symlink.
+
+**Pre-commit hook update (`.husky/pre-commit`):**
+- Switched from `engine/tests/` (stale, broken imports) to `api/tests/` (maintained suite).
+- Deselected two pre-existing failing tests (test_comments, test_dashboard_embed).
+- Added frontend vitest run with SettingsPage exclusion.
+
+**Data cleanup:** Removed all test-generated junk (8 connections, 25 uploads, 42 dashboards, 69 charts). Restored clean state from `data/seed/`: 1 dashboard, 25 charts, 25 CSV sources, 1 Snowflake connection.
+
+**Commits:** `5bcdc31`–`29ca3fd` (6 commits total)
+
+---
+
+### Session 13: AWS Redeployment + Deploy Script Fix
+
+**Goal:** Fix broken AWS deployment caused by password regeneration bug.
+
+**Deploy script fix (`deploy/cli.py`, `deploy/aws.py`):**
+- Root cause: `secrets.token_urlsafe(16)` generated a new random DB password on every deploy run, not just the first. When a deployment failed for a transient reason (ECR access role), App Runner rolled back its config to the old password while RDS kept the new one — creating an unrecoverable mismatch.
+- Fix: Only generate a password on first-time creation (`is_new` check via `get_stack_status(quiet=True)`). Updates use `UsePreviousValue` to preserve the existing RDS password.
+- Added `quiet` param to `get_stack_status()` (returns `{}` instead of `sys.exit(1)` for missing stacks).
+
+**Fresh deployment:** Destroyed old stack and redeployed cleanly. New App URL: `https://gdqppc4pig.us-east-2.awsapprunner.com`
+
+**Local deployment:** Redirected to custom domain `story.bi`.
+
+**Commits:** `90e133b` (deploy script fix), `c4304ce` (route refactor)
+
+---
+
+### Session 12: Onboarding Notifications + Deploy-to-Unlock Prompts
+
+**Goal:** Seed onboarding tips for new users, add deploy-to-unlock pattern for cloud-only features, fix UI bugs.
+
+**Onboarding notifications (`api/services/metadata_db.py`, `api/auth_simple.py`):**
+- New `seed_onboarding_tips(user_id)` function: idempotent, inserts tips with staggered timestamps so they appear as "just now", "2m ago", etc.
+- 10 base tips (welcome, upload data, create chart, build dashboard, customize theme, AI provider keys, AI suggestions, chart types, transforms, export).
+- 4 cloud-only tips when `AUTH_ENABLED=true` (API keys for Claude Code, share/embed, invite team, set locale).
+- Called from `ensure_default_user()` (local) and `/register` endpoint (cloud).
+- Tests: `TestOnboardingTips` class with 5 tests; added `teardown_method` to `TestNotifications` to prevent notification leak.
+
+**Notification dropdown enhancements (`app/src/components/notifications/`):**
+- Click-to-navigate: clicking a notification with `action_url` in its payload navigates to that page and closes the dropdown.
+- Emoji icons: `ICON_MAP` maps icon keys (rocket, upload, chart, etc.) to emojis rendered beside each notification.
+- Mute toggle: `notificationStore.ts` gains `muted` state (localStorage-persisted). When muted, fetches become no-ops, bell hides badge and stops polling. "Notifications are muted" message with Unmute button in dropdown.
+- Settings: new `NotificationPreferences` section with mute toggle switch.
+
+**Deploy-to-unlock pattern (`app/src/components/DeployPrompt.tsx`):**
+- `DeployPopover`: inline popover shown when clicking Share locally — explains deployment is needed, links to `docs/deploy-aws.md`.
+- `DeployTeaser`: card-style teaser for settings sections hidden locally.
+- Applied to: Share buttons (dashboard, editor, chart view), Teams, User Management, and API Keys in Settings.
+- Previously hidden sections now show what users are missing, encouraging deployment.
+
+**UI fixes:**
+- Chart library card actions: added `flex-wrap` to prevent overflow at narrow widths, removed `flex-1` spacers. Reordered to Edit → Duplicate → Move → Archive → Delete. Added border to Move button for visual consistency.
+- HTML export: converted `<a href>` to `authFetch` blob download — plain anchor tags bypass the Vite dev proxy, causing "site wasn't available" errors locally.
+
+**Commits:** `9de9442` (onboarding notifications), `dd7a5dc` (deploy prompts + UI fixes)
+
+---
+
 ### Session 11: Invite Link Fallback + Deploy Docs Fix
 
 **Goal:** Make team invites work without Resend email configured; fix deploy docs inaccuracies.

@@ -166,10 +166,15 @@ class DatabaseConnector(ABC):
     @staticmethod
     def validate_sql(sql: str) -> None:
         """Ensure SQL is read-only (SELECT/WITH/EXPLAIN only). Raises ValueError if not."""
-        stripped = sql.strip().upper()
+        import re
+        stripped = sql.strip()
         if not stripped:
             raise ValueError("SQL statement is empty")
-        if not (stripped.startswith("SELECT") or stripped.startswith("WITH") or stripped.startswith("EXPLAIN")):
+        # Strip leading SQL comments (block and line) before checking the first keyword
+        stripped_no_comments = re.sub(
+            r'^\s*(/\*.*?\*/\s*|--[^\n]*(?:\n|$)\s*)*', '', stripped, flags=re.DOTALL
+        ).upper()
+        if not (stripped_no_comments.startswith("SELECT") or stripped_no_comments.startswith("WITH") or stripped_no_comments.startswith("EXPLAIN")):
             raise ValueError("Only SELECT, WITH, and EXPLAIN statements are allowed")
         dangerous = ["INSERT", "UPDATE", "DELETE", "DROP", "ALTER", "CREATE", "TRUNCATE", "GRANT", "REVOKE"]
         for keyword in dangerous:
