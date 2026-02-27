@@ -97,14 +97,17 @@ export function useGeoMap({
     return () => ro.disconnect()
   }, [autoHeight, loading])
 
+  // Resolve width: prefer ResizeObserver value, fall back to clientWidth
+  const resolvedWidth = containerWidth || (containerRef.current?.clientWidth ?? 0)
+
   // Compute effective dimensions — in autoHeight mode, use actual container height
   const effectiveHeight = autoHeight
-    ? (containerHeight > 0 ? containerHeight : Math.max(containerWidth * 0.55, 200))
+    ? (containerHeight > 0 ? containerHeight : Math.max(resolvedWidth * 0.55, 200))
     : height
 
   // Compute projection and path when geoData/dimensions change
   const projectionFn = (() => {
-    if (!geoData || containerWidth <= 0) return null
+    if (!geoData || resolvedWidth <= 0) return null
     const projFactory = (d3Geo as Record<string, unknown>)[projectionId] as (() => d3Geo.GeoProjection) | undefined
     const proj = projFactory ? projFactory() : d3Geo.geoEqualEarth()
 
@@ -115,9 +118,9 @@ export function useGeoMap({
         type: 'Feature', properties: {},
         geometry: { type: 'Polygon', coordinates: [[[-180, -55], [180, -55], [180, 80], [-180, 80], [-180, -55]]] },
       }
-      proj.fitExtent([[pad, pad], [containerWidth - pad, effectiveHeight - pad]], worldClip)
+      proj.fitExtent([[pad, pad], [resolvedWidth - pad, effectiveHeight - pad]], worldClip)
     } else {
-      proj.fitExtent([[pad, pad], [containerWidth - pad, effectiveHeight - pad]], geoData)
+      proj.fitExtent([[pad, pad], [resolvedWidth - pad, effectiveHeight - pad]], geoData)
     }
     return proj
   })()
@@ -127,9 +130,10 @@ export function useGeoMap({
   // Create SVG and zoom behavior
   useEffect(() => {
     const el = containerRef.current
-    if (!el || !geoData || containerWidth <= 0) return
+    if (!el || !geoData) return
 
-    const width = containerWidth
+    const width = containerWidth || el.clientWidth
+    if (width <= 0) return
     const h = effectiveHeight
 
     // Clear previous render
@@ -190,7 +194,7 @@ export function useGeoMap({
     geoData,
     projectionFn,
     pathFn,
-    containerWidth,
+    containerWidth: resolvedWidth,
     effectiveHeight,
     loading,
     error,
