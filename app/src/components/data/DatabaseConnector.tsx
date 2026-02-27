@@ -650,8 +650,8 @@ export function DatabaseConnector({ onSynced, onOpenSqlWorkbench }: DatabaseConn
   // ── Pre-import confirmation step ──────────────────────────────────────────
   if (step === 'confirm') {
     const selectedInfos = tableInfos.filter((t) => selectedTables.has(t.name))
-    const importable = selectedInfos.filter((t) => getRowStatus(t.row_count) !== 'blocked')
-    const blockedCount = selectedInfos.length - importable.length
+    const importable = selectedInfos.filter((t) => getRowStatus(t.row_count) === 'ok')
+    const largeCount = selectedInfos.length - importable.length
 
     return (
       <div className="rounded-2xl border border-border-default bg-surface-raised overflow-hidden">
@@ -707,7 +707,7 @@ export function DatabaseConnector({ onSynced, onOpenSqlWorkbench }: DatabaseConn
                       {status === 'blocked'
                         ? `Too large (${formatRowCount(ti.row_count)}) — use SQL to filter`
                         : status === 'warning'
-                          ? `Large table (${formatRowCount(ti.row_count)}), may be slow`
+                          ? `Large table (${formatRowCount(ti.row_count)}) — import with SQL`
                           : formatRowCount(ti.row_count) || 'Ready to import'}
                     </p>
                   </div>
@@ -726,9 +726,9 @@ export function DatabaseConnector({ onSynced, onOpenSqlWorkbench }: DatabaseConn
             })}
           </div>
 
-          {blockedCount > 0 && (
+          {largeCount > 0 && (
             <p className="text-[13px] text-text-muted">
-              {blockedCount} table{blockedCount !== 1 ? 's' : ''} blocked — use SQL to filter before importing.
+              Large tables must be imported one at a time using SQL to filter or aggregate the data.
             </p>
           )}
 
