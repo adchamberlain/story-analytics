@@ -89,7 +89,7 @@ export const SqlEditor = forwardRef<SqlEditorRef, SqlEditorProps>(
             }
           }),
           EditorView.theme({
-            '&': { fontSize: '13px', maxHeight: '200px' },
+            '&': { fontSize: '13px', minHeight: '80px', maxHeight: '200px' },
             '.cm-scroller': { overflow: 'auto' },
             '.cm-content': { fontFamily: 'ui-monospace, monospace' },
           }),

@@ -128,12 +128,12 @@ export function SqlWorkbenchPanel({
       fetchSchema()
       checkAiConfig()
 
-      // Pre-populate and run initial SQL if provided
+      // Pre-populate and run initial SQL if provided (delayed to allow editor mount)
       if (initialSql) {
-        requestAnimationFrame(() => {
+        setTimeout(() => {
           editorRef.current?.setValue(initialSql)
           runQuery(initialSql)
-        })
+        }, 100)
       }
 
       // Trigger slide-in animation
