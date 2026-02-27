@@ -75,11 +75,17 @@ export function SqlWorkbenchPanel({
     const map: Record<string, string[]> = {}
     for (const s of schemas) {
       for (const t of s.tables) {
-        map[`${s.name}.${t.name}`] = t.columns.map((c) => c.name)
+        const cols = t.columns.map((c) => c.name)
+        if (dbType === 'csv') {
+          // CSV: use bare DuckDB table name (src_xxx), no schema prefix
+          map[t.name] = cols
+        } else {
+          map[`${s.name}.${t.name}`] = cols
+        }
       }
     }
     return map
-  }, [schemas])
+  }, [schemas, dbType])
 
   // ---------- Build schema context string for AI ----------
   const schemaContext = useMemo(() => {
