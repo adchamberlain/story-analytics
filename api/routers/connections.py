@@ -39,6 +39,9 @@ _SCHEMA_CACHE_DIR = Path(__file__).parent.parent.parent / "data" / "schema_cache
 # Schema cache staleness threshold (1 hour)
 _SCHEMA_CACHE_MAX_AGE_SECONDS = 3600
 
+# Row-limit safeguards for table imports
+MAX_IMPORT_ROWS = 1_000_000
+
 
 # ── Request / Response Schemas ───────────────────────────────────────────────
 
@@ -60,10 +63,15 @@ class TestConnectionRequest(BaseModel):
     credentials: dict | None = None  # Generic credentials for any connector
     save_credentials: bool = False   # Persist encrypted credentials on successful test
 
+class TableInfoResponse(BaseModel):
+    name: str
+    row_count: int | None = None
+
 class TestConnectionResponse(BaseModel):
     success: bool
     message: str
     tables: list[str] = []
+    table_infos: list[TableInfoResponse] = []
 
 class ListTablesRequest(BaseModel):
     username: str | None = None
@@ -291,6 +299,10 @@ async def test_connection(connection_id: str, request: TestConnectionRequest, us
                 success=True,
                 message=result.message,
                 tables=tables_result.tables if tables_result.success else [],
+                table_infos=[
+                    TableInfoResponse(name=ti.name, row_count=ti.row_count)
+                    for ti in tables_result.table_infos
+                ] if tables_result.success else [],
             )
         return TestConnectionResponse(success=False, message=result.message)
     except ImportError as e:
@@ -363,6 +375,7 @@ async def sync_tables(connection_id: str, request: SyncRequest, user: dict = Dep
             credentials=creds,
             duckdb_service=db,
             cache_dir=cache_dir,
+            max_rows=MAX_IMPORT_ROWS,
         )
     except ImportError:
         # Missing library — Snowflake can fall back to cached parquet
@@ -591,8 +604,8 @@ async def sync_query_result(connection_id: str, request: QuerySyncRequest, user:
         result = connector.execute_query(
             sql=request.sql,
             credentials=creds,
-            limit=10000,
-            timeout=30,
+            limit=MAX_IMPORT_ROWS,
+            timeout=120,
         )
     except ValueError as e:
         # SQL validation errors (INSERT, DELETE, etc.)

@@ -6,6 +6,7 @@ import { PasteDataInput } from '../components/data/PasteDataInput'
 import { GoogleSheetsInput } from '../components/data/GoogleSheetsInput'
 import { UrlSourceInput } from '../components/data/UrlSourceInput'
 import { DatabaseConnector, type SyncedInfo } from '../components/data/DatabaseConnector'
+import { SqlWorkbenchPanel } from '../components/data/SqlWorkbenchPanel'
 import { DataShaper } from '../components/data/DataShaper'
 import { DataPreview } from '../components/data/DataPreview'
 import { useDataStore } from '../stores/dataStore'
@@ -33,6 +34,12 @@ export function SourcePickerPage() {
   // Database wizard state
   const [dbStep, setDbStep] = useState<'connector' | 'shaper'>('connector')
   const [syncedInfo, setSyncedInfo] = useState<SyncedInfo | null>(null)
+
+  // SQL workbench state (for "Query with SQL" import flow)
+  const [workbenchConnectionId, setWorkbenchConnectionId] = useState<string | null>(null)
+  const [workbenchConnectionName, setWorkbenchConnectionName] = useState('')
+  const [workbenchDbType, setWorkbenchDbType] = useState('')
+  const [workbenchInitialSql, setWorkbenchInitialSql] = useState<string | undefined>()
 
   const dataStore = useDataStore()
 
@@ -118,6 +125,28 @@ export function SourcePickerPage() {
     setSyncedInfo(null)
     setDbStep('connector')
   }, [])
+
+  const handleOpenSqlWorkbench = useCallback(
+    (connId: string, connName: string, connDbType: string, tableName: string) => {
+      setWorkbenchConnectionId(connId)
+      setWorkbenchConnectionName(connName)
+      setWorkbenchDbType(connDbType)
+      setWorkbenchInitialSql(`SELECT * FROM ${tableName} LIMIT 100`)
+    },
+    [],
+  )
+
+  const handleWorkbenchClose = useCallback(() => {
+    setWorkbenchConnectionId(null)
+    setWorkbenchInitialSql(undefined)
+  }, [])
+
+  const handleImportSource = useCallback(
+    (sourceId: string, _rowCount: number) => {
+      handleSelectSource(sourceId)
+    },
+    [handleSelectSource],
+  )
 
   // Deduplicate sources by name, keeping only the most recent (last in the list)
   const deduped = sources.reduce<SourceSummary[]>((acc, src) => {
@@ -309,7 +338,7 @@ export function SourcePickerPage() {
               </div>
 
               {/* Connect to Database */}
-              <DatabaseConnector onSynced={handleSynced} />
+              <DatabaseConnector onSynced={handleSynced} onOpenSqlWorkbench={handleOpenSqlWorkbench} />
             </div>
 
             {/* Recent sources (collapsible) */}
@@ -359,6 +388,16 @@ export function SourcePickerPage() {
           </>
         )}
       </main>
+
+      {/* SQL Workbench panel (for "Query with SQL" import) */}
+      <SqlWorkbenchPanel
+        connectionId={workbenchConnectionId}
+        connectionName={workbenchConnectionName}
+        dbType={workbenchDbType}
+        onClose={handleWorkbenchClose}
+        initialSql={workbenchInitialSql}
+        onImportSource={handleImportSource}
+      />
 
       {/* Duplicate file confirmation modal */}
       {dataStore.duplicateConflict && (

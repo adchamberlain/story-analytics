@@ -107,8 +107,8 @@ class TestSyncQueryEndpoint:
         mock_connector.execute_query.assert_called_once()
         call_kwargs = mock_connector.execute_query.call_args
         assert call_kwargs.kwargs["sql"] == "SELECT id, name FROM users"
-        assert call_kwargs.kwargs["limit"] == 10000
-        assert call_kwargs.kwargs["timeout"] == 30
+        assert call_kwargs.kwargs["limit"] == 1_000_000
+        assert call_kwargs.kwargs["timeout"] == 120
 
         # Verify ingest_parquet was called with the source name
         mock_duckdb.ingest_parquet.assert_called_once()

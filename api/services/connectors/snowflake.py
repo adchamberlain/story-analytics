@@ -8,7 +8,7 @@ import os
 import tempfile
 from pathlib import Path
 
-from .base import DatabaseConnector, ColumnInfo, ConnectorResult, QueryResult, SchemaColumn, SchemaTable, SchemaInfo
+from .base import DatabaseConnector, ColumnInfo, ConnectorResult, QueryResult, SchemaColumn, SchemaTable, SchemaInfo, TableInfo
 
 
 class SnowflakeConnector(DatabaseConnector):
@@ -65,9 +65,15 @@ class SnowflakeConnector(DatabaseConnector):
             conn = snowflake.connector.connect(**self._get_connect_kwargs(credentials))
             cursor = conn.cursor()
             cursor.execute("SHOW TABLES")
-            tables = [row[1] for row in cursor.fetchall()]  # name is column index 1
+            rows = cursor.fetchall()
+            # name at index 1, row count at index 7
+            tables = [row[1] for row in rows]
+            table_infos = [
+                TableInfo(name=row[1], row_count=row[7] if len(row) > 7 else None)
+                for row in rows
+            ]
             cursor.close()
-            return ConnectorResult(success=True, tables=tables)
+            return ConnectorResult(success=True, tables=tables, table_infos=table_infos)
         except Exception as e:
             return ConnectorResult(success=False, message=f"Failed to list tables: {e}")
         finally:
@@ -144,6 +150,7 @@ class SnowflakeConnector(DatabaseConnector):
         credentials: dict,
         duckdb_service: object,
         cache_dir: Path | None = None,
+        max_rows: int | None = None,
     ) -> list[dict]:
         import snowflake.connector
         import pyarrow as pa
@@ -154,7 +161,10 @@ class SnowflakeConnector(DatabaseConnector):
         try:
             cursor = conn.cursor()
             for table in tables:
-                cursor.execute(f"SELECT * FROM {self._quote_identifier(table)}")
+                sql = f"SELECT * FROM {self._quote_identifier(table)}"
+                if max_rows is not None:
+                    sql += f" LIMIT {max_rows}"
+                cursor.execute(sql)
                 columns = [desc[0] for desc in cursor.description]
                 rows = cursor.fetchall()
                 arrow_table = pa.table(

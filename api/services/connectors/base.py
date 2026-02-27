@@ -41,11 +41,19 @@ class SchemaInfo:
 
 
 @dataclass
+class TableInfo:
+    """Table name with optional row count, returned by list_tables()."""
+    name: str
+    row_count: int | None = None
+
+
+@dataclass
 class ConnectorResult:
     """Result of a connector operation."""
     success: bool
     message: str = ""
     tables: list[str] = field(default_factory=list)
+    table_infos: list[TableInfo] = field(default_factory=list)
     columns: list[ColumnInfo] = field(default_factory=list)
     schemas: list[SchemaInfo] = field(default_factory=list)
 
@@ -133,12 +141,13 @@ class DatabaseConnector(ABC):
         credentials: dict,
         duckdb_service: object,
         cache_dir: Path | None = None,
+        max_rows: int | None = None,
     ) -> list[dict]:
         """
         Sync the specified tables from the remote database into DuckDB.
 
         Uses parquet as the intermediary format:
-        1. SELECT * from remote table
+        1. SELECT * from remote table (with optional LIMIT)
         2. Write to parquet (optionally cached on disk)
         3. Load into DuckDB via duckdb_service.ingest_parquet()
 
@@ -147,6 +156,7 @@ class DatabaseConnector(ABC):
             credentials: Connection credentials dict.
             duckdb_service: The DuckDBService instance to ingest into.
             cache_dir: Optional directory to cache parquet files.
+            max_rows: Optional row limit per table.
 
         Returns:
             List of SourceSchema dicts (one per synced table).

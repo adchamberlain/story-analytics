@@ -19,6 +19,8 @@ export interface QueryResultsProps {
   loading?: boolean
   onChartThis: () => void
   onFixWithAi?: () => void
+  actionLabel?: string // Override "Chart this" button label
+  actionLoading?: boolean
 }
 
 type SortDir = 'asc' | 'desc'
@@ -62,7 +64,7 @@ function Spinner() {
 // Main Component
 // ---------------------------------------------------------------------------
 
-export function QueryResults({ data, error, loading, onChartThis, onFixWithAi }: QueryResultsProps) {
+export function QueryResults({ data, error, loading, onChartThis, onFixWithAi, actionLabel, actionLoading }: QueryResultsProps) {
   const [sortCol, setSortCol] = useState<number | null>(null)
   const [sortDir, setSortDir] = useState<SortDir>('asc')
 
@@ -174,9 +176,10 @@ export function QueryResults({ data, error, loading, onChartThis, onFixWithAi }:
         </span>
         <button
           onClick={onChartThis}
-          className="px-4 py-1.5 text-[13px] font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-500 transition-colors"
+          disabled={actionLoading}
+          className="px-4 py-1.5 text-[13px] font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-500 transition-colors disabled:opacity-50"
         >
-          Chart this
+          {actionLoading ? 'Importing...' : actionLabel || 'Chart this'}
         </button>
       </div>
     </div>
