@@ -14,6 +14,8 @@ import { PublicChartPage } from './pages/PublicChartPage'
 import { EmbedChartPage } from './pages/EmbedChartPage'
 import { EmbedDashboardPage } from './pages/EmbedDashboardPage'
 import { LoginPage } from './pages/LoginPage'
+import { ForgotPasswordPage } from './pages/ForgotPasswordPage'
+import { ResetPasswordPage } from './pages/ResetPasswordPage'
 import { HomeRedirect } from './components/HomeRedirect'
 import { ThemeBuilderPage } from './pages/ThemeBuilderPage'
 
@@ -22,6 +24,8 @@ function App() {
     <Routes>
       {/* Public routes (no auth required) */}
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route path="/public/chart/:chartId" element={<PublicChartPage />} />
       <Route path="/embed/chart/:chartId" element={<EmbedChartPage />} />
       <Route path="/embed/dashboard/:dashboardId" element={<EmbedDashboardPage />} />

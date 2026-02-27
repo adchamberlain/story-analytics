@@ -129,6 +129,15 @@ def _ensure_tables() -> None:
             key TEXT PRIMARY KEY,
             value TEXT NOT NULL
         );
+
+        CREATE TABLE IF NOT EXISTS password_resets (
+            id TEXT PRIMARY KEY,
+            email TEXT NOT NULL,
+            token TEXT UNIQUE NOT NULL,
+            created_at TEXT NOT NULL,
+            expires_at TEXT NOT NULL,
+            used_at TEXT
+        );
     """)
     # Migrate invites table: add team columns if missing
     if db._is_postgres:
@@ -206,6 +215,64 @@ def update_user_password(user_id: str, password_hash: str) -> bool:
         return False
     db.execute("UPDATE users SET password_hash = ? WHERE id = ?", (password_hash, user_id))
     return True
+
+
+# ── Password Resets ───────────────────────────────────────────────────────
+
+
+def create_password_reset(email: str) -> str | None:
+    """Create a password reset token. Returns token, or None if rate-limited (3/hr/email).
+
+    Invalidates any previous unused tokens for this email.
+    """
+    _ensure_tables()
+    db = get_db()
+    now = datetime.now(timezone.utc)
+    one_hour_ago = (now - timedelta(hours=1)).isoformat()
+
+    # Rate limit: max 3 per email per hour
+    row = db.fetchone(
+        "SELECT COUNT(*) AS cnt FROM password_resets WHERE email = ? AND created_at > ?",
+        (email, one_hour_ago),
+    )
+    if row and row["cnt"] >= 3:
+        return None
+
+    # Invalidate previous unused tokens
+    db.execute(
+        "UPDATE password_resets SET used_at = ? WHERE email = ? AND used_at IS NULL",
+        (now.isoformat(), email),
+    )
+
+    reset_id = uuid.uuid4().hex[:12]
+    token = secrets.token_urlsafe(32)
+    expires_at = (now + timedelta(minutes=30)).isoformat()
+    db.execute(
+        "INSERT INTO password_resets (id, email, token, created_at, expires_at) "
+        "VALUES (?, ?, ?, ?, ?)",
+        (reset_id, email, token, now.isoformat(), expires_at),
+    )
+    return token
+
+
+def get_valid_password_reset(token: str) -> dict | None:
+    """Find an unused, unexpired password reset by token."""
+    _ensure_tables()
+    db = get_db()
+    now = datetime.now(timezone.utc).isoformat()
+    return db.fetchone(
+        "SELECT id, email, token, created_at, expires_at FROM password_resets "
+        "WHERE token = ? AND used_at IS NULL AND expires_at > ?",
+        (token, now),
+    )
+
+
+def mark_password_reset_used(reset_id: str) -> None:
+    """Mark a password reset token as used."""
+    _ensure_tables()
+    db = get_db()
+    now = datetime.now(timezone.utc).isoformat()
+    db.execute("UPDATE password_resets SET used_at = ? WHERE id = ?", (now, reset_id))
 
 
 def get_user_by_id(user_id: str) -> dict | None:
