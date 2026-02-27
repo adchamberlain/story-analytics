@@ -142,39 +142,37 @@ export function ChoroplethMap({ data, config, height = 400, autoHeight = false }
 
   }, [geoData, data, containerWidth, effectiveHeight, basemapId, joinColumn, valueColumn, colorScaleType, pathFn, config.colorRange, config.color, containerRef, mapGroupRef])
 
-  if (loading) {
-    return (
-      <div ref={containerRef} style={{ width: '100%', height, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <span style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>Loading map...</span>
-      </div>
-    )
-  }
-
-  if (error) {
-    return (
-      <div ref={containerRef} style={{ width: '100%', height, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <span style={{ fontSize: 13, color: 'var(--color-red-500, red)' }}>Map error: {error}</span>
-      </div>
-    )
-  }
-
   const gradientCSS = legendInfo
     ? `linear-gradient(to right, ${legendInfo.colors.join(', ')})`
     : undefined
 
   return (
     <div style={{ width: '100%', height: autoHeight ? '100%' : height, display: 'flex', flexDirection: 'column' }}>
-      {/* Map area */}
+      {/* Map area — single persistent ref so ResizeObserver always tracks the right element */}
       <div ref={containerRef} onMouseLeave={() => setTooltip(null)} style={{ width: '100%', flex: '1 1 0', minHeight: 0, position: 'relative', overflow: 'hidden' }}>
+        {/* Loading / error overlays */}
+        {loading && (
+          <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 6 }}>
+            <span style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>Loading map...</span>
+          </div>
+        )}
+        {error && (
+          <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 6 }}>
+            <span style={{ fontSize: 13, color: 'var(--color-red-500, red)' }}>Map error: {error}</span>
+          </div>
+        )}
+
         {/* Zoom controls */}
-        <div
-          data-testid="zoom-controls"
-          style={{ position: 'absolute', top: 8, right: 8, display: 'flex', flexDirection: 'column', gap: 2, zIndex: 5 }}
-        >
-          <button onClick={handleZoomIn} style={zoomBtnStyle} aria-label="Zoom in">+</button>
-          <button onClick={handleZoomOut} style={zoomBtnStyle} aria-label="Zoom out">-</button>
-          <button onClick={handleReset} style={{ ...zoomBtnStyle, fontSize: 10 }} aria-label="Reset zoom">Reset</button>
-        </div>
+        {!loading && !error && (
+          <div
+            data-testid="zoom-controls"
+            style={{ position: 'absolute', top: 8, right: 8, display: 'flex', flexDirection: 'column', gap: 2, zIndex: 5 }}
+          >
+            <button onClick={handleZoomIn} style={zoomBtnStyle} aria-label="Zoom in">+</button>
+            <button onClick={handleZoomOut} style={zoomBtnStyle} aria-label="Zoom out">-</button>
+            <button onClick={handleReset} style={{ ...zoomBtnStyle, fontSize: 10 }} aria-label="Reset zoom">Reset</button>
+          </div>
+        )}
 
         {tooltip && (
           <div
