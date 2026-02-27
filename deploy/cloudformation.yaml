@@ -381,7 +381,7 @@ Resources:
               - Name: S3_BUCKET
                 Value: !Ref S3Bucket
               - Name: DATABASE_URL
-                Value: !Sub "postgresql://storyanalytics:${DBPassword}@${RDSInstance.Endpoint.Address}:${RDSInstance.Endpoint.Port}/storyanalytics"
+                Value: !Sub "postgresql://storyanalytics:${DBPassword}@${RDSInstance.Endpoint.Address}:${RDSInstance.Endpoint.Port}/storyanalytics?sslmode=require"
               - Name: AUTH_ENABLED
                 Value: "true"
               - Name: JWT_SECRET
