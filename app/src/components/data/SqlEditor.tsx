@@ -2,6 +2,7 @@ import { useRef, useEffect, useCallback, useImperativeHandle, forwardRef } from 
 import { EditorView, keymap, placeholder as cmPlaceholder } from '@codemirror/view'
 import { EditorState } from '@codemirror/state'
 import { sql } from '@codemirror/lang-sql'
+import { syntaxHighlighting, defaultHighlightStyle } from '@codemirror/language'
 import { defaultKeymap } from '@codemirror/commands'
 import { oneDark } from '@codemirror/theme-one-dark'
 import { autocompletion, CompletionContext } from '@codemirror/autocomplete'
@@ -105,6 +106,7 @@ export const SqlEditor = forwardRef<SqlEditorRef, SqlEditorProps>(
           keymap.of([...defaultKeymap, ...searchKeymap]),
           sql(),
           autocompletion({ override: schema ? [schemaCompletion] : undefined }),
+          syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
           resolved === 'dark' ? oneDark : lightTheme,
           cmPlaceholder(placeholder),
           EditorView.updateListener.of((update) => {

@@ -6,6 +6,7 @@ import { ObservableChartFactory } from '../components/charts/ObservableChartFact
 import { ChartShareModal } from '../components/sharing/ChartShareModal'
 import { DeployPopover } from '../components/DeployPrompt'
 import { useAuthStore } from '../stores/authStore'
+import { TopNav } from '../components/layout/TopNav'
 import { buildChartConfig } from '../utils/buildChartConfig'
 import type { ChartType } from '../types/chart'
 
@@ -113,6 +114,7 @@ export function ChartViewPage() {
 
   return (
     <div className="min-h-screen bg-surface-secondary">
+      {user && <TopNav />}
       {/* Header */}
       <header className="bg-surface border-b border-border-default px-6 py-3 flex items-center justify-between">
         {user ? (

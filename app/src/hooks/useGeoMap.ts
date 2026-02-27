@@ -95,7 +95,7 @@ export function useGeoMap({
     })
     ro.observe(el)
     return () => ro.disconnect()
-  }, [autoHeight])
+  }, [autoHeight, loading])
 
   // Compute effective dimensions — in autoHeight mode, use actual container height
   const effectiveHeight = autoHeight
