@@ -56,13 +56,14 @@
                 <p class="hero-badge">Open Source</p>
                 <h1 class="hero-title">Publication-ready dashboards<br>from any data source</h1>
                 <p class="hero-subtitle">
-                    Connect to your database. Build charts with a visual editor and built-in SQL workbench.
-                    Export to SVG, PNG, PDF, or PowerPoint. Deploy locally or to the cloud.
+                    Connect to your database. Build charts with a visual editor, SQL workbench, or AI.
+                    Ask Claude Code to build a chart and push it automatically. Export to SVG, PNG, PDF, or PowerPoint. Deploy locally or to the cloud.
                 </p>
                 <div class="hero-actions">
                     <a href="https://github.com/adchamberlain/story-analytics" class="btn btn-primary">Get Started</a>
                     <a href="#features" class="btn btn-secondary">See Features</a>
                 </div>
+                <img class="hero-screenshot" src="images/chart_editing.png" alt="Story Analytics chart editor showing a bar chart with live preview, color controls, and formatting options">
             </div>
         </section>
 
@@ -87,8 +88,44 @@
                     <div class="value-icon">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
                     </div>
-                    <h3>AI Assistant</h3>
-                    <p>Use Claude, GPT, or Gemini to help write SQL, add calculated fields, and refine your charts through natural language.</p>
+                    <h3>AI-Native</h3>
+                    <p>Built-in AI assistant for writing SQL and refining charts. Or use the API with Claude Code to build any chart from a prompt — it creates the chart and pushes it directly to your Story Analytics instance.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Showcase -->
+        <section class="showcase">
+            <div class="showcase-inner">
+                <div class="showcase-block">
+                    <div class="showcase-img">
+                        <img src="images/sql_editor.png" alt="SQL workbench with schema browser, syntax highlighting, and query results">
+                    </div>
+                    <div class="showcase-text">
+                        <p class="showcase-label">SQL Workbench</p>
+                        <h3>Query any database with a built-in SQL editor</h3>
+                        <p>Schema browser, syntax highlighting, inline AI assistant, DuckDB engine. Connect to Snowflake, PostgreSQL, BigQuery, or uploaded CSV files.</p>
+                    </div>
+                </div>
+                <div class="showcase-block">
+                    <div class="showcase-img">
+                        <img src="images/dashboards.png" alt="Dashboard canvas with multiple chart types arranged in a responsive grid">
+                    </div>
+                    <div class="showcase-text">
+                        <p class="showcase-label">Dashboards</p>
+                        <h3>25 chart types on a drag-and-drop canvas</h3>
+                        <p>Bar, line, scatter, heatmap, KPI cards, maps, small multiples, and more. Arrange on a responsive grid and export the whole dashboard as a portable HTML file.</p>
+                    </div>
+                </div>
+                <div class="showcase-block">
+                    <div class="showcase-img">
+                        <img src="images/chart_types.png" alt="Grid of available chart types including choropleth, symbol, locator, and spike maps">
+                    </div>
+                    <div class="showcase-text">
+                        <p class="showcase-label">Geographic Maps</p>
+                        <h3>Choropleth, symbol, locator, and spike maps</h3>
+                        <p>Built-in basemaps with zoom, pan, and smart label placement. Small multiples for comparing across categories. All rendered as clean SVG.</p>
+                    </div>
                 </div>
             </div>
         </section>
@@ -122,7 +159,7 @@
                     </div>
                     <div class="feature">
                         <h4>Teams &amp; Auth</h4>
-                        <p>Magic link authentication, team management with roles, threaded comments on charts, and scoped API keys for programmatic access.</p>
+                        <p>Magic link authentication, team management with roles, threaded comments on charts, and scoped API keys — use them with Claude Code or any AI agent to create charts programmatically.</p>
                     </div>
                     <div class="feature">
                         <h4>Annotations</h4>
