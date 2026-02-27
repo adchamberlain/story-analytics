@@ -1,6 +1,9 @@
 /**
  * useGeoMap — shared hook for all geo map components.
  * Handles basemap loading, projection, ResizeObserver, d3-zoom, and SVG management.
+ *
+ * Consumers compute projection/path inside their own effects by reading the SVG
+ * element dimensions directly — this guarantees projection and SVG always match.
  */
 
 import { useRef, useEffect, useState, useCallback } from 'react'
@@ -24,8 +27,8 @@ export interface UseGeoMapResult {
   svgRef: React.MutableRefObject<SVGSVGElement | null>
   mapGroupRef: React.MutableRefObject<SVGGElement | null>
   geoData: FeatureCollection | null
-  projectionFn: d3Geo.GeoProjection | null
-  pathFn: d3Geo.GeoPath | null
+  /** Increments each time the SVG is (re)created — use in consumer effect deps */
+  mapVersion: number
   containerWidth: number
   effectiveHeight: number
   loading: boolean
@@ -35,9 +38,38 @@ export interface UseGeoMapResult {
   handleReset: () => void
 }
 
+/**
+ * Build a d3-geo projection fitted to the given width × height.
+ * Exported so consumers can call it inside their own effects to guarantee
+ * the projection matches the SVG dimensions exactly.
+ */
+export function buildProjection(
+  geoData: FeatureCollection,
+  width: number,
+  height: number,
+  basemapId: string,
+  projectionId: string,
+): { projection: d3Geo.GeoProjection; path: d3Geo.GeoPath } {
+  const projFactory = (d3Geo as Record<string, unknown>)[projectionId] as (() => d3Geo.GeoProjection) | undefined
+  const proj = projFactory ? projFactory() : d3Geo.geoEqualEarth()
+
+  const pad = 8
+  if (basemapId === 'world') {
+    const worldClip: GeoJSON.Feature = {
+      type: 'Feature', properties: {},
+      geometry: { type: 'Polygon', coordinates: [[[-180, -55], [180, -55], [180, 80], [-180, 80], [-180, -55]]] },
+    }
+    proj.fitExtent([[pad, pad], [width - pad, height - pad]], worldClip)
+  } else {
+    proj.fitExtent([[pad, pad], [width - pad, height - pad]], geoData)
+  }
+
+  return { projection: proj, path: d3Geo.geoPath(proj) }
+}
+
 export function useGeoMap({
   basemap,
-  projection: projectionId,
+  projection: _projectionId,
   height = 400,
   autoHeight = false,
 }: UseGeoMapOptions): UseGeoMapResult {
@@ -49,6 +81,7 @@ export function useGeoMap({
   const [geoData, setGeoData] = useState<FeatureCollection | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [mapVersion, setMapVersion] = useState(0)
   const customGeoData = useEditorStore((s) => s.customGeoData)
 
   const basemapId = (basemap as BasemapId | 'custom') || 'world'
@@ -79,7 +112,7 @@ export function useGeoMap({
       })
   }, [basemapId, customGeoData])
 
-  // ResizeObserver — track both width and height
+  // ResizeObserver — guards against 0 (matches ElectionDonut pattern)
   const [containerHeight, setContainerHeight] = useState(0)
 
   useEffect(() => {
@@ -87,7 +120,8 @@ export function useGeoMap({
     if (!el) return
     const ro = new ResizeObserver((entries) => {
       for (const entry of entries) {
-        setContainerWidth(entry.contentRect.width)
+        const w = entry.contentRect.width
+        if (w > 0) setContainerWidth(w)
         if (autoHeight && entry.contentRect.height > 0) {
           setContainerHeight(entry.contentRect.height)
         }
@@ -95,39 +129,16 @@ export function useGeoMap({
     })
     ro.observe(el)
     return () => ro.disconnect()
-  }, [autoHeight, loading])
+  }, [autoHeight])
 
-  // Resolve width: prefer ResizeObserver value, fall back to clientWidth
   const resolvedWidth = containerWidth || (containerRef.current?.clientWidth ?? 0)
-
-  // Compute effective dimensions — in autoHeight mode, use actual container height
   const effectiveHeight = autoHeight
     ? (containerHeight > 0 ? containerHeight : Math.max(resolvedWidth * 0.55, 200))
     : height
 
-  // Compute projection and path when geoData/dimensions change
-  const projectionFn = (() => {
-    if (!geoData || resolvedWidth <= 0) return null
-    const projFactory = (d3Geo as Record<string, unknown>)[projectionId] as (() => d3Geo.GeoProjection) | undefined
-    const proj = projFactory ? projFactory() : d3Geo.geoEqualEarth()
-
-    const pad = 8
-    if (basemap === 'world') {
-      // Clip Mercator to 55°S–80°N for a clean rectangular world view
-      const worldClip: GeoJSON.Feature = {
-        type: 'Feature', properties: {},
-        geometry: { type: 'Polygon', coordinates: [[[-180, -55], [180, -55], [180, 80], [-180, 80], [-180, -55]]] },
-      }
-      proj.fitExtent([[pad, pad], [resolvedWidth - pad, effectiveHeight - pad]], worldClip)
-    } else {
-      proj.fitExtent([[pad, pad], [resolvedWidth - pad, effectiveHeight - pad]], geoData)
-    }
-    return proj
-  })()
-
-  const pathFn = projectionFn ? d3Geo.geoPath(projectionFn) : null
-
-  // Create SVG and zoom behavior
+  // Create SVG and zoom behavior.
+  // Projection is NOT computed here — consumers do that in their own effects
+  // by reading the SVG dimensions directly, avoiding async state mismatches.
   useEffect(() => {
     const el = containerRef.current
     if (!el || !geoData) return
@@ -150,11 +161,9 @@ export function useGeoMap({
 
     svgRef.current = svg.node()
 
-    // Create a <g> wrapper that receives the zoom transform
     const mapGroup = svg.append('g').attr('class', 'map-group')
     mapGroupRef.current = mapGroup.node()
 
-    // Attach d3-zoom behavior
     const zoomBehavior = d3Zoom<SVGSVGElement, unknown>()
       .scaleExtent([1, 8])
       .on('zoom', (event) => {
@@ -163,6 +172,9 @@ export function useGeoMap({
 
     svg.call(zoomBehavior)
     zoomBehaviorRef.current = zoomBehavior
+
+    // Bump version so consumer effects know to redraw
+    setMapVersion((v) => v + 1)
   }, [geoData, containerWidth, effectiveHeight])
 
   // Zoom control handlers
@@ -192,8 +204,7 @@ export function useGeoMap({
     svgRef,
     mapGroupRef,
     geoData,
-    projectionFn,
-    pathFn,
+    mapVersion,
     containerWidth: resolvedWidth,
     effectiveHeight,
     loading,

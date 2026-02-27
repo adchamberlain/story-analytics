@@ -12,7 +12,7 @@ import {
   BASEMAPS,
   type BasemapId,
 } from '../../utils/geoUtils'
-import { useGeoMap, zoomBtnStyle } from '../../hooks/useGeoMap'
+import { useGeoMap, buildProjection, zoomBtnStyle } from '../../hooks/useGeoMap'
 import { detectUnitFromTitleSubtitle, fmtWithUnit } from '../../utils/formatters'
 
 /** Format legend value — use SI prefixes only for large numbers to avoid
@@ -42,11 +42,11 @@ export function ChoroplethMap({ data, config, height = 400, autoHeight = false }
 
   const {
     containerRef,
+    svgRef,
     mapGroupRef,
     geoData,
-    pathFn,
+    mapVersion,
     containerWidth,
-    effectiveHeight,
     loading,
     error,
     handleZoomIn,
@@ -54,10 +54,19 @@ export function ChoroplethMap({ data, config, height = 400, autoHeight = false }
     handleReset,
   } = useGeoMap({ basemap: basemapId, projection: projectionId, height, autoHeight })
 
-  // Draw filled features when geoData, data, or dimensions change
+  // Draw filled features — computes projection by reading SVG dimensions directly
+  // so projection and SVG are guaranteed to match.
   useEffect(() => {
     const mapGroup = mapGroupRef.current
-    if (!mapGroup || !geoData || !pathFn || containerWidth <= 0) return
+    const svgEl = svgRef.current
+    if (!mapGroup || !svgEl || !geoData) return
+
+    // Read dimensions from the actual SVG element — single source of truth
+    const width = +(svgEl.getAttribute('width') || 0)
+    const h = +(svgEl.getAttribute('height') || 0)
+    if (width <= 0 || h <= 0) return
+
+    const { path: pathFn } = buildProjection(geoData, width, h, basemapId, projectionId)
 
     const mapGroupSel = d3.select(mapGroup)
 
@@ -140,7 +149,7 @@ export function ChoroplethMap({ data, config, height = 400, autoHeight = false }
     }
     setLegendInfo({ min: minVal, max: maxVal, colors: gradColors })
 
-  }, [geoData, data, containerWidth, effectiveHeight, basemapId, joinColumn, valueColumn, colorScaleType, pathFn, config.colorRange, config.color, containerRef, mapGroupRef])
+  }, [mapVersion, geoData, data, basemapId, projectionId, joinColumn, valueColumn, colorScaleType, config.colorRange, config.color, containerRef, mapGroupRef, svgRef])
 
   const gradientCSS = legendInfo
     ? `linear-gradient(to right, ${legendInfo.colors.join(', ')})`
