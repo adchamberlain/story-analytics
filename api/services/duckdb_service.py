@@ -210,8 +210,19 @@ class DuckDBService:
                     CREATE OR REPLACE TABLE {table_name} AS
                     SELECT * FROM read_parquet('{_sql_string(str(parquet_path))}')
                 """)
-            self._sources[source_id] = SourceMeta(path=parquet_path, ingested_at=datetime.now(timezone.utc))
-            schema = self._inspect_table(table_name, source_id, table_name_hint)
+            # Store a clean synthetic path based on the friendly name (the temp
+            # file is deleted immediately after ingest, so its path is useless).
+            # Deduplicate: if "orders.parquet" exists, try "orders_2.parquet", etc.
+            clean_stem = re.sub(r'[^\w\s-]', '', table_name_hint).strip().replace(' ', '_') or 'query_result'
+            candidate = f"{clean_stem}.parquet"
+            existing_names = {m.path.name for sid, m in self._sources.items() if sid != source_id}
+            if candidate in existing_names:
+                n = 2
+                while f"{clean_stem}_{n}.parquet" in existing_names:
+                    n += 1
+                candidate = f"{clean_stem}_{n}.parquet"
+            self._sources[source_id] = SourceMeta(path=Path(candidate), ingested_at=datetime.now(timezone.utc))
+            schema = self._inspect_table(table_name, source_id, candidate)
             return schema
         except Exception:
             self._sources.pop(source_id, None)

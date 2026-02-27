@@ -2,6 +2,7 @@ import { useEffect, useState, useRef, useCallback } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { authFetch } from '../utils/authFetch'
 import { useAuthStore } from '../stores/authStore'
+import { TopNav } from '../components/layout/TopNav'
 import { DeployPopover } from '../components/DeployPrompt'
 import { DashboardGrid } from '../components/dashboard/DashboardGrid'
 import { ShareModal } from '../components/sharing/ShareModal'
@@ -197,6 +198,7 @@ export function DashboardViewPage() {
 
   return (
     <div className="min-h-screen bg-surface-secondary">
+      {user && <TopNav />}
       {/* Header */}
       <header className="bg-surface border-b border-border-default shadow-sm px-4 sm:px-16 py-4 flex items-center justify-between gap-2">
         {user ? (

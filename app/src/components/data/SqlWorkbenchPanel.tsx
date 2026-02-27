@@ -25,6 +25,13 @@ const TYPE_BADGES: Record<string, string> = {
   bigquery: 'bg-amber-500/15 text-amber-500',
 }
 
+/** Derive a friendly source name from a SQL query by extracting the main table name. */
+function deriveSourceName(sql: string): string {
+  // Match first table name after FROM, ignoring schema/db prefixes like db.schema.table
+  const match = sql.match(/\bFROM\s+(?:[\w"]+\.)*"?(\w+)"?/i)
+  return match ? match[1] : 'SQL Query Result'
+}
+
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
@@ -238,7 +245,7 @@ export function SqlWorkbenchPanel({
       const res = await authFetch(`/api/connections/${connectionId}/sync-query`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sql: currentSql, source_name: 'Query Result' }),
+        body: JSON.stringify({ sql: currentSql, source_name: deriveSourceName(currentSql) }),
       })
       if (res.ok) {
         const data = await res.json()
@@ -262,7 +269,7 @@ export function SqlWorkbenchPanel({
       const res = await authFetch(`/api/connections/${connectionId}/sync-query`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sql: currentSql, source_name: 'Query Result' }),
+        body: JSON.stringify({ sql: currentSql, source_name: deriveSourceName(currentSql) }),
       })
       if (res.ok) {
         const data = await res.json()
