@@ -162,6 +162,72 @@ def send_magic_link_email(
         return False
 
 
+def send_password_reset_email(
+    to_email: str,
+    reset_url: str,
+) -> bool:
+    """Send a password reset email."""
+    is_localhost = "localhost" in reset_url
+    if is_localhost:
+        print(f"\n{'='*60}")
+        print("PASSWORD RESET (use this for local dev)")
+        print(f"{'='*60}")
+        print(f"Email: {to_email}")
+        print(f"Link:  {reset_url}")
+        print(f"{'='*60}\n")
+
+    if not init_resend():
+        if not is_localhost:
+            logger.warning("[No Resend API key] Password reset for %s: %s", to_email, reset_url)
+            return False
+        return True
+
+    html_content = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <style>
+            body {{ font-family: 'JetBrains Mono', 'Fira Code', monospace; background-color: #0a0a0a; color: #e0e0e0; padding: 40px; margin: 0; }}
+            .container {{ max-width: 500px; margin: 0 auto; background-color: #111111; border: 1px solid #222222; border-radius: 8px; padding: 32px; }}
+            h1 {{ color: #7c9eff; font-size: 24px; margin-top: 0; }}
+            p {{ color: #e0e0e0; line-height: 1.6; }}
+            .button {{ display: inline-block; background-color: transparent; color: #7c9eff; border: 1px solid #7c9eff; padding: 12px 24px; text-decoration: none; font-family: inherit; font-size: 14px; margin: 20px 0; }}
+            .footer {{ color: #666666; font-size: 12px; margin-top: 32px; }}
+            .link {{ color: #666666; word-break: break-all; font-size: 11px; }}
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>Reset your password</h1>
+            <p>We received a request to reset your password. Click the button below to choose a new one.</p>
+            <p>
+                <a href="{reset_url}" class="button">> Reset Password</a>
+            </p>
+            <p class="footer">
+                This link expires in 30 minutes.<br><br>
+                If you didn't request this, you can safely ignore this email. Your password won't be changed.
+            </p>
+            <p class="link">Or copy this link: {reset_url}</p>
+        </div>
+    </body>
+    </html>
+    """
+
+    try:
+        from_email = os.environ.get("FROM_EMAIL", "Story Analytics <noreply@storyanalytics.io>")
+        resend.Emails.send({
+            "from": from_email,
+            "to": to_email,
+            "subject": "Reset your Story Analytics password",
+            "html": html_content,
+            "text": f"Reset your Story Analytics password\n\nClick the link below to reset your password:\n{reset_url}\n\nThis link expires in 30 minutes.\n\nIf you didn't request this, you can safely ignore this email.",
+        })
+        return True
+    except Exception as e:
+        logger.error("Failed to send password reset email to %s: %s", to_email, e)
+        return False
+
+
 def send_team_invite_email(
     to_email: str,
     team_name: str,

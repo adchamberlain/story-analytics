@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuthStore } from '../stores/authStore'
 import { LogoMark } from '../components/brand/Logo'
 
@@ -113,6 +113,17 @@ export function LoginPage() {
                 className={inputClass}
               />
             </div>
+
+            {mode === 'login' && (
+              <div className="text-right -mt-2">
+                <Link
+                  to="/forgot-password"
+                  className="text-sm text-text-muted hover:text-blue-400 transition-colors"
+                >
+                  Forgot password?
+                </Link>
+              </div>
+            )}
 
             <div className="pt-2">
               <button

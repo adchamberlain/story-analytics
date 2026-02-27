@@ -16,6 +16,8 @@ interface AuthState {
   checkStatus: () => Promise<void>
   login: (email: string, password: string) => Promise<void>
   register: (email: string, password: string, displayName?: string, inviteToken?: string) => Promise<void>
+  forgotPassword: (email: string) => Promise<void>
+  resetPassword: (token: string, newPassword: string) => Promise<void>
   logout: () => void
 }
 
@@ -73,6 +75,33 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     })
     if (!res.ok) {
       const body = await res.json().catch(() => ({ detail: 'Registration failed' }))
+      throw new Error(body.detail)
+    }
+    const data = await res.json()
+    localStorage.setItem('auth_token', data.token)
+    set({ token: data.token, user: data.user })
+  },
+
+  forgotPassword: async (email: string) => {
+    const res = await fetch('/api/auth/forgot-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    })
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({ detail: 'Request failed' }))
+      throw new Error(body.detail)
+    }
+  },
+
+  resetPassword: async (token: string, newPassword: string) => {
+    const res = await fetch('/api/auth/reset-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token, new_password: newPassword }),
+    })
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({ detail: 'Reset failed' }))
       throw new Error(body.detail)
     }
     const data = await res.json()

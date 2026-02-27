@@ -24,6 +24,7 @@ from .services.metadata_db import (
     ensure_default_user, update_user_password,
     update_user_display_name,
     get_api_key_by_prefix, update_api_key_last_used,
+    create_password_reset, get_valid_password_reset, mark_password_reset_used,
 )
 
 
@@ -271,6 +272,61 @@ async def change_password(
     update_user_password(user["id"], new_hash)
 
     return {"message": "Password changed successfully"}
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: str
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str
+
+
+@router.post("/forgot-password")
+async def forgot_password(request: ForgotPasswordRequest, req: Request):
+    """Request a password reset email. Always returns success (timing-safe)."""
+    if not AUTH_ENABLED:
+        raise HTTPException(status_code=400, detail="Auth is disabled")
+
+    user = get_user_by_email(request.email)
+    if user:
+        token = create_password_reset(request.email)
+        if token:
+            # Build reset URL from request origin
+            origin = req.headers.get("origin", "http://localhost:3001")
+            reset_url = f"{origin}/reset-password?token={token}"
+            from .email import send_password_reset_email
+            send_password_reset_email(request.email, reset_url)
+
+    # Always return success — never reveal whether email exists
+    return {"message": "If an account with that email exists, a reset link has been sent."}
+
+
+@router.post("/reset-password", response_model=AuthResponse)
+async def reset_password(request: ResetPasswordRequest):
+    """Reset password using a token. Returns JWT on success (auto-login)."""
+    if not AUTH_ENABLED:
+        raise HTTPException(status_code=400, detail="Auth is disabled")
+
+    if len(request.new_password) < 6:
+        raise HTTPException(status_code=400, detail="Password must be at least 6 characters")
+
+    reset = get_valid_password_reset(request.token)
+    if not reset:
+        raise HTTPException(status_code=400, detail="Invalid or expired reset link")
+
+    user = get_user_by_email(reset["email"])
+    if not user:
+        raise HTTPException(status_code=400, detail="Invalid or expired reset link")
+
+    new_hash = _hash_password(request.new_password)
+    update_user_password(user["id"], new_hash)
+    mark_password_reset_used(reset["id"])
+
+    token = _create_token(user["id"])
+    safe_user = {k: v for k, v in user.items() if k != "password_hash"}
+    return AuthResponse(token=token, user=safe_user)
 
 
 class ProfileUpdate(BaseModel):
