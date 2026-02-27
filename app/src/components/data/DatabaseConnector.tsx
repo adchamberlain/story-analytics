@@ -712,7 +712,7 @@ export function DatabaseConnector({ onSynced, onOpenSqlWorkbench }: DatabaseConn
                     </p>
                   </div>
 
-                  {status === 'blocked' && onOpenSqlWorkbench && activeConnectionId && (
+                  {status !== 'ok' && onOpenSqlWorkbench && activeConnectionId && (
                     <button
                       onClick={() => onOpenSqlWorkbench(activeConnectionId!, connectionName, dbType, ti.name)}
                       className="text-[13px] font-medium shrink-0 rounded-lg border border-border-default hover:border-blue-400 transition-colors"
