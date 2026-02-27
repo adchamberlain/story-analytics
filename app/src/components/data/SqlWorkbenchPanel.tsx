@@ -193,9 +193,11 @@ export function SqlWorkbenchPanel({
         }, 100)
       }
 
-      // Mount immediately, then trigger slide-in animation
+      // Mount first, then trigger slide-in after the browser paints the off-screen state
       setMounted(true)
-      requestAnimationFrame(() => setVisible(true))
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => setVisible(true))
+      })
     } else {
       // Slide out first, then unmount after transition
       setVisible(false)
