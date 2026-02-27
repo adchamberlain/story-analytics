@@ -7,7 +7,7 @@ import { useEffect, useState } from 'react'
 import * as d3 from 'd3'
 import type { ChartConfig } from '../../types/chart'
 import { BASEMAPS, type BasemapId } from '../../utils/geoUtils'
-import { useGeoMap, zoomBtnStyle } from '../../hooks/useGeoMap'
+import { useGeoMap, buildProjection, zoomBtnStyle } from '../../hooks/useGeoMap'
 import { detectUnitFromTitleSubtitle, fmtWithUnit } from '../../utils/formatters'
 
 export interface GeoPointMapProps {
@@ -31,10 +31,10 @@ export function GeoPointMap({ data, config, height = 400, autoHeight = false, ma
 
   const {
     containerRef,
+    svgRef,
     mapGroupRef,
     geoData,
-    pathFn,
-    projectionFn,
+    mapVersion,
     containerWidth,
     effectiveHeight,
     loading,
@@ -44,10 +44,19 @@ export function GeoPointMap({ data, config, height = 400, autoHeight = false, ma
     handleReset,
   } = useGeoMap({ basemap: basemapId, projection: projectionId, height, autoHeight })
 
-  // Draw basemap background + point data
+  // Draw basemap background + point data — computes projection by reading SVG
+  // dimensions directly so projection and SVG are guaranteed to match.
   useEffect(() => {
     const mapGroup = mapGroupRef.current
-    if (!mapGroup || !geoData || !pathFn || !projectionFn || containerWidth <= 0) return
+    const svgEl = svgRef.current
+    if (!mapGroup || !svgEl || !geoData) return
+
+    // Read dimensions from the actual SVG element — single source of truth
+    const width = +(svgEl.getAttribute('width') || 0)
+    const h = +(svgEl.getAttribute('height') || 0)
+    if (width <= 0 || h <= 0) return
+
+    const { projection: projectionFn, path: pathFn } = buildProjection(geoData, width, h, basemapId, projectionId)
 
     const mapGroupSel = d3.select(mapGroup)
 
@@ -72,7 +81,6 @@ export function GeoPointMap({ data, config, height = 400, autoHeight = false, ma
       if (data.length === 0) return undefined
       const reserved = new Set([latColumn, lonColumn, sizeColumn].filter(Boolean))
       const keys = Object.keys(data[0])
-      // Prefer columns with string content that aren't lat/lon/size
       return keys.find((k) => !reserved.has(k) && typeof data[0][k] === 'string')
         ?? keys.find((k) => !reserved.has(k) && typeof data[0][k] !== 'number')
     })()
@@ -208,7 +216,6 @@ export function GeoPointMap({ data, config, height = 400, autoHeight = false, ma
 
         let fitted = false
         for (const c of candidates) {
-          // Compute bounding rect in SVG coordinate space
           let rx: number
           if (c.anchor === 'end') rx = pinX + c.dx - textW
           else if (c.anchor === 'middle') rx = pinX + c.dx - textW / 2
@@ -256,7 +263,7 @@ export function GeoPointMap({ data, config, height = 400, autoHeight = false, ma
       // Spike map: tapered triangular spikes, height proportional to value
       const sizeValues = points.map((p) => p.sizeVal).filter((v): v is number => v !== null)
       const sizeExtent = sizeValues.length > 0 ? [d3.min(sizeValues)!, d3.max(sizeValues)!] : [0, 1]
-      const maxSpikeHeight = Math.min(effectiveHeight * 0.3, 80)
+      const maxSpikeHeight = Math.min(h * 0.3, 80)
       const heightScale = d3.scaleLinear().domain(sizeExtent).range([6, maxSpikeHeight])
 
       // Sort large spikes behind small ones so dense areas stay readable
@@ -270,9 +277,9 @@ export function GeoPointMap({ data, config, height = 400, autoHeight = false, ma
         .join('path')
         .attr('class', 'spike')
         .attr('d', (d) => {
-          const h = d.sizeVal !== null ? heightScale(d.sizeVal) : 6
-          const w = Math.max(2, h * 0.08)
-          return `M${d.x},${d.y} L${d.x - w},${d.y} L${d.x},${d.y - h} L${d.x + w},${d.y} Z`
+          const sH = d.sizeVal !== null ? heightScale(d.sizeVal) : 6
+          const w = Math.max(2, sH * 0.08)
+          return `M${d.x},${d.y} L${d.x - w},${d.y} L${d.x},${d.y - sH} L${d.x + w},${d.y} Z`
         })
         .attr('fill', color)
         .attr('fill-opacity', 0.5)
@@ -298,7 +305,7 @@ export function GeoPointMap({ data, config, height = 400, autoHeight = false, ma
           setTooltip(null)
         })
     }
-  }, [geoData, data, containerWidth, effectiveHeight, pathFn, projectionFn, latColumn, lonColumn, sizeColumn, labelColumn, mapVariant, config.colorRange, config.color, sizeRange, containerRef, mapGroupRef])
+  }, [mapVersion, geoData, data, basemapId, projectionId, latColumn, lonColumn, sizeColumn, labelColumn, mapVariant, config.colorRange, config.color, sizeRange, containerRef, mapGroupRef, svgRef, effectiveHeight])
 
   return (
     <div ref={containerRef} onMouseLeave={() => setTooltip(null)} style={{ width: '100%', height: autoHeight ? '100%' : height, position: 'relative', overflow: 'hidden' }}>

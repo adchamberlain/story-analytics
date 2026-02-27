@@ -3,6 +3,7 @@ import type { ChartType, Annotations } from '../types/chart'
 import type { PaletteKey } from '../themes/plotTheme'
 import { buildDataSummary } from '../utils/dataSummary'
 import { authFetch } from '../utils/authFetch'
+import { BASEMAPS, type BasemapId } from '../utils/geoUtils'
 
 // ── Editor Config ──────────────────────────────────────────────────────────
 
@@ -352,7 +353,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         geoJoinColumn: chart.config?.geoJoinColumn ?? null,
         geoValueColumn: chart.config?.geoValueColumn ?? null,
         geoColorScale: chart.config?.geoColorScale ?? 'sequential',
-        geoProjection: chart.config?.geoProjection ?? 'geoEqualEarth',
+        geoProjection: chart.config?.geoProjection
+          ?? BASEMAPS.find((b) => b.id === (chart.config?.basemap as BasemapId))?.defaultProjection
+          ?? 'geoEqualEarth',
         geoLatColumn: chart.config?.geoLatColumn ?? null,
         geoLonColumn: chart.config?.geoLonColumn ?? null,
         geoLabelColumn: chart.config?.geoLabelColumn ?? null,
@@ -627,6 +630,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     // Reset timeGrain when aggregation is turned off
     if (partial.aggregation === 'none' && config.timeGrain !== 'none') {
       partial = { ...partial, timeGrain: 'none' }
+    }
+
+    // When basemap changes, auto-set projection to the basemap's default
+    if (partial.basemap && !partial.geoProjection) {
+      const basemapDefault = BASEMAPS.find((b) => b.id === partial.basemap)?.defaultProjection
+      if (basemapDefault) {
+        partial = { ...partial, geoProjection: basemapDefault }
+      }
     }
 
     set({
