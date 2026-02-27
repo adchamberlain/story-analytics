@@ -6,6 +6,7 @@ import { defaultKeymap } from '@codemirror/commands'
 import { oneDark } from '@codemirror/theme-one-dark'
 import { autocompletion, CompletionContext } from '@codemirror/autocomplete'
 import { searchKeymap } from '@codemirror/search'
+import { useThemeStore } from '../../stores/themeStore'
 
 export interface SqlEditorRef {
   getValue: () => string
@@ -22,10 +23,30 @@ interface SqlEditorProps {
   className?: string
 }
 
+const lightTheme = EditorView.theme({
+  '&': {
+    backgroundColor: '#ffffff',
+    color: '#1a1a1a',
+  },
+  '.cm-gutters': {
+    backgroundColor: '#f9fafb',
+    color: '#999999',
+    borderRight: '1px solid #e5e7eb',
+  },
+  '.cm-activeLine': { backgroundColor: 'rgba(59,130,246,0.04)' },
+  '.cm-activeLineGutter': { backgroundColor: '#f3f4f6' },
+  '.cm-selectionMatch': { backgroundColor: 'rgba(59,130,246,0.12)' },
+  '&.cm-focused .cm-cursor': { borderLeftColor: '#1a1a1a' },
+  '&.cm-focused .cm-selectionBackground, ::selection': {
+    backgroundColor: 'rgba(59,130,246,0.2)',
+  },
+})
+
 export const SqlEditor = forwardRef<SqlEditorRef, SqlEditorProps>(
   ({ defaultValue = '', placeholder = 'Write SQL...', schema, onRun, onChange, className }, ref) => {
     const containerRef = useRef<HTMLDivElement>(null)
     const viewRef = useRef<EditorView | null>(null)
+    const resolved = useThemeStore((s) => s.resolved)
 
     useImperativeHandle(ref, () => ({
       getValue: () => viewRef.current?.state.doc.toString() ?? '',
@@ -81,7 +102,7 @@ export const SqlEditor = forwardRef<SqlEditorRef, SqlEditorProps>(
           runKeymap,
           sql(),
           autocompletion({ override: schema ? [schemaCompletion] : undefined }),
-          oneDark,
+          resolved === 'dark' ? oneDark : lightTheme,
           cmPlaceholder(placeholder),
           EditorView.updateListener.of((update) => {
             if (update.docChanged && onChange) {
@@ -104,7 +125,7 @@ export const SqlEditor = forwardRef<SqlEditorRef, SqlEditorProps>(
         viewRef.current = null
       }
       // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [schema])
+    }, [schema, resolved])
 
     return <div ref={containerRef} className={className} />
   },
