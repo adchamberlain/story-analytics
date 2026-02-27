@@ -8,7 +8,7 @@ import json
 import tempfile
 from pathlib import Path
 
-from .base import DatabaseConnector, ColumnInfo, ConnectorResult, QueryResult, SchemaColumn, SchemaTable, SchemaInfo
+from .base import DatabaseConnector, ColumnInfo, ConnectorResult, QueryResult, SchemaColumn, SchemaTable, SchemaInfo, TableInfo
 
 
 class BigQueryConnector(DatabaseConnector):
@@ -51,9 +51,15 @@ class BigQueryConnector(DatabaseConnector):
         try:
             client = self._get_client(credentials)
             dataset_ref = f"{credentials['project_id']}.{credentials['dataset']}"
-            tables_iter = client.list_tables(dataset_ref)
-            tables = [t.table_id for t in tables_iter]
-            return ConnectorResult(success=True, tables=tables)
+            table_refs = list(client.list_tables(dataset_ref))
+            tables: list[str] = []
+            table_infos: list[TableInfo] = []
+            for t in table_refs:
+                tables.append(t.table_id)
+                full_ref = f"{credentials['project_id']}.{credentials['dataset']}.{t.table_id}"
+                bq_table = client.get_table(full_ref)
+                table_infos.append(TableInfo(name=t.table_id, row_count=bq_table.num_rows))
+            return ConnectorResult(success=True, tables=tables, table_infos=table_infos)
         except Exception as e:
             return ConnectorResult(success=False, message=f"Failed to list tables: {e}")
 
@@ -110,6 +116,7 @@ class BigQueryConnector(DatabaseConnector):
         credentials: dict,
         duckdb_service: object,
         cache_dir: Path | None = None,
+        max_rows: int | None = None,
     ) -> list[dict]:
         import pyarrow.parquet as pq
 
@@ -120,7 +127,7 @@ class BigQueryConnector(DatabaseConnector):
             table_ref = f"{credentials['project_id']}.{credentials['dataset']}.{table}"
 
             # Use BigQuery Storage API for efficient Arrow export
-            arrow_table = client.list_rows(table_ref).to_arrow()
+            arrow_table = client.list_rows(table_ref, max_results=max_rows).to_arrow()
 
             # Write to parquet
             if cache_dir:

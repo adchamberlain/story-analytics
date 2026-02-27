@@ -15,6 +15,8 @@ interface SqlWorkbenchPanelProps {
   connectionName: string
   dbType: string // "snowflake" | "postgres" | "bigquery"
   onClose: () => void
+  initialSql?: string // Pre-populate the editor (e.g. "SELECT * FROM table LIMIT 100")
+  onImportSource?: (sourceId: string, rowCount: number) => void // Import mode: sync query result as source
 }
 
 const TYPE_BADGES: Record<string, string> = {
@@ -32,9 +34,12 @@ export function SqlWorkbenchPanel({
   connectionName,
   dbType,
   onClose,
+  initialSql,
+  onImportSource,
 }: SqlWorkbenchPanelProps) {
   const navigate = useNavigate()
   const editorRef = useRef<SqlEditorRef>(null)
+  const [importLoading, setImportLoading] = useState(false)
 
   // Schema state
   const [schemas, setSchemas] = useState<SchemaData[]>([])
@@ -115,12 +120,21 @@ export function SqlWorkbenchPanel({
       setSchemas([])
       setQueryResult(null)
       setQueryError(null)
-      setCurrentSql('')
+      setCurrentSql(initialSql || '')
       setAutoExpandWithError(false)
+      setImportLoading(false)
 
       // Fetch data
       fetchSchema()
       checkAiConfig()
+
+      // Pre-populate and run initial SQL if provided
+      if (initialSql) {
+        requestAnimationFrame(() => {
+          editorRef.current?.setValue(initialSql)
+          runQuery(initialSql)
+        })
+      }
 
       // Trigger slide-in animation
       requestAnimationFrame(() => setVisible(true))
@@ -204,6 +218,31 @@ export function SqlWorkbenchPanel({
   const handleFixWithAi = useCallback(() => {
     setAutoExpandWithError(true)
   }, [])
+
+  // ---------- "Import as Source" (import mode) ----------
+  const handleImportSource = useCallback(async () => {
+    if (!connectionId || !currentSql.trim() || !onImportSource) return
+    setImportLoading(true)
+
+    try {
+      const res = await authFetch(`/api/connections/${connectionId}/sync-query`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sql: currentSql, source_name: 'Query Result' }),
+      })
+      if (res.ok) {
+        const data = await res.json()
+        if (data.source_id) {
+          onImportSource(data.source_id, data.row_count)
+          onClose()
+        }
+      }
+    } catch {
+      // sync-query failed
+    } finally {
+      setImportLoading(false)
+    }
+  }, [connectionId, currentSql, onImportSource, onClose])
 
   // ---------- "Chart this" ----------
   const handleChartThis = useCallback(async () => {
@@ -349,8 +388,10 @@ export function SqlWorkbenchPanel({
             data={queryResult}
             error={queryError}
             loading={queryLoading}
-            onChartThis={handleChartThis}
+            onChartThis={onImportSource ? handleImportSource : handleChartThis}
             onFixWithAi={handleFixWithAi}
+            actionLabel={onImportSource ? 'Import as Source' : undefined}
+            actionLoading={importLoading}
           />
         </div>
       </div>

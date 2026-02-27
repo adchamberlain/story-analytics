@@ -9,7 +9,7 @@ from pathlib import Path
 
 import re as _re
 
-from .base import DatabaseConnector, ColumnInfo, ConnectorResult, QueryResult, SchemaColumn, SchemaTable, SchemaInfo
+from .base import DatabaseConnector, ColumnInfo, ConnectorResult, QueryResult, SchemaColumn, SchemaTable, SchemaInfo, TableInfo
 
 _SAFE_SCHEMA_RE = _re.compile(r'^[a-zA-Z_][a-zA-Z0-9_$]*$')
 
@@ -66,15 +66,21 @@ class PostgresConnector(DatabaseConnector):
             conn = self._connect(credentials)
             cursor = conn.cursor()
             schema = credentials.get("schema", "public")
+            # Join with pg_stat_user_tables for approximate row counts
             cursor.execute(
-                "SELECT table_name FROM information_schema.tables "
-                "WHERE table_schema = %s AND table_type = 'BASE TABLE' "
-                "ORDER BY table_name",
+                "SELECT t.table_name, COALESCE(s.n_live_tup, 0) "
+                "FROM information_schema.tables t "
+                "LEFT JOIN pg_stat_user_tables s "
+                "  ON s.schemaname = t.table_schema AND s.relname = t.table_name "
+                "WHERE t.table_schema = %s AND t.table_type = 'BASE TABLE' "
+                "ORDER BY t.table_name",
                 (schema,),
             )
-            tables = [row[0] for row in cursor.fetchall()]
+            rows = cursor.fetchall()
+            tables = [row[0] for row in rows]
+            table_infos = [TableInfo(name=row[0], row_count=row[1]) for row in rows]
             cursor.close()
-            return ConnectorResult(success=True, tables=tables)
+            return ConnectorResult(success=True, tables=tables, table_infos=table_infos)
         except Exception as e:
             return ConnectorResult(success=False, message=f"Failed to list tables: {e}")
         finally:
@@ -170,6 +176,7 @@ class PostgresConnector(DatabaseConnector):
         credentials: dict,
         duckdb_service: object,
         cache_dir: Path | None = None,
+        max_rows: int | None = None,
     ) -> list[dict]:
         import pyarrow as pa
         import pyarrow.parquet as pq
@@ -181,7 +188,10 @@ class PostgresConnector(DatabaseConnector):
             schema_name = credentials.get("schema", "public")
 
             for table in tables:
-                cursor.execute(f'SELECT * FROM {self._quote_identifier(schema_name)}.{self._quote_identifier(table)}')
+                sql = f'SELECT * FROM {self._quote_identifier(schema_name)}.{self._quote_identifier(table)}'
+                if max_rows is not None:
+                    sql += f' LIMIT {max_rows}'
+                cursor.execute(sql)
                 col_names = [desc[0] for desc in cursor.description]
                 rows = cursor.fetchall()
 

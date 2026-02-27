@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { authFetch } from '../../utils/authFetch'
 
-type Step = 'closed' | 'pick' | 'form' | 'tables' | 'syncing'
+type Step = 'closed' | 'pick' | 'form' | 'tables' | 'confirm' | 'syncing'
 type DbType = 'snowflake' | 'postgres' | 'bigquery'
 
 interface SavedConnection {
@@ -10,6 +10,11 @@ interface SavedConnection {
   db_type: string
   config: Record<string, string>
   created_at: string
+}
+
+interface TableInfoItem {
+  name: string
+  row_count: number | null
 }
 
 export interface SyncedColumnInfo {
@@ -32,6 +37,7 @@ export interface SyncedInfo {
 
 interface DatabaseConnectorProps {
   onSynced: (info: SyncedInfo) => void
+  onOpenSqlWorkbench?: (connectionId: string, connectionName: string, dbType: string, tableName: string) => void
 }
 
 const DB_LABELS: Record<DbType, string> = {
@@ -40,7 +46,25 @@ const DB_LABELS: Record<DbType, string> = {
   bigquery: 'BigQuery',
 }
 
-export function DatabaseConnector({ onSynced }: DatabaseConnectorProps) {
+// Row count thresholds
+const WARNING_THRESHOLD = 100_000
+const MAX_IMPORT_ROWS = 1_000_000
+
+function formatRowCount(n: number | null): string {
+  if (n === null) return ''
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M rows`
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K rows`
+  return `${n} rows`
+}
+
+function getRowStatus(n: number | null): 'ok' | 'warning' | 'blocked' {
+  if (n === null) return 'ok'
+  if (n > MAX_IMPORT_ROWS) return 'blocked'
+  if (n > WARNING_THRESHOLD) return 'warning'
+  return 'ok'
+}
+
+export function DatabaseConnector({ onSynced, onOpenSqlWorkbench }: DatabaseConnectorProps) {
   const [step, setStep] = useState<Step>('closed')
   const [savedConnections, setSavedConnections] = useState<SavedConnection[]>([])
   const [loadingConnections, setLoadingConnections] = useState(false)
@@ -49,6 +73,7 @@ export function DatabaseConnector({ onSynced }: DatabaseConnectorProps) {
   // Form fields — shared
   const [dbType, setDbType] = useState<DbType>('postgres')
   const [name, setName] = useState('')
+  const [connectionName, setConnectionName] = useState('')
 
   // Snowflake-specific
   const [account, setAccount] = useState('')
@@ -70,8 +95,8 @@ export function DatabaseConnector({ onSynced }: DatabaseConnectorProps) {
   // Test / tables state
   const [testing, setTesting] = useState(false)
   const [testMessage, setTestMessage] = useState<string | null>(null)
-  const [tables, setTables] = useState<string[]>([])
-  const [selectedTable, setSelectedTable] = useState<string | null>(null)
+  const [tableInfos, setTableInfos] = useState<TableInfoItem[]>([])
+  const [selectedTables, setSelectedTables] = useState<Set<string>>(new Set())
   const [activeConnectionId, setActiveConnectionId] = useState<string | null>(null)
 
   // Fetch saved connections
@@ -97,6 +122,7 @@ export function DatabaseConnector({ onSynced }: DatabaseConnectorProps) {
 
   const resetForm = () => {
     setName('')
+    setConnectionName('')
     setAccount('')
     setWarehouse('')
     setHost('')
@@ -110,8 +136,8 @@ export function DatabaseConnector({ onSynced }: DatabaseConnectorProps) {
     setServiceAccountJson('')
     setError(null)
     setTestMessage(null)
-    setTables([])
-    setSelectedTable(null)
+    setTableInfos([])
+    setSelectedTables(new Set())
     setActiveConnectionId(null)
     setTesting(false)
   }
@@ -147,12 +173,12 @@ export function DatabaseConnector({ onSynced }: DatabaseConnectorProps) {
   const handleSelectSaved = async (conn: SavedConnection) => {
     setActiveConnectionId(conn.connection_id)
     setDbType(conn.db_type as DbType)
+    setConnectionName(conn.name)
     setError(null)
     setTesting(true)
     setTestMessage(null)
 
     try {
-      // Send empty credentials — server merges with saved config and env vars
       const res = await authFetch(`/api/connections/${conn.connection_id}/test`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -163,8 +189,13 @@ export function DatabaseConnector({ onSynced }: DatabaseConnectorProps) {
       if (!res.ok) { setError(data.detail || 'Test failed'); return }
       if (data.success) {
         setTestMessage(data.message)
-        setTables(data.tables || [])
-        setSelectedTable(null)
+        // Use table_infos if available, fall back to tables array
+        if (data.table_infos?.length) {
+          setTableInfos(data.table_infos)
+        } else {
+          setTableInfos((data.tables || []).map((t: string) => ({ name: t, row_count: null })))
+        }
+        setSelectedTables(new Set())
         setStep('tables')
       } else {
         setError(data.message)
@@ -212,6 +243,7 @@ export function DatabaseConnector({ onSynced }: DatabaseConnectorProps) {
         if (!createRes.ok) { setError(createData.detail || 'Failed to save connection'); return }
         connectionId = createData.connection_id
         setActiveConnectionId(connectionId)
+        setConnectionName(name.trim())
       }
 
       const testRes = await authFetch(`/api/connections/${connectionId}/test`, {
@@ -224,8 +256,12 @@ export function DatabaseConnector({ onSynced }: DatabaseConnectorProps) {
 
       if (testData.success) {
         setTestMessage(testData.message)
-        setTables(testData.tables || [])
-        setSelectedTable(null)
+        if (testData.table_infos?.length) {
+          setTableInfos(testData.table_infos)
+        } else {
+          setTableInfos((testData.tables || []).map((t: string) => ({ name: t, row_count: null })))
+        }
+        setSelectedTables(new Set())
         setStep('tables')
       } else {
         setError(testData.message)
@@ -237,8 +273,44 @@ export function DatabaseConnector({ onSynced }: DatabaseConnectorProps) {
     }
   }
 
-  const handleSync = async () => {
-    if (!activeConnectionId || !selectedTable) return
+  const toggleTable = (tableName: string) => {
+    setSelectedTables((prev) => {
+      const next = new Set(prev)
+      if (next.has(tableName)) next.delete(tableName)
+      else next.add(tableName)
+      return next
+    })
+  }
+
+  const toggleAll = () => {
+    if (selectedTables.size === tableInfos.length) {
+      setSelectedTables(new Set())
+    } else {
+      setSelectedTables(new Set(tableInfos.map((t) => t.name)))
+    }
+  }
+
+  const handleImportClick = () => {
+    if (selectedTables.size === 0) return
+    // Check if any selected table exceeds warning threshold
+    const hasWarningOrBlocked = tableInfos.some(
+      (t) => selectedTables.has(t.name) && t.row_count !== null && t.row_count > WARNING_THRESHOLD,
+    )
+    if (hasWarningOrBlocked) {
+      setStep('confirm')
+    } else {
+      handleSync()
+    }
+  }
+
+  const handleSync = async (tablesToSync?: string[]) => {
+    if (!activeConnectionId) return
+    const syncList = tablesToSync || [...selectedTables].filter((t) => {
+      const info = tableInfos.find((ti) => ti.name === t)
+      return getRowStatus(info?.row_count ?? null) !== 'blocked'
+    })
+    if (syncList.length === 0) return
+
     setStep('syncing')
     setError(null)
 
@@ -246,26 +318,29 @@ export function DatabaseConnector({ onSynced }: DatabaseConnectorProps) {
       const res = await authFetch(`/api/connections/${activeConnectionId}/sync`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tables: [selectedTable], credentials: buildCredentials(), username: username || null }),
+        body: JSON.stringify({ tables: syncList, credentials: buildCredentials(), username: username || null }),
       })
       const data = await res.json()
       if (!res.ok) { setError(data.detail || 'Sync failed'); setStep('tables'); return }
 
-      // The sync response contains synced_sources: [{ source_id, table_name, row_count }]
-      // Fetch full schema for the synced source to get column metadata
-      const synced = data.synced_sources?.[0]
-      if (!synced) { setError('Sync completed but no source returned'); setStep('tables'); return }
+      // Process each synced source
+      const sources = data.sources || []
+      if (sources.length === 0) { setError('Sync completed but no sources returned'); setStep('tables'); return }
 
-      const schemaRes = await authFetch(`/api/data/schema/${synced.source_id}`)
-      if (!schemaRes.ok) { setError('Failed to fetch schema after sync'); setStep('tables'); return }
-      const schemaData = await schemaRes.json()
+      // Fetch schema and call onSynced for each source
+      for (const synced of sources) {
+        const schemaRes = await authFetch(`/api/data/schema/${synced.source_id}`)
+        if (!schemaRes.ok) continue
+        const schemaData = await schemaRes.json()
 
-      onSynced({
-        sourceId: synced.source_id,
-        tableName: selectedTable,
-        rowCount: schemaData.row_count,
-        columns: schemaData.columns,
-      })
+        onSynced({
+          sourceId: synced.source_id,
+          tableName: synced.table_name,
+          rowCount: schemaData.row_count,
+          columns: schemaData.columns,
+        })
+      }
+
       resetForm()
       setStep('closed')
     } catch (err: unknown) {
@@ -474,15 +549,17 @@ export function DatabaseConnector({ onSynced }: DatabaseConnectorProps) {
     )
   }
 
-  // ── Table picker (single select) ───────────────────────────────────────────
+  // ── Table picker (multi-select with row counts) ───────────────────────────
   if (step === 'tables') {
+    const allSelected = selectedTables.size === tableInfos.length && tableInfos.length > 0
+
     return (
       <div className="rounded-2xl border border-border-default bg-surface-raised overflow-hidden">
         <div
           className="border-b border-border-default flex items-center justify-between"
           style={{ padding: '20px 28px' }}
         >
-          <h3 className="text-[17px] font-semibold text-text-primary">Choose a Table</h3>
+          <h3 className="text-[17px] font-semibold text-text-primary">Choose Tables</h3>
           <button
             onClick={handleClose}
             className="flex items-center justify-center rounded-lg text-text-icon hover:text-text-primary hover:bg-surface-secondary transition-colors"
@@ -499,34 +576,63 @@ export function DatabaseConnector({ onSynced }: DatabaseConnectorProps) {
               <p className="text-[14px]" style={{ color: '#22c55e' }}>{testMessage}</p>
             </div>
           )}
-          <p className="text-[13px] text-text-muted">{tables.length} table{tables.length !== 1 ? 's' : ''} available</p>
+
+          <div className="flex items-center justify-between">
+            <p className="text-[13px] text-text-muted">
+              {tableInfos.length} table{tableInfos.length !== 1 ? 's' : ''} available
+            </p>
+            <label className="flex items-center cursor-pointer text-[13px] text-text-secondary" style={{ gap: '6px' }}>
+              <input
+                type="checkbox"
+                checked={allSelected}
+                onChange={toggleAll}
+                className="border-border-strong text-blue-600 focus:ring-blue-500 rounded"
+              />
+              Select all
+            </label>
+          </div>
+
           <div className="overflow-y-auto border border-border-default rounded-xl divide-y divide-border-subtle" style={{ maxHeight: '280px' }}>
-            {tables.map((table) => (
-              <label
-                key={table}
-                className="flex items-center cursor-pointer hover:bg-surface-secondary transition-colors"
-                style={{ gap: '14px', padding: '14px 20px' }}
-              >
-                <input
-                  type="radio"
-                  name="table-select"
-                  checked={selectedTable === table}
-                  onChange={() => setSelectedTable(table)}
-                  className="border-border-strong text-blue-600 focus:ring-blue-500"
-                />
-                <span className="text-[15px] text-text-primary">{table}</span>
-              </label>
-            ))}
+            {tableInfos.map((ti) => {
+              const status = getRowStatus(ti.row_count)
+              return (
+                <label
+                  key={ti.name}
+                  className="flex items-center cursor-pointer hover:bg-surface-secondary transition-colors"
+                  style={{ gap: '14px', padding: '14px 20px' }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={selectedTables.has(ti.name)}
+                    onChange={() => toggleTable(ti.name)}
+                    className="border-border-strong text-blue-600 focus:ring-blue-500 rounded"
+                  />
+                  <span className="text-[15px] text-text-primary flex-1">{ti.name}</span>
+                  {ti.row_count !== null && (
+                    <span
+                      className="text-[12px] font-medium shrink-0"
+                      style={{
+                        color: status === 'blocked' ? '#ef4444'
+                             : status === 'warning' ? '#f59e0b'
+                             : '#6b7280',
+                      }}
+                    >
+                      {formatRowCount(ti.row_count)}
+                    </span>
+                  )}
+                </label>
+              )
+            })}
           </div>
           {error && <p className="text-[14px]" style={{ color: '#ef4444' }}>{error}</p>}
           <div className="flex items-center" style={{ gap: '12px', paddingTop: '4px' }}>
             <button
-              onClick={handleSync}
-              disabled={!selectedTable}
+              onClick={handleImportClick}
+              disabled={selectedTables.size === 0}
               className="text-[14px] rounded-xl bg-blue-600 text-white hover:bg-blue-700 transition-colors font-medium disabled:opacity-50"
               style={{ padding: '10px 24px' }}
             >
-              Import Table
+              Import {selectedTables.size > 0 ? `${selectedTables.size} Table${selectedTables.size !== 1 ? 's' : ''}` : 'Tables'}
             </button>
             <button
               onClick={handleClose}
@@ -541,12 +647,122 @@ export function DatabaseConnector({ onSynced }: DatabaseConnectorProps) {
     )
   }
 
+  // ── Pre-import confirmation step ──────────────────────────────────────────
+  if (step === 'confirm') {
+    const selectedInfos = tableInfos.filter((t) => selectedTables.has(t.name))
+    const importable = selectedInfos.filter((t) => getRowStatus(t.row_count) !== 'blocked')
+    const blockedCount = selectedInfos.length - importable.length
+
+    return (
+      <div className="rounded-2xl border border-border-default bg-surface-raised overflow-hidden">
+        <div
+          className="border-b border-border-default flex items-center justify-between"
+          style={{ padding: '20px 28px' }}
+        >
+          <h3 className="text-[17px] font-semibold text-text-primary">Confirm Import</h3>
+          <button
+            onClick={handleClose}
+            className="flex items-center justify-center rounded-lg text-text-icon hover:text-text-primary hover:bg-surface-secondary transition-colors"
+            style={{ width: '36px', height: '36px' }}
+          >
+            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        <div style={{ padding: '24px 28px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div className="overflow-y-auto border border-border-default rounded-xl divide-y divide-border-subtle" style={{ maxHeight: '320px' }}>
+            {selectedInfos.map((ti) => {
+              const status = getRowStatus(ti.row_count)
+              return (
+                <div
+                  key={ti.name}
+                  className="flex items-center"
+                  style={{ gap: '12px', padding: '14px 20px' }}
+                >
+                  {/* Status icon */}
+                  {status === 'ok' && (
+                    <svg className="h-5 w-5 shrink-0" style={{ color: '#22c55e' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  )}
+                  {status === 'warning' && (
+                    <svg className="h-5 w-5 shrink-0" style={{ color: '#f59e0b' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+                    </svg>
+                  )}
+                  {status === 'blocked' && (
+                    <svg className="h-5 w-5 shrink-0" style={{ color: '#ef4444' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 9.75l4.5 4.5m0-4.5l-4.5 4.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  )}
+
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[15px] text-text-primary truncate">{ti.name}</p>
+                    <p className="text-[12px]" style={{
+                      color: status === 'blocked' ? '#ef4444'
+                           : status === 'warning' ? '#f59e0b'
+                           : '#6b7280',
+                    }}>
+                      {status === 'blocked'
+                        ? `Too large (${formatRowCount(ti.row_count)}) — use SQL to filter`
+                        : status === 'warning'
+                          ? `Large table (${formatRowCount(ti.row_count)}), may be slow`
+                          : formatRowCount(ti.row_count) || 'Ready to import'}
+                    </p>
+                  </div>
+
+                  {status === 'blocked' && onOpenSqlWorkbench && activeConnectionId && (
+                    <button
+                      onClick={() => onOpenSqlWorkbench(activeConnectionId!, connectionName, dbType, ti.name)}
+                      className="text-[13px] font-medium shrink-0 rounded-lg border border-border-default hover:border-blue-400 transition-colors"
+                      style={{ padding: '6px 12px', color: '#3b82f6' }}
+                    >
+                      Query with SQL
+                    </button>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+
+          {blockedCount > 0 && (
+            <p className="text-[13px] text-text-muted">
+              {blockedCount} table{blockedCount !== 1 ? 's' : ''} blocked — use SQL to filter before importing.
+            </p>
+          )}
+
+          {error && <p className="text-[14px]" style={{ color: '#ef4444' }}>{error}</p>}
+
+          <div className="flex items-center" style={{ gap: '12px', paddingTop: '4px' }}>
+            {importable.length > 0 && (
+              <button
+                onClick={() => handleSync(importable.map((t) => t.name))}
+                className="text-[14px] rounded-xl bg-blue-600 text-white hover:bg-blue-700 transition-colors font-medium"
+                style={{ padding: '10px 24px' }}
+              >
+                Import {importable.length} Table{importable.length !== 1 ? 's' : ''}
+              </button>
+            )}
+            <button
+              onClick={() => setStep('tables')}
+              className="text-[14px] text-text-muted hover:text-text-primary transition-colors font-medium"
+              style={{ padding: '10px 16px' }}
+            >
+              Back
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   // ── Syncing state ─────────────────────────────────────────────────────────
   if (step === 'syncing') {
     return (
       <div className="rounded-2xl border border-border-default bg-surface-raised text-center" style={{ padding: '48px 32px' }}>
         <Spinner className="h-8 w-8 mx-auto text-blue-500" />
-        <p className="text-[15px] font-medium text-text-primary" style={{ marginTop: '16px' }}>Importing table...</p>
+        <p className="text-[15px] font-medium text-text-primary" style={{ marginTop: '16px' }}>Importing tables...</p>
         <p className="text-[13px] text-text-muted" style={{ marginTop: '6px' }}>This may take a moment</p>
       </div>
     )
