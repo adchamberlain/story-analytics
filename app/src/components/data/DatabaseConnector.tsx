@@ -182,7 +182,7 @@ export function DatabaseConnector({ onSynced, onOpenSqlWorkbench }: DatabaseConn
       const res = await authFetch(`/api/connections/${conn.connection_id}/test`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ credentials: {}, username: null }),
+        body: JSON.stringify({ credentials: {}, username: null, save_credentials: true }),
       })
       const data = await res.json()
 
@@ -249,7 +249,7 @@ export function DatabaseConnector({ onSynced, onOpenSqlWorkbench }: DatabaseConn
       const testRes = await authFetch(`/api/connections/${connectionId}/test`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ credentials: buildCredentials(), username: username || null }),
+        body: JSON.stringify({ credentials: buildCredentials(), username: username || null, save_credentials: true }),
       })
       const testData = await testRes.json()
       if (!testRes.ok) { setError(testData.detail || 'Test failed'); return }
