@@ -244,6 +244,12 @@ python3 -m deploy.cli update --region us-east-2
 
 This rebuilds the Docker image and pushes it to ECR. App Runner automatically detects the new image and redeploys (~2–5 minutes).
 
+> **Important:** `update` only pushes new code. It does **not** change environment variables, database passwords, or other configuration. For config changes, use `deploy` instead:
+>
+> ```bash
+> python3 -m deploy.cli deploy --region us-east-2 --db-password NEW_PASSWORD
+> ```
+
 ---
 
 ## Setting Up Email (Optional)
@@ -346,6 +352,26 @@ App Runner needs 2–5 minutes to start after the stack completes. If it stays u
 2. Click your service (`story-analytics-service`)
 3. Check the **Logs** tab for error messages
 4. Verify the **Events** tab shows "Service status is running"
+
+### App Runner keeps rolling back (deploy loop)
+
+If `update` keeps failing and App Runner rolls back repeatedly:
+
+1. **Do NOT try to fix it by changing the RDS password or App Runner config directly.** Direct AWS CLI changes (`aws rds modify-db-instance`, `aws apprunner update-service`) go out of sync with CloudFormation and make things worse.
+
+2. **The fix is a clean redeploy:**
+
+```bash
+# 1. Destroy the current stack
+python3 -m deploy.cli destroy --region us-east-2
+
+# 2. Deploy fresh
+python3 -m deploy.cli deploy --region us-east-2
+```
+
+3. **If you use a custom domain** (e.g. via Cloudflare), update your DNS records to point to the new App Runner URL shown in the deploy output.
+
+> **Why this happens:** App Runner rolls back both the Docker image AND environment variables when a deploy fails. This creates a catch-22 where config fixes also get rolled back. A clean redeploy is the only reliable escape.
 
 ### Docker push fails with "no basic auth credentials"
 
