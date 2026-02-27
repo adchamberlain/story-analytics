@@ -2,6 +2,31 @@
 
 ## 2026-02-26
 
+### Session 15: SQL Editor Polish, Nav Bar Fix, Map Sizing, Source Naming
+
+**Goal:** Fix several UX issues — SQL syntax highlighting, missing nav bar on detail pages, squished maps in editor, and ugly temp file names from SQL query exports.
+
+**SQL Editor syntax highlighting (`SqlEditor.tsx`):**
+- CodeMirror 6 had `sql()` language extension but no highlight style for light mode.
+- Added `syntaxHighlighting(defaultHighlightStyle, { fallback: true })` — keywords (SELECT, FROM, WHERE) now show in distinct colors. `oneDark` theme's own styles take precedence in dark mode.
+
+**TopNav restored on detail pages (`ChartViewPage.tsx`, `DashboardViewPage.tsx`):**
+- Commit `acc2cd3` moved `/chart/:chartId` and `/dashboard/:dashboardId` routes outside `AppShell` for public share link support, but this removed the persistent `TopNav` for authenticated users.
+- Added `{user && <TopNav />}` to both pages — authenticated users see the full nav bar, anonymous viewers still get the minimal header.
+
+**Map sizing fix (`useGeoMap.ts`):**
+- All map types (Choropleth, Spike, Symbol, Locator) rendered squished in the editor because the ResizeObserver watched the loading-state div, then never re-observed the actual map div after basemap loaded.
+- Added `loading` to the ResizeObserver effect's dependency array so it disconnects and reconnects to the correct DOM element on state transition.
+
+**SQL query source naming (`SqlWorkbenchPanel.tsx`, `duckdb_service.py`):**
+- SQL query results were saved with ugly temp file names (`tmpvdn35wam.parquet`) from Python's `tempfile.NamedTemporaryFile`.
+- Frontend: Added `deriveSourceName()` that extracts the main table name from SQL (e.g., `SELECT * FROM earthquakes` → `"earthquakes"`).
+- Backend: `ingest_parquet` now stores a clean synthetic path based on the friendly name instead of the temp file path. Deduplicates with `_2`, `_3` suffixes on collision.
+
+**Commit:** `1f1070a`
+
+---
+
 ### Session 14: Multi-Table Import Safeguards + Test Isolation
 
 **Goal:** Enforce row limit safeguards on table imports, surface schema errors, and prevent tests from polluting production data.
