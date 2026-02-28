@@ -61,11 +61,7 @@ def _setup_isolation():
     _original_attrs.append((duckdb_svc, "_service", getattr(duckdb_svc, "_service")))
     duckdb_svc._service = None
 
-    # Redirect credential store
-    cred_dir = _session_tmp / "credentials"
-    cred_dir.mkdir()
-    _original_attrs.append((cred_store, "_CREDENTIALS_DIR", cred_store._CREDENTIALS_DIR))
-    cred_store._CREDENTIALS_DIR = cred_dir
+    # Reset credential store encryption key (storage is already redirected via get_storage())
     _original_attrs.append((cred_store, "_fernet", cred_store._fernet))
     cred_store._fernet = None
 

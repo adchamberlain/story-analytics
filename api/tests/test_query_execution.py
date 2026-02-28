@@ -16,9 +16,11 @@ import pytest
 @pytest.fixture(autouse=True)
 def _isolate_dirs(tmp_path, monkeypatch):
     """Redirect credential storage to a temp directory for every test."""
+    from api.services.storage import LocalStorageBackend
+    cred_backend = LocalStorageBackend(str(tmp_path))
     monkeypatch.setattr(
-        "api.services.credential_store._CREDENTIALS_DIR",
-        tmp_path / "credentials",
+        "api.services.credential_store.get_storage",
+        lambda: cred_backend,
     )
     monkeypatch.setattr(
         "api.services.credential_store._fernet",

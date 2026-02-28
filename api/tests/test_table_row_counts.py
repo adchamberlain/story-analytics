@@ -14,9 +14,11 @@ from api.services.connectors.base import ConnectorResult, TableInfo
 
 @pytest.fixture(autouse=True)
 def _isolate_dirs(tmp_path, monkeypatch):
+    from api.services.storage import LocalStorageBackend
+    cred_backend = LocalStorageBackend(str(tmp_path))
     monkeypatch.setattr(
-        "api.services.credential_store._CREDENTIALS_DIR",
-        tmp_path / "credentials",
+        "api.services.credential_store.get_storage",
+        lambda: cred_backend,
     )
     monkeypatch.setattr("api.services.credential_store._fernet", None)
 
