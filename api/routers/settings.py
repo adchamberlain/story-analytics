@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
 from ..auth_simple import get_current_user
+from .admin import require_admin
 
 from ..services.settings_storage import load_settings, save_settings, mask_key
 from ..services.duckdb_service import get_duckdb_service
@@ -45,7 +46,7 @@ class DataSourceInfo(BaseModel):
 # ── Endpoints ────────────────────────────────────────────────────────────────
 
 @router.get("/", response_model=SettingsResponse)
-async def get_settings(user: dict = Depends(get_current_user)):
+async def get_settings(user: dict = Depends(require_admin)):
     """Return current settings with API keys masked."""
     s = load_settings()
     return SettingsResponse(
@@ -58,7 +59,7 @@ async def get_settings(user: dict = Depends(get_current_user)):
 
 
 @router.put("/", response_model=SettingsResponse)
-async def update_settings(request: UpdateSettingsRequest, user: dict = Depends(get_current_user)):
+async def update_settings(request: UpdateSettingsRequest, user: dict = Depends(require_admin)):
     """Update provider and/or API keys. Returns masked keys."""
     fields = {k: v for k, v in request.model_dump().items() if v is not None}
     # Never accept masked or empty keys — they'd overwrite the real key
