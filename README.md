@@ -15,7 +15,7 @@ Ships with **The Perfect Dashboard** — a showcase of all 25 chart types with s
 ## Features
 
 ### Charts & Visualization
-- **25 chart types** — Classic (bar, line, area, scatter, histogram, heatmap, box plot, pie, treemap, data table), Analytical (dot plot, range, bullet bar, small multiples, stacked/grouped column, split bars, arrow plot), Maps (choropleth, symbol, locator, spike), Specialty (KPI cards, election donut, multiple pies)
+- **25 chart types** — Classic (bar, line, area, scatter, histogram, heatmap, box plot, pie, treemap, data table), Analytical (dot plot, range, bullet bar, small multiples, stacked/grouped column, split bars, arrow plot), Maps (choropleth, symbol, locator, spike), Specialty (big value / KPI, election donut, multiple pies)
 - **Geographic maps** — 4 map types with basemap selection, zoom/pan, and label collision avoidance
 - **Observable Plot rendering** — Clean SVG output with publication-ready defaults
 - **Annotations** — Reference lines, text labels, and highlighted ranges with responsive scaling
@@ -107,7 +107,7 @@ Run locally with `./dev.sh`. All data stored as JSON files in `data/`.
 Deploy to AWS using the included infrastructure:
 
 ```bash
-cd deploy && ./deploy.sh
+python3 -m deploy.cli deploy --region us-east-2
 ```
 
 See **[docs/deploy-aws.md](docs/deploy-aws.md)** for a step-by-step guide covering VPC, RDS PostgreSQL, S3 storage, ECR, and App Runner.

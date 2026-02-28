@@ -214,7 +214,7 @@ POST /api/v2/charts/save
 }
 ```
 
-**Chart types:** `BarChart`, `LineChart`, `AreaChart`, `ScatterPlot`, `PieChart`, `DonutChart`, `Histogram`, `HeatMap`, `BoxPlot`, `DotPlot`, `RangePlot`, `BulletBar`, `ArrowPlot`, `SplitBars`, `TreeMap`, `SlopeChart`, `WaffleChart`, `SmallMultiples`, `GroupedColumn`, `StackedColumn`, `DataTable`, `SpikeMap`, `BigNumber`, `Sparkline`, `StackedArea`
+**Chart types:** `BarChart`, `LineChart`, `AreaChart`, `ScatterPlot`, `PieChart`, `Histogram`, `HeatMap`, `BoxPlot`, `DotPlot`, `RangePlot`, `BulletBar`, `ArrowPlot`, `SplitBars`, `Treemap`, `SmallMultiples`, `GroupedColumn`, `StackedColumn`, `DataTable`, `SpikeMap`, `BigValue`, `ChoroplethMap`, `SymbolMap`, `LocatorMap`, `ElectionDonut`, `MultiplePies`
 
 ### AI Propose a Chart
 
@@ -339,25 +339,26 @@ Chart `width`: `"full"` or `"half"`. Filters support `dateRange`, `dropdown`, an
 ### Get Dashboard with Data
 
 ```
-GET /api/v2/dashboards/{id}/with-data
+GET /api/v2/dashboards/{id}
 ```
 
-Returns all charts with their data, plus health status (detects schema changes, missing sources, stale data).
+Re-executes each chart's SQL and returns the dashboard with all chart data. Accepts an optional `?filters=<JSON>` query parameter for dashboard-level filtering.
 
 ### Other Dashboard Endpoints
 
 | Method | Path | Description |
 |--------|------|-------------|
 | `GET` | `/v2/dashboards/` | List dashboards |
-| `GET` | `/v2/dashboards/{id}` | Get dashboard metadata |
 | `PUT` | `/v2/dashboards/{id}` | Update dashboard |
 | `DELETE` | `/v2/dashboards/{id}` | Delete dashboard |
 | `PUT` | `/v2/dashboards/{id}/publish` | Publish |
 | `PUT` | `/v2/dashboards/{id}/unpublish` | Unpublish |
 | `GET` | `/v2/dashboards/{id}/public` | Get published (no auth) |
-| `GET` | `/v2/dashboards/{id}/export.html` | Export to static HTML |
+| `GET` | `/v2/dashboards/{id}/export/html` | Export to self-contained HTML |
 | `POST` | `/v2/dashboards/{id}/health-check` | Check chart health |
-| `POST` | `/v2/dashboards/{id}/filter-query` | Re-query with filter params |
+| `GET` | `/v2/dashboards/{id}/health` | Get cached health results |
+| `GET` | `/v2/dashboards/{id}/sharing` | Get sharing settings |
+| `PUT` | `/v2/dashboards/{id}/sharing` | Update visibility (private/team/public) |
 
 ---
 
@@ -384,12 +385,12 @@ Move a chart to a folder via `PUT /api/v2/charts/{id}` with `{"folder_id": "..."
 | `POST` | `/teams/` | Create team (creator becomes admin) |
 | `GET` | `/teams/` | List user's teams |
 | `GET` | `/teams/{id}` | Get team with members |
-| `POST` | `/teams/{id}/invite` | Invite by email (admin only) |
-| `POST` | `/teams/{id}/members` | Add member directly (admin only) |
+| `POST` | `/teams/{id}/invite` | Invite by email (registered users only) |
+| `POST` | `/teams/{id}/members` | Add member by user ID (admin only) |
 | `DELETE` | `/teams/{id}/members/{uid}` | Remove member (admin only) |
+| `GET` | `/teams/{id}/invites` | List pending invites |
+| `DELETE` | `/teams/{id}/invites/{invite_id}` | Cancel pending invite |
 | `DELETE` | `/teams/{id}` | Delete team (owner only) |
-
-Inviting an unregistered email sends a registration invite; registered users are added directly.
 
 ---
 
@@ -402,9 +403,13 @@ Connect to external databases (Snowflake, PostgreSQL, BigQuery) and sync tables 
 | `GET` | `/connections/types` | List supported connector types |
 | `POST` | `/connections/` | Create connection |
 | `GET` | `/connections/` | List connections |
+| `GET` | `/connections/{id}` | Get connection by ID |
 | `POST` | `/connections/{id}/test` | Test connection |
 | `POST` | `/connections/{id}/tables` | List available tables |
+| `POST` | `/connections/{id}/schema` | Full schema introspection (`?refresh=true` to bypass cache) |
+| `POST` | `/connections/{id}/query` | Execute read-only SQL against warehouse |
 | `POST` | `/connections/{id}/sync` | Sync tables into DuckDB |
+| `POST` | `/connections/{id}/sync-query` | Sync query result into DuckDB as new source |
 | `DELETE` | `/connections/{id}` | Delete connection |
 
 ---
@@ -428,6 +433,94 @@ Connect to external databases (Snowflake, PostgreSQL, BigQuery) and sync tables 
 | `GET` | `/themes/{id}` | Get theme |
 | `PUT` | `/themes/{id}` | Update theme |
 | `DELETE` | `/themes/{id}` | Delete theme |
+
+---
+
+## Auth
+
+Authentication endpoints (email + password with JWT).
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/auth/status` | Auth status and current user info |
+| `POST` | `/auth/register` | Register with email + password (accepts optional `invite_token`) |
+| `POST` | `/auth/login` | Login with email + password → returns JWT |
+| `POST` | `/auth/change-password` | Change password (requires current password) |
+| `POST` | `/auth/forgot-password` | Request password reset email |
+| `POST` | `/auth/reset-password` | Reset password using token |
+| `PUT` | `/auth/profile` | Update display name |
+
+Legacy magic-link endpoints (`POST /auth/magic-link`, `GET /auth/verify`) are also available.
+
+---
+
+## Admin
+
+All admin endpoints require the `admin` role.
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/admin/users` | List all users |
+| `PUT` | `/admin/users/{id}/role` | Change user role (admin/editor) |
+| `PUT` | `/admin/users/{id}/status` | Activate or deactivate user |
+| `DELETE` | `/admin/users/{id}` | Permanently delete user |
+| `POST` | `/admin/invites` | Create invite link |
+| `GET` | `/admin/invites` | List pending invites |
+| `DELETE` | `/admin/invites/{id}` | Revoke invite |
+| `GET` | `/admin/settings` | Get admin settings (e.g. `open_registration`) |
+| `PUT` | `/admin/settings` | Update admin settings |
+
+---
+
+## Comments
+
+Threaded comments on charts and dashboards.
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/comments/` | Add comment (`{"chart_id": "..."}` or `{"dashboard_id": "..."}`) |
+| `GET` | `/comments/?chart_id=...` | List comments for a chart or dashboard |
+| `PUT` | `/comments/{id}` | Edit comment (author only) |
+| `DELETE` | `/comments/{id}` | Soft-delete comment (author only) |
+
+---
+
+## Notifications
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/notifications/` | List recent notifications |
+| `GET` | `/notifications/unread-count` | Get unread count |
+| `PUT` | `/notifications/{id}/read` | Mark notification as read |
+| `PUT` | `/notifications/read-all` | Mark all as read |
+
+---
+
+## Templates
+
+Reusable chart configuration templates.
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/v2/templates/` | Create template |
+| `GET` | `/v2/templates/` | List templates |
+| `GET` | `/v2/templates/{id}` | Get template |
+| `PUT` | `/v2/templates/{id}` | Update template |
+| `DELETE` | `/v2/templates/{id}` | Delete template |
+
+Charts can also be saved as templates via `POST /v2/charts/{id}/save-as-template`.
+
+---
+
+## Settings
+
+AI provider configuration.
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/settings/` | Get AI provider settings (API keys masked) |
+| `PUT` | `/settings/` | Update provider and API keys |
+| `GET` | `/settings/sources` | List all data sources (connections + CSVs) |
 
 ---
 
