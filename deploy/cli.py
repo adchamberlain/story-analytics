@@ -53,18 +53,18 @@ def cmd_deploy(args: argparse.Namespace) -> None:
     print("Deploying Story Analytics to AWS...\n")
 
     # 1. Validate credentials
-    print("[1/7] Checking AWS credentials...")
+    print("[1/6] Checking AWS credentials...")
     if not validate_credentials():
         print("\nERROR: AWS credentials not configured.")
         print("  Run `aws configure` or export AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY.")
         sys.exit(1)
 
     # 2. Create ECR repo (must exist before CloudFormation, which needs an image)
-    print("\n[2/7] Ensuring ECR repository exists...")
+    print("\n[2/6] Ensuring ECR repository exists...")
     ecr_uri = ensure_ecr_repo(args.stack_name, args.region)
 
     # 3. Build and push Docker image (must be in ECR before App Runner starts)
-    print("\n[3/7] Building and pushing Docker image...")
+    print("\n[3/6] Building and pushing Docker image...")
     build_and_push_image(args.region, ecr_uri)
 
     # 4. Deploy CloudFormation stack (S3, RDS, App Runner pointing at the image)

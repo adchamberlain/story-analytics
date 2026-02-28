@@ -158,7 +158,7 @@ You should see your account ID and user ARN. If you get an error, double-check y
 Download the Story Analytics source code:
 
 ```bash
-git clone https://github.com/your-org/story-analytics.git
+git clone https://github.com/adchamberlain/story-analytics.git
 cd story-analytics
 ```
 
@@ -180,40 +180,40 @@ One command does everything:
 python3 -m deploy.cli deploy --region us-east-2
 ```
 
-You'll see seven steps:
+You'll see six steps:
 
 ```
 Deploying Story Analytics to AWS...
 
-[1/7] Checking AWS credentials...
+[1/6] Checking AWS credentials...
   AWS Account : 123456789012
   User/Role   : arn:aws:iam::123456789012:user/your-name
 
-[2/7] Ensuring ECR repository exists...
+[2/6] Ensuring ECR repository exists...
   ECR repo created: 123456789012.dkr.ecr.us-east-2.amazonaws.com/story-analytics
 
-[3/7] Building and pushing Docker image...
+[3/6] Building and pushing Docker image...
   Building Docker image...
   Logging in to ECR...
   Tagging image...
   Pushing image to ECR...
   Image pushed successfully.
 
-[4/7] Deploying CloudFormation stack (this takes ~10 min for RDS)...
+[4/6] Deploying CloudFormation stack (this takes ~10 min for RDS)...
   Creating stack 'story-analytics' in us-east-2...
   Waiting................ done.
 
-[5/7] Setting FRONTEND_BASE_URL...
+[5/6] Setting FRONTEND_BASE_URL...
 
-[6/7] Triggering App Runner deployment...
-
-[7/7] Deployment complete!
+[6/6] Deployment complete!
 
   App URL      : https://abc123xyz.us-east-2.awsapprunner.com
   S3 Bucket    : story-analytics-data-123456789012
   RDS Endpoint : story-analytics-db.xxxx.us-east-2.rds.amazonaws.com
   DB Password  : xK9_mN2pLqRs7vW   (save this!)
 ```
+
+> **SSL:** RDS PostgreSQL 16 requires SSL connections. The deploy script sets `sslmode=require` automatically — no manual configuration needed.
 
 **Save the DB Password!** You'll need it if you ever need to access the database directly. It's auto-generated and won't be shown again.
 

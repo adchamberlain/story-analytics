@@ -18,8 +18,13 @@ data/*
 sources/*/connection.yaml
 
 # Development files (private)
+CLAUDE.md
+CONTRIBUTING.md
 DEV_LOG.md
 DEV_PLAN.md
+scripts/
+tasks/
+website/
 business-records/
 docs/plans/
 docs/v2-product-spec*
