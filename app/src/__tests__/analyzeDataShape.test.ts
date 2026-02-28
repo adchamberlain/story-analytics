@@ -27,10 +27,13 @@ describe('analyzeDataShape', () => {
     expect(result).toEqual([])
   })
 
-  it('warns Line chart with no date column', () => {
+  it('shows info for Line chart with no date column', () => {
     const data = [{ a: 'x', b: 1 }]
     const result = analyzeDataShape(data, ['a', 'b'], { a: 'VARCHAR', b: 'INTEGER' }, 'LineChart', {})
-    expect(result.some((a) => a.message.includes('time column'))).toBe(true)
+    expect(result.length).toBe(1)
+    expect(result[0].level).toBe('info')
+    expect(result[0].message).toContain('time or sequential')
+    expect(result[0].action).toBeUndefined()
   })
 
   it('no advice for Line chart with date column', () => {

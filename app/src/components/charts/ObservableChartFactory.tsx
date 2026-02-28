@@ -584,7 +584,7 @@ function buildBarMarks(
   if (config.horizontal) {
     // Horizontal bars: x is numeric, y is categorical
     const sortOpt = config.sort !== false
-      ? { sort: { y: 'x' as const, reverse: true } }
+      ? { sort: { y: 'x' as const, reverse: (config.sortDir ?? 'desc') === 'desc' } }
       : {}
 
     // Gray bar track behind each bar (non-series only)
@@ -618,8 +618,9 @@ function buildBarMarks(
     }
   } else {
     // Vertical bars
+    const sortKey = (config.sortDir ?? 'desc') === 'desc' ? '-y' as const : 'y' as const
     const sortOpt = config.sort !== false
-      ? { sort: { x: '-y' as const } }
+      ? { sort: { x: sortKey } }
       : {}
 
     if (series) {
@@ -1862,7 +1863,7 @@ function sortOrdinalDomain(domain: string[], config: ChartConfig): string[] {
   if (domain.length === 0) return domain
 
   // Normalise for matching (case-insensitive)
-  const lower = domain.map((d) => d.toLowerCase())
+  const lower = domain.map((d) => String(d).toLowerCase())
 
   // Try each known ordinal sequence
   const sequences: [string[], string[]][] = [
@@ -1951,7 +1952,7 @@ function buildPlotOptions(
       const seen = new Set<string>()
       const yDomain: string[] = []
       for (const row of data) {
-        const v = row[yCol] as string
+        const v = row[yCol] != null ? String(row[yCol]) : null
         if (v != null && !seen.has(v)) { seen.add(v); yDomain.push(v) }
       }
       overrides.y = { ...getBaseAxis(), domain: sortOrdinalDomain(yDomain, config) }

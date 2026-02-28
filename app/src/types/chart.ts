@@ -204,6 +204,7 @@ export interface ChartConfig {
 
   /** Chart-specific options */
   sort?: boolean | string
+  sortDir?: 'asc' | 'desc'
   horizontal?: boolean
   stacked?: boolean
   legendLabel?: string

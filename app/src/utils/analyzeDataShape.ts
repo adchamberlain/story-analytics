@@ -50,9 +50,8 @@ const RULES: Record<string, Rule[]> = {
       const hasDate = Object.values(types).some(isDateType)
       if (!hasDate) {
         return {
-          level: 'warning',
-          message: 'Line charts need a time column. None detected in your data.',
-          action: { label: 'Switch to Bar', type: 'switchChart', chartType: 'BarChart' },
+          level: 'info',
+          message: 'Line charts work best with a time or sequential column.',
         }
       }
       return null
@@ -63,9 +62,8 @@ const RULES: Record<string, Rule[]> = {
       const hasDate = Object.values(types).some(isDateType)
       if (!hasDate) {
         return {
-          level: 'warning',
-          message: 'Area charts need a time column. None detected in your data.',
-          action: { label: 'Switch to Bar', type: 'switchChart', chartType: 'BarChart' },
+          level: 'info',
+          message: 'Area charts work best with a time or sequential column.',
         }
       }
       return null
