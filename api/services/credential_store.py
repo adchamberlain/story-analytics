@@ -2,21 +2,23 @@
 Credential store: encrypted storage for database connection credentials.
 
 Uses Fernet symmetric encryption (AES-128-CBC + HMAC-SHA256).
-- Encryption key is auto-generated on first use and stored at data/credentials/.key
-- Encrypted credential files are stored at data/credentials/{connection_id}.enc
+- Encryption key priority: CREDENTIAL_ENCRYPTION_KEY env var > stored key > generate new
+- Encrypted credential files are stored at credentials/{connection_id}.enc
+- All storage goes through the storage abstraction (local filesystem or S3)
 """
 from __future__ import annotations
 
 import json
 import logging
+import os
 import re
-from pathlib import Path
 
 from cryptography.fernet import Fernet
 
+from api.services.storage import get_storage
+
 logger = logging.getLogger(__name__)
 
-_CREDENTIALS_DIR = Path(__file__).parent.parent.parent / "data" / "credentials"
 _SAFE_ID_RE = re.compile(r"^[a-f0-9]{1,32}$")
 
 # Lazily-initialized Fernet instance (reset in tests via monkeypatch)
@@ -30,24 +32,34 @@ def _validate_id(connection_id: str) -> None:
 
 
 def _get_fernet() -> Fernet:
-    """Return (and lazily create) the Fernet instance backed by a persistent key."""
+    """Return (and lazily create) the Fernet instance backed by a persistent key.
+
+    Key resolution order:
+    1. CREDENTIAL_ENCRYPTION_KEY env var (base64-encoded Fernet key)
+    2. Stored key at credentials/.key in the storage backend
+    3. Generate a new key and store it
+    """
     global _fernet
     if _fernet is not None:
         return _fernet
 
-    _CREDENTIALS_DIR.mkdir(parents=True, exist_ok=True)
-    key_path = _CREDENTIALS_DIR / ".key"
+    storage = get_storage()
 
-    if key_path.exists():
-        key = key_path.read_bytes().strip()
-    else:
+    # 1. Check env var
+    env_key = os.environ.get("CREDENTIAL_ENCRYPTION_KEY")
+    if env_key:
+        _fernet = Fernet(env_key.encode("utf-8") if isinstance(env_key, str) else env_key)
+        return _fernet
+
+    # 2. Check stored key
+    key_path = "credentials/.key"
+    try:
+        key = storage.read(key_path).strip()
+    except FileNotFoundError:
+        # 3. Generate and store new key
         key = Fernet.generate_key()
-        key_path.write_bytes(key)
-        # Restrict key file permissions (owner-only read/write)
-        try:
-            key_path.chmod(0o600)
-        except OSError:
-            pass  # Windows or other OS may not support chmod
+        storage.write(key_path, key)
+        logger.info("Generated new credential encryption key")
 
     _fernet = Fernet(key)
     return _fernet
@@ -60,25 +72,22 @@ def store_credentials(connection_id: str, credentials: dict) -> None:
     plaintext = json.dumps(credentials).encode("utf-8")
     encrypted = f.encrypt(plaintext)
 
-    _CREDENTIALS_DIR.mkdir(parents=True, exist_ok=True)
-    enc_path = _CREDENTIALS_DIR / f"{connection_id}.enc"
-    enc_path.write_bytes(encrypted)
-    try:
-        enc_path.chmod(0o600)
-    except OSError:
-        pass  # Windows or other OS may not support chmod
+    storage = get_storage()
+    storage.write(f"credentials/{connection_id}.enc", encrypted)
     logger.info("Stored encrypted credentials for connection %s", connection_id)
 
 
 def load_credentials(connection_id: str) -> dict | None:
     """Load and decrypt credentials for a connection. Returns None if not found."""
     _validate_id(connection_id)
-    enc_path = _CREDENTIALS_DIR / f"{connection_id}.enc"
-    if not enc_path.exists():
+    storage = get_storage()
+
+    try:
+        encrypted = storage.read(f"credentials/{connection_id}.enc")
+    except FileNotFoundError:
         return None
 
     f = _get_fernet()
-    encrypted = enc_path.read_bytes()
     try:
         plaintext = f.decrypt(encrypted)
         return json.loads(plaintext.decode("utf-8"))
@@ -90,7 +99,9 @@ def load_credentials(connection_id: str) -> dict | None:
 def delete_credentials(connection_id: str) -> None:
     """Delete stored credentials for a connection. No-op if not found."""
     _validate_id(connection_id)
-    enc_path = _CREDENTIALS_DIR / f"{connection_id}.enc"
-    if enc_path.exists():
-        enc_path.unlink()
+    storage = get_storage()
+    try:
+        storage.delete(f"credentials/{connection_id}.enc")
         logger.info("Deleted credentials for connection %s", connection_id)
+    except FileNotFoundError:
+        pass
