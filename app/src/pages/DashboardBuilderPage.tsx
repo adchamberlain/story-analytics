@@ -11,9 +11,8 @@ import { useDashboardBuilderStore } from '../stores/dashboardBuilderStore'
 import { ChartPicker } from '../components/dashboard/ChartPicker'
 import { ChartWrapper } from '../components/charts/ChartWrapper'
 import { ObservableChartFactory } from '../components/charts/ObservableChartFactory'
-import { PALETTES } from '../themes/plotTheme'
-import type { ChartConfig, ChartType } from '../types/chart'
-import type { PaletteKey } from '../themes/plotTheme'
+import { buildChartConfig } from '../utils/buildChartConfig'
+import type { ChartType } from '../types/chart'
 
 /** Full chart data fetched for rendering previews in the builder. */
 interface ChartFullData {
@@ -449,35 +448,7 @@ function BuilderGridCard({
   }
 
   const chartType = (chartFullData.chart_type ?? 'BarChart') as ChartType
-
-  const isMultiY = Array.isArray(chartFullData.y) && chartFullData.y.length > 1
-  const chartConfig: ChartConfig = {
-    x: chartFullData.x ?? undefined,
-    y: isMultiY ? 'metric_value' : (Array.isArray(chartFullData.y) ? chartFullData.y[0] : chartFullData.y) ?? undefined,
-    series: isMultiY ? 'metric_name' : chartFullData.series ?? undefined,
-    horizontal: chartFullData.horizontal,
-    sort: chartFullData.sort,
-    stacked: (chartFullData.config?.stacked as boolean) ?? false,
-    showGrid: (chartFullData.config?.showGrid as boolean) ?? true,
-    showLegend: (chartFullData.config?.showLegend as boolean) ?? true,
-    showValues: (chartFullData.config?.showValues as boolean) ?? false,
-    xAxisTitle: (chartFullData.config?.xAxisTitle as string) || undefined,
-    yAxisTitle: (chartFullData.config?.yAxisTitle as string) || undefined,
-    annotations: chartFullData.config?.annotations as ChartConfig['annotations'],
-    value: (chartFullData.config?.value as string) ?? undefined,
-    comparisonValue: (chartFullData.config?.comparisonValue as string) ?? undefined,
-    comparisonLabel: (chartFullData.config?.comparisonLabel as string) || undefined,
-    valueFormat: (chartFullData.config?.valueFormat as ChartConfig['valueFormat']) || undefined,
-    positiveIsGood: (chartFullData.config?.positiveIsGood as boolean) ?? true,
-    metricLabel: (chartFullData.config?.metricLabel as string) ?? undefined,
-    unitColumn: (chartFullData.config?.unitColumn as string) ?? undefined,
-  }
-
-  const palette = (chartFullData.config?.palette as PaletteKey) ?? 'default'
-  const paletteColors = PALETTES[palette] ?? PALETTES.default
-  if (palette !== 'default') {
-    chartConfig.colorRange = paletteColors
-  }
+  const chartConfig = buildChartConfig(chartFullData)
 
   return (
     <div className="group relative h-full">
