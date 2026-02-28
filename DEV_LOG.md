@@ -2,6 +2,34 @@
 
 ## 2026-02-27
 
+### Session 19: Invite Consolidation + User Deletion
+
+**Goal:** Consolidate the two separate invite paths (Teams and User Management) into a single entry point, and add permanent user deletion.
+
+**Changes:**
+
+**Invite consolidation — Teams no longer invite unregistered users:**
+- `api/routers/teams.py`: Team invite endpoint returns 404 for unregistered users instead of creating invite tokens. Removed `send_team_invite_email` and `create_invite` imports.
+- `api/email.py`: Deleted `send_team_invite_email()` function (dead code after consolidation)
+- `app/src/pages/SettingsPage.tsx`:
+  - Added `prefillInviteEmail` shared state in parent `SettingsPage` for cross-panel communication
+  - TeamManager shows amber "not registered" inline message with link that triggers User Management's invite modal pre-filled
+  - AdminUsersSection accepts `prefillEmail` prop, auto-opens modal and scrolls into view
+  - Removed `inviteResult` state and "share link" UI from TeamManager (no longer needed)
+- `api/tests/test_teams.py`: Updated `test_invite_unregistered_user` to expect 404, removed `test_send_team_invite_email_no_resend`
+
+**User deletion:**
+- `api/services/metadata_db.py`: Added `delete_user()` with cascading cleanup (notifications, team_members, dashboard_shares, api_keys, comments)
+- `api/routers/admin.py`: Added `DELETE /api/admin/users/{user_id}` endpoint (self-delete blocked)
+- `app/src/pages/SettingsPage.tsx`: "Delete" button appears for inactive users, with ConfirmDialog warning about permanent data removal
+
+**Other:**
+- `app/src/pages/DashboardBuilderPage.tsx`: Refactored to use shared `buildChartConfig` utility
+
+**Commits:** `70fd533`, `7de61ec`
+
+---
+
 ### Session 18: SQL Editor for CSV Sources + Panel Animation
 
 **Goal:** Enable the SQL workbench for uploaded CSV sources (not just database connections), and polish panel animations.
