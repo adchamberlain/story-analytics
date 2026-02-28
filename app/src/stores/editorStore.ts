@@ -22,6 +22,7 @@ export interface EditorConfig {
   series: string | null
   horizontal: boolean
   sort: boolean
+  sortDir: 'asc' | 'desc'
   stacked: boolean
   showGrid: boolean
   showLegend: boolean
@@ -97,6 +98,7 @@ const DEFAULT_CONFIG: EditorConfig = {
   series: null,
   horizontal: false,
   sort: true,
+  sortDir: 'desc',
   stacked: false,
   showGrid: true,
   showLegend: true,
@@ -320,6 +322,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         series: chart.series ?? null,
         horizontal: chart.horizontal ?? false,
         sort: chart.sort ?? true,
+        sortDir: (chart.config?.sortDir as 'asc' | 'desc') ?? 'desc',
         stacked: chart.config?.stacked ?? false,
         showGrid: chart.config?.showGrid ?? true,
         showLegend: chart.config?.showLegend ?? true,
@@ -548,6 +551,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           subtitle: config.subtitle || null,
           source: config.source || null,
           config: {
+            sortDir: config.sortDir !== 'desc' ? config.sortDir : undefined,
             stacked: config.stacked,
             showGrid: config.showGrid,
             showLegend: config.showLegend,
@@ -849,6 +853,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           horizontal: config.horizontal,
           sort: config.sort,
           config: {
+            sortDir: config.sortDir !== 'desc' ? config.sortDir : undefined,
             stacked: config.stacked,
             showGrid: config.showGrid,
             showLegend: config.showLegend,

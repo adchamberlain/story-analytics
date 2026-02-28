@@ -625,11 +625,30 @@ export function Toolbox() {
             />
           )}
           {isBar && (
-            <Toggle
-              label="Sort by value"
-              checked={config.sort}
-              onChange={(sort) => updateConfig({ sort })}
-            />
+            <>
+              <Toggle
+                label="Sort by value"
+                checked={config.sort}
+                onChange={(sort) => updateConfig({ sort })}
+              />
+              {config.sort && (
+                <div className="flex gap-1 ml-0.5">
+                  {(['desc', 'asc'] as const).map((dir) => (
+                    <button
+                      key={dir}
+                      onClick={() => updateConfig({ sortDir: dir })}
+                      className={`flex-1 px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                        (config.sortDir ?? 'desc') === dir
+                          ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+                          : 'text-text-secondary hover:text-text-on-surface hover:bg-surface-tertiary'
+                      }`}
+                    >
+                      {dir === 'desc' ? 'Descending' : 'Ascending'}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </>
           )}
           {isBar && config.series !== null && (
             <Toggle
