@@ -7,12 +7,12 @@ from pydantic import BaseModel, Field
 
 from ..auth_simple import get_current_user
 from ..config import get_settings
-from ..email import send_team_invite_email, send_team_added_email
+from ..email import send_team_added_email
 from ..services.metadata_db import (
     create_team, list_teams, get_team, get_team_members,
     add_team_member, remove_team_member, delete_team,
     get_user_by_email, get_team_member_role,
-    create_invite, get_pending_team_invites, delete_invite,
+    get_pending_team_invites, delete_invite,
 )
 
 logger = logging.getLogger(__name__)
@@ -78,36 +78,19 @@ async def invite_member(team_id: str, request: InviteRequest, user: dict = Depen
     settings = get_settings()
     inviter_name = user.get("display_name") or user.get("email", "A team admin")
 
-    if target_user:
-        # User is registered — add directly
-        existing_role = get_team_member_role(team_id, target_user["id"])
-        if existing_role is not None:
-            raise HTTPException(status_code=409, detail="User is already a team member")
-        add_team_member(team_id, target_user["id"], "member")
-        email_sent = send_team_added_email(request.email, team["name"], settings.frontend_base_url, inviter_name)
-        if not email_sent:
-            logger.error("Failed to send team-added notification email to %s for team %s", request.email, team_id)
-            raise HTTPException(status_code=502, detail="Member was added to the team but the notification email failed to send")
-        return {"status": "added", "message": f"{request.email} has been added to the team"}
-    else:
-        # User is NOT registered — create invite token
-        invite = create_invite(
-            email=request.email,
-            role="editor",
-            created_by=user["id"],
-            team_id=team_id,
-            team_role="member",
-        )
-        invite_url = f"{settings.frontend_base_url}/login?invite={invite['token']}"
-        email_sent = send_team_invite_email(request.email, team["name"], invite_url, inviter_name)
-        if not email_sent:
-            logger.warning("Email not sent for team invite to %s (team %s) — returning link for manual sharing", request.email, team_id)
-        return {
-            "status": "invited",
-            "message": f"Invite sent to {request.email}" if email_sent else f"Invite created for {request.email}",
-            "invite_url": invite_url,
-            "email_sent": email_sent,
-        }
+    if not target_user:
+        raise HTTPException(status_code=404, detail="User is not registered. Invite them from User Management first.")
+
+    # User is registered — add directly
+    existing_role = get_team_member_role(team_id, target_user["id"])
+    if existing_role is not None:
+        raise HTTPException(status_code=409, detail="User is already a team member")
+    add_team_member(team_id, target_user["id"], "member")
+    email_sent = send_team_added_email(request.email, team["name"], settings.frontend_base_url, inviter_name)
+    if not email_sent:
+        logger.error("Failed to send team-added notification email to %s for team %s", request.email, team_id)
+        raise HTTPException(status_code=502, detail="Member was added to the team but the notification email failed to send")
+    return {"status": "added", "message": f"{request.email} has been added to the team"}
 
 
 @router.post("/{team_id}/members")

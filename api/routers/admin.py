@@ -7,7 +7,7 @@ from pydantic import BaseModel
 
 from api.auth_simple import get_current_user
 from api.services.metadata_db import (
-    list_all_users, update_user_role, update_user_status,
+    list_all_users, update_user_role, update_user_status, delete_user,
     create_invite, list_invites, delete_invite,
     get_admin_setting, set_admin_setting,
 )
@@ -70,6 +70,20 @@ async def change_user_status(
     if not success:
         raise HTTPException(status_code=404, detail="User not found")
     return {"id": user_id, "is_active": body.active}
+
+
+@router.delete("/users/{user_id}")
+async def remove_user(
+    user_id: str,
+    user: dict = Depends(require_admin),
+):
+    """Permanently delete a user (admin only). Cannot delete yourself."""
+    if user_id == user["id"]:
+        raise HTTPException(status_code=400, detail="Cannot delete yourself")
+    success = delete_user(user_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="User not found")
+    return {"status": "deleted"}
 
 
 # ── Invites ──────────────────────────────────────────────────────────────────

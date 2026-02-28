@@ -133,19 +133,6 @@ class TestTeamInviteDB:
 
 
 class TestTeamEmails:
-    def test_send_team_invite_email_no_resend(self):
-        """Without RESEND_API_KEY, prints to console and returns True."""
-        import os
-        os.environ.pop("RESEND_API_KEY", None)
-        from api.email import send_team_invite_email
-        result = send_team_invite_email(
-            to_email="newuser@test.com",
-            team_name="Data Team",
-            invite_url="http://localhost:3001/login?invite=abc123",
-            inviter_name="Admin User",
-        )
-        assert result is True
-
     def test_send_team_added_email_no_resend(self):
         """Without RESEND_API_KEY, prints to console and returns True."""
         import os
@@ -177,19 +164,14 @@ class TestTeamInviteEndpoint:
         assert user["id"] in member_ids
         client.delete(f"/api/teams/{team_id}")
 
-    def test_invite_unregistered_user_creates_invite(self):
-        """Inviting an unregistered email creates a pending invite."""
+    def test_invite_unregistered_user_returns_404(self):
+        """Inviting an unregistered email returns 404 with guidance message."""
         r = client.post("/api/teams/", json={"name": "Invite Unreg Team"})
         team_id = r.json()["id"]
         email = f"notyet_{uuid.uuid4().hex[:8]}@test.com"
         resp = client.post(f"/api/teams/{team_id}/invite", json={"email": email})
-        assert resp.status_code == 200
-        data = resp.json()
-        assert data["status"] == "invited"
-        assert "invite_url" in data
-        from api.services.metadata_db import get_pending_team_invites
-        pending = get_pending_team_invites(team_id)
-        assert any(p["email"] == email for p in pending)
+        assert resp.status_code == 404
+        assert "not registered" in resp.json()["detail"].lower()
         client.delete(f"/api/teams/{team_id}")
 
     def test_invite_already_member_returns_409(self):

@@ -319,6 +319,20 @@ def update_user_status(user_id: str, active: bool) -> bool:
     return count > 0
 
 
+def delete_user(user_id: str) -> bool:
+    """Permanently delete a user and their related data. Returns True if deleted."""
+    _ensure_tables()
+    db = get_db()
+    # Delete related records first (SQLite foreign keys may not cascade)
+    db.execute("DELETE FROM notifications WHERE user_id = ?", (user_id,))
+    db.execute("DELETE FROM team_members WHERE user_id = ?", (user_id,))
+    db.execute("DELETE FROM dashboard_shares WHERE user_id = ?", (user_id,))
+    db.execute("DELETE FROM api_keys WHERE user_id = ?", (user_id,))
+    db.execute("DELETE FROM comments WHERE author_id = ?", (user_id,))
+    count = db.execute("DELETE FROM users WHERE id = ?", (user_id,))
+    return count > 0
+
+
 def update_user_display_name(user_id: str, display_name: str) -> bool:
     """Update a user's display name. Returns True if updated."""
     _ensure_tables()

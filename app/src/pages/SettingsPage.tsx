@@ -25,6 +25,9 @@ interface Settings {
 export function SettingsPage() {
   const { authEnabled } = useAuthStore()
 
+  // Cross-panel invite linking: TeamManager can trigger AdminUsersSection invite modal
+  const [prefillInviteEmail, setPrefillInviteEmail] = useState<string | null>(null)
+
   // Settings state
   const [settings, setSettings] = useState<Settings | null>(null)
   const [selectedProvider, setSelectedProvider] = useState('')
@@ -136,7 +139,7 @@ export function SettingsPage() {
         <ChangePasswordSection />
 
         {/* ── Teams ────────────────────────────────────────────────── */}
-        <TeamManager />
+        <TeamManager onInviteNewUser={setPrefillInviteEmail} />
 
         {/* ── AI Provider ──────────────────────────────────────────── */}
         <section className="bg-surface-raised rounded-2xl shadow-card border border-border-default p-7">
@@ -205,7 +208,7 @@ export function SettingsPage() {
         </section>
 
         {/* ── User Management (Admin) ─────────────────────── */}
-        <AdminUsersSection />
+        <AdminUsersSection prefillEmail={prefillInviteEmail} onPrefillHandled={() => setPrefillInviteEmail(null)} />
 
         {/* ── Chart Theme ──────────────────────────────────────────── */}
         <ChartThemeSelector />
@@ -513,7 +516,7 @@ interface Team {
   members?: TeamMember[]
 }
 
-function TeamManager() {
+function TeamManager({ onInviteNewUser }: { onInviteNewUser: (email: string) => void }) {
   const { authEnabled, user } = useAuthStore()
   if (!authEnabled) return (
     <DeployTeaser
@@ -530,7 +533,7 @@ function TeamManager() {
   const [inviteEmail, setInviteEmail] = useState('')
   const [inviting, setInviting] = useState(false)
   const [inviteError, setInviteError] = useState('')
-  const [inviteResult, setInviteResult] = useState<{ url: string; emailSent: boolean; email: string } | null>(null)
+  const [notRegisteredEmail, setNotRegisteredEmail] = useState<string | null>(null)
 
   useEffect(() => {
     authFetch('/api/teams/')
@@ -564,7 +567,7 @@ function TeamManager() {
       setExpandedTeamId(teamId)
       setInviteEmail('')
       setInviteError('')
-      setInviteResult(null)
+      setNotRegisteredEmail(null)
       if (!membersByTeam[teamId]) loadMembers(teamId)
       loadInvites(teamId)
     }
@@ -590,35 +593,27 @@ function TeamManager() {
     if (!inviteEmail.trim()) return
     setInviting(true)
     setInviteError('')
-    setInviteResult(null)
+    setNotRegisteredEmail(null)
     try {
       const res = await authFetch(`/api/teams/${teamId}/invite`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: inviteEmail.trim() }),
       })
+      if (res.status === 404) {
+        // User not registered — show message with link to User Management
+        setNotRegisteredEmail(inviteEmail.trim())
+        setInviteEmail('')
+        return
+      }
       if (!res.ok) {
         const body = await res.json().catch(() => ({ detail: 'Failed to invite' }))
         throw new Error(body.detail)
       }
-      const data = await res.json()
-      const sentEmail = inviteEmail.trim()
       setInviteEmail('')
-      if (data.status === 'added') {
-        await loadMembers(teamId)
-        setInviteResult(null)
-        setInviteError('✓ Added to team')
-        setTimeout(() => setInviteError(''), 3000)
-      } else {
-        await loadInvites(teamId)
-        if (data.email_sent === false) {
-          setInviteResult({ url: data.invite_url, emailSent: false, email: sentEmail })
-        } else {
-          setInviteResult(null)
-          setInviteError('✓ Invite sent')
-          setTimeout(() => setInviteError(''), 3000)
-        }
-      }
+      await loadMembers(teamId)
+      setInviteError('✓ Added to team')
+      setTimeout(() => setInviteError(''), 3000)
     } catch (err) {
       setInviteError(err instanceof Error ? err.message : 'Failed to invite')
     } finally {
@@ -823,20 +818,17 @@ function TeamManager() {
                         {inviteError && (
                           <p className={`text-[12px] mt-1.5 ${inviteError.startsWith('✓') ? 'text-green-400' : 'text-red-400'}`}>{inviteError}</p>
                         )}
-                        {inviteResult && !inviteResult.emailSent && (
-                          <div className="mt-2 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
-                            <p className="text-[12px] text-yellow-400 mb-1.5">
-                              Email could not be sent. Share this invite link with <span className="font-medium">{inviteResult.email}</span>:
-                            </p>
-                            <div className="flex items-center gap-2">
-                              <code className="flex-1 text-[12px] text-text-primary break-all select-all bg-surface-raised px-2 py-1.5 rounded">{inviteResult.url}</code>
+                        {notRegisteredEmail && (
+                          <div className="mt-2 p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                            <p className="text-[12px] text-amber-400">
+                              <span className="font-medium">{notRegisteredEmail}</span> is not registered.{' '}
                               <button
-                                onClick={() => navigator.clipboard.writeText(inviteResult.url)}
-                                className="shrink-0 px-2.5 py-1.5 text-[12px] font-medium rounded-md bg-yellow-600 text-white hover:bg-yellow-500 transition-colors"
+                                onClick={() => { onInviteNewUser(notRegisteredEmail); setNotRegisteredEmail(null) }}
+                                className="underline hover:text-amber-300 transition-colors"
                               >
-                                Copy link
+                                Invite them from User Management
                               </button>
-                            </div>
+                            </p>
                           </div>
                         )}
                       </div>
@@ -881,7 +873,7 @@ interface Invite {
   expires_at: string
 }
 
-function AdminUsersSection() {
+function AdminUsersSection({ prefillEmail, onPrefillHandled }: { prefillEmail?: string | null; onPrefillHandled?: () => void }) {
   const { authEnabled, user } = useAuthStore()
   const [users, setUsers] = useState<AdminUser[]>([])
   const [invites, setInvites] = useState<Invite[]>([])
@@ -893,6 +885,21 @@ function AdminUsersSection() {
   const [creating, setCreating] = useState(false)
   const [inviteError, setInviteError] = useState('')
   const [settings, setSettings] = useState<{ open_registration: string }>({ open_registration: 'true' })
+  const sectionRef = useRef<HTMLElement>(null)
+
+  // Open invite modal when prefillEmail is set (from TeamManager cross-panel link)
+  useEffect(() => {
+    if (prefillEmail) {
+      setShowInviteModal(true)
+      setInviteEmail(prefillEmail)
+      setInviteRole('editor')
+      setInviteUrl(null)
+      setInviteError('')
+      onPrefillHandled?.()
+      // Scroll into view
+      setTimeout(() => sectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100)
+    }
+  }, [prefillEmail, onPrefillHandled])
 
   const isAdmin = authEnabled && user?.role === 'admin'
 
@@ -969,6 +976,17 @@ function AdminUsersSection() {
     setInvites(prev => prev.filter(i => i.id !== inviteId))
   }
 
+  const [deleteUserId, setDeleteUserId] = useState<string | null>(null)
+
+  const handleDeleteUser = async () => {
+    if (!deleteUserId) return
+    const res = await authFetch(`/api/admin/users/${deleteUserId}`, { method: 'DELETE' })
+    if (res.ok) {
+      setUsers(prev => prev.filter(u => u.id !== deleteUserId))
+    }
+    setDeleteUserId(null)
+  }
+
   const handleToggleOpenRegistration = async () => {
     const newValue = settings.open_registration === 'true' ? 'false' : 'true'
     const res = await authFetch('/api/admin/settings', {
@@ -986,11 +1004,17 @@ function AdminUsersSection() {
     editor: 'bg-blue-500/15 text-blue-400',
   }
 
-  const formatDate = (dateStr: string) => {
+  const formatDate = (dateStr: string, future = false) => {
     const date = new Date(dateStr)
     const now = new Date()
-    const diffMs = now.getTime() - date.getTime()
+    const diffMs = future ? date.getTime() - now.getTime() : now.getTime() - date.getTime()
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+    if (future) {
+      if (diffDays < 0) return 'Expired'
+      if (diffDays === 0) return 'today'
+      if (diffDays === 1) return 'in 1d'
+      return `in ${diffDays}d`
+    }
     if (diffDays === 0) return 'Today'
     if (diffDays === 1) return 'Yesterday'
     if (diffDays < 30) return `${diffDays}d ago`
@@ -998,7 +1022,7 @@ function AdminUsersSection() {
   }
 
   return (
-    <section className="bg-surface-raised rounded-2xl shadow-card border border-border-default p-7">
+    <section ref={sectionRef} className="bg-surface-raised rounded-2xl shadow-card border border-border-default p-7">
       <div className="flex items-center justify-between mb-5">
         <div>
           <h2 className="text-[17px] font-semibold text-text-primary mb-1">User Management</h2>
@@ -1088,6 +1112,14 @@ function AdminUsersSection() {
                         >
                           {u.is_active ? 'Deactivate' : 'Reactivate'}
                         </button>
+                        {!u.is_active && (
+                          <button
+                            onClick={() => setDeleteUserId(u.id)}
+                            className="text-[12px] font-medium text-red-500 hover:text-red-400 transition-colors"
+                          >
+                            Delete
+                          </button>
+                        )}
                       </>
                     )}
                   </div>
@@ -1112,7 +1144,7 @@ function AdminUsersSection() {
                         {inv.role}
                       </span>
                       <span className="text-[12px] text-text-muted">
-                        Expires {formatDate(inv.expires_at)}
+                        Expires {formatDate(inv.expires_at, true)}
                       </span>
                     </div>
                     <button
@@ -1216,6 +1248,16 @@ function AdminUsersSection() {
             )}
           </div>
         </div>
+      )}
+      {deleteUserId && (
+        <ConfirmDialog
+          title="Delete user"
+          message="This will permanently delete this user and all their related data (team memberships, API keys, comments). This cannot be undone."
+          confirmLabel="Delete"
+          destructive
+          onConfirm={handleDeleteUser}
+          onCancel={() => setDeleteUserId(null)}
+        />
       )}
     </section>
   )
