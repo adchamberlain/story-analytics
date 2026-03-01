@@ -30,6 +30,8 @@ class SnowflakeConnector(DatabaseConnector):
             "database": credentials.get("database", ""),
             "schema": credentials.get("schema", ""),
         }
+        if credentials.get("role"):
+            kwargs["role"] = credentials["role"]
         pat = os.environ.get("SNOWFLAKE_PAT")
         if pat:
             kwargs["authenticator"] = "PROGRAMMATIC_ACCESS_TOKEN"
