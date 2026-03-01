@@ -20,6 +20,7 @@ from ..services.connection_service import (
     save_connection,
     load_connection,
     list_connections,
+    update_connection,
     delete_connection,
 )
 from ..services.connectors import get_connector, CONNECTOR_REGISTRY
@@ -56,6 +57,10 @@ class ConnectionResponse(BaseModel):
     db_type: str
     config: dict
     created_at: str
+
+class UpdateConnectionRequest(BaseModel):
+    name: str | None = None
+    config: dict | None = None
 
 class TestConnectionRequest(BaseModel):
     username: str | None = None
@@ -244,6 +249,21 @@ async def list_all(user: dict = Depends(get_current_user)):
 async def get_connection(connection_id: str, user: dict = Depends(get_current_user)):
     """Get a connection by ID."""
     conn = load_connection(connection_id)
+    if not conn:
+        raise HTTPException(status_code=404, detail="Connection not found")
+    return ConnectionResponse(
+        connection_id=conn.connection_id,
+        name=conn.name,
+        db_type=conn.db_type,
+        config=conn.config,
+        created_at=conn.created_at,
+    )
+
+
+@router.put("/{connection_id}", response_model=ConnectionResponse)
+async def edit_connection(connection_id: str, request: UpdateConnectionRequest, user: dict = Depends(get_current_user)):
+    """Update an existing connection's name and/or config."""
+    conn = update_connection(connection_id, name=request.name, config=request.config)
     if not conn:
         raise HTTPException(status_code=404, detail="Connection not found")
     return ConnectionResponse(
