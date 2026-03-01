@@ -55,14 +55,17 @@ class SnowflakeConnector(DatabaseConnector):
         return kwargs
 
     def _use_context(self, cursor, credentials: dict, *, schema: bool = True) -> None:
-        """Explicitly set database (and optionally schema) session context."""
+        """Explicitly set database (and optionally schema) session context.
+
+        Uses unquoted identifiers so Snowflake resolves them case-insensitively.
+        """
         db = credentials.get("database")
         if db:
-            cursor.execute(f"USE DATABASE {self._quote_identifier(db)}")
+            cursor.execute(f"USE DATABASE {db}")
         if schema:
             s = credentials.get("schema")
             if s:
-                cursor.execute(f"USE SCHEMA {self._quote_identifier(s)}")
+                cursor.execute(f"USE SCHEMA {s}")
 
     def test_connection(self, credentials: dict) -> ConnectorResult:
         conn = None
