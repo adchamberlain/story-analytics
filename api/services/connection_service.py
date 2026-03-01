@@ -93,6 +93,19 @@ def list_connections() -> list[ConnectionInfo]:
     return connections
 
 
+def update_connection(connection_id: str, *, name: str | None = None, config: dict | None = None) -> ConnectionInfo | None:
+    """Update an existing connection's name and/or config."""
+    conn = load_connection(connection_id)
+    if not conn:
+        return None
+    if name is not None:
+        conn.name = name
+    if config is not None:
+        conn.config = config
+    _storage.write_text(f"connections/{connection_id}.json", json.dumps(asdict(conn), indent=2))
+    return conn
+
+
 def delete_connection(connection_id: str) -> bool:
     """Delete a connection."""
     if not _validate_id(connection_id):
