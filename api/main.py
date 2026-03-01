@@ -167,7 +167,7 @@ async def startup():
     import logging
     logger = logging.getLogger(__name__)
 
-    max_retries = 5
+    max_retries = 10
     for attempt in range(1, max_retries + 1):
         try:
             logger.info(f"Startup attempt {attempt}/{max_retries}: connecting to database...")
@@ -175,13 +175,16 @@ async def startup():
             from .services.metadata_db import ensure_default_user
             ensure_default_user()
             logger.info("Database connected, seeding data if needed...")
-            # Seed example dashboard on first run
-            _seed_data_if_empty()
+            # Seed example dashboard on first run (non-fatal if storage isn't ready yet)
+            try:
+                _seed_data_if_empty()
+            except Exception as seed_err:
+                logger.warning(f"Seed data skipped (will retry on next restart): {seed_err}")
             logger.info("Startup complete.")
             return
         except Exception as e:
             if attempt < max_retries:
-                wait = attempt * 2
+                wait = min(attempt * 2, 10)
                 logger.warning(f"Startup attempt {attempt}/{max_retries} failed: {e}. Retrying in {wait}s...")
                 time.sleep(wait)
             else:
