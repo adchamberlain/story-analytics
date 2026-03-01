@@ -87,7 +87,8 @@ export function DatabaseConnector({ onSynced, onOpenSqlWorkbench }: DatabaseConn
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
 
-  // Snowflake key-pair auth
+  // Snowflake role & key-pair auth
+  const [role, setRole] = useState('')
   const [privateKey, setPrivateKey] = useState('')
 
   // BigQuery-specific
@@ -128,6 +129,7 @@ export function DatabaseConnector({ onSynced, onOpenSqlWorkbench }: DatabaseConn
     setConnectionName('')
     setAccount('')
     setWarehouse('')
+    setRole('')
     setHost('')
     setPort('5432')
     setDatabase('')
@@ -154,7 +156,7 @@ export function DatabaseConnector({ onSynced, onOpenSqlWorkbench }: DatabaseConn
   const buildConfig = (): Record<string, string> => {
     switch (dbType) {
       case 'snowflake':
-        return { account: account.trim(), warehouse: warehouse.trim(), database: database.trim(), schema: schema.trim() }
+        return { account: account.trim(), warehouse: warehouse.trim(), database: database.trim(), schema: schema.trim(), ...(role.trim() ? { role: role.trim() } : {}) }
       case 'postgres':
         return { host: host.trim(), port: port.trim(), database: database.trim(), schema: schema.trim() || 'public' }
       case 'bigquery':
@@ -487,6 +489,7 @@ export function DatabaseConnector({ onSynced, onOpenSqlWorkbench }: DatabaseConn
               <FormField label="Warehouse" value={warehouse} onChange={setWarehouse} placeholder="COMPUTE_WH" hint="Admin → Warehouses → name of your warehouse" />
               <FormField label="Database" value={database} onChange={setDatabase} placeholder="MY_DATABASE" hint="Data → Databases → name of your database" />
               <FormField label="Schema" value={schema} onChange={setSchema} placeholder="PUBLIC" hint="Inside your database → Schemas (PUBLIC is the default)" />
+              <FormField label="Role" value={role} onChange={setRole} placeholder="SYSADMIN" hint="Admin → Users → default role for this user (e.g. SYSADMIN)" />
               <div className="col-span-2 border-t border-border-subtle" style={{ paddingTop: '16px' }}>
                 <p className="text-[13px] text-text-muted" style={{ marginBottom: '12px' }}>Falls back to .env if blank (SNOWFLAKE_PAT or SNOWFLAKE_USERNAME).</p>
                 <div className="grid grid-cols-2" style={{ gap: '16px' }}>
