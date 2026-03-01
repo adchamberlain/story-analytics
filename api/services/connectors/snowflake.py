@@ -52,12 +52,23 @@ class SnowflakeConnector(DatabaseConnector):
             )
         return kwargs
 
+    def _use_context(self, cursor, credentials: dict, *, schema: bool = True) -> None:
+        """Explicitly set database (and optionally schema) session context."""
+        db = credentials.get("database")
+        if db:
+            cursor.execute(f"USE DATABASE {self._quote_identifier(db)}")
+        if schema:
+            s = credentials.get("schema")
+            if s:
+                cursor.execute(f"USE SCHEMA {self._quote_identifier(s)}")
+
     def test_connection(self, credentials: dict) -> ConnectorResult:
         conn = None
         try:
             import snowflake.connector
             conn = snowflake.connector.connect(**self._get_connect_kwargs(credentials))
             cursor = conn.cursor()
+            self._use_context(cursor, credentials)
             cursor.execute("SELECT 1")
             cursor.close()
             return ConnectorResult(success=True, message="Connected to Snowflake.")
@@ -73,6 +84,7 @@ class SnowflakeConnector(DatabaseConnector):
             import snowflake.connector
             conn = snowflake.connector.connect(**self._get_connect_kwargs(credentials))
             cursor = conn.cursor()
+            self._use_context(cursor, credentials)
             cursor.execute("SHOW TABLES")
             rows = cursor.fetchall()
             # name at index 1, row count at index 7
@@ -94,6 +106,8 @@ class SnowflakeConnector(DatabaseConnector):
         """Quote a Snowflake identifier (table/column name) safely."""
         return '"' + name.replace('"', '""') + '"'
 
+    _SYSTEM_SCHEMAS = {"INFORMATION_SCHEMA"}
+
     def list_schemas(self, credentials: dict) -> ConnectorResult:
         conn = None
         try:
@@ -101,30 +115,41 @@ class SnowflakeConnector(DatabaseConnector):
             conn = snowflake.connector.connect(**self._get_connect_kwargs(credentials))
             cursor = conn.cursor()
 
-            # Get all schemas in the database
+            # Explicitly set database context
+            self._use_context(cursor, credentials, schema=False)
+
             cursor.execute("SHOW SCHEMAS")
             schema_names = [row[1] for row in cursor.fetchall()]
 
             schemas: list[SchemaInfo] = []
             for schema_name in schema_names:
-                # Get tables in this schema (row count is at index 7)
-                cursor.execute(f"SHOW TABLES IN SCHEMA {self._quote_identifier(schema_name)}")
-                table_rows = cursor.fetchall()
+                if schema_name.upper() in self._SYSTEM_SCHEMAS:
+                    continue
+
+                # Skip schemas we can't access
+                try:
+                    cursor.execute(f"SHOW TABLES IN SCHEMA {self._quote_identifier(schema_name)}")
+                    table_rows = cursor.fetchall()
+                except Exception:
+                    continue
 
                 tables: list[SchemaTable] = []
                 for trow in table_rows:
                     table_name = trow[1]
                     row_count = trow[7] if len(trow) > 7 else None
 
-                    # Get columns for this table
-                    cursor.execute(
-                        f"DESCRIBE TABLE {self._quote_identifier(schema_name)}"
-                        f".{self._quote_identifier(table_name)}"
-                    )
-                    columns = [
-                        SchemaColumn(name=crow[0], type=crow[1])
-                        for crow in cursor.fetchall()
-                    ]
+                    try:
+                        cursor.execute(
+                            f"DESCRIBE TABLE {self._quote_identifier(schema_name)}"
+                            f".{self._quote_identifier(table_name)}"
+                        )
+                        columns = [
+                            SchemaColumn(name=crow[0], type=crow[1])
+                            for crow in cursor.fetchall()
+                        ]
+                    except Exception:
+                        columns = []
+
                     tables.append(SchemaTable(name=table_name, columns=columns, row_count=row_count))
 
                 schemas.append(SchemaInfo(name=schema_name, tables=tables))
@@ -143,6 +168,7 @@ class SnowflakeConnector(DatabaseConnector):
             import snowflake.connector
             conn = snowflake.connector.connect(**self._get_connect_kwargs(credentials))
             cursor = conn.cursor()
+            self._use_context(cursor, credentials)
             cursor.execute(f"DESCRIBE TABLE {self._quote_identifier(table)}")
             columns = [ColumnInfo(name=row[0], type=row[1]) for row in cursor.fetchall()]
             cursor.close()
@@ -169,6 +195,7 @@ class SnowflakeConnector(DatabaseConnector):
         results: list[dict] = []
         try:
             cursor = conn.cursor()
+            self._use_context(cursor, credentials)
             for table in tables:
                 sql = f"SELECT * FROM {self._quote_identifier(table)}"
                 if max_rows is not None:
@@ -222,6 +249,7 @@ class SnowflakeConnector(DatabaseConnector):
         conn = snowflake.connector.connect(**kwargs)
         try:
             cursor = conn.cursor()
+            self._use_context(cursor, credentials)
 
             # Always wrap in LIMIT subquery (database optimizes away redundant LIMIT)
             exec_sql = f"SELECT * FROM ({sql}) _q LIMIT {limit}"
