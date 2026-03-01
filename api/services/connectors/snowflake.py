@@ -55,10 +55,14 @@ class SnowflakeConnector(DatabaseConnector):
         return kwargs
 
     def _use_context(self, cursor, credentials: dict, *, schema: bool = True) -> None:
-        """Explicitly set database (and optionally schema) session context.
+        """Explicitly set role, database (and optionally schema) session context.
 
         Uses unquoted identifiers so Snowflake resolves them case-insensitively.
+        Role is set first since it determines access to databases/schemas.
         """
+        role = credentials.get("role")
+        if role:
+            cursor.execute(f"USE ROLE {role}")
         db = credentials.get("database")
         if db:
             cursor.execute(f"USE DATABASE {db}")
