@@ -70,7 +70,6 @@ class SnowflakeConnector(DatabaseConnector):
             import snowflake.connector
             conn = snowflake.connector.connect(**self._get_connect_kwargs(credentials))
             cursor = conn.cursor()
-            self._use_context(cursor, credentials)
             cursor.execute("SELECT 1")
             cursor.close()
             return ConnectorResult(success=True, message="Connected to Snowflake.")
