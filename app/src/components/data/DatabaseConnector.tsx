@@ -87,6 +87,9 @@ export function DatabaseConnector({ onSynced, onOpenSqlWorkbench }: DatabaseConn
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
 
+  // Snowflake key-pair auth
+  const [privateKey, setPrivateKey] = useState('')
+
   // BigQuery-specific
   const [projectId, setProjectId] = useState('')
   const [dataset, setDataset] = useState('')
@@ -131,6 +134,7 @@ export function DatabaseConnector({ onSynced, onOpenSqlWorkbench }: DatabaseConn
     setSchema('')
     setUsername('')
     setPassword('')
+    setPrivateKey('')
     setProjectId('')
     setDataset('')
     setServiceAccountJson('')
@@ -162,7 +166,7 @@ export function DatabaseConnector({ onSynced, onOpenSqlWorkbench }: DatabaseConn
   const buildCredentials = (): Record<string, string> => {
     switch (dbType) {
       case 'snowflake':
-        return { ...(username ? { username } : {}), ...(password ? { password } : {}) }
+        return { ...(username ? { username } : {}), ...(password ? { password } : {}), ...(privateKey ? { private_key: privateKey } : {}) }
       case 'postgres':
         return { username, password }
       case 'bigquery':
@@ -487,7 +491,21 @@ export function DatabaseConnector({ onSynced, onOpenSqlWorkbench }: DatabaseConn
                 <p className="text-[13px] text-text-muted" style={{ marginBottom: '12px' }}>Falls back to .env if blank (SNOWFLAKE_PAT or SNOWFLAKE_USERNAME).</p>
                 <div className="grid grid-cols-2" style={{ gap: '16px' }}>
                   <FormField label="Username" value={username} onChange={setUsername} placeholder="jane.doe" hint="Admin → Users → your login name" />
-                  <FormField label="Password" value={password} onChange={setPassword} placeholder="" type="password" hint="Your Snowflake password" />
+                  <FormField label="Password" value={password} onChange={setPassword} placeholder="" type="password" hint="Your Snowflake password (skip if using private key)" />
+                </div>
+                <div style={{ marginTop: '16px' }}>
+                  <label className="block text-[13px] font-medium text-text-secondary" style={{ marginBottom: '6px' }}>
+                    Private Key (PEM) <span className="text-text-muted font-normal">— optional, bypasses MFA</span>
+                  </label>
+                  <textarea
+                    value={privateKey}
+                    onChange={(e) => setPrivateKey(e.target.value)}
+                    placeholder={'-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----'}
+                    rows={4}
+                    className="w-full text-[14px] font-mono border border-border-default rounded-xl bg-surface text-text-primary focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 resize-y transition-colors"
+                    style={{ padding: '12px 16px' }}
+                  />
+                  <p className="text-[11px] text-text-muted" style={{ marginTop: '4px' }}>RSA key-pair auth — use instead of password to bypass MFA</p>
                 </div>
               </div>
             </div>

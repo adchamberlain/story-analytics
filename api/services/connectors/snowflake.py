@@ -34,12 +34,21 @@ class SnowflakeConnector(DatabaseConnector):
         if pat:
             kwargs["authenticator"] = "PROGRAMMATIC_ACCESS_TOKEN"
             kwargs["token"] = pat
+        elif credentials.get("private_key"):
+            from cryptography.hazmat.primitives.serialization import (
+                load_pem_private_key, Encoding, PrivateFormat, NoEncryption,
+            )
+            pem = credentials["private_key"].encode("utf-8")
+            private_key_obj = load_pem_private_key(pem, password=None)
+            kwargs["private_key"] = private_key_obj.private_bytes(
+                Encoding.DER, PrivateFormat.PKCS8, NoEncryption(),
+            )
         elif credentials.get("password"):
             kwargs["password"] = credentials["password"]
         else:
             raise RuntimeError(
-                "No Snowflake auth available: no PAT found and no password provided. "
-                "Set SNOWFLAKE_PAT in .env or provide password."
+                "No Snowflake auth available: no PAT found and no password or private key provided. "
+                "Set SNOWFLAKE_PAT in .env, provide password, or provide a private key."
             )
         return kwargs
 
