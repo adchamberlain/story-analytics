@@ -80,6 +80,8 @@ export interface EditorConfig {
   refreshInterval: number
   // Allow users to download chart data as CSV
   allowDataDownload: boolean
+  // Top-N category clipping for bar-family charts (0 = show all)
+  maxCategories?: number
   // Week start day for ordinal day-of-week sorting
   weekStartDay: 'Mon' | 'Sun'
   // DataTable default sort
@@ -369,6 +371,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         locale: chart.config?.locale ?? '',
         refreshInterval: (chart.config?.refreshInterval as number) ?? 0,
         allowDataDownload: (chart.config?.allowDataDownload as boolean) ?? true,
+        maxCategories: chart.config?.maxCategories as number | undefined,
         weekStartDay: (chart.config?.weekStartDay as 'Mon' | 'Sun') ?? 'Mon',
         tableDefaultSortColumn: (chart.config?.tableDefaultSortColumn as string) ?? null,
         tableDefaultSortDir: (chart.config?.tableDefaultSortDir as 'asc' | 'desc') ?? 'asc',

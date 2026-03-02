@@ -15,6 +15,10 @@ export interface TopNResult {
 /**
  * Clips data to the top N categories by y-value for bar-family charts.
  * Returns original data unchanged for other chart types or when under the limit.
+ *
+ * Note: clipping always selects by descending value regardless of config.sort.
+ * When sort is intentionally off (user-controlled order), lower-value categories
+ * are still removed silently. The source-line notice informs the reader.
  */
 export function applyTopNCategories(
   data: Record<string, unknown>[],

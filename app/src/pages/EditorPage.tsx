@@ -254,6 +254,7 @@ export function EditorPage() {
     geoSizeRange: store.config.geoSizeRange,
     tableDefaultSortColumn: store.config.tableDefaultSortColumn ?? undefined,
     tableDefaultSortDir: store.config.tableDefaultSortColumn ? store.config.tableDefaultSortDir : undefined,
+    maxCategories: store.config.maxCategories,
   }
 
   // Apply palette colors
