@@ -353,7 +353,19 @@ export function SqlWorkbenchPanel({
     if (!connectionId || !currentSql.trim()) return
 
     if (dbType === 'csv') {
-      // CSV data is already in DuckDB — navigate directly
+      // CSV data is already in DuckDB — check for geo columns before navigating
+      try {
+        const geoRes = await authFetch(`/api/data/sources/${connectionId}/detect-geo`, { method: 'POST' })
+        if (geoRes.ok) {
+          const geoData = await geoRes.json()
+          if (geoData?.columns?.length > 0) {
+            openGeoWizard(connectionId, geoData.columns)
+            return
+          }
+        }
+      } catch {
+        // geo detection is best-effort — fall through to direct navigation
+      }
       navigate(`/editor/new?sourceId=${connectionId}`)
       return
     }
