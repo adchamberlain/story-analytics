@@ -36,7 +36,7 @@ export function ChoroplethMap({ data, config, height = 400, autoHeight = false }
 
   const basemapId = (config.basemap as BasemapId | 'custom') || 'world'
   const joinColumn = config.geoJoinColumn || config.x
-  const valueColumn = config.geoValueColumn || config.y as string || config.value
+  const valueColumn = config.geoValueColumn || config.y as string || config.value || '_count'
   const colorScaleType = (config.geoColorScale as 'sequential' | 'diverging') || 'sequential'
   const projectionId = config.geoProjection || BASEMAPS.find((b) => b.id === basemapId)?.defaultProjection || 'geoEqualEarth'
 

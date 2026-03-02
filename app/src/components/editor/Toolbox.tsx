@@ -58,6 +58,7 @@ export function Toolbox() {
   const isBar = config.chartType === 'BarChart'
   const isBigValue = config.chartType === 'BigValue'
   const isDataTable = config.chartType === 'DataTable'
+  const isMapType = ['ChoroplethMap', 'SymbolMap', 'LocatorMap', 'SpikeMap'].includes(config.chartType)
   const hasSeriesOption = ['BarChart', 'LineChart', 'AreaChart', 'ScatterPlot', 'DotPlot', 'SmallMultiples'].includes(config.chartType)
   const isSqlMode = config.dataMode === 'sql'
   const sqlHasResults = isSqlMode && data.length > 0
@@ -224,74 +225,78 @@ export function Toolbox() {
               <BigValueColumnMapping columns={columns} columnTypes={columnTypes} config={config} updateConfig={updateConfig} />
             ) : (
               <>
-                <ColumnDropdown
-                  label="X Axis"
-                  value={config.x}
-                  columns={columns}
-                  columnTypes={columnTypes}
-                  onChange={(x) => updateConfig({ x })}
-                />
-                {config.chartType !== 'Histogram' && hasSeriesOption ? (
-                  <MultiColumnSelect
-                    label="Y Axis"
-                    value={config.y}
-                    columns={columns}
-                    columnTypes={columnTypes}
-                    onChange={(y) => updateConfig({ y })}
-                  />
-                ) : config.chartType !== 'Histogram' ? (
-                  <ColumnDropdown
-                    label="Y Axis"
-                    value={Array.isArray(config.y) ? config.y[0] ?? null : config.y}
-                    columns={columns}
-                    columnTypes={columnTypes}
-                    onChange={(y) => updateConfig({ y })}
-                  />
-                ) : null}
-                {hasSeriesOption && !isMultiY && (
-                  <ColumnDropdown
-                    label="Series (color)"
-                    value={config.series}
-                    columns={columns}
-                    columnTypes={columnTypes}
-                    allowNone
-                    onChange={(series) => updateConfig({ series })}
-                  />
-                )}
-                {config.chartType !== 'Histogram' && hasY && (
-                  <div>
-                    <label className="block text-xs font-medium text-text-secondary mb-1">Aggregation</label>
-                    <select
-                      value={config.aggregation}
-                      onChange={(e) => updateConfig({ aggregation: e.target.value as AggregationType })}
-                      className="w-full px-2 py-1.5 text-sm border border-border-default rounded-md bg-surface text-text-primary focus:outline-none focus:border-blue-400"
-                    >
-                      <option value="none">None (raw)</option>
-                      <option value="sum">Sum</option>
-                      <option value="avg">Average</option>
-                      <option value="median">Median</option>
-                      <option value="count">Count</option>
-                      <option value="min">Min</option>
-                      <option value="max">Max</option>
-                    </select>
-                  </div>
-                )}
-                {config.aggregation !== 'none' && config.x && isDateColumn(columnTypes[config.x]) && (
-                  <div>
-                    <label className="block text-xs font-medium text-text-secondary mb-1">Time grain</label>
-                    <select
-                      value={config.timeGrain}
-                      onChange={(e) => updateConfig({ timeGrain: e.target.value as TimeGrain })}
-                      className="w-full px-2 py-1.5 text-sm border border-border-default rounded-md bg-surface text-text-primary focus:outline-none focus:border-blue-400"
-                    >
-                      <option value="none">As-is</option>
-                      <option value="day">Daily</option>
-                      <option value="week">Weekly</option>
-                      <option value="month">Monthly</option>
-                      <option value="quarter">Quarterly</option>
-                      <option value="year">Yearly</option>
-                    </select>
-                  </div>
+                {!isMapType && (
+                  <>
+                    <ColumnDropdown
+                      label="X Axis"
+                      value={config.x}
+                      columns={columns}
+                      columnTypes={columnTypes}
+                      onChange={(x) => updateConfig({ x })}
+                    />
+                    {config.chartType !== 'Histogram' && hasSeriesOption ? (
+                      <MultiColumnSelect
+                        label="Y Axis"
+                        value={config.y}
+                        columns={columns}
+                        columnTypes={columnTypes}
+                        onChange={(y) => updateConfig({ y })}
+                      />
+                    ) : config.chartType !== 'Histogram' ? (
+                      <ColumnDropdown
+                        label="Y Axis"
+                        value={Array.isArray(config.y) ? config.y[0] ?? null : config.y}
+                        columns={columns}
+                        columnTypes={columnTypes}
+                        onChange={(y) => updateConfig({ y })}
+                      />
+                    ) : null}
+                    {hasSeriesOption && !isMultiY && (
+                      <ColumnDropdown
+                        label="Series (color)"
+                        value={config.series}
+                        columns={columns}
+                        columnTypes={columnTypes}
+                        allowNone
+                        onChange={(series) => updateConfig({ series })}
+                      />
+                    )}
+                    {config.chartType !== 'Histogram' && hasY && (
+                      <div>
+                        <label className="block text-xs font-medium text-text-secondary mb-1">Aggregation</label>
+                        <select
+                          value={config.aggregation}
+                          onChange={(e) => updateConfig({ aggregation: e.target.value as AggregationType })}
+                          className="w-full px-2 py-1.5 text-sm border border-border-default rounded-md bg-surface text-text-primary focus:outline-none focus:border-blue-400"
+                        >
+                          <option value="none">None (raw)</option>
+                          <option value="sum">Sum</option>
+                          <option value="avg">Average</option>
+                          <option value="median">Median</option>
+                          <option value="count">Count</option>
+                          <option value="min">Min</option>
+                          <option value="max">Max</option>
+                        </select>
+                      </div>
+                    )}
+                    {config.aggregation !== 'none' && config.x && isDateColumn(columnTypes[config.x]) && (
+                      <div>
+                        <label className="block text-xs font-medium text-text-secondary mb-1">Time grain</label>
+                        <select
+                          value={config.timeGrain}
+                          onChange={(e) => updateConfig({ timeGrain: e.target.value as TimeGrain })}
+                          className="w-full px-2 py-1.5 text-sm border border-border-default rounded-md bg-surface text-text-primary focus:outline-none focus:border-blue-400"
+                        >
+                          <option value="none">As-is</option>
+                          <option value="day">Daily</option>
+                          <option value="week">Weekly</option>
+                          <option value="month">Monthly</option>
+                          <option value="quarter">Quarterly</option>
+                          <option value="year">Yearly</option>
+                        </select>
+                      </div>
+                    )}
+                  </>
                 )}
                 {config.chartType === 'RangePlot' && (
                   <>
@@ -452,14 +457,38 @@ export function Toolbox() {
                       allowNone
                       onChange={(geoJoinColumn) => updateConfig({ geoJoinColumn })}
                     />
-                    <ColumnDropdown
-                      label="Value Column"
-                      value={config.geoValueColumn ?? null}
-                      columns={isSqlMode ? sqlResultColumns : columns}
-                      columnTypes={columnTypes}
-                      allowNone
-                      onChange={(geoValueColumn) => updateConfig({ geoValueColumn })}
-                    />
+                    <div>
+                      <label className="block text-xs font-medium text-text-secondary mb-1">Value Column</label>
+                      <select
+                        value={config.geoValueColumn ?? ''}
+                        onChange={(e) => updateConfig({ geoValueColumn: e.target.value || null })}
+                        className="w-full px-2 py-1.5 text-sm border border-border-default rounded-md bg-surface text-text-primary focus:outline-none focus:border-blue-400"
+                      >
+                        <option value="">None</option>
+                        <option value="_count">Count (rows)</option>
+                        {(isSqlMode ? sqlResultColumns : columns).map((col) => (
+                          <option key={col} value={col}>
+                            {col}{columnTypes[col] ? ` (${columnTypes[col]})` : ''}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    {config.geoValueColumn && config.geoValueColumn !== '_count' && (
+                      <div>
+                        <label className="block text-xs font-medium text-text-secondary mb-1">Aggregation</label>
+                        <select
+                          value={config.aggregation === 'none' ? 'sum' : config.aggregation}
+                          onChange={(e) => updateConfig({ aggregation: e.target.value as AggregationType })}
+                          className="w-full px-2 py-1.5 text-sm border border-border-default rounded-md bg-surface text-text-primary focus:outline-none focus:border-blue-400"
+                        >
+                          <option value="sum">Sum</option>
+                          <option value="avg">Average</option>
+                          <option value="count">Count</option>
+                          <option value="min">Min</option>
+                          <option value="max">Max</option>
+                        </select>
+                      </div>
+                    )}
                     <div>
                       <label className="block text-xs font-medium text-text-secondary mb-1">Color Scale</label>
                       <select

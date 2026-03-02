@@ -242,7 +242,7 @@ interface EditorState {
 const MAX_HISTORY = 50
 
 /** Keys that trigger auto build-query in new chart mode */
-const DATA_KEYS: (keyof EditorConfig)[] = ['x', 'y', 'series', 'aggregation', 'timeGrain', 'value', 'metricLabel']
+const DATA_KEYS: (keyof EditorConfig)[] = ['x', 'y', 'series', 'aggregation', 'timeGrain', 'value', 'metricLabel', 'geoJoinColumn', 'geoValueColumn', 'geoLatColumn', 'geoLonColumn', 'geoSizeColumn', 'geoLabelColumn']
 
 /** Debounce timer for auto buildQuery calls from updateConfig */
 let _buildQueryTimer: ReturnType<typeof setTimeout>
@@ -482,6 +482,53 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         set({
           data: result.rows ?? [],
           sql: `SELECT * FROM data`,
+          error: null,
+        })
+      } catch (e) {
+        set({ error: e instanceof Error ? e.message : String(e) })
+      }
+      return
+    }
+
+    // Map charts — build queries from geo config fields, not X/Y
+    const MAP_TYPES = ['ChoroplethMap', 'SymbolMap', 'LocatorMap', 'SpikeMap']
+    if (MAP_TYPES.includes(config.chartType)) {
+      if (!sourceId) return
+
+      let sql: string
+
+      if (config.chartType === 'ChoroplethMap') {
+        if (!config.geoJoinColumn) return
+        const joinCol = config.geoJoinColumn
+
+        if (!config.geoValueColumn || config.geoValueColumn === '_count') {
+          // Count rows per region
+          sql = `SELECT "${joinCol}", COUNT(*) AS _count FROM data GROUP BY 1`
+        } else {
+          // Aggregate a value column — default to SUM when aggregation is "none"
+          const agg = config.aggregation === 'none' ? 'SUM' : config.aggregation.toUpperCase()
+          const valCol = config.geoValueColumn
+          sql = `SELECT "${joinCol}", ${agg}("${valCol}") AS "${valCol}" FROM data GROUP BY 1`
+        }
+      } else {
+        // Point maps (Symbol, Locator, Spike) — return all rows
+        sql = 'SELECT * FROM data'
+      }
+
+      try {
+        const res = await authFetch('/api/data/query', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ source_id: sourceId, sql }),
+        })
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({ detail: res.statusText }))
+          throw new Error(body.detail ?? `Query failed: ${res.status}`)
+        }
+        const result = await res.json()
+        set({
+          data: result.rows ?? [],
+          sql,
           error: null,
         })
       } catch (e) {
