@@ -16,9 +16,10 @@ export interface GeoPointMapProps {
   height?: number
   autoHeight?: boolean
   mapVariant: 'symbol' | 'locator' | 'spike'
+  onViewportChange?: (viewport: { k: number; x: number; y: number }) => void
 }
 
-export function GeoPointMap({ data, config, height = 400, autoHeight = false, mapVariant }: GeoPointMapProps) {
+export function GeoPointMap({ data, config, height = 400, autoHeight = false, mapVariant, onViewportChange }: GeoPointMapProps) {
   const [tooltip, setTooltip] = useState<{ x: number; y: number; label: string; value: string } | null>(null)
 
   const basemapId = (config.basemap as BasemapId | 'custom') || 'world'
@@ -42,7 +43,14 @@ export function GeoPointMap({ data, config, height = 400, autoHeight = false, ma
     handleZoomIn,
     handleZoomOut,
     handleReset,
-  } = useGeoMap({ basemap: basemapId, projection: projectionId, height, autoHeight })
+  } = useGeoMap({
+    basemap: basemapId,
+    projection: projectionId,
+    height,
+    autoHeight,
+    initialViewport: config.geoViewport,
+    onViewportChange,
+  })
 
   // Draw basemap background + point data — computes projection by reading SVG
   // dimensions directly so projection and SVG are guaranteed to match.

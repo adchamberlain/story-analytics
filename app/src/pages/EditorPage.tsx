@@ -324,6 +324,15 @@ export function EditorPage() {
           >
             &larr; Back
           </button>
+          {editorSourceId && (
+            <button
+              onClick={() => navigate(`/sources?openSourceId=${editorSourceId}`)}
+              className="text-xs px-2.5 py-1 rounded-md border border-border-default text-text-secondary hover:text-text-on-surface hover:bg-surface-secondary transition-colors"
+              title="Edit the underlying data"
+            >
+              Edit Data
+            </button>
+          )}
           <span className="text-base font-semibold text-text-primary">
             {isNew && !store.chartId ? 'New Chart' : store.config.title || 'Untitled Chart'}
           </span>
@@ -516,6 +525,7 @@ export function EditorPage() {
                     chartType={store.config.chartType}
                     height={420}
                     editable
+                    onViewportChange={(vp) => store.setGeoViewport(vp)}
                   />
                 </ChartWrapper>
               )}

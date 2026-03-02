@@ -72,6 +72,8 @@ export interface EditorConfig {
   geoSizeColumn: string | null
   geoSymbolShape: 'circle' | 'square' | 'triangle'
   geoSizeRange: [number, number]
+  // Saved map viewport (zoom/pan)
+  geoViewport?: { k: number; x: number; y: number }
   // Accessibility
   altText: string
   // Locale override
@@ -226,6 +228,7 @@ interface EditorState {
   buildQuery: () => Promise<void>
   saveNew: () => Promise<string | null>
   updateConfig: (partial: Partial<EditorConfig>) => void
+  setGeoViewport: (viewport: { k: number; x: number; y: number } | undefined) => void
   setDataMode: (mode: DataMode) => void
   setCustomSql: (sql: string) => void
   executeCustomSql: () => Promise<void>
@@ -367,6 +370,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         geoSizeColumn: chart.config?.geoSizeColumn ?? null,
         geoSymbolShape: chart.config?.geoSymbolShape ?? 'circle',
         geoSizeRange: chart.config?.geoSizeRange ?? [3, 25],
+        geoViewport: (chart.config?.geoViewport as EditorConfig['geoViewport']) ?? undefined,
         altText: chart.config?.altText ?? '',
         locale: chart.config?.locale ?? '',
         refreshInterval: (chart.config?.refreshInterval as number) ?? 0,
@@ -649,6 +653,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
             geoSizeColumn: config.geoSizeColumn ?? undefined,
             geoSymbolShape: config.geoSymbolShape !== 'circle' ? config.geoSymbolShape : undefined,
             geoSizeRange: (config.geoSizeRange[0] !== 3 || config.geoSizeRange[1] !== 25) ? config.geoSizeRange : undefined,
+            geoViewport: config.geoViewport ?? undefined,
             altText: config.altText || undefined,
             locale: config.locale || undefined,
             refreshInterval: config.refreshInterval || undefined,
@@ -733,6 +738,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         }
       }, IDLE_VERSION_TIMEOUT)
     }
+  },
+
+  setGeoViewport: (viewport: { k: number; x: number; y: number } | undefined) => {
+    // Bypass undo history — viewport is not an undoable config change
+    const { config } = get()
+    set({ config: { ...config, geoViewport: viewport } })
   },
 
   setDataMode: (mode: DataMode) => {
@@ -951,6 +962,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
             geoSizeColumn: config.geoSizeColumn ?? undefined,
             geoSymbolShape: config.geoSymbolShape !== 'circle' ? config.geoSymbolShape : undefined,
             geoSizeRange: (config.geoSizeRange[0] !== 3 || config.geoSizeRange[1] !== 25) ? config.geoSizeRange : undefined,
+            geoViewport: config.geoViewport ?? undefined,
             altText: config.altText || undefined,
             locale: config.locale || undefined,
             refreshInterval: config.refreshInterval || undefined,

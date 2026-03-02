@@ -284,6 +284,8 @@ export interface ChartConfig {
   geoSymbolShape?: 'circle' | 'square' | 'triangle'
   /** Point map: [min, max] radius for symbol sizing */
   geoSizeRange?: [number, number]
+  /** Saved map viewport (zoom/pan) — restored when chart loads */
+  geoViewport?: { k: number; x: number; y: number }
 
   /** Alt text for accessibility (screen readers) */
   altText?: string

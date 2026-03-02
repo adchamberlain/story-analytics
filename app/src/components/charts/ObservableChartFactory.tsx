@@ -31,6 +31,8 @@ interface ObservableChartFactoryProps {
   autoHeight?: boolean
   /** When true, point note labels are draggable (editor only). */
   editable?: boolean
+  /** Called when the user pans/zooms a map (editor only) */
+  onViewportChange?: (viewport: { k: number; x: number; y: number }) => void
 }
 
 /**
@@ -44,6 +46,7 @@ export function ObservableChartFactory({
   height = 320,
   autoHeight = false,
   editable = false,
+  onViewportChange,
 }: ObservableChartFactoryProps) {
   const resolved = useThemeStore((s) => s.resolved)
   const chartTheme = useChartThemeStore((s) => s.theme)
@@ -279,7 +282,7 @@ export function ObservableChartFactory({
 
   if (chartType === 'SymbolMap' || chartType === 'LocatorMap' || chartType === 'SpikeMap') {
     const variant = chartType === 'SymbolMap' ? 'symbol' : chartType === 'LocatorMap' ? 'locator' : 'spike'
-    return <GeoPointMap data={data} config={config} height={height} autoHeight={autoHeight} mapVariant={variant} />
+    return <GeoPointMap data={data} config={config} height={height} autoHeight={autoHeight} mapVariant={variant} onViewportChange={onViewportChange} />
   }
 
   if (chartType === 'ElectionDonut') {
