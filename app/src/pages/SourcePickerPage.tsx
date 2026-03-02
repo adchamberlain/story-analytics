@@ -10,6 +10,7 @@ import { SqlWorkbenchPanel } from '../components/data/SqlWorkbenchPanel'
 import { DataShaper } from '../components/data/DataShaper'
 import { DataPreview } from '../components/data/DataPreview'
 import { useDataStore } from '../stores/dataStore'
+import { GeoWizardModal } from '../components/editor/GeoWizardModal'
 
 interface SourceSummary {
   source_id: string
@@ -42,6 +43,8 @@ export function SourcePickerPage() {
   const [workbenchInitialSql, setWorkbenchInitialSql] = useState<string | undefined>()
 
   const dataStore = useDataStore()
+  const geoWizardPending = dataStore.geoWizardPending
+  const clearGeoWizard = dataStore.clearGeoWizard
 
   // Reset stale data source state from a previous visit so the user always
   // starts on the "Choose a data source" step instead of the old preview.
@@ -439,6 +442,22 @@ export function SourcePickerPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Geo wizard modal — shown after upload if geo columns are detected */}
+      {geoWizardPending && (
+        <GeoWizardModal
+          sourceId={geoWizardPending.sourceId}
+          detectedColumns={geoWizardPending.columns}
+          onComplete={() => {
+            clearGeoWizard()
+            handleSelectSource(geoWizardPending.sourceId)
+          }}
+          onSkip={() => {
+            clearGeoWizard()
+            handleSelectSource(geoWizardPending.sourceId)
+          }}
+        />
       )}
     </div>
   )
