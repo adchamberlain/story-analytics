@@ -15,6 +15,7 @@ from .data.countries import COUNTRIES
 logger = logging.getLogger(__name__)
 
 _NOMINATIM_CACHE: dict[str, tuple[float, float] | None] = {}
+_LAST_NOMINATIM_CALL: float = 0.0
 
 GeoType = Literal["lat_lon", "state", "country", "zip", "fips", "city", "address"]
 
@@ -124,9 +125,14 @@ class GeoResult:
 
 
 def _call_nominatim(query: str) -> tuple[float, float] | None:
-    """Call Nominatim public API. Returns (lat, lon) or None. Results cached in _NOMINATIM_CACHE."""
+    """Call Nominatim public API. Rate-limited to 1 req/sec. Results cached."""
+    global _LAST_NOMINATIM_CALL
     if query in _NOMINATIM_CACHE:
         return _NOMINATIM_CACHE[query]
+    # Rate limit: only applies to actual HTTP calls, not cache hits
+    elapsed = time.monotonic() - _LAST_NOMINATIM_CALL
+    if elapsed < 1.0:
+        time.sleep(1.0 - elapsed)
     params = urllib.parse.urlencode({"q": query, "format": "json", "limit": 1})
     url = f"https://nominatim.openstreetmap.org/search?{params}"
     req = urllib.request.Request(url, headers={"User-Agent": "story-analytics/1.0"})
@@ -136,10 +142,12 @@ def _call_nominatim(query: str) -> tuple[float, float] | None:
         if data:
             result: tuple[float, float] = (float(data[0]["lat"]), float(data[0]["lon"]))
             _NOMINATIM_CACHE[query] = result
+            _LAST_NOMINATIM_CALL = time.monotonic()
             return result
     except Exception as e:
         logger.warning("Nominatim error for %r: %s", query, e)
     _NOMINATIM_CACHE[query] = None
+    _LAST_NOMINATIM_CALL = time.monotonic()
     return None
 
 
@@ -151,7 +159,6 @@ def geocode_values(values: list[str], geo_type: GeoType) -> list[GeoResult]:
     """
     # Resolve unique values (preserves order via dict.fromkeys)
     unique: dict[str, tuple[float, float] | None] = {}
-    last_nominatim_call = 0.0
 
     for v in dict.fromkeys(values):
         normalized = v.strip().lower()
@@ -168,11 +175,7 @@ def geocode_values(values: list[str], geo_type: GeoType) -> list[GeoResult]:
             continue
 
         # Nominatim fallback for all unresolved types
-        elapsed = time.monotonic() - last_nominatim_call
-        if elapsed < 1.0:
-            time.sleep(1.0 - elapsed)
         coords = _call_nominatim(v)
-        last_nominatim_call = time.monotonic()
         unique[v] = coords
 
     return [
