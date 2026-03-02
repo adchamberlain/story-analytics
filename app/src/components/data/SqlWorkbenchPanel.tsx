@@ -5,6 +5,7 @@ import { SqlEditor, SqlEditorRef } from './SqlEditor'
 import { AiSqlAssistant } from './AiSqlAssistant'
 import { QueryResults, QueryResultData } from './QueryResults'
 import { authFetch } from '../../utils/authFetch'
+import { useDataStore } from '../../stores/dataStore'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -46,6 +47,7 @@ export function SqlWorkbenchPanel({
   onImportSource,
 }: SqlWorkbenchPanelProps) {
   const navigate = useNavigate()
+  const openGeoWizard = useDataStore((s) => s.openGeoWizard)
   const editorRef = useRef<SqlEditorRef>(null)
   const [importLoading, setImportLoading] = useState(false)
 
@@ -365,13 +367,27 @@ export function SqlWorkbenchPanel({
       if (res.ok) {
         const data = await res.json()
         if (data.source_id) {
+          // Check for geographic columns — if found, open the GeoWizard instead of
+          // navigating directly. The wizard's onComplete/onSkip handles navigation.
+          try {
+            const geoRes = await authFetch(`/api/data/sources/${data.source_id}/detect-geo`, { method: 'POST' })
+            if (geoRes.ok) {
+              const geoData = await geoRes.json()
+              if (geoData?.columns?.length > 0) {
+                openGeoWizard(data.source_id, geoData.columns)
+                return
+              }
+            }
+          } catch {
+            // geo detection is best-effort — fall through to direct navigation
+          }
           navigate(`/editor/new?sourceId=${data.source_id}`)
         }
       }
     } catch {
       // sync-query not yet available
     }
-  }, [connectionId, currentSql, navigate, dbType])
+  }, [connectionId, currentSql, navigate, dbType, openGeoWizard])
 
   // ---------- Render nothing when fully closed ----------
   if (!mounted) return null

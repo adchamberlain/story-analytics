@@ -49,6 +49,7 @@ interface DataState {
 
   /** Pending geo wizard — set after upload if geo columns are detected */
   geoWizardPending: { sourceId: string; columns: DetectedColumn[] } | null
+  openGeoWizard: (sourceId: string, columns: DetectedColumn[]) => void
   clearGeoWizard: () => void
 
   /** Actions */
@@ -103,6 +104,7 @@ export const useDataStore = create<DataState>((set, get) => ({
   duplicateConflict: null,
   geoWizardPending: null,
 
+  openGeoWizard: (sourceId: string, columns: DetectedColumn[]) => set({ geoWizardPending: { sourceId, columns } }),
   clearGeoWizard: () => set({ geoWizardPending: null }),
 
   uploadCSV: async (file: File, replace = false) => {
