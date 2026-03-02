@@ -361,9 +361,11 @@ export function SqlWorkbenchPanel({
         const geoRes = await authFetch(`/api/data/sources/${connectionId}/detect-geo`, { method: 'POST' })
         if (geoRes.ok) {
           const geoData = await geoRes.json()
-          // Only open wizard for columns that need geocoding — skip if data already has lat/lon
-          const needsGeocoding = geoData?.columns?.filter((c: { inferred_type: string }) => c.inferred_type !== 'lat_lon') ?? []
-          if (needsGeocoding.length > 0) {
+          // If lat/lon columns already exist the data is already geocoded — skip the wizard.
+          // Only open it when there are geocodable columns (state, zip, etc.) with NO existing lat/lon.
+          const alreadyGeocoded = geoData?.columns?.some((c: { inferred_type: string }) => c.inferred_type === 'lat_lon')
+          const needsGeocoding = !alreadyGeocoded && (geoData?.columns?.length ?? 0) > 0
+          if (needsGeocoding) {
             onClose()
             openGeoWizard(connectionId, geoData.columns)
             return
@@ -385,13 +387,14 @@ export function SqlWorkbenchPanel({
       if (res.ok) {
         const data = await res.json()
         if (data.source_id) {
-          // Check for geographic columns that need geocoding — skip wizard if data already has lat/lon.
+          // Skip wizard if data already has lat/lon — only geocode when lat/lon are absent.
           try {
             const geoRes = await authFetch(`/api/data/sources/${data.source_id}/detect-geo`, { method: 'POST' })
             if (geoRes.ok) {
               const geoData = await geoRes.json()
-              const needsGeocoding = geoData?.columns?.filter((c: { inferred_type: string }) => c.inferred_type !== 'lat_lon') ?? []
-              if (needsGeocoding.length > 0) {
+              const alreadyGeocoded = geoData?.columns?.some((c: { inferred_type: string }) => c.inferred_type === 'lat_lon')
+              const needsGeocoding = !alreadyGeocoded && (geoData?.columns?.length ?? 0) > 0
+              if (needsGeocoding) {
                 onClose()
                 openGeoWizard(data.source_id, geoData.columns)
                 return
