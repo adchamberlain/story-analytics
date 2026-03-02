@@ -96,6 +96,9 @@ export function DatabaseConnector({ onSynced, onOpenSqlWorkbench }: DatabaseConn
   const [dataset, setDataset] = useState('')
   const [serviceAccountJson, setServiceAccountJson] = useState('')
 
+  // Edit mode
+  const [editingConnectionId, setEditingConnectionId] = useState<string | null>(null)
+
   // Test / tables state
   const [testing, setTesting] = useState(false)
   const [testMessage, setTestMessage] = useState<string | null>(null)
@@ -145,12 +148,39 @@ export function DatabaseConnector({ onSynced, onOpenSqlWorkbench }: DatabaseConn
     setTableInfos([])
     setSelectedTables(new Set())
     setActiveConnectionId(null)
+    setEditingConnectionId(null)
     setTesting(false)
   }
 
   const handleOpen = () => { resetForm(); setStep('pick') }
   const handleClose = () => { resetForm(); setStep('closed') }
   const handleNewConnection = () => { setError(null); setTestMessage(null); setStep('form') }
+
+  const handleEditConnection = (conn: SavedConnection) => {
+    resetForm()
+    setActiveConnectionId(conn.connection_id)
+    setEditingConnectionId(conn.connection_id)
+    setDbType(conn.db_type as DbType)
+    setName(conn.name)
+    // Populate fields from saved config
+    const c = conn.config
+    if (conn.db_type === 'snowflake') {
+      setAccount(c.account || '')
+      setWarehouse(c.warehouse || '')
+      setDatabase(c.database || '')
+      setSchema(c.schema || '')
+      setRole(c.role || '')
+    } else if (conn.db_type === 'postgres') {
+      setHost(c.host || '')
+      setPort(c.port || '5432')
+      setDatabase(c.database || '')
+      setSchema(c.schema || '')
+    } else if (conn.db_type === 'bigquery') {
+      setProjectId(c.project_id || '')
+      setDataset(c.dataset || '')
+    }
+    setStep('form')
+  }
 
   // Build config object based on selected DB type
   const buildConfig = (): Record<string, string> => {
@@ -239,7 +269,18 @@ export function DatabaseConnector({ onSynced, onOpenSqlWorkbench }: DatabaseConn
     try {
       let connectionId = activeConnectionId
 
-      if (!connectionId) {
+      if (editingConnectionId) {
+        // Update existing connection
+        const updateRes = await authFetch(`/api/connections/${editingConnectionId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: name.trim(), config: buildConfig() }),
+        })
+        const updateData = await updateRes.json()
+        if (!updateRes.ok) { setError(updateData.detail || 'Failed to update connection'); return }
+        connectionId = editingConnectionId
+        setConnectionName(name.trim())
+      } else if (!connectionId) {
         const createRes = await authFetch('/api/connections/', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -421,9 +462,21 @@ export function DatabaseConnector({ onSynced, onOpenSqlWorkbench }: DatabaseConn
                       }
                     </p>
                   </div>
-                  <span className="text-[13px] font-medium shrink-0" style={{ color: '#3b82f6', marginLeft: '16px' }}>
-                    {testing && activeConnectionId === conn.connection_id ? 'Testing...' : 'Connect'}
-                  </span>
+                  <div className="flex items-center shrink-0" style={{ gap: '8px', marginLeft: '16px' }}>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleEditConnection(conn) }}
+                      className="flex items-center justify-center rounded-lg text-text-icon hover:text-blue-500 hover:bg-surface-secondary transition-colors"
+                      style={{ width: '32px', height: '32px' }}
+                      title="Edit connection"
+                    >
+                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
+                      </svg>
+                    </button>
+                    <span className="text-[13px] font-medium" style={{ color: '#3b82f6' }}>
+                      {testing && activeConnectionId === conn.connection_id ? 'Testing...' : 'Connect'}
+                    </span>
+                  </div>
                 </button>
               ))}
               <button
@@ -449,7 +502,7 @@ export function DatabaseConnector({ onSynced, onOpenSqlWorkbench }: DatabaseConn
           className="border-b border-border-default flex items-center justify-between"
           style={{ padding: '20px 28px' }}
         >
-          <h3 className="text-[17px] font-semibold text-text-primary">New Connection</h3>
+          <h3 className="text-[17px] font-semibold text-text-primary">{editingConnectionId ? 'Edit Connection' : 'New Connection'}</h3>
           <button
             onClick={handleClose}
             className="flex items-center justify-center rounded-lg text-text-icon hover:text-text-primary hover:bg-surface-secondary transition-colors"
@@ -555,10 +608,10 @@ export function DatabaseConnector({ onSynced, onOpenSqlWorkbench }: DatabaseConn
               style={{ padding: '10px 24px' }}
             >
               {testing && <Spinner />}
-              {testing ? 'Testing...' : 'Test Connection'}
+              {testing ? 'Testing...' : editingConnectionId ? 'Save & Test' : 'Test Connection'}
             </button>
             <button
-              onClick={() => setStep('pick')}
+              onClick={() => { setEditingConnectionId(null); setStep('pick') }}
               className="text-[14px] text-text-muted hover:text-text-primary transition-colors font-medium"
               style={{ padding: '10px 16px' }}
             >
