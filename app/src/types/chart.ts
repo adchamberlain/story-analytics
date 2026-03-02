@@ -297,6 +297,9 @@ export interface ChartConfig {
   /** Allow users to download the chart's underlying data as CSV (default: true) */
   allowDataDownload?: boolean
 
+  /** Max categories to show in bar-family charts (0 = no limit, undefined = use default of 20) */
+  maxCategories?: number
+
   /** Data mode (used by editor) */
   dataMode?: 'table' | 'sql'
 
