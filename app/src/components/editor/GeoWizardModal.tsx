@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 
 export const GEO_TYPES = ['state', 'country', 'zip', 'fips', 'city', 'address', 'lat_lon'] as const
 export type GeoType = typeof GEO_TYPES[number]
@@ -62,6 +62,8 @@ export function GeoWizardModal({ sourceId, detectedColumns, onComplete, onSkip }
     error: null,
   })
 
+  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
   const update = (patch: Partial<WizardState>) => setState(s => ({ ...s, ...patch }))
 
   const handlePreview = async () => {
@@ -115,16 +117,19 @@ export function GeoWizardModal({ sourceId, detectedColumns, onComplete, onSkip }
         update({ jobResolved: data.resolved, jobTotal: data.total })
         if (data.status === 'complete') {
           clearInterval(interval)
+          pollIntervalRef.current = null
           onComplete()
         }
         if (data.status === 'failed') {
           clearInterval(interval)
+          pollIntervalRef.current = null
           update({ error: data.error ?? 'Geocoding failed', step: 2 })
         }
       } catch {
         // network error during poll — interval will retry
       }
     }, 2000)
+    pollIntervalRef.current = interval
   }
 
   const matchPct = state.previewTotal > 0 ? state.previewMatched / state.previewTotal : 0
@@ -163,11 +168,14 @@ export function GeoWizardModal({ sourceId, detectedColumns, onComplete, onSkip }
                   <option key={c.name} value={c.name}>{c.name}</option>
                 ))}
               </select>
-              {primary && (
-                <p className="text-[10px] text-text-muted mt-1">
-                  Sample values: {primary.samples.slice(0, 3).join(', ')}
-                </p>
-              )}
+              {(() => {
+                const selectedColData = detectedColumns.find(c => c.name === state.selectedColumn)
+                return selectedColData?.samples.length ? (
+                  <p className="text-[10px] text-text-muted mt-1">
+                    Sample values: {selectedColData.samples.slice(0, 3).join(', ')}
+                  </p>
+                ) : null
+              })()}
             </div>
             <div>
               <label className="block text-xs font-medium text-text-secondary mb-1">Location type</label>
@@ -252,7 +260,13 @@ export function GeoWizardModal({ sourceId, detectedColumns, onComplete, onSkip }
           <button
             onClick={() => {
               if (state.step === 2) update({ step: 1 })
-              else if (state.step === 3) update({ step: 2, error: null })
+              else if (state.step === 3) {
+                if (pollIntervalRef.current) {
+                  clearInterval(pollIntervalRef.current)
+                  pollIntervalRef.current = null
+                }
+                update({ step: 2, error: null })
+              }
               else onSkip()
             }}
             className="text-sm text-text-secondary hover:text-text-primary"
