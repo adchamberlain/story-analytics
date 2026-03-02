@@ -1,4 +1,4 @@
-"""Geo column detection, static resolution, Nominatim geocoding, job management."""
+"""Static geo lookup: resolves state and country names to (lat, lon)."""
 from __future__ import annotations
 from typing import Literal
 
@@ -6,8 +6,6 @@ from .data.us_states import US_STATES
 from .data.countries import COUNTRIES
 
 GeoType = Literal["lat_lon", "state", "country", "zip", "fips", "city", "address"]
-
-_NOMINATIM_CACHE: dict[str, tuple[float, float] | None] = {}
 
 
 def resolve_static(value: str, geo_type: GeoType) -> tuple[float, float] | None:
