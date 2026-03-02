@@ -3,6 +3,7 @@ import { useParams, useSearchParams } from 'react-router-dom'
 import { ObservableChartFactory } from '../components/charts/ObservableChartFactory'
 import { parseEmbedFlags } from '../utils/embedFlags'
 import { buildChartConfig } from '../utils/buildChartConfig'
+import { applyTopNCategories, buildCategoryNotice } from '../utils/topNCategories'
 import type { ChartConfig, ChartType } from '../types/chart'
 
 interface ChartData {
@@ -199,6 +200,11 @@ export function EmbedChartPage() {
     ...(flags.search ? { extraProps: { ...chartConfig.extraProps, initialSearch: flags.search } } : {}),
   }
 
+  const topNResult = applyTopNCategories(data, effectiveConfig, chart.chart_type as ChartType)
+  const categoryNotice = buildCategoryNotice(topNResult)
+  const displayData = topNResult.data
+  const displaySource = [chart.source, categoryNotice].filter(Boolean).join(' · ')
+
   return (
     <div
       ref={containerRef}
@@ -224,15 +230,15 @@ export function EmbedChartPage() {
       )}
       <div style={flags.static ? { pointerEvents: 'none' } : undefined}>
         <ObservableChartFactory
-          data={data}
+          data={displayData}
           config={effectiveConfig}
           chartType={chart.chart_type as ChartType}
           height={360}
         />
       </div>
-      {!flags.plain && chart.source && (
+      {!flags.plain && displaySource && (
         <p style={{ margin: '8px 0 0', fontSize: 11, color: isDark ? '#64748b' : '#999' }}>
-          Source: {chart.source}
+          {chart.source ? `Source: ${displaySource}` : displaySource}
         </p>
       )}
       {!flags.plain && chart.config?.allowDataDownload !== false && (
