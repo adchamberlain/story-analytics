@@ -68,13 +68,18 @@ export function EditorPage() {
             // Template fetch failed — continue with defaults
           })
       }
-    } else if (chartId && chartId !== 'new' && chartId !== store.chartId) {
-      store.reset()
-      if (refreshSourceId) {
-        // Return from "Edit Data" with modified SQL — load chart config then swap source
-        store.loadChart(chartId).then(() => store.refreshSource(refreshSourceId))
-      } else {
-        store.loadChart(chartId)
+    } else if (chartId && chartId !== 'new') {
+      if (chartId !== store.chartId) {
+        // Different chart — full load (+ optional source swap)
+        store.reset()
+        if (refreshSourceId) {
+          store.loadChart(chartId).then(() => store.refreshSource(refreshSourceId))
+        } else {
+          store.loadChart(chartId)
+        }
+      } else if (refreshSourceId) {
+        // Same chart already in store — just swap in the new data source
+        store.refreshSource(refreshSourceId)
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
