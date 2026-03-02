@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { authFetch } from '../utils/authFetch'
 import { SqlWorkbenchPanel } from '../components/data/SqlWorkbenchPanel'
+import { GeoWizardModal } from '../components/editor/GeoWizardModal'
+import { useDataStore } from '../stores/dataStore'
 
 interface DataSource {
   source_id: string
@@ -25,6 +27,8 @@ export function SourcesPage() {
   const [deleting, setDeleting] = useState<string | null>(null)
   const [confirmId, setConfirmId] = useState<string | null>(null)
   const [openConnection, setOpenConnection] = useState<DataSource | null>(null)
+  const geoWizardPending = useDataStore((s) => s.geoWizardPending)
+  const clearGeoWizard = useDataStore((s) => s.clearGeoWizard)
 
   const fetchSources = useCallback(() => {
     authFetch('/api/settings/sources')
@@ -138,6 +142,23 @@ export function SourcesPage() {
         dbType={openConnection?.type ?? ''}
         onClose={() => setOpenConnection(null)}
       />
+
+      {geoWizardPending && (
+        <GeoWizardModal
+          sourceId={geoWizardPending.sourceId}
+          detectedColumns={geoWizardPending.columns}
+          onComplete={() => {
+            const sourceId = geoWizardPending.sourceId
+            clearGeoWizard()
+            navigate(`/editor/new?sourceId=${sourceId}`)
+          }}
+          onSkip={() => {
+            const sourceId = geoWizardPending.sourceId
+            clearGeoWizard()
+            navigate(`/editor/new?sourceId=${sourceId}`)
+          }}
+        />
+      )}
     </div>
   )
 }
