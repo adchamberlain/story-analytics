@@ -92,3 +92,78 @@ def test_geocode_preview_unknown_column():
         json={"column": "nonexistent_col", "geo_type": "state"},
     )
     assert resp.status_code == 400
+
+
+import time as _time
+
+
+def test_geocode_full_starts_job():
+    csv_content = "state,revenue\nCalifornia,100\nTexas,200\n"
+    source_id = _upload_csv(csv_content, "states_full1.csv")
+
+    resp = client.post(
+        f"/api/data/sources/{source_id}/geocode-full",
+        json={"column": "state", "geo_type": "state"},
+    )
+    assert resp.status_code == 200
+    assert "job_id" in resp.json()
+
+
+def test_geocode_status_returns_progress():
+    csv_content = "state,revenue\nCalifornia,100\nTexas,200\n"
+    source_id = _upload_csv(csv_content, "states_full2.csv")
+
+    start = client.post(
+        f"/api/data/sources/{source_id}/geocode-full",
+        json={"column": "state", "geo_type": "state"},
+    )
+    job_id = start.json()["job_id"]
+
+    # Poll until complete (max 15 seconds — states resolve via static lookup, should be fast)
+    for _ in range(30):
+        status = client.get(
+            f"/api/data/sources/{source_id}/geocode-status/{job_id}",
+        )
+        assert status.status_code == 200
+        data = status.json()
+        assert "status" in data
+        if data["status"] == "complete":
+            assert data["resolved"] == 2
+            break
+        _time.sleep(0.5)
+    else:
+        pytest.fail(f"Geocoding job did not complete in time. Last status: {data}")
+
+
+def test_geocode_full_writes_lat_lon_columns():
+    csv_content = "state,revenue\nCalifornia,100\nTexas,200\n"
+    source_id = _upload_csv(csv_content, "states_full3.csv")
+
+    start = client.post(
+        f"/api/data/sources/{source_id}/geocode-full",
+        json={"column": "state", "geo_type": "state"},
+    )
+    job_id = start.json()["job_id"]
+
+    for _ in range(30):
+        status = client.get(
+            f"/api/data/sources/{source_id}/geocode-status/{job_id}",
+        )
+        if status.json()["status"] == "complete":
+            break
+        _time.sleep(0.5)
+
+    schema = client.get(f"/api/data/schema/{source_id}")
+    col_names = [c["name"] for c in schema.json()["columns"]]
+    assert "_lat" in col_names
+    assert "_lon" in col_names
+
+
+def test_geocode_status_unknown_job():
+    csv_content = "state,revenue\nCalifornia,100\n"
+    source_id = _upload_csv(csv_content, "states_full4.csv")
+
+    resp = client.get(
+        f"/api/data/sources/{source_id}/geocode-status/doesnotexist",
+    )
+    assert resp.status_code == 404

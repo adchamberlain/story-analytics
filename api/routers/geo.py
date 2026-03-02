@@ -1,12 +1,13 @@
 """Geo intake endpoints: detect, preview, geocode."""
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel
 
 from ..auth_simple import get_current_user
 from ..services.duckdb_service import get_duckdb_service, _SAFE_SOURCE_ID_RE
 from ..services import geocoding_service as geo
+from .transforms import _get_source_info, _read_csv, _write_csv
 
 router = APIRouter(prefix="/data", tags=["geo"])
 
@@ -26,6 +27,22 @@ class GeoPreviewResponse(BaseModel):
     results: list[dict]
     matched: int
     total: int
+
+
+class GeoFullRequest(BaseModel):
+    column: str
+    geo_type: str
+
+
+class GeoFullResponse(BaseModel):
+    job_id: str
+
+
+class GeoStatusResponse(BaseModel):
+    status: str
+    resolved: int
+    total: int
+    error: str | None = None
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -95,4 +112,91 @@ def geocode_preview(
         ],
         matched=sum(1 for r in results if r.matched),
         total=len(results),
+    )
+
+
+def _run_geocode_full(job_id: str, source_id: str, column: str, geo_type: str) -> None:
+    """Background task: geocode all rows, write _lat/_lon columns back to CSV."""
+    try:
+        _path, key = _get_source_info(source_id)
+        columns, rows = _read_csv(key)
+
+        # Collect unique non-empty values
+        unique_values = list(dict.fromkeys(
+            str(r.get(column, "")) for r in rows
+            if r.get(column) and str(r.get(column, "")).strip()
+        ))
+        geo.update_job_progress(job_id, resolved=0, total=len(unique_values))
+
+        # Geocode unique values
+        results = geo.geocode_values(unique_values, geo_type)  # type: ignore[arg-type]
+        lookup = {r.value: (r.lat, r.lon) for r in results if r.matched}
+
+        # Add _lat/_lon columns if not present
+        if "_lat" not in columns:
+            columns.append("_lat")
+        if "_lon" not in columns:
+            columns.append("_lon")
+
+        # Write lat/lon back to each row
+        resolved = 0
+        for row in rows:
+            val = str(row.get(column, ""))
+            coords = lookup.get(val)
+            row["_lat"] = str(coords[0]) if coords else ""
+            row["_lon"] = str(coords[1]) if coords else ""
+            if coords:
+                resolved += 1
+
+        _write_csv(key, columns, rows)
+
+        # Re-ingest into DuckDB
+        svc = get_duckdb_service()
+        svc.reload_source(source_id)
+
+        geo.update_job_progress(job_id, resolved=resolved, total=len(unique_values), status="complete")
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        geo.update_job_progress(job_id, resolved=0, total=0, status="failed", error=str(e))
+
+
+@router.post("/sources/{source_id}/geocode-full", response_model=GeoFullResponse)
+def geocode_full(
+    source_id: str,
+    req: GeoFullRequest,
+    background_tasks: BackgroundTasks,
+    user: dict = Depends(get_current_user),
+):
+    _validate_source(source_id)
+    # Validate column exists
+    svc = get_duckdb_service()
+    schema = svc.get_schema(source_id)
+    known_columns = {c.name for c in schema.columns}
+    if req.column not in known_columns:
+        raise HTTPException(400, f"Column {req.column!r} not found in source")
+
+    job_id = geo.create_job(
+        source_id=source_id,
+        column=req.column,
+        geo_type=req.geo_type,  # type: ignore[arg-type]
+    )
+    background_tasks.add_task(_run_geocode_full, job_id, source_id, req.column, req.geo_type)
+    return GeoFullResponse(job_id=job_id)
+
+
+@router.get("/sources/{source_id}/geocode-status/{job_id}", response_model=GeoStatusResponse)
+def geocode_status(
+    source_id: str,
+    job_id: str,
+    user: dict = Depends(get_current_user),
+):
+    job = geo.get_job(job_id)
+    if not job:
+        raise HTTPException(404, "Job not found")
+    return GeoStatusResponse(
+        status=job.status,
+        resolved=job.resolved,
+        total=job.total,
+        error=job.error,
     )
