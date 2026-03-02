@@ -75,7 +75,6 @@ export function applyTopNCategories(
 }
 
 /** Builds the category notice string to append to the source line. */
-// Bug 3 fix: use result.effectiveMax instead of taking it as a parameter
 export function buildCategoryNotice(result: TopNResult): string {
   if (!result.clipped) return ''
   return `Showing top ${result.effectiveMax} of ${result.totalCount} categories`
