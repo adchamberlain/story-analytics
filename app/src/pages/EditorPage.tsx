@@ -11,6 +11,7 @@ import { CommentSidebar } from '../components/comments/CommentSidebar'
 import { VersionHistoryPanel } from '../components/editor/VersionHistoryPanel'
 import { DataTransformGrid } from '../components/editor/DataTransformGrid'
 import { PALETTES } from '../themes/plotTheme'
+import { applyTopNCategories, buildCategoryNotice } from '../utils/topNCategories'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { ChartShareModal } from '../components/sharing/ChartShareModal'
 import { DeployPopover } from '../components/DeployPrompt'
@@ -307,6 +308,10 @@ export function EditorPage() {
 
   const showEmptyState = isNew && store.data.length === 0
 
+  const topNResult = applyTopNCategories(store.data, chartConfig, store.config.chartType)
+  const categoryNotice = buildCategoryNotice(topNResult)
+  const displaySource = [store.config.source, categoryNotice].filter(Boolean).join(' · ')
+
   return (
     <div className="h-[calc(100vh-72px)] flex flex-col bg-surface-secondary">
       {/* Header */}
@@ -494,7 +499,7 @@ export function EditorPage() {
                 <ChartWrapper
                   title={store.config.title || undefined}
                   subtitle={store.config.subtitle || undefined}
-                  source={store.config.source || undefined}
+                  source={displaySource || undefined}
                   sourceUrl={store.config.sourceUrl || undefined}
                   altText={store.config.altText || undefined}
                   chartType={store.config.chartType}
@@ -505,7 +510,7 @@ export function EditorPage() {
                   allowDataDownload={store.config.allowDataDownload}
                 >
                   <ObservableChartFactory
-                    data={store.data}
+                    data={topNResult.data}
                     config={chartConfig}
                     chartType={store.config.chartType}
                     height={420}
