@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { authFetch } from '../utils/authFetch'
 import { SqlWorkbenchPanel } from '../components/data/SqlWorkbenchPanel'
 import { GeoWizardModal } from '../components/editor/GeoWizardModal'
@@ -22,6 +22,7 @@ const TYPE_BADGES: Record<string, string> = {
 
 export function SourcesPage() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const [sources, setSources] = useState<DataSource[]>([])
   const [loading, setLoading] = useState(true)
   const [deleting, setDeleting] = useState<string | null>(null)
@@ -46,6 +47,14 @@ export function SourcesPage() {
   useEffect(() => {
     fetchSources()
   }, [fetchSources])
+
+  // Auto-open workbench if navigated from chart editor with ?openSourceId=
+  const openSourceId = searchParams.get('openSourceId')
+  useEffect(() => {
+    if (!openSourceId || sources.length === 0) return
+    const match = sources.find((s) => s.source_id === openSourceId)
+    if (match) setOpenConnection(match)
+  }, [openSourceId, sources])
 
   const handleDelete = async (source: DataSource) => {
     setDeleting(source.source_id)

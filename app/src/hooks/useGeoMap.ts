@@ -20,6 +20,10 @@ export interface UseGeoMapOptions {
   projection: string // D3 projection name
   height?: number
   autoHeight?: boolean
+  /** Restore a previously saved zoom/pan state */
+  initialViewport?: { k: number; x: number; y: number }
+  /** Called (debounced 500ms) whenever the user pans or zooms */
+  onViewportChange?: (viewport: { k: number; x: number; y: number }) => void
 }
 
 export interface UseGeoMapResult {
@@ -72,17 +76,26 @@ export function useGeoMap({
   projection: _projectionId,
   height = 400,
   autoHeight = false,
+  initialViewport,
+  onViewportChange,
 }: UseGeoMapOptions): UseGeoMapResult {
   const containerRef = useRef<HTMLDivElement>(null!)
   const svgRef = useRef<SVGSVGElement | null>(null)
   const mapGroupRef = useRef<SVGGElement | null>(null)
   const zoomBehaviorRef = useRef<ZoomBehavior<SVGSVGElement, unknown> | null>(null)
+  const viewportChangeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const onViewportChangeRef = useRef(onViewportChange)
+  // initialViewport is only applied on map creation, not on every render — use a ref
+  const initialViewportRef = useRef(initialViewport)
   const [containerWidth, setContainerWidth] = useState(0)
   const [geoData, setGeoData] = useState<FeatureCollection | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [mapVersion, setMapVersion] = useState(0)
   const customGeoData = useEditorStore((s) => s.customGeoData)
+
+  // Keep ref in sync so the zoom handler always calls the latest callback
+  useEffect(() => { onViewportChangeRef.current = onViewportChange }, [onViewportChange])
 
   const basemapId = (basemap as BasemapId | 'custom') || 'world'
 
@@ -168,10 +181,22 @@ export function useGeoMap({
       .scaleExtent([1, 8])
       .on('zoom', (event) => {
         mapGroup.attr('transform', event.transform)
+        // Debounce viewport change notifications (500ms)
+        if (viewportChangeTimerRef.current) clearTimeout(viewportChangeTimerRef.current)
+        viewportChangeTimerRef.current = setTimeout(() => {
+          const t = event.transform
+          onViewportChangeRef.current?.({ k: t.k, x: t.x, y: t.y })
+        }, 500)
       })
 
     svg.call(zoomBehavior)
     zoomBehaviorRef.current = zoomBehavior
+
+    // Restore saved viewport if available (read from ref to avoid SVG recreation on every pan)
+    const vp = initialViewportRef.current
+    if (vp) {
+      svg.call(zoomBehavior.transform, zoomIdentity.translate(vp.x, vp.y).scale(vp.k))
+    }
 
     // Bump version so consumer effects know to redraw
     setMapVersion((v) => v + 1)
