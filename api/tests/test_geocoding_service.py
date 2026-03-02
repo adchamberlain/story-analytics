@@ -73,7 +73,8 @@ def test_geocode_values_static_state():
     assert abs(results[0].lat - 36.116203) < 1.0
     assert results[1].matched is True
 
-def test_geocode_values_unrecognized():
+def test_geocode_values_unrecognized(monkeypatch):
+    monkeypatch.setattr("api.services.geocoding_service._call_nominatim", lambda q: None)
     results = geocode_values(["notaplace123"], "state")
     assert results[0].matched is False
     assert results[0].lat is None
