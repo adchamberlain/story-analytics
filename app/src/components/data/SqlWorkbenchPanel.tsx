@@ -18,6 +18,8 @@ interface SqlWorkbenchPanelProps {
   onClose: () => void
   initialSql?: string // Pre-populate the editor (e.g. "SELECT * FROM table LIMIT 100")
   onImportSource?: (sourceId: string, rowCount: number) => void // Import mode: sync query result as source
+  /** If set, "Chart This" returns to this existing chart instead of creating a new one */
+  returnChartId?: string
 }
 
 const TYPE_BADGES: Record<string, string> = {
@@ -45,6 +47,7 @@ export function SqlWorkbenchPanel({
   onClose,
   initialSql,
   onImportSource,
+  returnChartId,
 }: SqlWorkbenchPanelProps) {
   const navigate = useNavigate()
   const openGeoWizard = useDataStore((s) => s.openGeoWizard)
@@ -353,7 +356,7 @@ export function SqlWorkbenchPanel({
     if (!connectionId || !currentSql.trim()) return
 
     if (dbType === 'csv') {
-      // CSV data is already in DuckDB — check for geo columns before navigating
+      // CSV data is already in DuckDB — source_id doesn't change, so return to original chart
       try {
         const geoRes = await authFetch(`/api/data/sources/${connectionId}/detect-geo`, { method: 'POST' })
         if (geoRes.ok) {
@@ -367,7 +370,7 @@ export function SqlWorkbenchPanel({
       } catch {
         // geo detection is best-effort — fall through to direct navigation
       }
-      navigate(`/editor/new?sourceId=${connectionId}`)
+      navigate(returnChartId ? `/editor/${returnChartId}` : `/editor/new?sourceId=${connectionId}`)
       return
     }
 
@@ -395,13 +398,17 @@ export function SqlWorkbenchPanel({
           } catch {
             // geo detection is best-effort — fall through to direct navigation
           }
-          navigate(`/editor/new?sourceId=${data.source_id}`)
+          if (returnChartId) {
+            navigate(`/editor/${returnChartId}?refreshSourceId=${data.source_id}`)
+          } else {
+            navigate(`/editor/new?sourceId=${data.source_id}`)
+          }
         }
       }
     } catch {
       // sync-query not yet available
     }
-  }, [connectionId, currentSql, navigate, dbType, openGeoWizard, onClose])
+  }, [connectionId, currentSql, navigate, dbType, openGeoWizard, onClose, returnChartId])
 
   // ---------- Render nothing when fully closed ----------
   if (!mounted) return null

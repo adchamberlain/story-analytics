@@ -50,6 +50,7 @@ export function SourcesPage() {
 
   // Auto-open workbench if navigated from chart editor with ?openSourceId=
   const openSourceId = searchParams.get('openSourceId')
+  const returnChartId = searchParams.get('returnChartId') ?? undefined
   useEffect(() => {
     if (!openSourceId || sources.length === 0) return
     const match = sources.find((s) => s.source_id === openSourceId)
@@ -149,6 +150,7 @@ export function SourcesPage() {
         connectionId={openConnection?.source_id ?? null}
         connectionName={openConnection?.name ?? ''}
         dbType={openConnection?.type ?? ''}
+        returnChartId={returnChartId}
         onClose={() => setOpenConnection(null)}
       />
 
@@ -159,12 +161,20 @@ export function SourcesPage() {
           onComplete={() => {
             const sourceId = geoWizardPending.sourceId
             clearGeoWizard()
-            navigate(`/editor/new?sourceId=${sourceId}`)
+            if (returnChartId) {
+              navigate(`/editor/${returnChartId}?refreshSourceId=${sourceId}`)
+            } else {
+              navigate(`/editor/new?sourceId=${sourceId}`)
+            }
           }}
           onSkip={() => {
             const sourceId = geoWizardPending.sourceId
             clearGeoWizard()
-            navigate(`/editor/new?sourceId=${sourceId}`)
+            if (returnChartId) {
+              navigate(`/editor/${returnChartId}?refreshSourceId=${sourceId}`)
+            } else {
+              navigate(`/editor/new?sourceId=${sourceId}`)
+            }
           }}
         />
       )}

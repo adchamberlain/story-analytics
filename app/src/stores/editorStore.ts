@@ -225,6 +225,7 @@ interface EditorState {
   // Actions
   loadChart: (chartId: string) => Promise<void>
   initNew: (sourceId: string) => Promise<void>
+  refreshSource: (sourceId: string) => Promise<void>
   buildQuery: () => Promise<void>
   saveNew: () => Promise<string | null>
   updateConfig: (partial: Partial<EditorConfig>) => void
@@ -471,6 +472,27 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         loading: false,
         error: e instanceof Error ? e.message : String(e),
       })
+    }
+  },
+
+  refreshSource: async (sourceId: string) => {
+    // Swap data source on an existing chart without resetting config.
+    // Called when user edits SQL and returns to their chart via "Edit Data" → "Chart This".
+    set({ loading: true, error: null, sourceId })
+    try {
+      const res = await authFetch(`/api/data/schema/${sourceId}`)
+      if (!res.ok) throw new Error(`Schema fetch failed: ${res.status}`)
+      const schema = await res.json()
+      const columns = (schema.columns ?? []).map((c: { name: string }) => c.name)
+      const columnTypes: Record<string, string> = {}
+      for (const col of schema.columns ?? []) {
+        columnTypes[col.name] = col.type
+      }
+      set({ loading: false, columns, columnTypes, data: [], sql: null })
+      // Re-run buildQuery to populate data from the new source
+      get().buildQuery()
+    } catch (e) {
+      set({ loading: false, error: e instanceof Error ? e.message : String(e) })
     }
   },
 
