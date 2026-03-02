@@ -4,9 +4,12 @@ Snowflake connector: sync tables from Snowflake into DuckDB via parquet.
 
 from __future__ import annotations
 
+import logging
 import os
 import tempfile
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 from .base import DatabaseConnector, ColumnInfo, ConnectorResult, QueryResult, SchemaColumn, SchemaTable, SchemaInfo, TableInfo
 
@@ -90,11 +93,14 @@ class SnowflakeConnector(DatabaseConnector):
         conn = None
         try:
             import snowflake.connector
+            logger.info("list_tables: role=%s database=%s schema=%s",
+                        credentials.get("role"), credentials.get("database"), credentials.get("schema"))
             conn = snowflake.connector.connect(**self._get_connect_kwargs(credentials))
             cursor = conn.cursor()
             self._use_context(cursor, credentials)
             cursor.execute("SHOW TABLES")
             rows = cursor.fetchall()
+            logger.info("list_tables: SHOW TABLES returned %d rows", len(rows))
             # name at index 1, row count at index 7
             tables = [row[1] for row in rows]
             table_infos = [
@@ -104,6 +110,7 @@ class SnowflakeConnector(DatabaseConnector):
             cursor.close()
             return ConnectorResult(success=True, tables=tables, table_infos=table_infos)
         except Exception as e:
+            logger.error("list_tables failed: %s", e)
             return ConnectorResult(success=False, message=f"Failed to list tables: {e}")
         finally:
             if conn:

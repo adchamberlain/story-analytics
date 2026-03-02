@@ -315,9 +315,12 @@ async def test_connection(connection_id: str, request: TestConnectionRequest, us
 
             # Also list tables on successful test
             tables_result = connector.list_tables(creds)
+            msg = result.message
+            if not tables_result.success:
+                msg += f" (table listing failed: {tables_result.message})"
             return TestConnectionResponse(
                 success=True,
-                message=result.message,
+                message=msg,
                 tables=tables_result.tables if tables_result.success else [],
                 table_infos=[
                     TableInfoResponse(name=ti.name, row_count=ti.row_count)
