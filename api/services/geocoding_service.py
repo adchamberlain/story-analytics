@@ -48,6 +48,12 @@ _GEO_NAME_PATTERNS: dict[str, re.Pattern] = {
     "city":    re.compile(r'\b(city|town|municipality)\b', re.I),
     "address": re.compile(r'\b(address|addr|street)\b', re.I),
 }
+_UNDERSCORE_RE = re.compile(r'[_]+')
+
+
+def _normalize_col_name(name: str) -> str:
+    """Replace underscores with spaces so \b word boundaries work on snake_case column names."""
+    return _UNDERSCORE_RE.sub(' ', name)
 _ZIP_VALUE_RE = re.compile(r'^\d{5}(-\d{4})?$')
 
 
@@ -82,9 +88,11 @@ def detect_geo_columns(columns: list[dict]) -> list[DetectedColumn]:
     for col in columns:
         name: str = col["name"]
         samples: list[str] = [str(v) for v in (col.get("sample_values") or [])]
+        # Normalize snake_case so \b word boundaries work (e.g. CUSTOMER_STATE → CUSTOMER STATE)
+        normalized = _normalize_col_name(name)
 
         # 1. lat/lon by name → highest confidence, skip further checks
-        if _LAT_LON_NAMES.search(name):
+        if _LAT_LON_NAMES.search(normalized):
             results.append(DetectedColumn(
                 name=name, inferred_type="lat_lon", confidence=0.95, samples=samples
             ))
@@ -93,7 +101,7 @@ def detect_geo_columns(columns: list[dict]) -> list[DetectedColumn]:
         # 2. Named pattern match
         matched_type: GeoType | None = None
         for geo_type, pattern in _GEO_NAME_PATTERNS.items():
-            if pattern.search(name):
+            if pattern.search(normalized):
                 matched_type = geo_type  # type: ignore[assignment]
                 break
 
