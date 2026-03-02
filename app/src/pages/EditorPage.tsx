@@ -28,6 +28,7 @@ export function EditorPage() {
   const isNew = chartId === 'new'
   const sourceId = searchParams.get('sourceId')
   const templateId = searchParams.get('template')
+  const refreshSourceId = searchParams.get('refreshSourceId')
   const initialSql = (location.state as { initialSql?: string } | null)?.initialSql
   const initialSqlApplied = useRef(false)
   const templateApplied = useRef(false)
@@ -69,10 +70,15 @@ export function EditorPage() {
       }
     } else if (chartId && chartId !== 'new' && chartId !== store.chartId) {
       store.reset()
-      store.loadChart(chartId)
+      if (refreshSourceId) {
+        // Return from "Edit Data" with modified SQL — load chart config then swap source
+        store.loadChart(chartId).then(() => store.refreshSource(refreshSourceId))
+      } else {
+        store.loadChart(chartId)
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chartId, sourceId, templateId])
+  }, [chartId, sourceId, templateId, refreshSourceId])
 
   // Auto-execute initial SQL passed from DataShaper wizard
   useEffect(() => {
@@ -326,7 +332,11 @@ export function EditorPage() {
           </button>
           {editorSourceId && (
             <button
-              onClick={() => navigate(`/sources?openSourceId=${editorSourceId}`)}
+              onClick={() => {
+                const params = new URLSearchParams({ openSourceId: editorSourceId })
+                if (store.chartId) params.set('returnChartId', store.chartId)
+                navigate(`/sources?${params}`)
+              }}
               className="text-xs px-2.5 py-1 rounded-md border border-border-default text-text-secondary hover:text-text-on-surface hover:bg-surface-secondary transition-colors"
               title="Edit the underlying data"
             >
