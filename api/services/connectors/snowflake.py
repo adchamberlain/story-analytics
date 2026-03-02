@@ -9,9 +9,9 @@ import os
 import tempfile
 from pathlib import Path
 
-logger = logging.getLogger(__name__)
-
 from .base import DatabaseConnector, ColumnInfo, ConnectorResult, QueryResult, SchemaColumn, SchemaTable, SchemaInfo, TableInfo
+
+logger = logging.getLogger(__name__)
 
 
 class SnowflakeConnector(DatabaseConnector):
