@@ -45,10 +45,13 @@ def _infer_type_from_values(samples: list[str]) -> GeoType | None:
     clean = [s.strip() for s in samples if s.strip()]
     if not clean:
         return None
-    # Zip code: 80%+ look like 5-digit postal codes
+    # 80% threshold (higher than state/country) because zip regex is precise — fewer false positives
     if sum(1 for s in clean if _ZIP_VALUE_RE.match(s)) / len(clean) >= 0.8:
         return "zip"
-    # State: 60%+ match known state names/abbreviations
+    # State: 60%+ match known state names/abbreviations.
+    # Note: 2-letter state abbreviations (e.g. "AL", "AR") overlap with ISO country codes.
+    # State check runs first — columns with ambiguous 2-letter codes may be misclassified.
+    # In practice this is rare: most users with state abbreviations also have a "state" column name.
     state_hits = sum(1 for s in clean if s.strip().lower() in US_STATES)
     if state_hits / len(clean) >= 0.6:
         return "state"
