@@ -77,6 +77,16 @@ class RawQueryResponse(BaseModel):
     error: str | None = None
 
 
+class QueryAsSourceRequest(BaseModel):
+    sql: str
+    source_name: str | None = None
+
+
+class QueryAsSourceResponse(BaseModel):
+    source_id: str
+    row_count: int
+
+
 class TableInfo(BaseModel):
     source_id: str
     table_name: str       # Internal DuckDB name, e.g. "src_abc123"
@@ -176,6 +186,61 @@ async def delete_source(source_id: str, user: dict = Depends(get_current_user)):
     storage.delete_tree(f"uploads/{source_id}")
 
     return {"deleted": True}
+
+
+@router.post("/sources/{source_id}/query-as-source", response_model=QueryAsSourceResponse)
+async def query_as_source(source_id: str, request: QueryAsSourceRequest, user: dict = Depends(get_current_user)):
+    """Run SQL against a local DuckDB source and materialize the result as a persistent CSV.
+
+    Used by the "Chart this" flow when the original source is a CSV: the user
+    may have written a WHERE / GROUP BY / JOIN query in the workbench; we run
+    it locally, write the result as a CSV to storage, and ingest it — exactly
+    like a regular upload so the source survives server restarts.
+    """
+    import csv as _csv
+    import io as _io
+
+    if not _SAFE_SOURCE_ID_RE.match(source_id):
+        raise HTTPException(status_code=400, detail="Invalid source_id")
+
+    service = get_duckdb_service()
+    if source_id not in service._sources:
+        raise HTTPException(status_code=404, detail="Source not found")
+
+    try:
+        query_result = service.execute_query(request.sql, source_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Query execution failed: {e}")
+
+    if not query_result.columns or not query_result.rows:
+        raise HTTPException(status_code=400, detail="Query returned no data")
+
+    # Write results to a temp CSV file and ingest via ingest_csv so the source
+    # is stored in uploads/ and automatically reloaded after server restarts.
+    hint = request.source_name or "query_result"
+    safe_hint = hint if hint.lower().endswith(".csv") else f"{hint}.csv"
+
+    buf = _io.StringIO()
+    writer = _csv.DictWriter(buf, fieldnames=query_result.columns)
+    writer.writeheader()
+    writer.writerows(query_result.rows)
+    csv_bytes = buf.getvalue().encode("utf-8")
+
+    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".csv")
+    tmp_path = Path(tmp.name)
+    tmp.close()
+
+    try:
+        tmp_path.write_bytes(csv_bytes)
+        schema = service.ingest_csv(tmp_path, safe_hint)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to create source: {e}")
+    finally:
+        tmp_path.unlink(missing_ok=True)
+
+    return QueryAsSourceResponse(source_id=schema.source_id, row_count=schema.row_count)
 
 
 @router.post("/query-raw", response_model=RawQueryResponse)

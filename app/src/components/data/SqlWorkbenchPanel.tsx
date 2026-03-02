@@ -356,9 +356,25 @@ export function SqlWorkbenchPanel({
     if (!connectionId || !currentSql.trim()) return
 
     if (dbType === 'csv') {
-      // CSV data is already in DuckDB — source_id doesn't change, so return to original chart
+      // Run the workbench SQL against the local DuckDB source to create a filtered snapshot.
+      // This ensures any WHERE / GROUP BY / JOIN the user wrote is actually applied.
+      let targetSourceId = connectionId
       try {
-        const geoRes = await authFetch(`/api/data/sources/${connectionId}/detect-geo`, { method: 'POST' })
+        const syncRes = await authFetch(`/api/data/sources/${connectionId}/query-as-source`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sql: currentSql, source_name: deriveSourceName(currentSql) }),
+        })
+        if (syncRes.ok) {
+          const syncData = await syncRes.json()
+          if (syncData.source_id) targetSourceId = syncData.source_id
+        }
+      } catch {
+        // query-as-source is best-effort — fall back to original source
+      }
+
+      try {
+        const geoRes = await authFetch(`/api/data/sources/${targetSourceId}/detect-geo`, { method: 'POST' })
         if (geoRes.ok) {
           const geoData = await geoRes.json()
           // If lat/lon columns already exist the data is already geocoded — skip the wizard.
@@ -367,14 +383,19 @@ export function SqlWorkbenchPanel({
           const needsGeocoding = !alreadyGeocoded && (geoData?.columns?.length ?? 0) > 0
           if (needsGeocoding) {
             onClose()
-            openGeoWizard(connectionId, geoData.columns)
+            openGeoWizard(targetSourceId, geoData.columns)
             return
           }
         }
       } catch {
         // geo detection is best-effort — fall through to direct navigation
       }
-      navigate(returnChartId ? `/editor/${returnChartId}` : `/editor/new?sourceId=${connectionId}`)
+
+      if (returnChartId) {
+        navigate(`/editor/${returnChartId}?refreshSourceId=${targetSourceId}`)
+      } else {
+        navigate(`/editor/new?sourceId=${targetSourceId}`)
+      }
       return
     }
 
