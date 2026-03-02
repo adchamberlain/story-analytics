@@ -196,8 +196,19 @@ export function GeoWizardModal({ sourceId, detectedColumns, onComplete, onSkip }
           </button>
         </div>
 
-        {/* Step 1: Column Mapping */}
-        {state.step === 1 && (
+        {/* Step 1: Column Mapping — loading overlay when preview is in flight */}
+        {state.step === 1 && state.loading && (
+          <div className="px-6 py-10 flex flex-col items-center gap-3 text-center">
+            <svg className="w-6 h-6 animate-spin text-blue-400" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+            </svg>
+            <p className="text-sm text-text-secondary">Checking your location data…</p>
+            <p className="text-xs text-text-muted">Resolving sample values against known locations</p>
+          </div>
+        )}
+
+        {state.step === 1 && !state.loading && (
           <div className="px-6 py-5 space-y-4">
             <p className="text-sm text-text-secondary">
               We detected a possible location column. Confirm the column and type so we can resolve coordinates.
@@ -351,13 +362,13 @@ export function GeoWizardModal({ sourceId, detectedColumns, onComplete, onSkip }
             {state.step === 1 ? 'Skip' : '← Back'}
           </button>
 
-          {state.step === 1 && (
+          {state.step === 1 && !state.loading && (
             <button
               onClick={handlePreview}
-              disabled={!state.selectedColumn || state.loading}
+              disabled={!state.selectedColumn}
               className="px-4 py-1.5 text-sm bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white rounded-md"
             >
-              {state.loading ? 'Loading…' : 'Preview →'}
+              Preview →
             </button>
           )}
           {state.step === 2 && (

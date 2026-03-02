@@ -441,6 +441,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         columnTypes[col.name] = col.type
       }
 
+      // Auto-configure as SymbolMap when GeoWizard has added _lat/_lon columns
+      const hasLatLon = columns.includes('_lat') && columns.includes('_lon')
+      const autoGeoConfig: Partial<EditorConfig> = hasLatLon
+        ? { chartType: 'SymbolMap', geoLatColumn: '_lat', geoLonColumn: '_lon', basemap: 'world' }
+        : {}
+
       set({
         loading: false,
         columns,
@@ -451,7 +457,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         sqlError: null,
         sqlExecuting: false,
         availableTables: [],
-        config: { ...DEFAULT_CONFIG },
+        config: { ...DEFAULT_CONFIG, ...autoGeoConfig },
         configHistory: [],
         configFuture: [],
         chatMessages: [],
