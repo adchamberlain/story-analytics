@@ -65,13 +65,16 @@ class SnowflakeConnector(DatabaseConnector):
         """
         role = credentials.get("role")
         if role:
+            logger.info("USE ROLE %s", role)
             cursor.execute(f"USE ROLE {role}")
         db = credentials.get("database")
         if db:
+            logger.info("USE DATABASE %s", db)
             cursor.execute(f"USE DATABASE {db}")
         if schema:
             s = credentials.get("schema")
             if s:
+                logger.info("USE SCHEMA %s", s)
                 cursor.execute(f"USE SCHEMA {s}")
 
     def test_connection(self, credentials: dict) -> ConnectorResult:
