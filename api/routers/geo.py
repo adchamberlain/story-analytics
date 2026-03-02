@@ -121,6 +121,10 @@ def _run_geocode_full(job_id: str, source_id: str, column: str, geo_type: str) -
         _path, key = _get_source_info(source_id)
         columns, rows = _read_csv(key)
 
+        # Guard: column must exist in the CSV (defensive check before iterating rows)
+        if column not in set(columns):
+            raise ValueError(f"Column {column!r} not found in CSV headers: {columns}")
+
         # Collect unique non-empty values
         unique_values = list(dict.fromkeys(
             str(r.get(column, "")) for r in rows
@@ -139,14 +143,12 @@ def _run_geocode_full(job_id: str, source_id: str, column: str, geo_type: str) -
             columns.append("_lon")
 
         # Write lat/lon back to each row
-        resolved = 0
+        resolved = len(lookup)  # number of unique values that matched
         for row in rows:
             val = str(row.get(column, ""))
             coords = lookup.get(val)
             row["_lat"] = str(coords[0]) if coords else ""
             row["_lon"] = str(coords[1]) if coords else ""
-            if coords:
-                resolved += 1
 
         _write_csv(key, columns, rows)
 
