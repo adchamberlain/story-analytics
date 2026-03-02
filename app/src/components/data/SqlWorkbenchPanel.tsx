@@ -361,7 +361,9 @@ export function SqlWorkbenchPanel({
         const geoRes = await authFetch(`/api/data/sources/${connectionId}/detect-geo`, { method: 'POST' })
         if (geoRes.ok) {
           const geoData = await geoRes.json()
-          if (geoData?.columns?.length > 0) {
+          // Only open wizard for columns that need geocoding — skip if data already has lat/lon
+          const needsGeocoding = geoData?.columns?.filter((c: { inferred_type: string }) => c.inferred_type !== 'lat_lon') ?? []
+          if (needsGeocoding.length > 0) {
             onClose()
             openGeoWizard(connectionId, geoData.columns)
             return
@@ -383,13 +385,13 @@ export function SqlWorkbenchPanel({
       if (res.ok) {
         const data = await res.json()
         if (data.source_id) {
-          // Check for geographic columns — if found, close the panel and open the GeoWizard.
-          // The wizard's onComplete/onSkip handles navigation to the editor.
+          // Check for geographic columns that need geocoding — skip wizard if data already has lat/lon.
           try {
             const geoRes = await authFetch(`/api/data/sources/${data.source_id}/detect-geo`, { method: 'POST' })
             if (geoRes.ok) {
               const geoData = await geoRes.json()
-              if (geoData?.columns?.length > 0) {
+              const needsGeocoding = geoData?.columns?.filter((c: { inferred_type: string }) => c.inferred_type !== 'lat_lon') ?? []
+              if (needsGeocoding.length > 0) {
                 onClose()
                 openGeoWizard(data.source_id, geoData.columns)
                 return
