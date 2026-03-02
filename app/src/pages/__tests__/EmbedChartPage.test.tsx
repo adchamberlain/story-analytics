@@ -101,7 +101,7 @@ describe('EmbedChartPage embed flags', () => {
   })
 
   it('plain flag: hides source when flags.plain is true', () => {
-    expect(source).toContain('!flags.plain && chart.source')
+    expect(source).toContain('!flags.plain && displaySource')
   })
 
   it('plain flag: hides staleness indicator when flags.plain is true', () => {
