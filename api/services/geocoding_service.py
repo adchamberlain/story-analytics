@@ -12,6 +12,7 @@ from typing import Literal
 
 from .data.us_states import US_STATES
 from .data.countries import COUNTRIES
+from .data.br_states import BR_STATES
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +26,7 @@ def resolve_static(value: str, geo_type: GeoType) -> tuple[float, float] | None:
     """Resolve a value to (lat, lon) using static lookup tables."""
     key = value.strip().lower()
     if geo_type == "state":
-        return US_STATES.get(key)
+        return US_STATES.get(key) or BR_STATES.get(key)
     if geo_type == "country":
         return COUNTRIES.get(key)
     return None
@@ -170,10 +171,6 @@ def geocode_values(values: list[str], geo_type: GeoType, country: str = "") -> l
     Nominatim calls are rate-limited to 1 request per second.
     """
     country_clean = country.strip()
-    country_lc = country_clean.lower()
-    # Use US static tables only when country is unset or explicitly US
-    use_us_static = not country_lc or country_lc in ("united states", "us", "usa")
-
     # Resolve unique values (preserves order via dict.fromkeys)
     unique: dict[str, tuple[float, float] | None] = {}
 
@@ -185,13 +182,14 @@ def geocode_values(values: list[str], geo_type: GeoType, country: str = "") -> l
             unique[v] = None
             continue
 
-        # Try US static lookup only when appropriate
-        if use_us_static:
-            coords = resolve_static(normalized, geo_type)
-            if coords:
-                unique[v] = coords
-                continue
+        # Always try static tables first (US states, Brazilian states, countries).
+        # This avoids slow Nominatim calls for common values regardless of country context.
+        coords = resolve_static(normalized, geo_type)
+        if coords:
+            unique[v] = coords
+            continue
 
+        # Skip US-specific static for non-US data (already tried above); fall through to Nominatim
         # Nominatim: append country context for better international resolution
         query = f"{v}, {country_clean}" if country_clean else v
         coords = _call_nominatim(query)
