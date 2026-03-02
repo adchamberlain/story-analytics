@@ -13,6 +13,7 @@ describe('GeoWizardModal constants', () => {
     expect(mod.GEO_TYPES).toContain('state')
     expect(mod.GEO_TYPES).toContain('country')
     expect(mod.GEO_TYPES).toContain('zip')
+    expect(mod.GEO_TYPES).toContain('fips')
     expect(mod.GEO_TYPES).toContain('city')
     expect(mod.GEO_TYPES).toContain('address')
     expect(mod.GEO_TYPES).toContain('lat_lon')
