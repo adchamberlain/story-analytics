@@ -74,7 +74,18 @@ class SnowflakeConnector(DatabaseConnector):
             try:
                 cursor.execute(f"USE DATABASE {db}")
             except Exception as e:
-                raise RuntimeError(f"USE DATABASE {db} failed: {e}") from e
+                # List available databases to help user fix the name
+                try:
+                    cursor.execute("SHOW DATABASES")
+                    available = [row[1] for row in cursor.fetchall()]
+                    raise RuntimeError(
+                        f"USE DATABASE {db} failed: {e}. "
+                        f"Available databases: {available}"
+                    ) from e
+                except RuntimeError:
+                    raise
+                except Exception:
+                    raise RuntimeError(f"USE DATABASE {db} failed: {e}") from e
         if schema:
             s = credentials.get("schema")
             if s:
