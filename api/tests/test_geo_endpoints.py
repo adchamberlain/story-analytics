@@ -152,6 +152,8 @@ def test_geocode_full_writes_lat_lon_columns():
         if status.json()["status"] == "complete":
             break
         _time.sleep(0.5)
+    else:
+        pytest.fail("Geocoding job did not complete in time")
 
     schema = client.get(f"/api/data/schema/{source_id}")
     col_names = [c["name"] for c in schema.json()["columns"]]
