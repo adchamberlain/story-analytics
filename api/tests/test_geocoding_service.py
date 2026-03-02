@@ -1,5 +1,11 @@
-import pytest
-from api.services.geocoding_service import resolve_static, detect_geo_columns, DetectedColumn
+from api.services.geocoding_service import (
+    resolve_static,
+    detect_geo_columns,
+    geocode_values,
+    create_job,
+    get_job,
+    update_job_progress,
+)
 
 def test_resolve_us_state_full_name():
     result = resolve_static("california", "state")
@@ -63,9 +69,6 @@ def test_no_false_positive_on_name_column():
     assert len(result) == 0
 
 
-from unittest.mock import patch
-from api.services.geocoding_service import geocode_values, GeoResult
-
 def test_geocode_values_static_state():
     results = geocode_values(["california", "texas"], "state")
     assert results[0].value == "california"
@@ -96,8 +99,6 @@ def test_geocode_values_nominatim_called_for_city(monkeypatch):
     assert results[0].matched is True
     assert "Austin TX" in called_with
 
-
-from api.services.geocoding_service import create_job, get_job, update_job_progress, GeoJob
 
 def test_create_and_get_job():
     job_id = create_job(source_id="abc123", column="city", geo_type="city")

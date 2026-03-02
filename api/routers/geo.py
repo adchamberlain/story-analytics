@@ -6,12 +6,12 @@ from typing import Literal
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel
 
-GeoTypeLiteral = Literal["lat_lon", "state", "country", "zip", "fips", "city", "address"]
-
 from ..auth_simple import get_current_user
 from ..services.duckdb_service import get_duckdb_service, _SAFE_SOURCE_ID_RE
 from ..services import geocoding_service as geo
 from .transforms import _get_source_info, _read_csv, _write_csv
+
+GeoTypeLiteral = Literal["lat_lon", "state", "country", "zip", "fips", "city", "address"]
 
 router = APIRouter(prefix="/data", tags=["geo"])
 

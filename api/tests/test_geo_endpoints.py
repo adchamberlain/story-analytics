@@ -1,4 +1,6 @@
 """Tests for geo intake endpoints: detect-geo and geocode-preview."""
+import time as _time
+
 import pytest
 from fastapi.testclient import TestClient
 from api.main import app
@@ -92,9 +94,6 @@ def test_geocode_preview_unknown_column():
         json={"column": "nonexistent_col", "geo_type": "state"},
     )
     assert resp.status_code == 400
-
-
-import time as _time
 
 
 def test_geocode_full_starts_job():
