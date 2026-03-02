@@ -593,7 +593,7 @@ function buildBarMarks(
       const maxVal = d3.max(data, (d) => Number(d[y] ?? 0)) ?? 0
       if (maxVal > 0) {
         marks.push(
-          Plot.barX(data, { x: () => maxVal, y: x, fill: trackColor, ...sortOpt }),
+          Plot.barX(data, { x: () => maxVal, y: x, fill: trackColor }),
         )
       }
     }
