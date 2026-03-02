@@ -122,45 +122,81 @@ def geocode_preview(
 
 
 def _run_geocode_full(job_id: str, source_id: str, column: str, geo_type: str, country: str = "") -> None:
-    """Background task: geocode all rows, write _lat/_lon columns back to CSV."""
+    """Background task: geocode all rows, write _lat/_lon columns back.
+
+    CSV sources: read/geocode/write file so changes persist across restarts.
+    Parquet/sync-query sources: geocode in-place inside DuckDB (no file to persist).
+    """
     try:
-        _path, key = _get_source_info(source_id)
-        columns, rows = _read_csv(key)
-
-        # Guard: column must exist in the CSV (defensive check before iterating rows)
-        if column not in set(columns):
-            raise ValueError(f"Column {column!r} not found in CSV headers: {columns}")
-
-        # Collect unique non-empty values
-        unique_values = list(dict.fromkeys(
-            str(r.get(column, "")) for r in rows
-            if r.get(column) and str(r.get(column, "")).strip()
-        ))
-        geo.update_job_progress(job_id, resolved=0, total=len(unique_values))
-
-        # Geocode unique values
-        results = geo.geocode_values(unique_values, geo_type, country)
-        lookup = {r.value: (r.lat, r.lon) for r in results if r.matched}
-
-        # Add _lat/_lon columns if not present
-        if "_lat" not in columns:
-            columns.append("_lat")
-        if "_lon" not in columns:
-            columns.append("_lon")
-
-        # Write lat/lon back to each row
-        resolved = len(lookup)  # number of unique values that matched
-        for row in rows:
-            val = str(row.get(column, ""))
-            coords = lookup.get(val)
-            row["_lat"] = str(coords[0]) if coords else ""
-            row["_lon"] = str(coords[1]) if coords else ""
-
-        _write_csv(key, columns, rows)
-
-        # Re-ingest into DuckDB
         svc = get_duckdb_service()
-        svc.reload_source(source_id)
+        meta = svc._sources.get(source_id)
+        if not meta:
+            raise ValueError(f"Source {source_id!r} not found")
+
+        table_name = f"src_{source_id}"
+        safe_col = column.replace('"', '""')
+        is_csv = meta.path.suffix.lower() == ".csv"
+
+        if is_csv:
+            # ── CSV path: read file → geocode → write file → reload DuckDB ──
+            _path, key = _get_source_info(source_id)
+            columns_list, rows = _read_csv(key)
+
+            if column not in set(columns_list):
+                raise ValueError(f"Column {column!r} not found in CSV headers: {columns_list}")
+
+            unique_values = list(dict.fromkeys(
+                str(r.get(column, "")) for r in rows
+                if r.get(column) and str(r.get(column, "")).strip()
+            ))
+            geo.update_job_progress(job_id, resolved=0, total=len(unique_values))
+
+            results = geo.geocode_values(unique_values, geo_type, country)
+            lookup = {r.value: (r.lat, r.lon) for r in results if r.matched}
+
+            if "_lat" not in columns_list:
+                columns_list.append("_lat")
+            if "_lon" not in columns_list:
+                columns_list.append("_lon")
+
+            resolved = len(lookup)
+            for row in rows:
+                val = str(row.get(column, ""))
+                coords = lookup.get(val)
+                row["_lat"] = str(coords[0]) if coords else ""
+                row["_lon"] = str(coords[1]) if coords else ""
+
+            _write_csv(key, columns_list, rows)
+            svc.reload_source(source_id)
+        else:
+            # ── Parquet / sync-query path: geocode directly in DuckDB ──
+            with svc._lock:
+                rows_raw = svc._conn.execute(
+                    f'SELECT DISTINCT CAST("{safe_col}" AS VARCHAR) FROM {table_name} '
+                    f'WHERE "{safe_col}" IS NOT NULL'
+                ).fetchall()
+
+            unique_values = [str(r[0]) for r in rows_raw if r[0] and str(r[0]).strip()]
+            geo.update_job_progress(job_id, resolved=0, total=len(unique_values))
+
+            results = geo.geocode_values(unique_values, geo_type, country)
+            lookup = {r.value: (r.lat, r.lon) for r in results if r.matched}
+            resolved = len(lookup)
+
+            with svc._lock:
+                # Add columns if not already present (DuckDB ignores IF NOT EXISTS on ADD COLUMN)
+                existing = {row[0] for row in svc._conn.execute(f"DESCRIBE {table_name}").fetchall()}
+                if "_lat" not in existing:
+                    svc._conn.execute(f"ALTER TABLE {table_name} ADD COLUMN _lat DOUBLE")
+                if "_lon" not in existing:
+                    svc._conn.execute(f"ALTER TABLE {table_name} ADD COLUMN _lon DOUBLE")
+
+                for val, (lat, lon) in lookup.items():
+                    svc._conn.execute(
+                        f'UPDATE {table_name} SET _lat = ?, _lon = ? '
+                        f'WHERE CAST("{safe_col}" AS VARCHAR) = ?',
+                        [lat, lon, val],
+                    )
 
         geo.update_job_progress(job_id, resolved=resolved, total=len(unique_values), status="complete")
     except Exception as e:
