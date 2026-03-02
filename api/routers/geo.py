@@ -71,13 +71,21 @@ def geocode_preview(
 ):
     _validate_source(source_id)
     svc = get_duckdb_service()
-    table = f"src_{source_id}"
-    try:
-        result = svc._conn.execute(
-            f'SELECT DISTINCT "{req.column}" FROM {table} WHERE "{req.column}" IS NOT NULL LIMIT 20'
-        ).fetchall()
-    except Exception:
+
+    # Validate column exists in schema (prevents SQL injection via column name)
+    schema = svc.get_schema(source_id)
+    known_columns = {c.name for c in schema.columns}
+    if req.column not in known_columns:
         raise HTTPException(400, f"Column {req.column!r} not found in source")
+
+    table = f"src_{source_id}"
+    # Escape double-quotes in identifier (defense in depth)
+    safe_column = req.column.replace('"', '""')
+    with svc._lock:
+        result = svc._conn.execute(
+            f'SELECT DISTINCT "{safe_column}" FROM {table} WHERE "{safe_column}" IS NOT NULL LIMIT 20'
+        ).fetchall()
+
     values = [str(row[0]) for row in result]
     results = geo.geocode_values(values, req.geo_type)  # type: ignore[arg-type]
     return GeoPreviewResponse(

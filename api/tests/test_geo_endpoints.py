@@ -91,5 +91,4 @@ def test_geocode_preview_unknown_column():
         f"/api/data/sources/{source_id}/geocode-preview",
         json={"column": "nonexistent_col", "geo_type": "state"},
     )
-    # Should return 200 with empty results (column not in table → no rows)
-    assert resp.status_code in (200, 400)
+    assert resp.status_code == 400
