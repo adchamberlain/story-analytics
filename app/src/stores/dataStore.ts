@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { authFetch } from '../utils/authFetch'
+import type { DetectedColumn } from '../components/editor/GeoWizardModal'
 
 export interface ColumnInfo {
   name: string
@@ -45,6 +46,10 @@ interface DataState {
 
   /** Whether a transform is in progress */
   transforming: boolean
+
+  /** Pending geo wizard — set after upload if geo columns are detected */
+  geoWizardPending: { sourceId: string; columns: DetectedColumn[] } | null
+  clearGeoWizard: () => void
 
   /** Actions */
   uploadCSV: (file: File, replace?: boolean) => Promise<void>
@@ -96,6 +101,9 @@ export const useDataStore = create<DataState>((set, get) => ({
   transforming: false,
   error: null,
   duplicateConflict: null,
+  geoWizardPending: null,
+
+  clearGeoWizard: () => set({ geoWizardPending: null }),
 
   uploadCSV: async (file: File, replace = false) => {
     set({ uploading: true, error: null, source: null, preview: null, duplicateConflict: null })
@@ -127,6 +135,17 @@ export const useDataStore = create<DataState>((set, get) => ({
 
       const source: UploadedSource = await res.json()
       set({ source, uploading: false })
+
+      // Silently detect geo columns — non-blocking, best-effort
+      const detectedSourceId = source.source_id
+      authFetch(`/api/data/sources/${detectedSourceId}/detect-geo`, { method: 'POST' })
+        .then(r => r.ok ? r.json() : null)
+        .then(data => {
+          if (data?.columns?.length > 0) {
+            set({ geoWizardPending: { sourceId: detectedSourceId, columns: data.columns } })
+          }
+        })
+        .catch(() => {}) // silent failure — geo intake is best-effort
 
       // Auto-load preview
       get().loadPreview(source.source_id)
@@ -201,7 +220,7 @@ export const useDataStore = create<DataState>((set, get) => ({
   },
 
   reset: () => {
-    set({ source: null, preview: null, uploading: false, loadingPreview: false, transforming: false, error: null, duplicateConflict: null })
+    set({ source: null, preview: null, uploading: false, loadingPreview: false, transforming: false, error: null, duplicateConflict: null, geoWizardPending: null })
   },
 
   // -- Data Transform methods -------------------------------------------------

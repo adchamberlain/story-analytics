@@ -38,3 +38,17 @@ describe('GeoWizardModal types', () => {
     expect(col.name).toBe('city')
   })
 })
+
+describe('dataStore geoWizardPending state', () => {
+  it('has geoWizardPending field defaulting to null', async () => {
+    const mod = await import('../stores/dataStore')
+    const store = mod.useDataStore.getState()
+    expect(store.geoWizardPending).toBeNull()
+  })
+
+  it('has clearGeoWizard action', async () => {
+    const mod = await import('../stores/dataStore')
+    const store = mod.useDataStore.getState()
+    expect(typeof store.clearGeoWizard).toBe('function')
+  })
+})
