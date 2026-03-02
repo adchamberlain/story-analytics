@@ -555,14 +555,51 @@ export function Toolbox() {
                       onChange={(geoLonColumn) => updateConfig({ geoLonColumn })}
                     />
                     {config.chartType === 'SymbolMap' && (
-                      <ColumnDropdown
-                        label="Size Column"
-                        value={config.geoSizeColumn ?? null}
-                        columns={isSqlMode ? sqlResultColumns : columns}
-                        columnTypes={columnTypes}
-                        allowNone
-                        onChange={(geoSizeColumn) => updateConfig({ geoSizeColumn })}
-                      />
+                      <>
+                        <ColumnDropdown
+                          label="Size Column"
+                          value={config.geoSizeColumn ?? null}
+                          columns={isSqlMode ? sqlResultColumns : columns}
+                          columnTypes={columnTypes}
+                          allowNone
+                          onChange={(geoSizeColumn) => updateConfig({ geoSizeColumn })}
+                        />
+                        <div>
+                          <label className="block text-xs font-medium text-text-secondary mb-1">Bubble size (px)</label>
+                          <div className="flex items-center gap-2">
+                            <div className="flex-1">
+                              <span className="block text-[10px] text-text-muted mb-0.5">Min</span>
+                              <input
+                                type="number"
+                                min={1}
+                                max={50}
+                                value={(config.geoSizeRange ?? [3, 25])[0]}
+                                onChange={(e) => {
+                                  const min = Math.max(1, Number(e.target.value))
+                                  const max = (config.geoSizeRange ?? [3, 25])[1]
+                                  updateConfig({ geoSizeRange: [min, Math.max(min + 1, max)] })
+                                }}
+                                className="w-full px-2 py-1.5 text-sm border border-border-default rounded-md bg-surface text-text-primary focus:outline-none focus:border-blue-400"
+                              />
+                            </div>
+                            <div className="flex-1">
+                              <span className="block text-[10px] text-text-muted mb-0.5">Max</span>
+                              <input
+                                type="number"
+                                min={2}
+                                max={120}
+                                value={(config.geoSizeRange ?? [3, 25])[1]}
+                                onChange={(e) => {
+                                  const max = Math.max(2, Number(e.target.value))
+                                  const min = (config.geoSizeRange ?? [3, 25])[0]
+                                  updateConfig({ geoSizeRange: [Math.min(min, max - 1), max] })
+                                }}
+                                className="w-full px-2 py-1.5 text-sm border border-border-default rounded-md bg-surface text-text-primary focus:outline-none focus:border-blue-400"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </>
                     )}
                     {config.chartType === 'LocatorMap' && (
                       <ColumnDropdown
