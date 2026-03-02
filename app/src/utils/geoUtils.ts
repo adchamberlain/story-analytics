@@ -145,30 +145,31 @@ export function joinDataToFeatures(
   const isUsStates = basemapId === 'us-states'
 
   // Build lookup: data join value → numeric value
+  // Use case-insensitive matching for robustness (handles "CALIFORNIA" vs "California")
   // For US states, also index by normalized abbreviation and full name
   const dataMap = new Map<string, number>()
   for (const row of data) {
     const key = String(row[joinColumn] ?? '').trim()
     const val = Number(row[valueColumn])
     if (key && isFinite(val)) {
-      dataMap.set(key, val)
+      dataMap.set(key.toLowerCase(), val)
       if (isUsStates) {
-        // If key is an abbreviation like "CA", also store under full name "California"
+        // If key is an abbreviation like "CA", also store under full name "california"
         const fullName = US_STATE_ABBREV[key.toUpperCase()]
-        if (fullName) dataMap.set(fullName, val)
-        // If key is a full name like "California", also store under abbreviation "CA"
+        if (fullName) dataMap.set(fullName.toLowerCase(), val)
+        // If key is a full name like "California", also store under abbreviation "ca"
         const abbrev = US_STATE_NAME_TO_ABBREV.get(key.toLowerCase())
-        if (abbrev) dataMap.set(abbrev, val)
+        if (abbrev) dataMap.set(abbrev.toLowerCase(), val)
       }
     }
   }
 
   return features.features.map((f) => {
-    const featureId = String(f.properties?.[idProp] ?? f.id ?? '')
-    const featureName = String(f.properties?.name ?? f.properties?.NAME ?? featureId)
-    const value = dataMap.get(featureId) ?? dataMap.get(featureName) ?? null
+    const featureId = String(f.properties?.[idProp] ?? f.id ?? '').toLowerCase()
+    const featureName = String(f.properties?.name ?? f.properties?.NAME ?? '')
+    const value = dataMap.get(featureId) ?? dataMap.get(featureName.toLowerCase()) ?? null
 
-    return { feature: f, value, label: featureName }
+    return { feature: f, value, label: featureName || featureId }
   })
 }
 
