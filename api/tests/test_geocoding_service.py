@@ -63,6 +63,20 @@ def test_detect_country_column():
     assert len(result) == 1
     assert result[0].inferred_type == "country"
 
+def test_detect_snake_case_state_column():
+    """CUSTOMER_STATE should be detected even though _ is a word char in \b patterns."""
+    columns = [{"name": "CUSTOMER_STATE", "type": "text", "sample_values": ["SP", "RJ", "MG"]}]
+    result = detect_geo_columns(columns)
+    assert len(result) == 1
+    assert result[0].inferred_type == "state"
+    assert result[0].confidence == 0.75  # name match only; Brazilian codes not in US_STATES
+
+def test_detect_snake_case_lat_column():
+    columns = [{"name": "customer_lat", "type": "float", "sample_values": ["37.7749", "34.0522"]}]
+    result = detect_geo_columns(columns)
+    assert len(result) == 1
+    assert result[0].inferred_type == "lat_lon"
+
 def test_no_false_positive_on_name_column():
     columns = [{"name": "customer_name", "type": "text", "sample_values": ["Alice", "Bob", "Charlie"]}]
     result = detect_geo_columns(columns)
