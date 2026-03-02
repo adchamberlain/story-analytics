@@ -9,6 +9,7 @@ import { AnnotationEditor } from './AnnotationEditor'
 import type { ChartType } from '../../types/chart'
 import type { PaletteKey } from '../../themes/plotTheme'
 import { loadCustomGeoJSON, BASEMAPS, PROJECTIONS } from '../../utils/geoUtils'
+import { DEFAULT_MAX_CATEGORIES } from '../../utils/topNCategories'
 import { SUPPORTED_LOCALES } from '../../stores/localeStore'
 
 import type { AggregationType, TimeGrain, DataMode, EditorConfig, TableInfoItem } from '../../stores/editorStore'
@@ -37,11 +38,11 @@ export function Toolbox() {
   const [sqlSuccess, setSqlSuccess] = useState<string | null>(null)
   const sqlSuccessTimer = useRef<ReturnType<typeof setTimeout>>()
 
-  const [maxCatRaw, setMaxCatRaw] = useState(String(config.maxCategories ?? 20))
+  const [maxCatRaw, setMaxCatRaw] = useState(String(config.maxCategories ?? DEFAULT_MAX_CATEGORIES))
 
   // Sync maxCatRaw when config.maxCategories changes externally (e.g. chart type switch)
   useEffect(() => {
-    setMaxCatRaw(String(config.maxCategories ?? 20))
+    setMaxCatRaw(String(config.maxCategories ?? DEFAULT_MAX_CATEGORIES))
   }, [config.maxCategories])
 
   // Clean up pending timer on unmount
@@ -705,9 +706,9 @@ export function Toolbox() {
                 value={maxCatRaw}
                 onChange={(e) => setMaxCatRaw(e.target.value)}
                 onBlur={(e) => {
-                  const val = parseInt(e.target.value, 10)
+                  const val = Math.max(0, parseInt(e.target.value, 10))
                   updateConfig({ maxCategories: isNaN(val) ? undefined : val })
-                  setMaxCatRaw(String(isNaN(val) ? 20 : val))
+                  setMaxCatRaw(String(isNaN(val) ? DEFAULT_MAX_CATEGORIES : val))
                 }}
                 className="w-16 text-xs text-right bg-surface border border-border-default rounded px-1.5 py-0.5 text-text-primary"
               />

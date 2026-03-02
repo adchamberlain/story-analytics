@@ -96,6 +96,9 @@ export function buildChartConfig(chart: {
     geoSizeColumn: (cfg.geoSizeColumn as string) ?? undefined,
     geoSymbolShape: (cfg.geoSymbolShape as ChartConfig['geoSymbolShape']) ?? undefined,
     geoSizeRange: (cfg.geoSizeRange as ChartConfig['geoSizeRange']) ?? undefined,
+
+    // Top-N category clipping
+    maxCategories: (cfg.maxCategories as number) ?? undefined,
   }
 
   // Pass title and subtitle so detectValueUnit() can infer units from them
