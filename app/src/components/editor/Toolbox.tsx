@@ -37,6 +37,13 @@ export function Toolbox() {
   const [sqlSuccess, setSqlSuccess] = useState<string | null>(null)
   const sqlSuccessTimer = useRef<ReturnType<typeof setTimeout>>()
 
+  const [maxCatRaw, setMaxCatRaw] = useState(String(config.maxCategories ?? 20))
+
+  // Sync maxCatRaw when config.maxCategories changes externally (e.g. chart type switch)
+  useEffect(() => {
+    setMaxCatRaw(String(config.maxCategories ?? 20))
+  }, [config.maxCategories])
+
   // Clean up pending timer on unmount
   useEffect(() => {
     return () => clearTimeout(sqlSuccessTimer.current)
@@ -689,17 +696,20 @@ export function Toolbox() {
           )}
           {isBarFamily && (
             <div className="flex items-center justify-between">
-              <label className="text-xs text-text-secondary">Max categories</label>
+              <label htmlFor="max-categories" className="text-xs text-text-secondary">Max categories</label>
               <input
+                id="max-categories"
                 type="number"
                 min={0}
                 step={5}
-                value={config.maxCategories ?? 20}
-                onChange={(e) => {
+                value={maxCatRaw}
+                onChange={(e) => setMaxCatRaw(e.target.value)}
+                onBlur={(e) => {
                   const val = parseInt(e.target.value, 10)
                   updateConfig({ maxCategories: isNaN(val) ? undefined : val })
+                  setMaxCatRaw(String(isNaN(val) ? 20 : val))
                 }}
-                className="w-16 text-xs text-right bg-surface-secondary border border-border-default rounded px-1.5 py-0.5 text-text-primary"
+                className="w-16 text-xs text-right bg-surface border border-border-default rounded px-1.5 py-0.5 text-text-primary"
               />
             </div>
           )}
