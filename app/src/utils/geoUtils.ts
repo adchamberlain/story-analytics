@@ -108,9 +108,30 @@ export interface JoinedFeature {
   label: string
 }
 
+/** US state abbreviation → full name mapping for flexible join matching */
+const US_STATE_ABBREV: Record<string, string> = {
+  AL:'Alabama',AK:'Alaska',AZ:'Arizona',AR:'Arkansas',CA:'California',
+  CO:'Colorado',CT:'Connecticut',DE:'Delaware',FL:'Florida',GA:'Georgia',
+  HI:'Hawaii',ID:'Idaho',IL:'Illinois',IN:'Indiana',IA:'Iowa',
+  KS:'Kansas',KY:'Kentucky',LA:'Louisiana',ME:'Maine',MD:'Maryland',
+  MA:'Massachusetts',MI:'Michigan',MN:'Minnesota',MS:'Mississippi',MO:'Missouri',
+  MT:'Montana',NE:'Nebraska',NV:'Nevada',NH:'New Hampshire',NJ:'New Jersey',
+  NM:'New Mexico',NY:'New York',NC:'North Carolina',ND:'North Dakota',OH:'Ohio',
+  OK:'Oklahoma',OR:'Oregon',PA:'Pennsylvania',RI:'Rhode Island',SC:'South Carolina',
+  SD:'South Dakota',TN:'Tennessee',TX:'Texas',UT:'Utah',VT:'Vermont',
+  VA:'Virginia',WA:'Washington',WV:'West Virginia',WI:'Wisconsin',WY:'Wyoming',
+  DC:'District of Columbia',PR:'Puerto Rico',
+}
+
+/** Reverse: full state name (lowercase) → abbreviation */
+const US_STATE_NAME_TO_ABBREV = new Map<string, string>(
+  Object.entries(US_STATE_ABBREV).map(([abbr, name]) => [name.toLowerCase(), abbr])
+)
+
 /**
  * Join data rows to geography features by matching joinColumn values to feature IDs.
  * Returns features enriched with the matched data value.
+ * Supports matching on feature ID, name, and US state abbreviations.
  */
 export function joinDataToFeatures(
   features: FeatureCollection,
@@ -121,14 +142,24 @@ export function joinDataToFeatures(
 ): JoinedFeature[] {
   const meta = BASEMAPS.find((b) => b.id === basemapId)
   const idProp = meta?.idProperty ?? 'id'
+  const isUsStates = basemapId === 'us-states'
 
   // Build lookup: data join value → numeric value
+  // For US states, also index by normalized abbreviation and full name
   const dataMap = new Map<string, number>()
   for (const row of data) {
     const key = String(row[joinColumn] ?? '').trim()
     const val = Number(row[valueColumn])
     if (key && isFinite(val)) {
       dataMap.set(key, val)
+      if (isUsStates) {
+        // If key is an abbreviation like "CA", also store under full name "California"
+        const fullName = US_STATE_ABBREV[key.toUpperCase()]
+        if (fullName) dataMap.set(fullName, val)
+        // If key is a full name like "California", also store under abbreviation "CA"
+        const abbrev = US_STATE_NAME_TO_ABBREV.get(key.toLowerCase())
+        if (abbrev) dataMap.set(abbrev, val)
+      }
     }
   }
 
