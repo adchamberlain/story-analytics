@@ -359,6 +359,7 @@ export function SqlWorkbenchPanel({
         if (geoRes.ok) {
           const geoData = await geoRes.json()
           if (geoData?.columns?.length > 0) {
+            onClose()
             openGeoWizard(connectionId, geoData.columns)
             return
           }
@@ -379,13 +380,14 @@ export function SqlWorkbenchPanel({
       if (res.ok) {
         const data = await res.json()
         if (data.source_id) {
-          // Check for geographic columns — if found, open the GeoWizard instead of
-          // navigating directly. The wizard's onComplete/onSkip handles navigation.
+          // Check for geographic columns — if found, close the panel and open the GeoWizard.
+          // The wizard's onComplete/onSkip handles navigation to the editor.
           try {
             const geoRes = await authFetch(`/api/data/sources/${data.source_id}/detect-geo`, { method: 'POST' })
             if (geoRes.ok) {
               const geoData = await geoRes.json()
               if (geoData?.columns?.length > 0) {
+                onClose()
                 openGeoWizard(data.source_id, geoData.columns)
                 return
               }
@@ -399,7 +401,7 @@ export function SqlWorkbenchPanel({
     } catch {
       // sync-query not yet available
     }
-  }, [connectionId, currentSql, navigate, dbType, openGeoWizard])
+  }, [connectionId, currentSql, navigate, dbType, openGeoWizard, onClose])
 
   // ---------- Render nothing when fully closed ----------
   if (!mounted) return null
