@@ -38,6 +38,7 @@ interface WizardState {
   jobResolved: number
   jobTotal: number
   error: string | null
+  loading: boolean
 }
 
 interface Props {
@@ -60,6 +61,7 @@ export function GeoWizardModal({ sourceId, detectedColumns, onComplete, onSkip }
     jobResolved: 0,
     jobTotal: 0,
     error: null,
+    loading: false,
   })
 
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -67,7 +69,7 @@ export function GeoWizardModal({ sourceId, detectedColumns, onComplete, onSkip }
   const update = (patch: Partial<WizardState>) => setState(s => ({ ...s, ...patch }))
 
   const handlePreview = async () => {
-    update({ error: null })
+    update({ error: null, loading: true })
     try {
       const res = await fetch(`/api/data/sources/${sourceId}/geocode-preview`, {
         method: 'POST',
@@ -82,13 +84,19 @@ export function GeoWizardModal({ sourceId, detectedColumns, onComplete, onSkip }
         previewResults: data.results,
         previewMatched: data.matched,
         previewTotal: data.total,
+        loading: false,
       })
     } catch (e) {
-      update({ error: e instanceof Error ? e.message : 'Preview failed' })
+      update({ error: e instanceof Error ? e.message : 'Preview failed', loading: false })
     }
   }
 
   const handleApplyFull = async () => {
+    // If user says columns are already lat/lon, no geocoding needed
+    if (state.selectedType === 'lat_lon') {
+      onComplete()
+      return
+    }
     update({ step: 3, error: null })
     try {
       const res = await fetch(`/api/data/sources/${sourceId}/geocode-full`, {
@@ -146,7 +154,16 @@ export function GeoWizardModal({ sourceId, detectedColumns, onComplete, onSkip }
             <h2 className="text-base font-semibold text-text-primary">Set up location data</h2>
             <p className="text-xs text-text-secondary mt-0.5">Step {state.step} of 3</p>
           </div>
-          <button onClick={onSkip} className="text-xs text-text-muted hover:text-text-secondary">
+          <button
+            onClick={() => {
+              if (pollIntervalRef.current) {
+                clearInterval(pollIntervalRef.current)
+                pollIntervalRef.current = null
+              }
+              onSkip()
+            }}
+            className="text-xs text-text-muted hover:text-text-secondary"
+          >
             Skip
           </button>
         </div>
@@ -161,7 +178,13 @@ export function GeoWizardModal({ sourceId, detectedColumns, onComplete, onSkip }
               <label className="block text-xs font-medium text-text-secondary mb-1">Location column</label>
               <select
                 value={state.selectedColumn}
-                onChange={e => update({ selectedColumn: e.target.value })}
+                onChange={e => {
+                  const col = detectedColumns.find(c => c.name === e.target.value)
+                  update({
+                    selectedColumn: e.target.value,
+                    selectedType: col?.inferred_type ?? state.selectedType,
+                  })
+                }}
                 className="w-full px-2 py-1.5 text-sm border border-border-default rounded-md bg-surface text-text-primary focus:outline-none focus:border-blue-400"
               >
                 {detectedColumns.map(c => (
@@ -277,19 +300,19 @@ export function GeoWizardModal({ sourceId, detectedColumns, onComplete, onSkip }
           {state.step === 1 && (
             <button
               onClick={handlePreview}
-              disabled={!state.selectedColumn}
+              disabled={!state.selectedColumn || state.loading}
               className="px-4 py-1.5 text-sm bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white rounded-md"
             >
-              Preview →
+              {state.loading ? 'Loading…' : 'Preview →'}
             </button>
           )}
           {state.step === 2 && (
             <button
               onClick={handleApplyFull}
-              disabled={state.previewMatched === 0}
+              disabled={state.selectedType !== 'lat_lon' && state.previewMatched === 0}
               className="px-4 py-1.5 text-sm bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white rounded-md"
             >
-              Apply to full dataset →
+              {state.selectedType === 'lat_lon' ? 'Continue →' : 'Apply to full dataset →'}
             </button>
           )}
         </div>

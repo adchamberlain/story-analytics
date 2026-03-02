@@ -1,8 +1,12 @@
 """Geo intake endpoints: detect, preview, geocode."""
 from __future__ import annotations
 
+from typing import Literal
+
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel
+
+GeoTypeLiteral = Literal["lat_lon", "state", "country", "zip", "fips", "city", "address"]
 
 from ..auth_simple import get_current_user
 from ..services.duckdb_service import get_duckdb_service, _SAFE_SOURCE_ID_RE
@@ -20,7 +24,7 @@ class DetectGeoResponse(BaseModel):
 
 class GeoPreviewRequest(BaseModel):
     column: str
-    geo_type: str
+    geo_type: GeoTypeLiteral
 
 
 class GeoPreviewResponse(BaseModel):
@@ -31,7 +35,7 @@ class GeoPreviewResponse(BaseModel):
 
 class GeoFullRequest(BaseModel):
     column: str
-    geo_type: str
+    geo_type: GeoTypeLiteral
 
 
 class GeoFullResponse(BaseModel):
@@ -104,7 +108,7 @@ def geocode_preview(
         ).fetchall()
 
     values = [str(row[0]) for row in result]
-    results = geo.geocode_values(values, req.geo_type)  # type: ignore[arg-type]
+    results = geo.geocode_values(values, req.geo_type)
     return GeoPreviewResponse(
         results=[
             {"value": r.value, "lat": r.lat, "lon": r.lon, "matched": r.matched}
@@ -133,7 +137,7 @@ def _run_geocode_full(job_id: str, source_id: str, column: str, geo_type: str) -
         geo.update_job_progress(job_id, resolved=0, total=len(unique_values))
 
         # Geocode unique values
-        results = geo.geocode_values(unique_values, geo_type)  # type: ignore[arg-type]
+        results = geo.geocode_values(unique_values, geo_type)
         lookup = {r.value: (r.lat, r.lon) for r in results if r.matched}
 
         # Add _lat/_lon columns if not present
@@ -181,7 +185,7 @@ def geocode_full(
     job_id = geo.create_job(
         source_id=source_id,
         column=req.column,
-        geo_type=req.geo_type,  # type: ignore[arg-type]
+        geo_type=req.geo_type,
     )
     background_tasks.add_task(_run_geocode_full, job_id, source_id, req.column, req.geo_type)
     return GeoFullResponse(job_id=job_id)
