@@ -37,6 +37,7 @@ from .routers.versions import router as versions_router  # noqa: E402
 from .routers.transforms import router as transforms_router  # noqa: E402
 from .routers.admin import router as admin_router  # noqa: E402
 from .routers.ai import router as ai_router  # noqa: E402
+from .routers import geo as geo_router  # noqa: E402
 
 settings = get_settings()
 
@@ -131,6 +132,7 @@ app.include_router(versions_router, prefix="/api")
 app.include_router(transforms_router, prefix="/api")
 app.include_router(admin_router, prefix="/api")
 app.include_router(ai_router, prefix="/api")
+app.include_router(geo_router.router, prefix="/api")
 
 
 def _seed_data_if_empty():
