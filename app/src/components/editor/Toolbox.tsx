@@ -56,6 +56,7 @@ export function Toolbox() {
   }
 
   const isBar = config.chartType === 'BarChart'
+  const isBarFamily = ['BarChart', 'StackedColumn', 'GroupedColumn'].includes(config.chartType)
   const isBigValue = config.chartType === 'BigValue'
   const isDataTable = config.chartType === 'DataTable'
   const isMapType = ['ChoroplethMap', 'SymbolMap', 'LocatorMap', 'SpikeMap'].includes(config.chartType)
@@ -685,6 +686,25 @@ export function Toolbox() {
               checked={config.stacked}
               onChange={(stacked) => updateConfig({ stacked })}
             />
+          )}
+          {isBarFamily && (
+            <div className="flex items-center justify-between">
+              <label className="text-xs text-text-secondary">Max categories</label>
+              <input
+                type="number"
+                min={0}
+                step={5}
+                value={config.maxCategories ?? 20}
+                onChange={(e) => {
+                  const val = parseInt(e.target.value, 10)
+                  updateConfig({ maxCategories: isNaN(val) ? undefined : val })
+                }}
+                className="w-16 text-xs text-right bg-surface-secondary border border-border-default rounded px-1.5 py-0.5 text-text-primary"
+              />
+            </div>
+          )}
+          {isBarFamily && (
+            <p className="text-xs text-text-muted -mt-1">0 = show all categories</p>
           )}
           {!isMapType && (
             <Toggle
