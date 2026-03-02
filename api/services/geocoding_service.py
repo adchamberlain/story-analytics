@@ -1,11 +1,20 @@
 """Static geo lookup: resolves state and country names to (lat, lon)."""
 from __future__ import annotations
 import re
+import time
+import urllib.request
+import urllib.parse
+import json
+import logging
 from dataclasses import dataclass
 from typing import Literal
 
 from .data.us_states import US_STATES
 from .data.countries import COUNTRIES
+
+logger = logging.getLogger(__name__)
+
+_NOMINATIM_CACHE: dict[str, tuple[float, float] | None] = {}
 
 GeoType = Literal["lat_lon", "state", "country", "zip", "fips", "city", "address"]
 
@@ -104,3 +113,74 @@ def detect_geo_columns(columns: list[dict]) -> list[DetectedColumn]:
         # else: not detected as geo — skip
 
     return results
+
+
+@dataclass
+class GeoResult:
+    value: str
+    lat: float | None
+    lon: float | None
+    matched: bool
+
+
+def _call_nominatim(query: str) -> tuple[float, float] | None:
+    """Call Nominatim public API. Returns (lat, lon) or None. Results cached in _NOMINATIM_CACHE."""
+    if query in _NOMINATIM_CACHE:
+        return _NOMINATIM_CACHE[query]
+    params = urllib.parse.urlencode({"q": query, "format": "json", "limit": 1})
+    url = f"https://nominatim.openstreetmap.org/search?{params}"
+    req = urllib.request.Request(url, headers={"User-Agent": "story-analytics/1.0"})
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read())
+        if data:
+            result: tuple[float, float] = (float(data[0]["lat"]), float(data[0]["lon"]))
+            _NOMINATIM_CACHE[query] = result
+            return result
+    except Exception as e:
+        logger.warning("Nominatim error for %r: %s", query, e)
+    _NOMINATIM_CACHE[query] = None
+    return None
+
+
+def geocode_values(values: list[str], geo_type: GeoType) -> list[GeoResult]:
+    """
+    Geocode a list of values. Deduplicates internally to avoid redundant lookups.
+    Uses static lookups first, Nominatim as fallback for city/address types.
+    Nominatim calls are rate-limited to 1 request per second.
+    """
+    # Resolve unique values (preserves order via dict.fromkeys)
+    unique: dict[str, tuple[float, float] | None] = {}
+    last_nominatim_call = 0.0
+
+    for v in dict.fromkeys(values):
+        normalized = v.strip().lower()
+
+        # Already lat_lon — nothing to geocode
+        if geo_type == "lat_lon":
+            unique[v] = None
+            continue
+
+        # Try static lookup first
+        coords = resolve_static(normalized, geo_type)
+        if coords:
+            unique[v] = coords
+            continue
+
+        # Nominatim fallback for all unresolved types
+        elapsed = time.monotonic() - last_nominatim_call
+        if elapsed < 1.0:
+            time.sleep(1.0 - elapsed)
+        coords = _call_nominatim(v)
+        last_nominatim_call = time.monotonic()
+        unique[v] = coords
+
+    return [
+        GeoResult(
+            value=v,
+            lat=unique[v][0] if unique.get(v) else None,
+            lon=unique[v][1] if unique.get(v) else None,
+            matched=unique.get(v) is not None,
+        )
+        for v in values
+    ]
