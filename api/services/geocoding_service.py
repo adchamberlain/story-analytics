@@ -152,12 +152,20 @@ def _call_nominatim(query: str) -> tuple[float, float] | None:
     return None
 
 
-def geocode_values(values: list[str], geo_type: GeoType) -> list[GeoResult]:
+def geocode_values(values: list[str], geo_type: GeoType, country: str = "") -> list[GeoResult]:
     """
     Geocode a list of values. Deduplicates internally to avoid redundant lookups.
-    Uses static lookups first, Nominatim as fallback for city/address types.
+    Uses static lookups first (US only), then Nominatim with optional country context.
+
+    country: if provided, appended to Nominatim queries ("São Paulo, Brazil") and
+             used to skip US-specific static tables when the data is non-US.
     Nominatim calls are rate-limited to 1 request per second.
     """
+    country_clean = country.strip()
+    country_lc = country_clean.lower()
+    # Use US static tables only when country is unset or explicitly US
+    use_us_static = not country_lc or country_lc in ("united states", "us", "usa")
+
     # Resolve unique values (preserves order via dict.fromkeys)
     unique: dict[str, tuple[float, float] | None] = {}
 
@@ -169,14 +177,16 @@ def geocode_values(values: list[str], geo_type: GeoType) -> list[GeoResult]:
             unique[v] = None
             continue
 
-        # Try static lookup first
-        coords = resolve_static(normalized, geo_type)
-        if coords:
-            unique[v] = coords
-            continue
+        # Try US static lookup only when appropriate
+        if use_us_static:
+            coords = resolve_static(normalized, geo_type)
+            if coords:
+                unique[v] = coords
+                continue
 
-        # Nominatim fallback for all unresolved types
-        coords = _call_nominatim(v)
+        # Nominatim: append country context for better international resolution
+        query = f"{v}, {country_clean}" if country_clean else v
+        coords = _call_nominatim(query)
         unique[v] = coords
 
     return [
@@ -196,6 +206,7 @@ class GeoJob:
     source_id: str
     column: str
     geo_type: GeoType
+    country: str = ""
     status: Literal["running", "complete", "failed"] = "running"
     resolved: int = 0
     total: int = 0
@@ -205,13 +216,14 @@ class GeoJob:
 _jobs: dict[str, GeoJob] = {}
 
 
-def create_job(source_id: str, column: str, geo_type: GeoType) -> str:
+def create_job(source_id: str, column: str, geo_type: GeoType, country: str = "") -> str:
     job_id = uuid.uuid4().hex[:16]
     _jobs[job_id] = GeoJob(
         job_id=job_id,
         source_id=source_id,
         column=column,
         geo_type=geo_type,
+        country=country,
     )
     return job_id
 

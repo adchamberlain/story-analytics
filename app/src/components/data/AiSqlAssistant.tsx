@@ -68,6 +68,7 @@ export function AiSqlAssistant({
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
   const prevErrorRef = useRef<string | null>(null)
 
   // Auto-scroll to bottom on new messages
@@ -158,6 +159,7 @@ export function AiSqlAssistant({
     const text = input.trim()
     if (!text || loading) return
     setInput('')
+    if (textareaRef.current) textareaRef.current.style.height = ''
     sendMessage(text)
   }
 
@@ -258,15 +260,16 @@ export function AiSqlAssistant({
           <div className="border-t border-border-default px-3 py-2">
             <div className="flex gap-2 items-end">
               <textarea
+                ref={textareaRef}
                 value={input}
                 onChange={(e) => {
                   setInput(e.target.value)
-                  // Auto-expand: reset to 1 row then grow to scrollHeight
+                  // Collapse to 1 row when empty, otherwise grow to content
                   e.target.style.height = 'auto'
-                  e.target.style.height = `${e.target.scrollHeight}px`
+                  e.target.style.height = e.target.value ? `${e.target.scrollHeight}px` : ''
                 }}
                 onKeyDown={handleKeyDown}
-                placeholder="e.g. How many unique customer IDs are in this table?"
+                placeholder=""
                 rows={1}
                 className="flex-1 px-2 py-1.5 text-sm border border-border-default rounded bg-surface text-text-primary focus:outline-none focus:border-blue-400 resize-none overflow-hidden"
                 style={{ maxHeight: 120 }}
