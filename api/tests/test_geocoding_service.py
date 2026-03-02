@@ -61,3 +61,36 @@ def test_no_false_positive_on_name_column():
     columns = [{"name": "customer_name", "type": "text", "sample_values": ["Alice", "Bob", "Charlie"]}]
     result = detect_geo_columns(columns)
     assert len(result) == 0
+
+
+from unittest.mock import patch
+from api.services.geocoding_service import geocode_values, GeoResult
+
+def test_geocode_values_static_state():
+    results = geocode_values(["california", "texas"], "state")
+    assert results[0].value == "california"
+    assert results[0].matched is True
+    assert abs(results[0].lat - 36.116203) < 1.0
+    assert results[1].matched is True
+
+def test_geocode_values_unrecognized():
+    results = geocode_values(["notaplace123"], "state")
+    assert results[0].matched is False
+    assert results[0].lat is None
+
+def test_geocode_values_deduplicates():
+    """Same value only geocoded once — both results have same lat."""
+    results = geocode_values(["california", "california", "texas"], "state")
+    assert len(results) == 3
+    assert results[0].lat == results[1].lat
+
+def test_geocode_values_nominatim_called_for_city(monkeypatch):
+    """City type falls through to Nominatim when not in static tables."""
+    called_with = []
+    def mock_nominatim(query: str) -> tuple[float, float] | None:
+        called_with.append(query)
+        return (30.2672, -97.7431)
+    monkeypatch.setattr("api.services.geocoding_service._call_nominatim", mock_nominatim)
+    results = geocode_values(["Austin TX"], "city")
+    assert results[0].matched is True
+    assert "Austin TX" in called_with
