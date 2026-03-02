@@ -95,3 +95,31 @@ def test_geocode_values_nominatim_called_for_city(monkeypatch):
     results = geocode_values(["Austin TX"], "city")
     assert results[0].matched is True
     assert "Austin TX" in called_with
+
+
+from api.services.geocoding_service import create_job, get_job, update_job_progress, GeoJob
+
+def test_create_and_get_job():
+    job_id = create_job(source_id="abc123", column="city", geo_type="city")
+    job = get_job(job_id)
+    assert job is not None
+    assert job.status == "running"
+    assert job.source_id == "abc123"
+    assert job.resolved == 0
+
+def test_update_job_progress():
+    job_id = create_job(source_id="def456", column="state", geo_type="state")
+    update_job_progress(job_id, resolved=25, total=50)
+    job = get_job(job_id)
+    assert job.resolved == 25
+    assert job.total == 50
+
+def test_complete_job():
+    job_id = create_job(source_id="ghi789", column="zip", geo_type="zip")
+    update_job_progress(job_id, resolved=100, total=100, status="complete")
+    job = get_job(job_id)
+    assert job.status == "complete"
+
+def test_get_nonexistent_job_returns_none():
+    result = get_job("doesnotexist")
+    assert result is None

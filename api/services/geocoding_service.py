@@ -2,6 +2,7 @@
 from __future__ import annotations
 import re
 import time
+import uuid
 import urllib.request
 import urllib.parse
 import json
@@ -187,3 +188,48 @@ def geocode_values(values: list[str], geo_type: GeoType) -> list[GeoResult]:
         )
         for v in values
     ]
+
+
+@dataclass
+class GeoJob:
+    job_id: str
+    source_id: str
+    column: str
+    geo_type: GeoType
+    status: Literal["running", "complete", "failed"] = "running"
+    resolved: int = 0
+    total: int = 0
+    error: str | None = None
+
+
+_jobs: dict[str, GeoJob] = {}
+
+
+def create_job(source_id: str, column: str, geo_type: GeoType) -> str:
+    job_id = uuid.uuid4().hex[:16]
+    _jobs[job_id] = GeoJob(
+        job_id=job_id,
+        source_id=source_id,
+        column=column,
+        geo_type=geo_type,
+    )
+    return job_id
+
+
+def get_job(job_id: str) -> GeoJob | None:
+    return _jobs.get(job_id)
+
+
+def update_job_progress(
+    job_id: str,
+    resolved: int,
+    total: int,
+    status: Literal["running", "complete", "failed"] = "running",
+    error: str | None = None,
+) -> None:
+    job = _jobs.get(job_id)
+    if job:
+        job.resolved = resolved
+        job.total = total
+        job.status = status
+        job.error = error
