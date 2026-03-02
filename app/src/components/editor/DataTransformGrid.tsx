@@ -158,21 +158,21 @@ export function DataTransformGrid({ data, onTransform, transforming }: DataTrans
                   {menuCol === col && (
                     <div
                       ref={menuRef}
-                      className="absolute top-full left-0 z-20 mt-1 bg-white dark:bg-gray-800 border border-border-default rounded-md shadow-lg py-1 min-w-[140px]"
+                      className="absolute top-full left-0 z-20 mt-1 bg-surface-raised border border-border-default rounded-md shadow-lg py-1 min-w-[140px]"
                     >
-                      <button onClick={() => handleColumnAction(col, 'rename')} className="block w-full text-left px-3 py-1.5 text-xs hover:bg-surface-secondary">
+                      <button onClick={() => handleColumnAction(col, 'rename')} className="block w-full text-left px-3 py-1.5 text-xs text-text-primary hover:bg-surface-secondary">
                         Rename
                       </button>
-                      <button onClick={() => handleColumnAction(col, 'round')} className="block w-full text-left px-3 py-1.5 text-xs hover:bg-surface-secondary">
+                      <button onClick={() => handleColumnAction(col, 'round')} className="block w-full text-left px-3 py-1.5 text-xs text-text-primary hover:bg-surface-secondary">
                         Round...
                       </button>
-                      <button onClick={() => handleColumnAction(col, 'cast-number')} className="block w-full text-left px-3 py-1.5 text-xs hover:bg-surface-secondary">
+                      <button onClick={() => handleColumnAction(col, 'cast-number')} className="block w-full text-left px-3 py-1.5 text-xs text-text-primary hover:bg-surface-secondary">
                         Cast to Number
                       </button>
-                      <button onClick={() => handleColumnAction(col, 'cast-text')} className="block w-full text-left px-3 py-1.5 text-xs hover:bg-surface-secondary">
+                      <button onClick={() => handleColumnAction(col, 'cast-text')} className="block w-full text-left px-3 py-1.5 text-xs text-text-primary hover:bg-surface-secondary">
                         Cast to Text
                       </button>
-                      <button onClick={() => handleColumnAction(col, 'prepend-append')} className="block w-full text-left px-3 py-1.5 text-xs hover:bg-surface-secondary">
+                      <button onClick={() => handleColumnAction(col, 'prepend-append')} className="block w-full text-left px-3 py-1.5 text-xs text-text-primary hover:bg-surface-secondary">
                         Prepend / Append...
                       </button>
                       <hr className="my-1 border-border-default" />
