@@ -63,7 +63,7 @@ def test_geocode_preview_returns_results(monkeypatch):
     # Monkeypatch geocode_values so no real Nominatim calls
     from api.services import geocoding_service as geo
     from api.services.geocoding_service import GeoResult
-    monkeypatch.setattr(geo, "geocode_values", lambda values, geo_type: [
+    monkeypatch.setattr(geo, "geocode_values", lambda values, geo_type, country="": [
         GeoResult(value=v, lat=30.0 + i, lon=-90.0, matched=True)
         for i, v in enumerate(values)
     ])

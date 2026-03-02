@@ -686,11 +686,13 @@ export function Toolbox() {
               onChange={(stacked) => updateConfig({ stacked })}
             />
           )}
-          <Toggle
-            label="Grid lines"
-            checked={config.showGrid}
-            onChange={(showGrid) => updateConfig({ showGrid })}
-          />
+          {!isMapType && (
+            <Toggle
+              label="Grid lines"
+              checked={config.showGrid}
+              onChange={(showGrid) => updateConfig({ showGrid })}
+            />
+          )}
           {(config.series || isMultiY) && (
             <Toggle
               label="Legend"
@@ -736,20 +738,22 @@ export function Toolbox() {
       </Section>
 
       {/* Axis Labels */}
-      <Section title="Axis Labels">
-        <div className="space-y-2">
-          <TextInput
-            label="X Axis Label"
-            value={config.xAxisTitle}
-            onChange={(xAxisTitle) => updateConfig({ xAxisTitle })}
-          />
-          <TextInput
-            label="Y Axis Label"
-            value={config.yAxisTitle}
-            onChange={(yAxisTitle) => updateConfig({ yAxisTitle })}
-          />
-        </div>
-      </Section>
+      {!isMapType && (
+        <Section title="Axis Labels">
+          <div className="space-y-2">
+            <TextInput
+              label="X Axis Label"
+              value={config.xAxisTitle}
+              onChange={(xAxisTitle) => updateConfig({ xAxisTitle })}
+            />
+            <TextInput
+              label="Y Axis Label"
+              value={config.yAxisTitle}
+              onChange={(yAxisTitle) => updateConfig({ yAxisTitle })}
+            />
+          </div>
+        </Section>
+      )}
 
       {/* Locale Override */}
       <Section title="Locale">

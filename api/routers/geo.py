@@ -25,6 +25,7 @@ class DetectGeoResponse(BaseModel):
 class GeoPreviewRequest(BaseModel):
     column: str
     geo_type: GeoTypeLiteral
+    country: str = ""
 
 
 class GeoPreviewResponse(BaseModel):
@@ -36,6 +37,7 @@ class GeoPreviewResponse(BaseModel):
 class GeoFullRequest(BaseModel):
     column: str
     geo_type: GeoTypeLiteral
+    country: str = ""
 
 
 class GeoFullResponse(BaseModel):
@@ -108,7 +110,7 @@ def geocode_preview(
         ).fetchall()
 
     values = [str(row[0]) for row in result]
-    results = geo.geocode_values(values, req.geo_type)
+    results = geo.geocode_values(values, req.geo_type, req.country)
     return GeoPreviewResponse(
         results=[
             {"value": r.value, "lat": r.lat, "lon": r.lon, "matched": r.matched}
@@ -119,7 +121,7 @@ def geocode_preview(
     )
 
 
-def _run_geocode_full(job_id: str, source_id: str, column: str, geo_type: str) -> None:
+def _run_geocode_full(job_id: str, source_id: str, column: str, geo_type: str, country: str = "") -> None:
     """Background task: geocode all rows, write _lat/_lon columns back to CSV."""
     try:
         _path, key = _get_source_info(source_id)
@@ -137,7 +139,7 @@ def _run_geocode_full(job_id: str, source_id: str, column: str, geo_type: str) -
         geo.update_job_progress(job_id, resolved=0, total=len(unique_values))
 
         # Geocode unique values
-        results = geo.geocode_values(unique_values, geo_type)
+        results = geo.geocode_values(unique_values, geo_type, country)
         lookup = {r.value: (r.lat, r.lon) for r in results if r.matched}
 
         # Add _lat/_lon columns if not present
@@ -186,8 +188,9 @@ def geocode_full(
         source_id=source_id,
         column=req.column,
         geo_type=req.geo_type,
+        country=req.country,
     )
-    background_tasks.add_task(_run_geocode_full, job_id, source_id, req.column, req.geo_type)
+    background_tasks.add_task(_run_geocode_full, job_id, source_id, req.column, req.geo_type, req.country)
     return GeoFullResponse(job_id=job_id)
 
 

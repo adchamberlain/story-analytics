@@ -4,7 +4,7 @@ export const GEO_TYPES = ['state', 'country', 'zip', 'fips', 'city', 'address', 
 export type GeoType = typeof GEO_TYPES[number]
 
 const GEO_TYPE_LABELS: Record<GeoType, string> = {
-  state: 'US State (name or abbreviation)',
+  state: 'State / Province name or abbreviation',
   country: 'Country name or ISO code',
   zip: 'US Zip / Postal code',
   fips: 'US FIPS code',
@@ -12,6 +12,27 @@ const GEO_TYPE_LABELS: Record<GeoType, string> = {
   address: 'Full address',
   lat_lon: 'Already Lat/Lon — skip geocoding',
 }
+
+// Types where country context meaningfully improves geocoding
+const COUNTRY_CONTEXT_TYPES: GeoType[] = ['state', 'city', 'address']
+
+const COMMON_COUNTRIES = [
+  { value: '', label: 'Auto-detect' },
+  { value: 'United States', label: 'United States' },
+  { value: 'Brazil', label: 'Brazil' },
+  { value: 'United Kingdom', label: 'United Kingdom' },
+  { value: 'Canada', label: 'Canada' },
+  { value: 'Australia', label: 'Australia' },
+  { value: 'Germany', label: 'Germany' },
+  { value: 'France', label: 'France' },
+  { value: 'Mexico', label: 'Mexico' },
+  { value: 'India', label: 'India' },
+  { value: 'Spain', label: 'Spain' },
+  { value: 'Italy', label: 'Italy' },
+  { value: 'Japan', label: 'Japan' },
+  { value: 'China', label: 'China' },
+  { value: '__other__', label: 'Other…' },
+]
 
 export interface DetectedColumn {
   name: string
@@ -31,6 +52,8 @@ interface WizardState {
   step: 1 | 2 | 3
   selectedColumn: string
   selectedType: GeoType
+  country: string       // empty = auto-detect; "__other__" = show free-text input
+  countryOther: string  // free-text value when country === '__other__'
   previewResults: PreviewRow[]
   previewMatched: number
   previewTotal: number
@@ -54,6 +77,8 @@ export function GeoWizardModal({ sourceId, detectedColumns, onComplete, onSkip }
     step: 1,
     selectedColumn: primary?.name ?? '',
     selectedType: primary?.inferred_type ?? 'city',
+    country: '',
+    countryOther: '',
     previewResults: [],
     previewMatched: 0,
     previewTotal: 0,
@@ -68,13 +93,16 @@ export function GeoWizardModal({ sourceId, detectedColumns, onComplete, onSkip }
 
   const update = (patch: Partial<WizardState>) => setState(s => ({ ...s, ...patch }))
 
+  // Resolve the effective country string to send to the API
+  const effectiveCountry = state.country === '__other__' ? state.countryOther.trim() : state.country
+
   const handlePreview = async () => {
     update({ error: null, loading: true })
     try {
       const res = await fetch(`/api/data/sources/${sourceId}/geocode-preview`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ column: state.selectedColumn, geo_type: state.selectedType }),
+        body: JSON.stringify({ column: state.selectedColumn, geo_type: state.selectedType, country: effectiveCountry }),
         credentials: 'include',
       })
       if (!res.ok) throw new Error('Preview failed')
@@ -102,7 +130,7 @@ export function GeoWizardModal({ sourceId, detectedColumns, onComplete, onSkip }
       const res = await fetch(`/api/data/sources/${sourceId}/geocode-full`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ column: state.selectedColumn, geo_type: state.selectedType }),
+        body: JSON.stringify({ column: state.selectedColumn, geo_type: state.selectedType, country: effectiveCountry }),
         credentials: 'include',
       })
       if (!res.ok) throw new Error('Failed to start geocoding')
@@ -212,6 +240,32 @@ export function GeoWizardModal({ sourceId, detectedColumns, onComplete, onSkip }
                 ))}
               </select>
             </div>
+
+            {/* Country context — only for types where it matters */}
+            {COUNTRY_CONTEXT_TYPES.includes(state.selectedType) && (
+              <div>
+                <label className="block text-xs font-medium text-text-secondary mb-1">Country</label>
+                <select
+                  value={state.country}
+                  onChange={e => update({ country: e.target.value, countryOther: '' })}
+                  className="w-full px-2 py-1.5 text-sm border border-border-default rounded-md bg-surface text-text-primary focus:outline-none focus:border-blue-400"
+                >
+                  {COMMON_COUNTRIES.map(c => (
+                    <option key={c.value} value={c.value}>{c.label}</option>
+                  ))}
+                </select>
+                {state.country === '__other__' && (
+                  <input
+                    type="text"
+                    value={state.countryOther}
+                    onChange={e => update({ countryOther: e.target.value })}
+                    placeholder="Type country name…"
+                    className="mt-1.5 w-full px-2 py-1.5 text-sm border border-border-default rounded-md bg-surface text-text-primary focus:outline-none focus:border-blue-400"
+                  />
+                )}
+              </div>
+            )}
+
             {state.error && <p className="text-xs text-red-400">{state.error}</p>}
           </div>
         )}

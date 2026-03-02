@@ -435,81 +435,86 @@ export function SqlWorkbenchPanel({
           </button>
         </div>
 
-        {/* ---- Scrollable body ---- */}
-        <div className="flex-1 overflow-y-auto flex flex-col gap-4 p-5">
-          {/* Schema tree */}
-          <div className="border border-border-default rounded-lg overflow-hidden max-h-[240px] overflow-y-auto bg-surface">
-            <div className="px-3 py-2 border-b border-border-default bg-surface-secondary text-xs font-semibold text-text-muted uppercase tracking-wider">
-              Schema
+        {/* ---- Body: schema + editor + results scroll; AI assistant pinned at bottom ---- */}
+        <div className="flex-1 flex flex-col overflow-hidden">
+          {/* Scrollable top section */}
+          <div className="flex-1 overflow-y-auto flex flex-col gap-4 p-5 min-h-0">
+            {/* Schema tree */}
+            <div className="border border-border-default rounded-lg overflow-hidden max-h-[240px] overflow-y-auto bg-surface">
+              <div className="px-3 py-2 border-b border-border-default bg-surface-secondary text-xs font-semibold text-text-muted uppercase tracking-wider">
+                Schema
+              </div>
+              {schemaError ? (
+                <div className="px-3 py-3 text-[13px] text-red-400">{schemaError}</div>
+              ) : (
+                <SchemaTree
+                  schemas={schemas}
+                  loading={schemaLoading}
+                  onSelectTable={handleSelectTable}
+                  onInsertColumn={handleInsertColumn}
+                />
+              )}
             </div>
-            {schemaError ? (
-              <div className="px-3 py-3 text-[13px] text-red-400">{schemaError}</div>
-            ) : (
-              <SchemaTree
-                schemas={schemas}
-                loading={schemaLoading}
-                onSelectTable={handleSelectTable}
-                onInsertColumn={handleInsertColumn}
-              />
-            )}
-          </div>
 
-          {/* SQL Editor */}
-          <div className="flex flex-col gap-2">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-text-muted uppercase tracking-wider">
-                SQL Editor
-              </span>
-              <div className="flex items-center gap-2">
-                <span className="text-[11px] text-text-muted">
-                  {'\u2318'}+Enter to run
+            {/* SQL Editor */}
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-text-muted uppercase tracking-wider">
+                  SQL Editor
                 </span>
-                <button
-                  onClick={() => runQuery()}
-                  disabled={queryLoading || !currentSql.trim()}
-                  className="px-3 py-1 text-xs font-medium rounded bg-blue-600 text-white hover:bg-blue-500 transition-colors disabled:opacity-50"
-                >
-                  Run
-                </button>
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] text-text-muted">
+                    {'\u2318'}+Enter to run
+                  </span>
+                  <button
+                    onClick={() => runQuery()}
+                    disabled={queryLoading || !currentSql.trim()}
+                    className="px-3 py-1 text-xs font-medium rounded bg-blue-600 text-white hover:bg-blue-500 transition-colors disabled:opacity-50"
+                  >
+                    Run
+                  </button>
+                </div>
+              </div>
+              <div className="border border-border-default rounded-lg overflow-hidden">
+                <SqlEditor
+                  ref={editorRef}
+                  schema={schemaCompletions}
+                  placeholder="Write SQL... (Cmd+Enter to run)"
+                  onRun={(sql) => {
+                    setCurrentSql(sql)
+                    runQuery(sql)
+                  }}
+                  onChange={setCurrentSql}
+                />
               </div>
             </div>
-            <div className="border border-border-default rounded-lg overflow-hidden">
-              <SqlEditor
-                ref={editorRef}
-                schema={schemaCompletions}
-                placeholder="Write SQL... (Cmd+Enter to run)"
-                onRun={(sql) => {
-                  setCurrentSql(sql)
-                  runQuery(sql)
-                }}
-                onChange={setCurrentSql}
-              />
-            </div>
+
+            {/* Query Results */}
+            <QueryResults
+              data={queryResult}
+              error={queryError}
+              loading={queryLoading}
+              onChartThis={onImportSource ? handleImportSource : handleChartThis}
+              onFixWithAi={handleFixWithAi}
+              actionLabel={onImportSource ? 'Import as Source' : undefined}
+              actionLoading={importLoading}
+            />
           </div>
 
-          {/* Query Results */}
-          <QueryResults
-            data={queryResult}
-            error={queryError}
-            loading={queryLoading}
-            onChartThis={onImportSource ? handleImportSource : handleChartThis}
-            onFixWithAi={handleFixWithAi}
-            actionLabel={onImportSource ? 'Import as Source' : undefined}
-            actionLoading={importLoading}
-          />
-
-          {/* AI SQL Assistant */}
-          <AiSqlAssistant
-            dialect={dbType === 'csv' ? 'duckdb' : dbType}
-            schemaContext={schemaContext}
-            currentSql={currentSql}
-            errorMessage={queryError}
-            onInsertSql={handleAiInsertSql}
-            aiConfigured={aiConfigured}
-            aiProvider={aiProvider}
-            autoExpandWithError={autoExpandWithError}
-            fixErrorTrigger={fixErrorTrigger}
-          />
+          {/* AI SQL Assistant — always visible at the bottom */}
+          <div className="shrink-0 border-t border-border-default px-5 py-3">
+            <AiSqlAssistant
+              dialect={dbType === 'csv' ? 'duckdb' : dbType}
+              schemaContext={schemaContext}
+              currentSql={currentSql}
+              errorMessage={queryError}
+              onInsertSql={handleAiInsertSql}
+              aiConfigured={aiConfigured}
+              aiProvider={aiProvider}
+              autoExpandWithError={autoExpandWithError}
+              fixErrorTrigger={fixErrorTrigger}
+            />
+          </div>
         </div>
       </div>
     </>
