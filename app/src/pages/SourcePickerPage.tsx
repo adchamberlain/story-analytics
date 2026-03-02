@@ -450,12 +450,14 @@ export function SourcePickerPage() {
           sourceId={geoWizardPending.sourceId}
           detectedColumns={geoWizardPending.columns}
           onComplete={() => {
+            const sourceId = geoWizardPending.sourceId
             clearGeoWizard()
-            handleSelectSource(geoWizardPending.sourceId)
+            handleSelectSource(sourceId)
           }}
           onSkip={() => {
+            const sourceId = geoWizardPending.sourceId
             clearGeoWizard()
-            handleSelectSource(geoWizardPending.sourceId)
+            handleSelectSource(sourceId)
           }}
         />
       )}
