@@ -1,0 +1,65 @@
+{
+  "name": "story-analytics-desktop",
+  "version": "1.0.0",
+  "description": "Story Analytics — AI-powered dashboard creation",
+  "main": "electron/main.js",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --mac --arm64",
+    "dist:x64": "electron-builder --mac --x64",
+    "dist:universal": "electron-builder --mac --universal"
+  },
+  "devDependencies": {
+    "electron": "^28.3.3",
+    "electron-builder": "^24.13.3",
+    "@electron/notarize": "^2.3.0"
+  },
+  "build": {
+    "appId": "com.storyanalytics.app",
+    "productName": "Story Analytics",
+    "copyright": "Copyright © 2025 Story Analytics",
+    "directories": {
+      "output": "dist",
+      "buildResources": "assets"
+    },
+    "files": [
+      "electron/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "../desktop/dist-python/story-analytics-api",
+        "to": "api-server/story-analytics-api",
+        "filter": ["**/*"]
+      }
+    ],
+    "mac": {
+      "category": "public.app-category.productivity",
+      "icon": "assets/icon.icns",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "assets/entitlements.mac.plist",
+      "entitlementsInherit": "assets/entitlements.mac.plist",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": ["arm64"]
+        }
+      ]
+    },
+    "dmg": {
+      "title": "Install Story Analytics",
+      "icon": "assets/icon.icns",
+      "iconSize": 80,
+      "window": {
+        "width": 540,
+        "height": 380
+      },
+      "contents": [
+        { "x": 130, "y": 200, "type": "file" },
+        { "x": 410, "y": 200, "type": "link", "path": "/Applications" }
+      ]
+    },
+    "afterSign": "scripts/notarize.js"
+  }
+}
