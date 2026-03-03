@@ -15,10 +15,49 @@ block_cipher = None
 # SPECPATH is the directory containing this spec file (desktop/)
 REPO_ROOT = str(Path(SPECPATH).parent)
 
+# Make local source packages (api, engine) importable during spec execution
+# so collect_submodules can discover them.
+sys.path.insert(0, REPO_ROOT)
+
+# ---------------------------------------------------------------------------
+# Collect data/binaries/hiddenimports for complex packages BEFORE Analysis.
+# Must be done before Analysis so they're passed in 2-tuple (src, dest_dir)
+# format that Analysis expects — not added to a.datas after the fact.
+# (PyInstaller 6.x requires consistent tuple format.)
+# ---------------------------------------------------------------------------
+from PyInstaller.utils.hooks import collect_all, collect_submodules
+
+extra_datas = []
+extra_binaries = []
+extra_hiddenimports = []
+
+# Bundle third-party packages that use dynamic imports
+for pkg in [
+    "duckdb",
+    "snowflake.connector",
+    "google.cloud.bigquery",
+    "cryptography",
+]:
+    try:
+        d, b, h = collect_all(pkg)
+        extra_datas += d
+        extra_binaries += b
+        extra_hiddenimports += h
+    except Exception:
+        # Package not installed — skip gracefully
+        pass
+
+# Bundle our local source packages (uvicorn loads them by string reference)
+for pkg in ["api", "engine"]:
+    try:
+        extra_hiddenimports += collect_submodules(pkg)
+    except Exception:
+        pass
+
 a = Analysis(
     [str(Path(SPECPATH).parent / "desktop" / "server_entry.py")],
     pathex=[REPO_ROOT],
-    binaries=[],
+    binaries=extra_binaries,
     datas=[
         # Built React SPA — must exist before running pyinstaller (built by build.sh)
         (str(Path(REPO_ROOT) / "static"), "static"),
@@ -27,7 +66,7 @@ a = Analysis(
         # YAML configs used by the engine
         (str(Path(REPO_ROOT) / "engine_config.yaml"), "."),
         (str(Path(REPO_ROOT) / "brand_config.yaml"), "."),
-    ],
+    ] + extra_datas,
     hiddenimports=[
         # uvicorn internals (static analysis misses these)
         "uvicorn.logging",
@@ -81,9 +120,9 @@ a = Analysis(
         # pydantic v2 internals
         "pydantic.deprecated.class_validators",
         "pydantic_settings",
-    ],
+    ] + extra_hiddenimports,
     hookspath=[],
-    runtime_hooks=[],
+    runtime_hooks=[str(Path(SPECPATH) / "runtime_hook_paths.py")],
     excludes=[
         # Test infrastructure — never ship these
         "playwright",
@@ -100,21 +139,6 @@ a = Analysis(
     cipher=block_cipher,
     noarchive=False,
 )
-
-# Collect all files for packages with complex internal module structures.
-# This handles dynamic imports that static analysis can't detect.
-from PyInstaller.utils.hooks import collect_all
-
-for pkg in [
-    "duckdb",
-    "snowflake.connector",
-    "google.cloud.bigquery",
-    "cryptography",
-]:
-    tmp_ret = collect_all(pkg)
-    a.datas += tmp_ret[0]
-    a.binaries += tmp_ret[1]
-    a.hiddenimports += tmp_ret[2]
 
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
