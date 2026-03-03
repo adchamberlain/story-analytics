@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <!-- Required for Electron and PyInstaller JIT compilation -->
+  <key>com.apple.security.cs.allow-jit</key>
+  <true/>
+  <!-- Required for PyInstaller-bundled Python (unsigned memory execution) -->
+  <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+  <true/>
+  <!-- Required to load third-party native extensions (duckdb, psycopg2, etc.) -->
+  <key>com.apple.security.cs.disable-library-validation</key>
+  <true/>
+  <!-- Network access for LLM API calls and external DB connections -->
+  <key>com.apple.security.network.client</key>
+  <true/>
+  <!-- Local server (FastAPI listening on localhost) -->
+  <key>com.apple.security.network.server</key>
+  <true/>
+</dict>
+</plist>
