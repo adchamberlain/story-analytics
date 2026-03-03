@@ -50,3 +50,11 @@ app/dist/
 .story-analytics/
 .claude/
 .worktrees/
+
+# Desktop app build artifacts
+desktop/dist/
+desktop/dist-python/
+desktop/node_modules/
+desktop/venv/
+desktop/.venv/
+static/
