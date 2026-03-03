@@ -49,7 +49,7 @@ if [ ! -d "$DESKTOP_DIR/venv" ]; then
   python3 -m venv "$DESKTOP_DIR/venv"
   "$DESKTOP_DIR/venv/bin/pip" install --quiet --upgrade pip
   "$DESKTOP_DIR/venv/bin/pip" install --quiet -r requirements.txt
-  "$DESKTOP_DIR/venv/bin/pip" install --quiet pyinstaller
+  "$DESKTOP_DIR/venv/bin/pip" install --quiet pyinstaller dmgbuild
 fi
 
 "$DESKTOP_DIR/venv/bin/pyinstaller" \
@@ -66,10 +66,29 @@ echo "▶ [3/4] Installing Electron dependencies..."
 cd "$DESKTOP_DIR"
 npm install --prefer-offline
 
-# ── Step 4: Package with electron-builder ────────────────────────────────────
+# ── Step 4: Package .app with electron-builder (dir target = no DMG) ─────────
 echo ""
-echo "▶ [4/4] Packaging Electron app..."
-npx electron-builder --mac "$ARCH_FLAG"
+echo "▶ [4/5] Packaging Electron .app (signing)..."
+# Use 'dir' target so electron-builder signs the .app but doesn't create a DMG.
+# We create the DMG ourselves in step 5 so the background image is applied
+# correctly (electron-builder silently drops backgrounds on APFS / Apple Silicon).
+npx electron-builder --mac dir
+
+APP_PATH="$DESKTOP_DIR/dist/mac-arm64/Story Analytics.app"
+
+# ── Step 5: Create DMG with dmgbuild (supports APFS + custom backgrounds) ────
+echo ""
+echo "▶ [5/5] Creating DMG with background..."
+DMG_OUT="$DESKTOP_DIR/dist/Story Analytics-1.0.0-arm64.dmg"
+rm -f "$DMG_OUT"
+
+"$DESKTOP_DIR/venv/bin/dmgbuild" \
+  -s "$DESKTOP_DIR/dmgbuild-settings.py" \
+  -D "app=$APP_PATH" \
+  "Install Story Analytics" \
+  "$DMG_OUT"
+
+echo "  → DMG written to $DMG_OUT"
 
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"

@@ -9,7 +9,7 @@ const fs = require("fs");
 
 let mainWindow = null;
 let pythonProcess = null;
-const SERVER_PORT = 8000;
+const SERVER_PORT = 8765;
 
 // ---------------------------------------------------------------------------
 // Paths
@@ -91,7 +91,7 @@ function pollForServer(onReady, attempts = 0, maxAttempts = 120) {
   }
 
   const req = http.get(
-    `http://localhost:${SERVER_PORT}/health`,
+    `http://127.0.0.1:${SERVER_PORT}/health`,
     { timeout: 1000 },
     (res) => {
       if (res.statusCode === 200) {
@@ -127,25 +127,55 @@ function createWindow(splash) {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
-      sandbox: true,
+      // sandbox omitted: contextIsolation provides isolation without the
+      // stricter Chromium sandbox that can silently block localhost rendering
     },
   });
 
-  mainWindow.loadURL(`http://localhost:${SERVER_PORT}/dashboards`);
+  mainWindow.loadURL(`http://127.0.0.1:${SERVER_PORT}/dashboards`);
 
-  mainWindow.once("ready-to-show", () => {
-    mainWindow.show();
-    mainWindow.focus(); // bring window to front on macOS
+  let shown = false;
+  let fallbackTimer = null;
+
+  // Reveal the main window and dismiss the splash.
+  // Called either by ready-to-show or by the 8-second fallback.
+  function revealWindow() {
+    if (shown) return;
+    shown = true;
+    if (fallbackTimer) clearTimeout(fallbackTimer);
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.show();
+      mainWindow.focus(); // bring window to front on macOS
+    }
     if (splash && !splash.isDestroyed()) splash.close();
+  }
+
+  // Preferred path: page finished first paint
+  mainWindow.once("ready-to-show", () => {
+    console.log("[electron] ready-to-show fired");
+    revealWindow();
+  });
+
+  // Fallback: show window after 8 s even if ready-to-show never fires
+  // (can happen on some macOS configs with unsigned / first-run apps)
+  fallbackTimer = setTimeout(() => {
+    console.log("[electron] ready-to-show fallback — revealing window after 8s");
+    revealWindow();
+  }, 8000);
+
+  // Log page load errors to aid debugging
+  mainWindow.webContents.on("did-fail-load", (event, errorCode, errorDescription) => {
+    console.error(`[electron] Page failed to load: ${errorCode} ${errorDescription}`);
   });
 
   mainWindow.on("closed", () => {
+    if (fallbackTimer) clearTimeout(fallbackTimer);
     mainWindow = null;
   });
 
   // Open external links in the default browser, not inside Electron.
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    if (url.startsWith(`http://localhost:${SERVER_PORT}`)) {
+    if (url.startsWith(`http://localhost:${SERVER_PORT}`) || url.startsWith(`http://127.0.0.1:${SERVER_PORT}`)) {
       return { action: "allow" };
     }
     shell.openExternal(url);
