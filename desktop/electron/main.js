@@ -116,7 +116,7 @@ function pollForServer(onReady, attempts = 0, maxAttempts = 120) {
 // Window creation
 // ---------------------------------------------------------------------------
 
-function createWindow() {
+function createWindow(splash) {
   mainWindow = new BrowserWindow({
     width: 1440,
     height: 900,
@@ -135,6 +135,8 @@ function createWindow() {
 
   mainWindow.once("ready-to-show", () => {
     mainWindow.show();
+    mainWindow.focus(); // bring window to front on macOS
+    if (splash && !splash.isDestroyed()) splash.close();
   });
 
   mainWindow.on("closed", () => {
@@ -263,9 +265,7 @@ app.whenReady().then(() => {
   const splash = createSplash();
 
   pollForServer(() => {
-    createWindow();
-    // Close splash after main window is ready to show
-    mainWindow.once("ready-to-show", () => splash.close());
+    createWindow(splash);
   });
 });
 

@@ -64,7 +64,7 @@ By default, authentication is disabled (`AUTH_ENABLED=false`). When enabled:
 4. Publish: `PUT /api/v2/charts/{chartId}/publish`
 5. Embed: Use the embed URL at `/embed/chart/{chartId}`
 """,
-    version="0.2.0",
+    version="1.0.0",
     openapi_tags=[
         {"name": "auth", "description": "Authentication and user management"},
         {"name": "charts", "description": "Chart CRUD, AI proposals, publishing, and export"},
@@ -204,7 +204,7 @@ async def root():
         return FileResponse(_static_index)
     return {
         "name": "Story Analytics API",
-        "version": "0.2.0",
+        "version": "1.0.0",
         "docs": "/docs",
     }
 
@@ -253,6 +253,10 @@ if os.path.isdir(_static_dir):
     # SPA catch-all: serve index.html for all other non-API routes
     @app.get("/{path:path}")
     async def _serve_spa(path: str):
+        # Never catch /api/* — those should 404 if not matched by a real route
+        if path.startswith("api/") or path == "api":
+            from fastapi import HTTPException
+            raise HTTPException(status_code=404)
         # Check if it's a real static file
         file_path = os.path.join(_static_dir, path)
         if os.path.isfile(file_path):
