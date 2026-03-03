@@ -86,7 +86,7 @@ class TestSyncQueryEndpoint:
         )
 
         mock_duckdb = MagicMock()
-        mock_duckdb.ingest_parquet.return_value = mock_schema
+        mock_duckdb.ingest_csv.return_value = mock_schema
 
         with (
             patch("api.routers.connections.get_connector", return_value=mock_connector),
@@ -112,10 +112,10 @@ class TestSyncQueryEndpoint:
         assert call_kwargs.kwargs["limit"] == 1_000_000
         assert call_kwargs.kwargs["timeout"] == 120
 
-        # Verify ingest_parquet was called with the source name
-        mock_duckdb.ingest_parquet.assert_called_once()
-        ingest_args = mock_duckdb.ingest_parquet.call_args
-        assert ingest_args[0][1] == "My Query"  # table_name_hint
+        # Verify ingest_csv was called — results are now persisted as CSV
+        mock_duckdb.ingest_csv.assert_called_once()
+        ingest_args = mock_duckdb.ingest_csv.call_args
+        assert ingest_args[0][1] == "My Query.csv"  # safe_hint with .csv extension
 
     def test_sync_default_source_name(self, tmp_path, monkeypatch):
         """When source_name is omitted, defaults to 'Query Result'."""
@@ -144,7 +144,7 @@ class TestSyncQueryEndpoint:
         )
 
         mock_duckdb = MagicMock()
-        mock_duckdb.ingest_parquet.return_value = mock_schema
+        mock_duckdb.ingest_csv.return_value = mock_schema
 
         with (
             patch("api.routers.connections.get_connector", return_value=mock_connector),
@@ -159,9 +159,9 @@ class TestSyncQueryEndpoint:
             )
 
         assert resp.status_code == 200
-        # Verify default source_name was used
-        ingest_args = mock_duckdb.ingest_parquet.call_args
-        assert ingest_args[0][1] == "Query Result"
+        # Verify default source_name was used (with .csv extension)
+        ingest_args = mock_duckdb.ingest_csv.call_args
+        assert ingest_args[0][1] == "Query Result.csv"
 
     def test_connection_not_found(self, tmp_path, monkeypatch):
         """Unknown connection ID returns 404."""

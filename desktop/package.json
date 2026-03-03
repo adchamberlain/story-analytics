@@ -50,14 +50,15 @@
     "dmg": {
       "title": "Install Story Analytics",
       "icon": "assets/icon.icns",
-      "iconSize": 80,
+      "background": "assets/dmg-background.png",
+      "iconSize": 100,
       "window": {
-        "width": 540,
+        "width": 600,
         "height": 380
       },
       "contents": [
-        { "x": 130, "y": 200, "type": "file" },
-        { "x": 410, "y": 200, "type": "link", "path": "/Applications" }
+        { "x": 160, "y": 160, "type": "file" },
+        { "x": 440, "y": 160, "type": "link", "path": "/Applications" }
       ]
     },
     "afterSign": "scripts/notarize.js"

@@ -598,9 +598,6 @@ async def sync_query_result(connection_id: str, request: QuerySyncRequest, user:
     to a parquet file, and ingests it into the local DuckDB instance.
     Used by the "Chart this" flow in the SQL workbench.
     """
-    import pyarrow as pa
-    import pyarrow.parquet as pq
-
     conn = load_connection(connection_id)
     if not conn:
         raise HTTPException(status_code=404, detail="Connection not found")
@@ -639,25 +636,34 @@ async def sync_query_result(connection_id: str, request: QuerySyncRequest, user:
     if not result.columns or not result.rows:
         raise HTTPException(status_code=400, detail="Query returned no data")
 
-    # Convert QueryResult rows to a pyarrow Table
-    # Transpose row-major data to column-major for Arrow
-    col_data = {
-        col: [row[i] for row in result.rows]
-        for i, col in enumerate(result.columns)
-    }
-    arrow_table = pa.table(col_data)
+    # Write results to a persistent CSV via ingest_csv so the source is stored
+    # in uploads/ and automatically reloaded after server restarts — same
+    # pattern as query_as_source() in data.py.
+    import csv as _csv
+    import io as _io
 
-    # Write to temp parquet file, ingest into DuckDB, clean up
-    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".parquet")
-    pq_path = Path(tmp.name)
+    hint = request.source_name or "query_result"
+    safe_hint = hint if hint.lower().endswith(".csv") else f"{hint}.csv"
+
+    buf = _io.StringIO()
+    writer = _csv.writer(buf)
+    writer.writerow(result.columns)
+    for row in result.rows:
+        writer.writerow(row)
+    csv_bytes = buf.getvalue().encode("utf-8")
+
+    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".csv")
+    tmp_path = Path(tmp.name)
     tmp.close()
 
     try:
-        pq.write_table(arrow_table, str(pq_path))
+        tmp_path.write_bytes(csv_bytes)
         db = get_duckdb_service()
-        schema = db.ingest_parquet(pq_path, request.source_name)
+        schema = db.ingest_csv(tmp_path, safe_hint)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to create source: {e}")
     finally:
-        pq_path.unlink(missing_ok=True)
+        tmp_path.unlink(missing_ok=True)
 
     return QuerySyncResponse(
         source_id=schema.source_id,
