@@ -66,6 +66,12 @@ a = Analysis(
         # YAML configs used by the engine
         (str(Path(REPO_ROOT) / "engine_config.yaml"), "."),
         (str(Path(REPO_ROOT) / "brand_config.yaml"), "."),
+        # These ensure api/ and engine/ directories exist as real filesystem dirs
+        # inside _MEIPASS. api/main.py uses __file__-relative paths like
+        # "../static" which require the intermediate directory to exist for the
+        # OS to resolve the ".." traversal correctly.
+        (str(Path(REPO_ROOT) / "api" / "__init__.py"), "api"),
+        (str(Path(REPO_ROOT) / "engine" / "__init__.py"), "engine"),
     ] + extra_datas,
     hiddenimports=[
         # uvicorn internals (static analysis misses these)
@@ -122,7 +128,7 @@ a = Analysis(
         "pydantic_settings",
     ] + extra_hiddenimports,
     hookspath=[],
-    runtime_hooks=[str(Path(SPECPATH) / "runtime_hook_paths.py")],
+    runtime_hooks=[],
     excludes=[
         # Test infrastructure — never ship these
         "playwright",
