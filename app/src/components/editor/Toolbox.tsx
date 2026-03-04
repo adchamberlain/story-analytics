@@ -215,11 +215,21 @@ export function Toolbox() {
                       />
                     ) : (
                       <ColumnDropdown
-                        label="Y Axis"
+                        label={config.chartType === 'HeatMap' ? 'Value (Color)' : 'Y Axis'}
                         value={Array.isArray(config.y) ? config.y[0] ?? null : config.y}
                         columns={sqlResultColumns}
                         columnTypes={columnTypes}
                         onChange={(y) => updateConfig({ y })}
+                      />
+                    )}
+                    {config.chartType === 'HeatMap' && (
+                      <ColumnDropdown
+                        label="Y Axis (Category)"
+                        value={config.series}
+                        columns={sqlResultColumns}
+                        columnTypes={columnTypes}
+                        allowNone
+                        onChange={(series) => updateConfig({ series })}
                       />
                     )}
                     {hasSeriesOption && (
@@ -271,11 +281,21 @@ export function Toolbox() {
                       />
                     ) : (
                       <ColumnDropdown
-                        label="Y Axis"
+                        label={config.chartType === 'HeatMap' ? 'Value (Color)' : 'Y Axis'}
                         value={Array.isArray(config.y) ? config.y[0] ?? null : config.y}
                         columns={columns}
                         columnTypes={columnTypes}
                         onChange={(y) => updateConfig({ y })}
+                      />
+                    )}
+                    {config.chartType === 'HeatMap' && (
+                      <ColumnDropdown
+                        label="Y Axis (Category)"
+                        value={config.series}
+                        columns={columns}
+                        columnTypes={columnTypes}
+                        allowNone
+                        onChange={(series) => updateConfig({ series })}
                       />
                     )}
                     {hasSeriesOption && !isMultiY && (
@@ -631,7 +651,7 @@ export function Toolbox() {
                     )}
                     {config.chartType === 'SpikeMap' && (
                       <ColumnDropdown
-                        label="Value Column"
+                        label="Spike Height Column"
                         value={config.geoSizeColumn ?? null}
                         columns={isSqlMode ? sqlResultColumns : columns}
                         columnTypes={columnTypes}

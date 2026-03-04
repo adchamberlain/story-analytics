@@ -1177,25 +1177,28 @@ function buildSmallMultiplesMarks(
 
 // ── Phase 7 Mark Builders ───────────────────────────────────────────────────
 
+/** Centered instructional text for charts with missing required config. */
+function missingFieldPlaceholder(message: string): Plot.Markish[] {
+  return [Plot.text([{ m: message }], { text: 'm', frameAnchor: 'middle', fontSize: 13, fill: '#94a3b8' })]
+}
+
 function buildStackedColumnMarks(
   data: Record<string, unknown>[],
   x: string | undefined,
   y: string | undefined,
   series: string | undefined,
   config: ChartConfig,
-  _colors: readonly string[] | string[],
+  colors: readonly string[] | string[],
 ): Plot.Markish[] {
-  if (!x || !y || !series) return []
+  if (!x || !y) return missingFieldPlaceholder('Set X Axis and Y Axis to render this chart')
+  // Series is required for stacking — fall back to a plain bar chart so the data is still visible.
+  if (!series) return buildBarMarks(data, x, y, undefined, config, colors)
 
-  const marks: Plot.Markish[] = []
-
-  marks.push(
+  return [
     Plot.barY(data, Plot.stackY({ x, y, fill: series })),
     Plot.tip(data, Plot.pointer(Plot.stackY({ x, y, fill: series, title: (d: Record<string, unknown>) => tipTitle(d, x, y, series, config) }))),
     Plot.ruleY([0]),
-  )
-
-  return marks
+  ]
 }
 
 function buildGroupedColumnMarks(
@@ -1204,9 +1207,11 @@ function buildGroupedColumnMarks(
   y: string | undefined,
   series: string | undefined,
   config: ChartConfig,
-  _colors: readonly string[] | string[],
+  colors: readonly string[] | string[],
 ): Plot.Markish[] {
-  if (!x || !y || !series) return []
+  if (!x || !y) return missingFieldPlaceholder('Set X Axis and Y Axis to render this chart')
+  // Series is required for grouping — fall back to a plain bar chart so the data is still visible.
+  if (!series) return buildBarMarks(data, x, y, undefined, config, colors)
 
   const marks: Plot.Markish[] = []
 
@@ -1235,7 +1240,8 @@ function buildSplitBarMarks(
   const leftCol = config.leftColumn
   const rightCol = config.rightColumn
 
-  if (!cat || !leftCol || !rightCol) return []
+  if (!cat) return missingFieldPlaceholder('Set the Category (X Axis) field')
+  if (!leftCol || !rightCol) return missingFieldPlaceholder('Set both Left Column and Right Column')
 
   const marks: Plot.Markish[] = []
 
@@ -1286,7 +1292,8 @@ function buildArrowPlotMarks(
   const startCol = config.startColumn
   const endCol = config.endColumn
 
-  if (!cat || !startCol || !endCol) return []
+  if (!cat) return missingFieldPlaceholder('Set the Category (X Axis) field')
+  if (!startCol || !endCol) return missingFieldPlaceholder('Set both Start Column and End Column')
 
   const marks: Plot.Markish[] = []
 
