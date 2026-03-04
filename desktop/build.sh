@@ -85,6 +85,7 @@ rm -f "$DMG_OUT"
 "$DESKTOP_DIR/venv/bin/dmgbuild" \
   -s "$DESKTOP_DIR/dmgbuild-settings.py" \
   -D "app=$APP_PATH" \
+  -D "desktop=$DESKTOP_DIR" \
   "Install Story Analytics" \
   "$DMG_OUT"
 
