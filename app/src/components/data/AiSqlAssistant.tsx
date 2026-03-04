@@ -67,9 +67,22 @@ export function AiSqlAssistant({
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
+  const [resolvedProvider, setResolvedProvider] = useState<string | null>(aiProvider)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const prevErrorRef = useRef<string | null>(null)
+
+  // Keep resolvedProvider in sync with prop; self-fetch if parent didn't provide it.
+  useEffect(() => {
+    if (aiProvider) {
+      setResolvedProvider(aiProvider)
+    } else {
+      authFetch('/api/settings')
+        .then(r => r.ok ? r.json() : null)
+        .then(data => { if (data?.ai_provider) setResolvedProvider(data.ai_provider) })
+        .catch(() => {})
+    }
+  }, [aiProvider])
 
   // Auto-scroll to bottom on new messages
   useEffect(() => {
@@ -187,7 +200,7 @@ export function AiSqlAssistant({
           >
             <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
           </svg>
-          <span>AI Assistant{aiConfigured && aiProvider ? ` (${PROVIDER_LABELS[aiProvider] ?? aiProvider})` : ''}</span>
+          <span>AI Assistant{resolvedProvider ? ` (${PROVIDER_LABELS[resolvedProvider] ?? resolvedProvider})` : ''}</span>
           {!aiConfigured && (
             <span className="text-xs text-text-muted">
               {' \u2014 '}
