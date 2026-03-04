@@ -26,13 +26,29 @@ exports.default = async function notarizing(context) {
 
   console.log(`[notarize] Submitting ${appPath} to Apple notarization...`);
 
-  await notarize({
-    tool: "notarytool",
-    appPath,
-    appleId: process.env.APPLE_ID,
-    appleIdPassword: process.env.APPLE_APP_SPECIFIC_PASSWORD,
-    teamId: process.env.APPLE_TEAM_ID,
-  });
+  const TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
+  const timeout = new Promise((_, reject) =>
+    setTimeout(() => reject(new Error("Notarization timed out after 30 minutes")), TIMEOUT_MS)
+  );
 
-  console.log("[notarize] Notarization complete");
+  try {
+    await Promise.race([
+      notarize({
+        tool: "notarytool",
+        appPath,
+        appleId: process.env.APPLE_ID,
+        appleIdPassword: process.env.APPLE_APP_SPECIFIC_PASSWORD,
+        teamId: process.env.APPLE_TEAM_ID,
+      }),
+      timeout,
+    ]);
+    console.log("[notarize] Notarization complete");
+  } catch (err) {
+    // If Apple's service is down/slow, log a warning but don't fail the build.
+    // Run `xcrun stapler staple` on the DMG once the submission is processed.
+    console.warn(`[notarize] WARNING: Notarization did not complete: ${err.message}`);
+    console.warn("[notarize] The app is signed but not yet notarized. Check submission status with:");
+    console.warn("[notarize]   xcrun notarytool history --apple-id $APPLE_ID --team-id $APPLE_TEAM_ID --password $APPLE_APP_SPECIFIC_PASSWORD");
+    console.warn("[notarize] Once Accepted, staple with: xcrun stapler staple 'Story Analytics-*.dmg'");
+  }
 };
