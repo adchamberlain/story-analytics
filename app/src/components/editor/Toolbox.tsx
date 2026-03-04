@@ -204,7 +204,16 @@ export function Toolbox() {
                       columnTypes={columnTypes}
                       onChange={(x) => updateConfig({ x })}
                     />
-                    {config.chartType !== 'Histogram' && (
+                    {config.chartType === 'Histogram' ? (
+                      <ColumnDropdown
+                        label="Frequency Column (optional)"
+                        value={Array.isArray(config.y) ? config.y[0] ?? null : config.y}
+                        columns={sqlResultColumns}
+                        columnTypes={columnTypes}
+                        allowNone
+                        onChange={(y) => updateConfig({ y })}
+                      />
+                    ) : (
                       <ColumnDropdown
                         label="Y Axis"
                         value={Array.isArray(config.y) ? config.y[0] ?? null : config.y}
@@ -243,7 +252,16 @@ export function Toolbox() {
                       columnTypes={columnTypes}
                       onChange={(x) => updateConfig({ x })}
                     />
-                    {config.chartType !== 'Histogram' && hasSeriesOption ? (
+                    {config.chartType === 'Histogram' ? (
+                      <ColumnDropdown
+                        label="Frequency Column (optional)"
+                        value={Array.isArray(config.y) ? config.y[0] ?? null : config.y}
+                        columns={columns}
+                        columnTypes={columnTypes}
+                        allowNone
+                        onChange={(y) => updateConfig({ y })}
+                      />
+                    ) : hasSeriesOption ? (
                       <MultiColumnSelect
                         label="Y Axis"
                         value={config.y}
@@ -251,7 +269,7 @@ export function Toolbox() {
                         columnTypes={columnTypes}
                         onChange={(y) => updateConfig({ y })}
                       />
-                    ) : config.chartType !== 'Histogram' ? (
+                    ) : (
                       <ColumnDropdown
                         label="Y Axis"
                         value={Array.isArray(config.y) ? config.y[0] ?? null : config.y}
@@ -259,7 +277,7 @@ export function Toolbox() {
                         columnTypes={columnTypes}
                         onChange={(y) => updateConfig({ y })}
                       />
-                    ) : null}
+                    )}
                     {hasSeriesOption && !isMultiY && (
                       <ColumnDropdown
                         label="Series (color)"
