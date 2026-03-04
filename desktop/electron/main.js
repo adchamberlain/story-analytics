@@ -1,7 +1,7 @@
 // desktop/electron/main.js
 "use strict";
 
-const { app, BrowserWindow, Menu, shell } = require("electron");
+const { app, BrowserWindow, Menu, shell, dialog } = require("electron");
 const { spawn } = require("child_process");
 const path = require("path");
 const http = require("http");
@@ -180,6 +180,22 @@ function createWindow(splash) {
     }
     shell.openExternal(url);
     return { action: "deny" };
+  });
+
+  // Handle file downloads: show a native Save As dialog.
+  // Without this, Electron silently discards blob-URL download attempts.
+  mainWindow.webContents.session.on("will-download", (event, item) => {
+    const defaultPath = path.join(app.getPath("downloads"), item.getFilename());
+    const savePath = dialog.showSaveDialogSync(mainWindow, {
+      defaultPath,
+      title: "Save File",
+      buttonLabel: "Save",
+    });
+    if (savePath) {
+      item.setSavePath(savePath);
+    } else {
+      item.cancel();
+    }
   });
 }
 

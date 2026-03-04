@@ -240,8 +240,10 @@ export function DashboardViewPage() {
                   const a = document.createElement('a')
                   a.href = url
                   a.download = filename
+                  document.body.appendChild(a)
                   a.click()
-                  URL.revokeObjectURL(url)
+                  document.body.removeChild(a)
+                  setTimeout(() => URL.revokeObjectURL(url), 10_000)
                 } catch { /* silent */ }
               }}
               className="text-[14px] px-4 py-2 rounded-xl border border-border-default text-text-on-surface hover:bg-surface-secondary transition-colors flex items-center gap-1.5"
