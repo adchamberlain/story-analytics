@@ -659,7 +659,23 @@ async def sync_query_result(connection_id: str, request: QuerySyncRequest, user:
     try:
         tmp_path.write_bytes(csv_bytes)
         db = get_duckdb_service()
-        schema = db.ingest_csv(tmp_path, safe_hint)
+
+        # Replace existing source with same filename rather than creating a duplicate.
+        existing_id = db.find_source_by_filename(safe_hint)
+        reuse_id: str | None = None
+        if existing_id:
+            table_name = f"src_{existing_id}"
+            with db._lock:
+                try:
+                    db._conn.execute(f"DROP TABLE IF EXISTS {table_name}")
+                except Exception:
+                    pass
+                db._sources.pop(existing_id, None)
+            from api.services.storage import get_storage as _get_storage
+            _get_storage().delete_tree(f"uploads/{existing_id}")
+            reuse_id = existing_id
+
+        schema = db.ingest_csv(tmp_path, safe_hint, source_id=reuse_id)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to create source: {e}")
     finally:

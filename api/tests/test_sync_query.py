@@ -87,6 +87,7 @@ class TestSyncQueryEndpoint:
 
         mock_duckdb = MagicMock()
         mock_duckdb.ingest_csv.return_value = mock_schema
+        mock_duckdb.find_source_by_filename.return_value = None  # no existing source
 
         with (
             patch("api.routers.connections.get_connector", return_value=mock_connector),
@@ -145,6 +146,7 @@ class TestSyncQueryEndpoint:
 
         mock_duckdb = MagicMock()
         mock_duckdb.ingest_csv.return_value = mock_schema
+        mock_duckdb.find_source_by_filename.return_value = None  # no existing source
 
         with (
             patch("api.routers.connections.get_connector", return_value=mock_connector),
@@ -162,6 +164,65 @@ class TestSyncQueryEndpoint:
         # Verify default source_name was used (with .csv extension)
         ingest_args = mock_duckdb.ingest_csv.call_args
         assert ingest_args[0][1] == "Query Result.csv"
+
+    def test_sync_replaces_duplicate_source(self, tmp_path, monkeypatch):
+        """Re-syncing with the same source_name replaces the existing source (no duplicate)."""
+        from fastapi.testclient import TestClient
+        from api.services.connectors.base import QueryResult
+        from api.services.duckdb_service import SourceSchema, ColumnInfo
+
+        conn = _setup_connection(tmp_path, monkeypatch)
+
+        mock_query_result = QueryResult(
+            columns=["id"], column_types=["INTEGER"],
+            rows=[[1], [2]], row_count=2,
+        )
+
+        mock_connector = MagicMock()
+        mock_connector.execute_query.return_value = mock_query_result
+
+        existing_id = "existing000aaa"
+        new_schema = SourceSchema(
+            source_id=existing_id,
+            filename="ORDERS.csv",
+            row_count=2,
+            columns=[
+                ColumnInfo(name="id", type="BIGINT", nullable=False,
+                           sample_values=["1", "2"], null_count=0, distinct_count=2),
+            ],
+        )
+
+        mock_duckdb = MagicMock()
+        mock_duckdb.ingest_csv.return_value = new_schema
+        # Simulate an existing source with the same filename
+        mock_duckdb.find_source_by_filename.return_value = existing_id
+        mock_duckdb._sources = {existing_id: MagicMock()}
+
+        with (
+            patch("api.routers.connections.get_connector", return_value=mock_connector),
+            patch("api.routers.connections.get_duckdb_service", return_value=mock_duckdb),
+            patch("api.services.storage.get_storage") as mock_storage,
+        ):
+            from api.main import app
+            client = TestClient(app)
+            resp = client.post(
+                f"/api/connections/{conn.connection_id}/sync-query",
+                json={"sql": "SELECT id FROM orders", "source_name": "ORDERS"},
+                headers={"Authorization": "Bearer dev-token"},
+            )
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["source_id"] == existing_id
+
+        # Old table should be dropped and storage cleared
+        mock_duckdb._conn.execute.assert_called_with(f"DROP TABLE IF EXISTS src_{existing_id}")
+        mock_storage.return_value.delete_tree.assert_called_once_with(f"uploads/{existing_id}")
+
+        # ingest_csv must reuse the existing source_id
+        ingest_args = mock_duckdb.ingest_csv.call_args
+        assert ingest_args[0][1] == "ORDERS.csv"
+        assert ingest_args[1].get("source_id") == existing_id
 
     def test_connection_not_found(self, tmp_path, monkeypatch):
         """Unknown connection ID returns 404."""
