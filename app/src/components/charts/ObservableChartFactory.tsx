@@ -750,19 +750,37 @@ function buildHistogramMarks(
 ): Plot.Markish[] {
   if (!x) return []
 
-  // Compute nice, even bin thresholds
+  const yCol = Array.isArray(config.y) ? config.y[0] : config.y
+  const fill = colors[0] as string
+
+  // Pre-aggregated mode: user has a dedicated frequency/count column.
+  // Render bars directly without binning.
+  if (yCol) {
+    const xLabel = config.xAxisTitle || titleCase(x)
+    const yLabel = config.yAxisTitle || titleCase(yCol)
+    return [
+      Plot.barY(data, { x, y: yCol, fill, sort: { x: 'x' } }),
+      Plot.tip(data, Plot.pointer({
+        x,
+        y: yCol,
+        title: (d: Record<string, unknown>) =>
+          `${xLabel}: ${d[x]}\n${yLabel}: ${Number(d[yCol]).toLocaleString()}`,
+      })),
+    ]
+  }
+
+  // Auto-bin mode: raw data, compute frequency by binning.
   const vals = data.map((d) => Number(d[x])).filter(isFinite)
   const [lo, hi] = d3.extent(vals) as [number, number]
   const thresholds = d3.ticks(lo, hi, 15)
   const fmt = d3.format(',.6~g')
 
   return [
-    Plot.rectY(data, { ...Plot.binX({ y: 'count' }, { x, thresholds }), fill: colors[0] as string }),
+    Plot.rectY(data, { ...Plot.binX({ y: 'count' }, { x, thresholds }), fill }),
     Plot.tip(data, Plot.pointerX(Plot.binX({ y: 'count', title: (bins: Record<string, unknown>[]) => {
       if (bins.length === 0) return ''
       const bv = bins.map((d) => Number(d[x!])).filter(isFinite)
       const minV = Math.min(...bv)
-      // Find the threshold edges for this bin
       let binLo = thresholds[0], binHi = thresholds[thresholds.length - 1]
       for (let i = 0; i < thresholds.length - 1; i++) {
         if (minV >= thresholds[i] && minV < thresholds[i + 1]) {
