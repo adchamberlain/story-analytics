@@ -253,6 +253,9 @@ const DATA_KEYS: (keyof EditorConfig)[] = ['x', 'y', 'series', 'aggregation', 't
 /** Debounce timer for auto buildQuery calls from updateConfig */
 let _buildQueryTimer: ReturnType<typeof setTimeout>
 
+/** Debounce timer for auto-save on config changes (existing charts only) */
+let _autoSaveTimer: ReturnType<typeof setTimeout>
+
 /** Debounce timer for idle auto-version snapshot (60s after last edit) */
 let _idleVersionTimer: ReturnType<typeof setTimeout>
 
@@ -743,6 +746,18 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         clearTimeout(_buildQueryTimer)
         _buildQueryTimer = setTimeout(() => get().buildQuery(), 150)
       }
+    }
+
+    // Auto-save existing charts 2s after the last config change
+    clearTimeout(_autoSaveTimer)
+    const chartIdForSave = get().chartId
+    if (chartIdForSave) {
+      _autoSaveTimer = setTimeout(() => {
+        const { chartId, saving } = get()
+        if (chartId && !saving) {
+          get().save().catch(() => { /* Non-critical — user can still manually save */ })
+        }
+      }, 2000)
     }
 
     // Idle auto-version: reset timer on each edit, snapshot after 60s of inactivity
