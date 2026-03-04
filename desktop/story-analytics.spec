@@ -135,6 +135,8 @@ a = Analysis(
         "pytest",
         "pytest_cov",
         "coverage",
+        # Our own test suite — never bundle into the app
+        "api.tests",
         # Jupyter (pulled in transitively by some packages)
         "IPython",
         "jupyter",
