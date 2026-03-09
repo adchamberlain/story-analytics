@@ -51,6 +51,19 @@ export function TopNav() {
         {/* Chart theme picker */}
         <ChartThemePicker />
 
+        {/* Bug report */}
+        <a
+          href="https://github.com/adchamberlain/story-analytics/issues/new/choose"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="p-2 rounded-lg transition-colors text-text-icon hover:text-text-icon-hover hover:bg-surface-secondary"
+          title="Report a bug"
+        >
+          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 12.75c1.148 0 2.278.08 3.383.237 1.037.146 1.866.966 1.866 2.013 0 3.728-2.35 6.75-5.25 6.75S6.75 18.728 6.75 15c0-1.046.83-1.867 1.866-2.013A24.204 24.204 0 0112 12.75zm0 0c2.883 0 5.647.508 8.207 1.44a23.91 23.91 0 01-1.152-6.135 23.881 23.881 0 01.117-2.87c-2.346-.755-4.732-1.3-7.172-1.435-2.44.135-4.826.68-7.172 1.435a23.881 23.881 0 01.117 2.87c-.052 2.126-.487 4.197-1.152 6.135A23.952 23.952 0 0112 12.75zm0 0V9M8.25 4.5l-.75-.75M15.75 4.5l.75-.75" />
+          </svg>
+        </a>
+
         <NavLink
           to="/settings"
           className={({ isActive }) =>
