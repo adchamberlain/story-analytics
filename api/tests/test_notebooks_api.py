@@ -210,9 +210,9 @@ class TestKernelExecution:
             resp = client.post(f"/api/notebooks/{nb['id']}/execute-all")
             assert resp.status_code == 200
             data = resp.json()
-            assert len(data["results"]) == 2
+            assert len(data["cells"]) == 2
             # Both should succeed
-            assert all(r["status"] == "ok" for r in data["results"])
+            assert all(r["status"] == "ok" for r in data["cells"])
         finally:
             client.post(f"/api/notebooks/{nb['id']}/shutdown")
             _cleanup_notebook(nb["id"])
@@ -230,8 +230,8 @@ class TestKernelExecution:
             assert resp.status_code == 200
             data = resp.json()
             # Should stop after first error — only 1 result
-            assert len(data["results"]) == 1
-            assert data["results"][0]["status"] == "error"
+            assert len(data["cells"]) == 1
+            assert data["cells"][0]["status"] == "error"
         finally:
             client.post(f"/api/notebooks/{nb['id']}/shutdown")
             _cleanup_notebook(nb["id"])

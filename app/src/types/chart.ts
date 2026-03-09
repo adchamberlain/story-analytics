@@ -193,6 +193,10 @@ export interface ChartConfig {
   lineWidth?: number
   markerSize?: number
 
+  /** Scatter plot trendline */
+  showTrendline?: boolean
+  showTrendlineEquation?: boolean
+
   /** Bar chart options */
   barGap?: number
   barGroupGap?: number

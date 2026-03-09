@@ -92,6 +92,9 @@ export function ObservableChartFactory({
   // Track container width for responsive annotation collapse
   const [chartWidth, setChartWidth] = useState(0)
 
+  // Scatter trendline equation (rendered as HTML overlay, not SVG text)
+  const equationLines = chartType === 'ScatterPlot' ? computeScatterEquations(effectiveData, config) : null
+
   const { containerRef } = useObservablePlot(
     (width, measuredHeight) => {
       const plotHeight = autoHeight ? measuredHeight : height
@@ -342,6 +345,31 @@ export function ObservableChartFactory({
         onClick={placingId ? handleChartClick : undefined}
         style={chartStyle}
       />
+      {/* Trendline equation overlay — rendered as HTML below chart, styled to match chart theme */}
+      {equationLines && (
+        <div data-equation={equationLines.join('\n')} style={{
+          padding: '6px 0 0',
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: '8px',
+          justifyContent: 'center',
+        }}>
+          {equationLines.map((line, i) => (
+            <span key={i} style={{
+              display: 'inline-block',
+              fontSize: chartTheme.font.source?.size ?? 11,
+              fontFamily: chartTheme.font.family || 'Inter, system-ui, sans-serif',
+              color: chartTheme.font.source?.color || 'var(--color-text-secondary)',
+              backgroundColor: 'color-mix(in srgb, currentColor 6%, transparent)',
+              padding: '3px 10px',
+              borderRadius: 4,
+              letterSpacing: '0.02em',
+            }}>
+              {formatEquationHTML(line)}
+            </span>
+          ))}
+        </div>
+      )}
       {/* Collapsed footnotes: show annotation text below chart on narrow screens */}
       {shouldCollapseAnnotations(chartWidth) && config.annotations && (
         (() => {
@@ -702,6 +730,113 @@ function buildAreaMarks(
   return marks
 }
 
+/** Format equation string into styled JSX with proper math typography */
+function formatEquationHTML(eq: string): React.ReactNode {
+  // Parse: "y = 5.99x + 25.97    R² = 0.850" or "GroupName: y = ..."
+  const parts: React.ReactNode[] = []
+  let rest = eq
+
+  // Extract optional prefix "Trend: " or "GroupName: "
+  const prefixMatch = rest.match(/^(.+?):\s*/)
+  if (prefixMatch && !prefixMatch[1].startsWith('y')) {
+    parts.push(<span key="prefix" style={{ fontWeight: 500 }}>{prefixMatch[1]}: </span>)
+    rest = rest.slice(prefixMatch[0].length)
+  }
+
+  // Match "y = 5.99x + 25.97" part
+  const eqMatch = rest.match(/^y\s*=\s*([-\d.]+)x\s*([+\-])\s*([\d.]+)/)
+  if (eqMatch) {
+    parts.push(
+      <span key="eq" style={{ fontStyle: 'italic' }}>y</span>,
+      <span key="eq2"> = {eqMatch[1]}</span>,
+      <span key="eq3" style={{ fontStyle: 'italic' }}>x</span>,
+      <span key="eq4"> {eqMatch[2]} {eqMatch[3]}</span>,
+    )
+    rest = rest.slice(eqMatch[0].length)
+  }
+
+  // Match "R² = 0.850" part
+  const r2Match = rest.match(/R²\s*=\s*([\d.]+)/)
+  if (r2Match) {
+    parts.push(
+      <span key="sep" style={{ margin: '0 6px', opacity: 0.3 }}>|</span>,
+      <span key="r2">R² = {r2Match[1]}</span>,
+    )
+  } else if (rest.trim()) {
+    parts.push(<span key="rest">{rest}</span>)
+  }
+
+  return parts.length > 0 ? <>{parts}</> : eq
+}
+
+/** Compute scatter trendline equation strings for HTML overlay rendering */
+function computeScatterEquations(
+  data: Record<string, unknown>[],
+  config: ChartConfig,
+): string[] | null {
+  if (!config.showTrendline || !config.showTrendlineEquation) return null
+  const x = config.x; const y = (Array.isArray(config.y) ? config.y[0] : config.y)
+  if (!x || !y) return null
+  const series = config.series
+
+  if (series) {
+    const groups = new Map<string, { xVals: number[]; yVals: number[] }>()
+    for (const d of data) {
+      const xv = Number(d[x]); const yv = Number(d[y])
+      if (!Number.isFinite(xv) || !Number.isFinite(yv)) continue
+      const key = String(d[series] ?? '')
+      if (!groups.has(key)) groups.set(key, { xVals: [], yVals: [] })
+      const g = groups.get(key)!
+      g.xVals.push(xv); g.yVals.push(yv)
+    }
+    const lines: string[] = []
+    for (const [groupName, g] of groups) {
+      const ols = computeOLS(g.xVals, g.yVals)
+      if (!ols) continue
+      const sign = ols.intercept >= 0 ? '+' : '-'
+      lines.push(`${groupName}: y = ${ols.slope.toFixed(2)}x ${sign} ${Math.abs(ols.intercept).toFixed(2)}  (R² = ${ols.r2.toFixed(3)})`)
+    }
+    return lines.length > 0 ? lines : null
+  } else {
+    const xVals: number[] = []; const yVals: number[] = []
+    for (const d of data) {
+      const xv = Number(d[x]); const yv = Number(d[y])
+      if (Number.isFinite(xv) && Number.isFinite(yv)) { xVals.push(xv); yVals.push(yv) }
+    }
+    const ols = computeOLS(xVals, yVals)
+    if (!ols) return null
+    const sign = ols.intercept >= 0 ? '+' : '-'
+    return [`Trend: y = ${ols.slope.toFixed(2)}x ${sign} ${Math.abs(ols.intercept).toFixed(2)}    R² = ${ols.r2.toFixed(3)}`]
+  }
+}
+
+/** Compute OLS linear regression: y = slope * x + intercept */
+function computeOLS(xVals: number[], yVals: number[]): { slope: number; intercept: number; r2: number } | null {
+  if (xVals.length < 2) return null
+  const n = xVals.length
+  let sumX = 0, sumY = 0
+  for (let i = 0; i < n; i++) { sumX += xVals[i]; sumY += yVals[i] }
+  const xBar = sumX / n
+  const yBar = sumY / n
+  let ssXY = 0, ssXX = 0, ssTot = 0, ssRes = 0
+  for (let i = 0; i < n; i++) {
+    const dx = xVals[i] - xBar
+    const dy = yVals[i] - yBar
+    ssXY += dx * dy
+    ssXX += dx * dx
+    ssTot += dy * dy
+  }
+  if (ssXX === 0) return null
+  const slope = ssXY / ssXX
+  const intercept = yBar - slope * xBar
+  for (let i = 0; i < n; i++) {
+    const predicted = slope * xVals[i] + intercept
+    ssRes += (yVals[i] - predicted) ** 2
+  }
+  const r2 = ssTot === 0 ? 1 : 1 - ssRes / ssTot
+  return { slope, intercept, r2 }
+}
+
 function buildScatterMarks(
   data: Record<string, unknown>[],
   x: string | undefined,
@@ -725,6 +860,48 @@ function buildScatterMarks(
     lines.push(`${titleCase(x)}: ${xv}`)
     lines.push(`${titleCase(y)}: ${yv}`)
     return lines.join('\n')
+  }
+
+  // Trendline marks (drawn first so they appear behind dots)
+  if (config.showTrendline) {
+    if (series) {
+      // Group data by series value, compute OLS per group
+      const groups = new Map<string, { xVals: number[]; yVals: number[] }>()
+      for (const d of data) {
+        const xv = Number(d[x]); const yv = Number(d[y])
+        if (!Number.isFinite(xv) || !Number.isFinite(yv)) continue
+        const key = String(d[series] ?? '')
+        if (!groups.has(key)) groups.set(key, { xVals: [], yVals: [] })
+        const g = groups.get(key)!
+        g.xVals.push(xv); g.yVals.push(yv)
+      }
+      for (const [groupName, g] of groups) {
+        const ols = computeOLS(g.xVals, g.yVals)
+        if (!ols) continue
+        const xMin = Math.min(...g.xVals); const xMax = Math.max(...g.xVals)
+        const lineData = [
+          { [x]: xMin, [y]: ols.slope * xMin + ols.intercept, [series]: groupName },
+          { [x]: xMax, [y]: ols.slope * xMax + ols.intercept, [series]: groupName },
+        ]
+        marks.push(Plot.line(lineData, { x, y, stroke: series, strokeWidth: 1.5, strokeDasharray: '6,3' }))
+      }
+    } else {
+      // Single trendline for all data
+      const xVals: number[] = []; const yVals: number[] = []
+      for (const d of data) {
+        const xv = Number(d[x]); const yv = Number(d[y])
+        if (Number.isFinite(xv) && Number.isFinite(yv)) { xVals.push(xv); yVals.push(yv) }
+      }
+      const ols = computeOLS(xVals, yVals)
+      if (ols) {
+        const xMin = Math.min(...xVals); const xMax = Math.max(...xVals)
+        const lineData = [
+          { [x]: xMin, [y]: ols.slope * xMin + ols.intercept },
+          { [x]: xMax, [y]: ols.slope * xMax + ols.intercept },
+        ]
+        marks.push(Plot.line(lineData, { x, y, stroke: colors[0], strokeWidth: 1.5, strokeDasharray: '6,3' }))
+      }
+    }
   }
 
   if (series) {

@@ -53,6 +53,8 @@ export function buildChartConfig(chart: {
     // Line/scatter options
     lineWidth: (cfg.lineWidth as number) ?? undefined,
     markerSize: (cfg.markerSize as number) ?? undefined,
+    showTrendline: (cfg.showTrendline as boolean) ?? false,
+    showTrendlineEquation: (cfg.showTrendlineEquation as boolean) ?? false,
 
     // Tooltip
     tooltipTemplate: (cfg.tooltipTemplate as string) || undefined,

@@ -1,15 +1,19 @@
-import { useEffect, useCallback } from 'react'
+import { useEffect, useCallback, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useNotebookStore } from '../stores/notebookStore'
 import { NotebookCell } from '../components/notebook/NotebookCell'
 import { AddCellButton } from '../components/notebook/AddCellButton'
 import { NotebookSourcesPanel } from '../components/notebook/NotebookSourcesPanel'
 import { NotebookAIChat } from '../components/notebook/NotebookAIChat'
+import { authFetch } from '../utils/authFetch'
 
 export function NotebookEditorPage() {
   const { notebookId } = useParams<{ notebookId: string }>()
   const navigate = useNavigate()
   const store = useNotebookStore()
+
+  // SQL autocomplete schema: { "src_abc123": ["col1", "col2"] }
+  const [sqlSchema, setSqlSchema] = useState<Record<string, string[]>>({})
 
   // Load notebook on mount
   useEffect(() => {
@@ -21,6 +25,14 @@ export function NotebookEditorPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [notebookId])
+
+  // Fetch table schemas for SQL autocomplete
+  useEffect(() => {
+    authFetch('/api/data/tables-schema')
+      .then((res) => (res.ok ? res.json() : {}))
+      .then((data: Record<string, string[]>) => setSqlSchema(data))
+      .catch(() => {})
+  }, [])
 
   // Cmd+S to save
   const handleKeyDown = useCallback(
@@ -131,7 +143,7 @@ export function NotebookEditorPage() {
       <div className="flex flex-col lg:flex-row flex-1 min-h-0 overflow-hidden">
         {/* Left sidebar: Data Sources */}
         <aside className="hidden lg:block w-[280px] border-r border-border-default bg-surface overflow-y-auto shrink-0">
-          <NotebookSourcesPanel />
+          <NotebookSourcesPanel notebookId={notebookId!} />
         </aside>
 
         {/* Center: Notebook cells */}
@@ -142,7 +154,7 @@ export function NotebookEditorPage() {
 
             {store.cells.map((cell, i) => (
               <div key={cell.id}>
-                <NotebookCell cell={cell} />
+                <NotebookCell cell={cell} sqlSchema={sqlSchema} />
                 <AddCellButton index={i + 1} />
               </div>
             ))}
@@ -180,7 +192,7 @@ export function NotebookEditorPage() {
 
         {/* Right sidebar: AI Assistant */}
         <aside className="hidden lg:flex lg:flex-col w-[320px] border-l border-border-default bg-surface shrink-0">
-          <NotebookAIChat />
+          <NotebookAIChat notebookId={notebookId ?? ''} />
         </aside>
       </div>
     </div>

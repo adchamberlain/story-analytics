@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState, useCallback } from 'react'
+import { useRef, useEffect, useState, useCallback, useMemo } from 'react'
 import { EditorView, keymap } from '@codemirror/view'
 import { EditorState } from '@codemirror/state'
 import { python } from '@codemirror/lang-python'
@@ -8,6 +8,7 @@ import { syntaxHighlighting, defaultHighlightStyle } from '@codemirror/language'
 import { defaultKeymap } from '@codemirror/commands'
 import { searchKeymap } from '@codemirror/search'
 import { oneDark } from '@codemirror/theme-one-dark'
+import { autocompletion, CompletionContext } from '@codemirror/autocomplete'
 import { useThemeStore } from '../../stores/themeStore'
 import { useNotebookStore } from '../../stores/notebookStore'
 import type { NotebookCell as NotebookCellType } from '../../stores/notebookStore'
@@ -74,9 +75,10 @@ function renderMarkdown(source: string): string {
 
 interface NotebookCellProps {
   cell: NotebookCellType
+  sqlSchema?: Record<string, string[]>
 }
 
-export function NotebookCell({ cell }: NotebookCellProps) {
+export function NotebookCell({ cell, sqlSchema }: NotebookCellProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<EditorView | null>(null)
   const resolved = useThemeStore((s) => s.resolved)
@@ -85,6 +87,7 @@ export function NotebookCell({ cell }: NotebookCellProps) {
   executeCellRef.current = executeCell
 
   const [editing, setEditing] = useState(cell.cell_type !== 'markdown')
+  const [showDfHint, setShowDfHint] = useState(false)
 
   // For markdown cells: show rendered view by default, click to edit
   const isMarkdown = cell.cell_type === 'markdown'
@@ -94,6 +97,32 @@ export function NotebookCell({ cell }: NotebookCellProps) {
       updateCellSource(cell.id, value)
     },
     [cell.id, updateCellSource],
+  )
+
+  // SQL autocomplete: table + column names from DuckDB sources
+  const schemaCompletion = useCallback(
+    (context: CompletionContext) => {
+      if (!sqlSchema) return null
+      const word = context.matchBefore(/[\w.]*/)
+      if (!word || (word.from === word.to && !context.explicit)) return null
+      const options = []
+      for (const [table, columns] of Object.entries(sqlSchema)) {
+        options.push({ label: table, type: 'class' as const })
+        for (const col of columns) {
+          options.push({ label: col, type: 'property' as const, detail: table })
+        }
+      }
+      return { from: word.from, options }
+    },
+    [sqlSchema],
+  )
+
+  // Memoize autocomplete extension so it updates when schema changes
+  const autocompleteExt = useMemo(
+    () => (cell.cell_type === 'sql' && sqlSchema && Object.keys(sqlSchema).length > 0
+      ? autocompletion({ override: [schemaCompletion] })
+      : autocompletion()),
+    [cell.cell_type, sqlSchema, schemaCompletion],
   )
 
   useEffect(() => {
@@ -119,6 +148,7 @@ export function NotebookCell({ cell }: NotebookCellProps) {
         runKeymap,
         keymap.of([...defaultKeymap, ...searchKeymap]),
         getLanguageExtension(cell.cell_type),
+        autocompleteExt,
         syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
         resolved === 'dark' ? oneDark : lightTheme,
         EditorView.updateListener.of((update) => {
@@ -142,7 +172,7 @@ export function NotebookCell({ cell }: NotebookCellProps) {
       viewRef.current = null
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cell.cell_type, resolved, editing])
+  }, [cell.cell_type, resolved, editing, autocompleteExt])
 
   // Execution count display
   const execLabel =
@@ -207,6 +237,37 @@ export function NotebookCell({ cell }: NotebookCellProps) {
 
       {/* Output */}
       <CellOutput outputs={cell.outputs} />
+
+      {/* SQL → DataFrame variable hint */}
+      {cell.dfVar && (
+        <div className="flex items-center gap-2 px-4 py-2 border-t border-border-default bg-surface text-xs">
+          <span className="text-text-muted">Result saved as</span>
+          <code className="font-mono font-medium text-blue-500 bg-blue-500/10 px-1.5 py-0.5 rounded">
+            {cell.dfVar}
+          </code>
+          <div className="relative">
+            <span
+              className="text-text-muted cursor-help border-b border-dotted border-text-muted"
+              onMouseEnter={() => setShowDfHint(true)}
+              onMouseLeave={() => setShowDfHint(false)}
+            >
+              How to use?
+            </span>
+            {showDfHint && (
+              <div className="absolute bottom-full left-0 mb-2 w-72 rounded-lg border border-border-default bg-surface-raised shadow-lg p-3 z-50">
+                <p className="text-xs text-text-primary font-medium mb-2">
+                  Use <code className="font-mono text-blue-500">{cell.dfVar}</code> in a Python cell to access this result as a pandas DataFrame.
+                </p>
+                <div className="space-y-1">
+                  <code className="block text-[11px] font-mono text-text-secondary">{cell.dfVar}.head()</code>
+                  <code className="block text-[11px] font-mono text-text-secondary">{cell.dfVar}.describe()</code>
+                  <code className="block text-[11px] font-mono text-text-secondary">{cell.dfVar}["column"].value_counts()</code>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Inline chart preview */}
       {cell.chartId && <InlineChartPreview chartId={cell.chartId} />}

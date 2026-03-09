@@ -24,6 +24,7 @@ export interface NotebookCell {
   execution_count: number | null
   running: boolean
   chartId: string | null
+  dfVar: string | null  // Variable name if SQL result was injected as DataFrame
 }
 
 export interface NotebookMeta {
@@ -62,7 +63,7 @@ interface NotebookState {
   loadNotebook: (id: string) => Promise<void>
   saveNotebook: () => Promise<void>
   updateTitle: (title: string) => void
-  addCell: (index: number, type: 'code' | 'markdown' | 'sql') => void
+  addCell: (index: number, type: 'code' | 'markdown' | 'sql', source?: string) => void
   deleteCell: (id: string) => void
   moveCell: (id: string, direction: 'up' | 'down') => void
   updateCellSource: (id: string, source: string) => void
@@ -117,6 +118,7 @@ function parseIpynbCell(raw: {
     execution_count: raw.execution_count ?? null,
     running: false,
     chartId: null,
+    dfVar: null,
   }
 }
 
@@ -238,15 +240,16 @@ export const useNotebookStore = create<NotebookState>((set, get) => ({
     set({ title, dirty: true })
   },
 
-  addCell: (index: number, type: 'code' | 'markdown' | 'sql') => {
+  addCell: (index: number, type: 'code' | 'markdown' | 'sql', source?: string) => {
     const cell: NotebookCell = {
       id: makeCellId(),
       cell_type: type,
-      source: '',
+      source: source ?? '',
       outputs: [],
       execution_count: null,
       running: false,
       chartId: null,
+      dfVar: null,
     }
     set((s) => {
       const cells = [...s.cells]
@@ -350,11 +353,14 @@ export const useNotebookStore = create<NotebookState>((set, get) => ({
                 running: false,
                 outputs: result.outputs ?? [],
                 execution_count: result.execution_count ?? c.execution_count,
+                dfVar: result.df_var ?? c.dfVar,
               }
             : c,
         ),
         kernelStatus: 'idle',
       }))
+      // Auto-save so outputs persist across navigation
+      get().saveNotebook()
     } catch {
       set((s) => ({
         cells: s.cells.map((c) => (c.id === id ? { ...c, running: false } : c)),
@@ -370,7 +376,15 @@ export const useNotebookStore = create<NotebookState>((set, get) => ({
     // Save first
     await get().saveNotebook()
 
-    set({ kernelStatus: 'busy' })
+    // Mark all executable cells as running and clear outputs
+    set((s) => ({
+      kernelStatus: 'busy',
+      cells: s.cells.map((c) =>
+        c.cell_type !== 'markdown' && c.source.trim()
+          ? { ...c, running: true, outputs: [] }
+          : c,
+      ),
+    }))
     try {
       const res = await authFetch(`${API}/${notebookId}/execute-all`, {
         method: 'POST',
@@ -383,7 +397,7 @@ export const useNotebookStore = create<NotebookState>((set, get) => ({
         set((s) => ({
           cells: s.cells.map((c) => {
             const updated = result.cells.find(
-              (rc: { cell_id: string; outputs: CellOutput[]; execution_count: number | null }) =>
+              (rc: { cell_id: string; outputs: CellOutput[]; execution_count: number | null; df_var?: string }) =>
                 rc.cell_id === c.id,
             )
             if (updated) {
@@ -391,19 +405,27 @@ export const useNotebookStore = create<NotebookState>((set, get) => ({
                 ...c,
                 outputs: updated.outputs ?? [],
                 execution_count: updated.execution_count ?? c.execution_count,
+                dfVar: updated.df_var ?? c.dfVar,
                 running: false,
               }
             }
             return c
           }),
           kernelStatus: 'idle',
-          dirty: false,
         }))
+        // Auto-save so outputs persist across navigation
+        get().saveNotebook()
       } else {
-        set({ kernelStatus: 'idle' })
+        set((s) => ({
+          cells: s.cells.map((c) => ({ ...c, running: false })),
+          kernelStatus: 'idle',
+        }))
       }
     } catch {
-      set({ kernelStatus: 'idle' })
+      set((s) => ({
+        cells: s.cells.map((c) => ({ ...c, running: false })),
+        kernelStatus: 'idle',
+      }))
     }
   },
 
