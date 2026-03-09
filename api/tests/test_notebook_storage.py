@@ -168,3 +168,20 @@ class TestDeleteNotebook:
 
     def test_delete_invalid_id_returns_false(self):
         assert delete_notebook("../../bad") is False
+
+
+class TestCreateFromIpynbValidation:
+    def test_rejects_missing_cells(self):
+        bad = json.dumps({"nbformat": 4, "metadata": {}}).encode()
+        with pytest.raises(ValueError, match="missing or invalid 'cells'"):
+            create_notebook_from_ipynb(bad, "bad.ipynb")
+
+    def test_rejects_missing_nbformat(self):
+        bad = json.dumps({"cells": [], "metadata": {}}).encode()
+        with pytest.raises(ValueError, match="unsupported or missing 'nbformat'"):
+            create_notebook_from_ipynb(bad, "bad.ipynb")
+
+    def test_rejects_wrong_nbformat(self):
+        bad = json.dumps({"cells": [], "nbformat": 3, "metadata": {}}).encode()
+        with pytest.raises(ValueError, match="unsupported or missing 'nbformat'"):
+            create_notebook_from_ipynb(bad, "bad.ipynb")
