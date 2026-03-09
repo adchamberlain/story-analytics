@@ -1,0 +1,51 @@
+/* Notebook output styling */
+.notebook-dataframe {
+  max-height: 400px;
+  overflow: auto;
+}
+
+.notebook-dataframe table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 12px;
+  font-family: ui-monospace, monospace;
+}
+
+.notebook-dataframe th {
+  background: var(--color-surface-inset, #f3f4f6);
+  padding: 6px 12px;
+  text-align: left;
+  font-weight: 500;
+  font-size: 11px;
+  color: var(--color-text-secondary, #6b7280);
+  border: 1px solid var(--color-border-default, #e5e7eb);
+  white-space: nowrap;
+}
+
+.notebook-dataframe td {
+  padding: 4px 12px;
+  border: 1px solid var(--color-border-default, #e5e7eb);
+  color: var(--color-text-primary, #111827);
+  white-space: nowrap;
+}
+
+.notebook-dataframe tbody tr:hover {
+  background: var(--color-surface-secondary, #f9fafb);
+}
+
+/* Rich HTML output */
+.notebook-html-output img {
+  max-width: 100%;
+  border-radius: 4px;
+}
+
+.notebook-html-output table {
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.notebook-html-output th,
+.notebook-html-output td {
+  padding: 4px 8px;
+  border: 1px solid var(--color-border-default, #e5e7eb);
+}

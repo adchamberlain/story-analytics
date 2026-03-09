@@ -13,6 +13,7 @@ import { useNotebookStore } from '../../stores/notebookStore'
 import type { NotebookCell as NotebookCellType } from '../../stores/notebookStore'
 import { CellOutput } from './CellOutput'
 import { CellToolbar } from './CellToolbar'
+import { InlineChartPreview } from './InlineChartPreview'
 
 // Light theme matching SqlEditor exactly
 const lightTheme = EditorView.theme({
@@ -206,6 +207,9 @@ export function NotebookCell({ cell }: NotebookCellProps) {
 
       {/* Output */}
       <CellOutput outputs={cell.outputs} />
+
+      {/* Inline chart preview */}
+      {cell.chartId && <InlineChartPreview chartId={cell.chartId} />}
     </div>
   )
 }
