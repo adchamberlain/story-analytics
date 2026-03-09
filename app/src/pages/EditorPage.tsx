@@ -180,7 +180,58 @@ export function EditorPage() {
           await ds.transformCastType(editorSourceId, params.column as string, params.type as string)
           break
       }
-      // Refresh the chart data so the chart tab shows updated data
+
+      // Refresh columns from schema after any transform (columns may have changed)
+      const schemaRes = await authFetch(`/api/data/schema/${editorSourceId}`)
+      if (schemaRes.ok) {
+        const schema = await schemaRes.json()
+        const newColumns = (schema.columns ?? []).map((c: { name: string }) => c.name)
+        const newColumnTypes: Record<string, string> = {}
+        for (const col of schema.columns ?? []) {
+          newColumnTypes[col.name] = col.type
+        }
+
+        // For rename, update config references from old to new column name
+        if (action === 'rename-column') {
+          const oldName = params.old as string
+          const newName = params.new as string
+          const cfg = store.config
+          const patch: Record<string, unknown> = {}
+          if (cfg.x === oldName) patch.x = newName
+          if (Array.isArray(cfg.y)) {
+            const updated = cfg.y.map((c: string) => c === oldName ? newName : c)
+            if (updated.some((c: string, i: number) => c !== cfg.y![i])) patch.y = updated
+          } else if (cfg.y === oldName) {
+            patch.y = newName
+          }
+          if (cfg.series === oldName) patch.series = newName
+          if (Object.keys(patch).length > 0) {
+            store.updateConfig(patch as Partial<typeof cfg>)
+          }
+        }
+
+        // For delete-column, clear config references to the deleted column
+        if (action === 'delete-column') {
+          const deleted = params.column as string
+          const cfg = store.config
+          const patch: Record<string, unknown> = {}
+          if (cfg.x === deleted) patch.x = null
+          if (Array.isArray(cfg.y)) {
+            const filtered = cfg.y.filter((c: string) => c !== deleted)
+            if (filtered.length !== cfg.y.length) patch.y = filtered.length > 0 ? filtered : null
+          } else if (cfg.y === deleted) {
+            patch.y = null
+          }
+          if (cfg.series === deleted) patch.series = null
+          if (Object.keys(patch).length > 0) {
+            store.updateConfig(patch as Partial<typeof cfg>)
+          }
+        }
+
+        // Update store columns, then rebuild query with fresh column names
+        useEditorStore.setState({ columns: newColumns, columnTypes: newColumnTypes })
+      }
+
       store.buildQuery()
     } catch (e) {
       // Error is already stored in dataStore.error by the transform method
@@ -266,6 +317,8 @@ export function EditorPage() {
     tableDefaultSortColumn: store.config.tableDefaultSortColumn ?? undefined,
     tableDefaultSortDir: store.config.tableDefaultSortColumn ? store.config.tableDefaultSortDir : undefined,
     maxCategories: store.config.maxCategories,
+    showTrendline: store.config.showTrendline,
+    showTrendlineEquation: store.config.showTrendlineEquation,
   }
 
   // Apply palette colors
@@ -443,8 +496,17 @@ export function EditorPage() {
 
       {/* Error banner */}
       {store.error && (
-        <div className="bg-red-50 border-b border-red-200 px-4 py-2 text-xs text-red-700 shrink-0">
-          {store.error}
+        <div className="bg-red-50 border-b border-red-200 px-4 py-2 text-xs text-red-700 shrink-0 flex items-center justify-between gap-2">
+          <span>{store.error}</span>
+          <button
+            onClick={() => useEditorStore.setState({ error: null })}
+            className="text-red-400 hover:text-red-600 transition-colors shrink-0"
+            aria-label="Dismiss error"
+          >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
         </div>
       )}
 
@@ -490,8 +552,17 @@ export function EditorPage() {
                 dataStore.preview ? (
                   <>
                     {dataStore.error && (
-                      <div className="mb-3 px-3 py-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-sm text-red-700 dark:text-red-400">
-                        {dataStore.error}
+                      <div className="mb-3 px-3 py-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-sm text-red-700 dark:text-red-400 flex items-center justify-between gap-2">
+                        <span>{dataStore.error}</span>
+                        <button
+                          onClick={() => useDataStore.setState({ error: null })}
+                          className="text-red-400 hover:text-red-600 transition-colors shrink-0"
+                          aria-label="Dismiss error"
+                        >
+                          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
                       </div>
                     )}
                     <DataTransformGrid

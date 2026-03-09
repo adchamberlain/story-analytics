@@ -25,6 +25,7 @@ _SAFE_SOURCE_ID_RE = re.compile(r"^[a-f0-9]{12}$")
 class SourceMeta:
     path: Path
     ingested_at: datetime
+    view_name: str | None = None
 
 
 @dataclass
@@ -65,6 +66,55 @@ class DuckDBService:
         # Ensure the uploads directory exists (storage.write() creates parents on demand)
         self._reload_uploaded_sources()
 
+    def _make_view_name(self, filename: str) -> str:
+        """Derive a unique, SQL-safe view name from a filename.
+
+        Examples:
+            "city-temp-ranges.csv" → "city_temp_ranges"
+            "Sales Data (2024).csv" → "sales_data_2024"
+            "my_data.parquet" → "my_data"
+
+        If the derived name collides with an existing view, appends _2, _3, etc.
+        """
+        stem = Path(filename).stem
+        # Lowercase, replace non-alphanumeric with underscores, collapse runs
+        name = re.sub(r'[^a-z0-9]+', '_', stem.lower()).strip('_')
+        if not name or not name[0].isalpha():
+            name = 'data_' + name if name else 'data'
+        # Deduplicate against existing view names
+        existing = {m.view_name for m in self._sources.values() if m.view_name}
+        if name not in existing:
+            return name
+        n = 2
+        while f"{name}_{n}" in existing:
+            n += 1
+        return f"{name}_{n}"
+
+    def _create_friendly_view(self, source_id: str, table_name: str, filename: str) -> str | None:
+        """Create a human-readable VIEW aliasing the internal table.
+
+        Returns the view name on success, None on failure.
+        """
+        view_name = self._make_view_name(filename)
+        try:
+            with self._lock:
+                self._conn.execute(
+                    f'CREATE OR REPLACE VIEW "{view_name}" AS SELECT * FROM {table_name}'
+                )
+            return view_name
+        except Exception:
+            return None
+
+    def _drop_friendly_view(self, source_id: str) -> None:
+        """Drop the friendly view for a source, if one exists."""
+        meta = self._sources.get(source_id)
+        if meta and meta.view_name:
+            try:
+                with self._lock:
+                    self._conn.execute(f'DROP VIEW IF EXISTS "{meta.view_name}"')
+            except Exception:
+                pass
+
     def _reload_uploaded_sources(self) -> None:
         """Re-ingest all CSVs from uploads/ on startup.
 
@@ -101,9 +151,12 @@ class DuckDBService:
                         CREATE OR REPLACE TABLE {table_name} AS
                         SELECT * FROM read_csv_auto('{_sql_string(str(local_path))}', delim='{delimiter}', header=true)
                     """)
+                filename = local_path.name
+                view_name = self._create_friendly_view(source_id, table_name, filename)
                 self._sources[source_id] = SourceMeta(
                     path=local_path,
                     ingested_at=datetime.fromtimestamp(local_path.stat().st_mtime, tz=timezone.utc),
+                    view_name=view_name,
                 )
                 count += 1
             except (duckdb.Error, UnicodeDecodeError, ValueError) as e:
@@ -190,7 +243,12 @@ class DuckDBService:
             )
 
         # Register source only after successful table creation
-        self._sources[source_id] = SourceMeta(path=stored_path, ingested_at=datetime.now(timezone.utc))
+        view_name = self._create_friendly_view(source_id, table_name, filename)
+        self._sources[source_id] = SourceMeta(
+            path=stored_path,
+            ingested_at=datetime.now(timezone.utc),
+            view_name=view_name,
+        )
 
         # Get schema info
         schema = self._inspect_table(table_name, source_id, filename)
@@ -212,16 +270,21 @@ class DuckDBService:
                 """)
             # Store a clean synthetic path based on the friendly name (the temp
             # file is deleted immediately after ingest, so its path is useless).
-            # Deduplicate: if "orders.parquet" exists, try "orders_2.parquet", etc.
+            # Deduplicate: if "orders.csv" exists, try "orders_2.csv", etc.
             clean_stem = re.sub(r'[^\w\s-]', '', table_name_hint).strip().replace(' ', '_') or 'query_result'
-            candidate = f"{clean_stem}.parquet"
+            candidate = f"{clean_stem}.csv"
             existing_names = {m.path.name for sid, m in self._sources.items() if sid != source_id}
             if candidate in existing_names:
                 n = 2
-                while f"{clean_stem}_{n}.parquet" in existing_names:
+                while f"{clean_stem}_{n}.csv" in existing_names:
                     n += 1
-                candidate = f"{clean_stem}_{n}.parquet"
-            self._sources[source_id] = SourceMeta(path=Path(candidate), ingested_at=datetime.now(timezone.utc))
+                candidate = f"{clean_stem}_{n}.csv"
+            view_name = self._create_friendly_view(source_id, table_name, candidate)
+            self._sources[source_id] = SourceMeta(
+                path=Path(candidate),
+                ingested_at=datetime.now(timezone.utc),
+                view_name=view_name,
+            )
             schema = self._inspect_table(table_name, source_id, candidate)
             return schema
         except Exception:
@@ -397,9 +460,23 @@ class DuckDBService:
                     '{_sql_string(str(local_path))}', delim='{delimiter}', header=true
                 )
             """)
+        # Preserve existing view name if present, otherwise create new one
+        old_meta = self._sources.get(source_id)
+        old_view = old_meta.view_name if old_meta else None
+        if old_view:
+            # Re-create same view (table was replaced)
+            try:
+                with self._lock:
+                    self._conn.execute(
+                        f'CREATE OR REPLACE VIEW "{old_view}" AS SELECT * FROM {table_name}'
+                    )
+            except Exception:
+                old_view = None
+        view_name = old_view or self._create_friendly_view(source_id, table_name, local_path.name)
         self._sources[source_id] = SourceMeta(
             path=local_path,
             ingested_at=datetime.now(timezone.utc),
+            view_name=view_name,
         )
 
     @staticmethod
@@ -528,6 +605,11 @@ class DuckDBService:
     def is_csv_source(self, source_id: str) -> bool:
         """Return True if the source is an uploaded CSV (static data)."""
         return source_id in self._sources
+
+    def get_view_name(self, source_id: str) -> str | None:
+        """Return the friendly view name for a source, or None."""
+        meta = self._sources.get(source_id)
+        return meta.view_name if meta else None
 
     def get_ingested_at(self, source_id: str) -> datetime | None:
         """Return the UTC timestamp when a source was ingested, or None."""

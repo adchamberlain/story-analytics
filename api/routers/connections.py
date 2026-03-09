@@ -432,6 +432,27 @@ async def sync_tables(connection_id: str, request: SyncRequest, user: dict = Dep
             detail=f"Sync failed: {e}",
         )
 
+    # Persist each synced table as CSV in uploads/ so it survives server restarts
+    # (connectors write to parquet/memory; this converts to the standard CSV path).
+    for r in sync_results:
+        sid = r["source_id"]
+        table_name = f"src_{sid}"
+        csv_filename = f"{r['filename']}.csv" if not r["filename"].endswith(".csv") else r["filename"]
+        try:
+            import io as _io
+            import csv as _csv
+            rows = db._conn.execute(f"SELECT * FROM {table_name}").fetchall()
+            cols = [desc[0] for desc in db._conn.execute(f"SELECT * FROM {table_name} LIMIT 0").description]
+            buf = _io.StringIO()
+            writer = _csv.writer(buf)
+            writer.writerow(cols)
+            for row in rows:
+                writer.writerow(row)
+            storage_key = f"uploads/{sid}/{csv_filename}"
+            db._storage.write(storage_key, buf.getvalue().encode("utf-8"))
+        except Exception as e:
+            print(f"[sync] Warning: failed to persist synced table {sid} as CSV: {e}")
+
     return SyncResponse(
         sources=[
             SyncedSource(

@@ -18,6 +18,8 @@ import { ForgotPasswordPage } from './pages/ForgotPasswordPage'
 import { ResetPasswordPage } from './pages/ResetPasswordPage'
 import { HomeRedirect } from './components/HomeRedirect'
 import { ThemeBuilderPage } from './pages/ThemeBuilderPage'
+import { NotebooksPage } from './pages/NotebooksPage'
+import { NotebookEditorPage } from './pages/NotebookEditorPage'
 
 function App() {
   return (
@@ -42,6 +44,8 @@ function App() {
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="/settings/themes" element={<ThemeBuilderPage />} />
         <Route path="/sources" element={<SourcesPage />} />
+        <Route path="/notebooks" element={<NotebooksPage />} />
+        <Route path="/notebook/:notebookId" element={<NotebookEditorPage />} />
         <Route path="/dashboard/new" element={<DashboardBuilderPage />} />
         <Route path="/dashboard/:dashboardId/edit" element={<DashboardBuilderPage />} />
         <Route path="/editor/new/source" element={<SourcePickerPage />} />

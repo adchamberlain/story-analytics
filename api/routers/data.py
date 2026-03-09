@@ -90,6 +90,7 @@ class QueryAsSourceResponse(BaseModel):
 class TableInfo(BaseModel):
     source_id: str
     table_name: str       # Internal DuckDB name, e.g. "src_abc123"
+    view_name: str | None = None  # Human-readable alias, e.g. "city_temp_ranges"
     display_name: str     # Original filename, e.g. "sales_data.csv"
     row_count: int
     column_count: int
@@ -142,22 +143,49 @@ async def list_sources(user: dict = Depends(get_current_user)):
 
 @router.get("/tables", response_model=list[TableInfo])
 async def list_tables(user: dict = Depends(get_current_user)):
-    """List all loaded DuckDB tables with their internal names (for raw SQL queries)."""
+    """List all loaded DuckDB tables with their internal names, newest first."""
     service = get_duckdb_service()
-    results = []
+    results: list[tuple[datetime, TableInfo]] = []
     for source_id in list(service._sources):
         try:
             schema = service.get_schema(source_id)
-            results.append(TableInfo(
-                source_id=schema.source_id,
-                table_name=f"src_{source_id}",
-                display_name=schema.filename,
-                row_count=schema.row_count,
-                column_count=len(schema.columns),
+            ingested_at = service.get_ingested_at(source_id)
+            results.append((
+                ingested_at or datetime.min.replace(tzinfo=timezone.utc),
+                TableInfo(
+                    source_id=schema.source_id,
+                    table_name=f"src_{source_id}",
+                    view_name=service.get_view_name(source_id),
+                    display_name=schema.filename,
+                    row_count=schema.row_count,
+                    column_count=len(schema.columns),
+                ),
             ))
         except Exception:
             continue
-    return results
+    results.sort(key=lambda t: t[0], reverse=True)
+    return [info for _, info in results]
+
+
+@router.get("/tables-schema")
+async def tables_schema(user: dict = Depends(get_current_user)):
+    """Return {table_name: [column_names]} for all sources — used for SQL autocomplete.
+
+    Uses the friendly view name when available, falls back to src_ name.
+    Both names are valid in SQL (the view aliases the table).
+    """
+    service = get_duckdb_service()
+    result: dict[str, list[str]] = {}
+    for source_id in list(service._sources):
+        try:
+            schema = service.get_schema(source_id)
+            cols = [c.name for c in schema.columns]
+            view_name = service.get_view_name(source_id)
+            # Use friendly name as primary, src_ as fallback
+            result[view_name or f"src_{source_id}"] = cols
+        except Exception:
+            continue
+    return result
 
 
 @router.delete("/sources/{source_id}")
@@ -171,7 +199,8 @@ async def delete_source(source_id: str, user: dict = Depends(get_current_user)):
     if source_id not in service._sources:
         raise HTTPException(status_code=404, detail="Source not found")
 
-    # Drop the DuckDB table and remove from in-memory registry atomically
+    # Drop the friendly view and DuckDB table, remove from in-memory registry
+    service._drop_friendly_view(source_id)
     table_name = f"src_{source_id}"
     with service._lock:
         try:

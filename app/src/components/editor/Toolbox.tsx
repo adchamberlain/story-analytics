@@ -806,6 +806,22 @@ export function Toolbox() {
               onChange={(showLegend) => updateConfig({ showLegend })}
             />
           )}
+          {config.chartType === 'ScatterPlot' && !isMultiY && (
+            <>
+              <Toggle
+                label="Show trendline"
+                checked={config.showTrendline ?? false}
+                onChange={(showTrendline) => updateConfig({ showTrendline })}
+              />
+              {config.showTrendline && (
+                <Toggle
+                  label="Show equation & R²"
+                  checked={config.showTrendlineEquation ?? false}
+                  onChange={(showTrendlineEquation) => updateConfig({ showTrendlineEquation })}
+                />
+              )}
+            </>
+          )}
           {hasDayOfWeekData && (
             <div>
               <label className="block text-xs font-medium text-text-secondary mb-1">Week starts on</label>
