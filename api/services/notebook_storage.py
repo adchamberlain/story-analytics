@@ -100,6 +100,12 @@ def create_notebook_from_ipynb(content: bytes, filename: str) -> NotebookMeta:
 
     data = json.loads(content.decode("utf-8"))
 
+    # Validate .ipynb structure
+    if not isinstance(data.get("cells"), list):
+        raise ValueError("Invalid .ipynb file: missing or invalid 'cells'")
+    if data.get("nbformat") not in (4,):
+        raise ValueError("Invalid .ipynb file: unsupported or missing 'nbformat' (only v4 supported)")
+
     # Ensure metadata dict exists
     if "metadata" not in data:
         data["metadata"] = {}
