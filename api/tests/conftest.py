@@ -35,6 +35,7 @@ def _setup_isolation():
     import api.services.theme_storage as theme_storage
     import api.services.data_cache as data_cache
     import api.services.template_storage as template_storage
+    import api.services.notebook_storage as notebook_storage
     import api.services.duckdb_service as duckdb_svc
 
     # Save originals for cleanup
@@ -52,6 +53,7 @@ def _setup_isolation():
     modules_with_storage = [
         chart_storage, dashboard_storage, connection_service, settings_storage,
         folder_storage, version_storage, theme_storage, data_cache, template_storage,
+        notebook_storage,
     ]
     for mod in modules_with_storage:
         _original_attrs.append((mod, "_storage", getattr(mod, "_storage")))

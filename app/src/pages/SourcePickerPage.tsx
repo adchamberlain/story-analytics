@@ -103,10 +103,15 @@ export function SourcePickerPage() {
   )
 
   const handleSynced = useCallback((info: SyncedInfo) => {
+    // If returnTo is set (e.g. from notebook), skip shaper and go back
+    if (safeReturnTo) {
+      navigate(safeReturnTo)
+      return
+    }
     setSyncedInfo(info)
     setDbStep('shaper')
     setRefreshKey((k) => k + 1)
-  }, [])
+  }, [safeReturnTo, navigate])
 
   const handleShaperApprove = useCallback((sql: string) => {
     if (!syncedInfo) return

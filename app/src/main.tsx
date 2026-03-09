@@ -6,6 +6,7 @@ import './styles/index.css'
 import './styles/tailwind.css'
 import 'react-grid-layout/css/styles.css'
 import 'react-resizable/css/styles.css'
+import './styles/notebook.css'
 // Initialize theme before React renders to prevent FOUC
 import './stores/themeStore'
 
