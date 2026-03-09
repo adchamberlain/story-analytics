@@ -3,6 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useNotebookStore } from '../stores/notebookStore'
 import { NotebookCell } from '../components/notebook/NotebookCell'
 import { AddCellButton } from '../components/notebook/AddCellButton'
+import { NotebookSourcesPanel } from '../components/notebook/NotebookSourcesPanel'
+import { NotebookAIChat } from '../components/notebook/NotebookAIChat'
 
 export function NotebookEditorPage() {
   const { notebookId } = useParams<{ notebookId: string }>()
@@ -125,48 +127,61 @@ export function NotebookEditorPage() {
         </div>
       </div>
 
-      {/* Body — scrollable cell list */}
-      <div className="flex-1 overflow-y-auto">
-        <div className="mx-auto py-8 px-4" style={{ maxWidth: '900px' }}>
-          {/* Add cell button at top */}
-          <AddCellButton index={0} />
+      {/* Three-pane layout */}
+      <div className="flex flex-col lg:flex-row flex-1 min-h-0 overflow-hidden">
+        {/* Left sidebar: Data Sources */}
+        <aside className="hidden lg:block w-[280px] border-r border-border-default bg-surface overflow-y-auto shrink-0">
+          <NotebookSourcesPanel />
+        </aside>
 
-          {store.cells.map((cell, i) => (
-            <div key={cell.id}>
-              <NotebookCell cell={cell} />
-              <AddCellButton index={i + 1} />
-            </div>
-          ))}
+        {/* Center: Notebook cells */}
+        <main className="flex-1 overflow-y-auto">
+          <div className="max-w-[900px] mx-auto py-6 px-4 space-y-1">
+            {/* Add cell button at top */}
+            <AddCellButton index={0} />
 
-          {/* Empty state */}
-          {store.cells.length === 0 && store.kernelStatus !== 'starting' && (
-            <div className="text-center py-16">
-              <p className="text-sm text-text-secondary mb-4">
-                This notebook is empty. Add a cell to get started.
-              </p>
-              <div className="flex items-center justify-center gap-2">
-                <button
-                  onClick={() => store.addCell(0, 'code')}
-                  className="text-sm rounded-lg bg-blue-600 text-white hover:bg-blue-700 px-4 py-2 transition-colors font-medium"
-                >
-                  + Python
-                </button>
-                <button
-                  onClick={() => store.addCell(0, 'sql')}
-                  className="text-sm rounded-lg border border-border-default text-text-primary hover:bg-surface-secondary px-4 py-2 transition-colors font-medium"
-                >
-                  + SQL
-                </button>
-                <button
-                  onClick={() => store.addCell(0, 'markdown')}
-                  className="text-sm rounded-lg border border-border-default text-text-primary hover:bg-surface-secondary px-4 py-2 transition-colors font-medium"
-                >
-                  + Markdown
-                </button>
+            {store.cells.map((cell, i) => (
+              <div key={cell.id}>
+                <NotebookCell cell={cell} />
+                <AddCellButton index={i + 1} />
               </div>
-            </div>
-          )}
-        </div>
+            ))}
+
+            {/* Empty state */}
+            {store.cells.length === 0 && store.kernelStatus !== 'starting' && (
+              <div className="text-center py-16">
+                <p className="text-sm text-text-secondary mb-4">
+                  This notebook is empty. Add a cell to get started.
+                </p>
+                <div className="flex items-center justify-center gap-2">
+                  <button
+                    onClick={() => store.addCell(0, 'code')}
+                    className="text-sm rounded-lg bg-blue-600 text-white hover:bg-blue-700 px-4 py-2 transition-colors font-medium"
+                  >
+                    + Python
+                  </button>
+                  <button
+                    onClick={() => store.addCell(0, 'sql')}
+                    className="text-sm rounded-lg border border-border-default text-text-primary hover:bg-surface-secondary px-4 py-2 transition-colors font-medium"
+                  >
+                    + SQL
+                  </button>
+                  <button
+                    onClick={() => store.addCell(0, 'markdown')}
+                    className="text-sm rounded-lg border border-border-default text-text-primary hover:bg-surface-secondary px-4 py-2 transition-colors font-medium"
+                  >
+                    + Markdown
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </main>
+
+        {/* Right sidebar: AI Assistant */}
+        <aside className="hidden lg:flex lg:flex-col w-[320px] border-l border-border-default bg-surface shrink-0">
+          <NotebookAIChat />
+        </aside>
       </div>
     </div>
   )
