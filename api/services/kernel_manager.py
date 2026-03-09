@@ -8,7 +8,12 @@ import threading
 import time
 from dataclasses import dataclass, field
 
-from jupyter_client import KernelManager as JupyterKernelManager
+try:
+    from jupyter_client import KernelManager as JupyterKernelManager
+    _JUPYTER_AVAILABLE = True
+except ImportError:
+    JupyterKernelManager = None  # type: ignore[assignment,misc]
+    _JUPYTER_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +23,7 @@ class KernelSession:
     """Wraps a single Jupyter kernel for a notebook session."""
 
     notebook_id: str
-    _km: JupyterKernelManager
+    _km: object  # JupyterKernelManager (or None if jupyter unavailable)
     _kc: object  # KernelClient
     last_activity: float = field(default_factory=time.time)
 
@@ -188,6 +193,11 @@ class KernelManager:
 
     def start_kernel(self, notebook_id: str) -> KernelSession:
         """Start a new ipykernel for a notebook. If one exists, return it."""
+        if not _JUPYTER_AVAILABLE:
+            raise RuntimeError(
+                "Python notebooks require jupyter_client and ipykernel. "
+                "Install them with: pip install jupyter_client ipykernel"
+            )
         with self._lock:
             if notebook_id in self._sessions:
                 session = self._sessions[notebook_id]
