@@ -60,6 +60,7 @@ Ships with **The Perfect Dashboard** — a showcase of all 25 chart types with s
 ### Deployment
 - **Local-first** — Run locally with file-based JSON storage, no cloud account required
 - **Cloud-ready** — Deploy to AWS with the included CloudFormation template, Docker images, and S3 storage backend
+- **Desktop app** — Native macOS app (Apple Silicon and Intel) via Electron, signed and notarized by Apple
 - **Dark mode** — Full light/dark theme support
 
 ## Quick Start
@@ -146,13 +147,18 @@ story-analytics/
 ├── engine/                 # LLM integration layer
 │   ├── v2/                 # Chart proposer and editor
 │   └── prompts/            # YAML prompt templates
+├── desktop/                # Electron desktop app (macOS)
 ├── deploy/                 # AWS CloudFormation + deploy scripts
+├── docs/                   # Deployment and API documentation
 ├── data/                   # Local data storage (gitignored)
 │   ├── seed/               # Example dashboard + charts (committed)
 │   ├── uploads/            # Uploaded CSV files
 │   ├── charts/             # Saved chart configs (JSON)
-│   └── dashboards/         # Saved dashboard layouts (JSON)
-└── website/                # Marketing site (storyanalytics.ai)
+│   ├── dashboards/         # Saved dashboard layouts (JSON)
+│   ├── versions/           # Chart version history snapshots
+│   ├── notebooks/          # Saved notebooks
+│   ├── templates/          # Chart templates
+│   └── themes/             # Custom themes
 ```
 
 ### Tech Stack
