@@ -159,8 +159,8 @@ export function NotebookCell({ cell }: NotebookCellProps) {
           <span className="text-xs font-mono text-text-muted w-8">{execLabel}</span>
           <span className="text-xs text-text-secondary font-medium">{typeLabel}</span>
 
-          {/* Run button */}
-          <button
+          {/* Run button (code and SQL cells only) */}
+          {cell.cell_type !== 'markdown' && <button
             onClick={() => executeCell(cell.id)}
             disabled={cell.running}
             className="p-1 rounded text-text-icon hover:text-blue-500 hover:bg-surface-secondary transition-colors disabled:opacity-50"
@@ -181,7 +181,7 @@ export function NotebookCell({ cell }: NotebookCellProps) {
                 <path d="M8 5v14l11-7z" />
               </svg>
             )}
-          </button>
+          </button>}
         </div>
 
         <CellToolbar cellId={cell.id} cellType={cell.cell_type} />
