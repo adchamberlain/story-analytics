@@ -8,7 +8,6 @@ destroy it via find_source_by_filename.
 Fix: Changed to "__paste__.csv" — a name no real upload would use.
 """
 
-import pytest
 
 from api.routers.data import router
 
@@ -18,7 +17,7 @@ class TestPasteFilenameCollision:
         """The paste sentinel filename must not be a plausible user upload name."""
         # Inspect the source to verify the sentinel
         import inspect
-        source = inspect.getsource(router.routes[-1].endpoint)  # fragile; use grep instead
+        inspect.getsource(router.routes[-1].endpoint)  # fragile; use grep instead
 
         # More robust: just check the actual data.py source text
         from pathlib import Path

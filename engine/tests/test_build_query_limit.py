@@ -6,9 +6,7 @@ LIMIT, allowing unbounded GROUP BY results on high-cardinality columns.
 Fix: Added LIMIT 10000 to both branches, consistent with multi-Y path.
 """
 
-import re
 
-import pytest
 
 
 class TestBuildQueryLimit:

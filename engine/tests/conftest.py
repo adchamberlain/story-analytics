@@ -2,10 +2,6 @@
 Shared fixtures for the Story Analytics regression test suite.
 """
 
-import json
-import shutil
-import tempfile
-from pathlib import Path
 
 import pytest
 

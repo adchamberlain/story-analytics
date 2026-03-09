@@ -7,9 +7,7 @@ and causing a 400 INVALID_ARGUMENT API error.
 Fix: Merge consecutive same-role messages into a single Content entry.
 """
 
-import pytest
 
-from engine.llm.gemini_provider import GeminiProvider
 
 
 class TestGeminiHistoryMerge:

@@ -7,7 +7,6 @@ could bypass validation and reference wrong or nonexistent tables.
 Fix: Changed to `^[a-f0-9]{12}$` to match the generation format exactly.
 """
 
-import re
 
 import pytest
 
