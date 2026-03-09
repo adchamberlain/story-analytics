@@ -208,7 +208,7 @@ export const useNotebookStore = create<NotebookState>((set, get) => ({
       const cells: NotebookCell[] = (nb.cells ?? []).map(parseIpynbCell)
       set({
         notebookId: id,
-        title: nb.title ?? 'Untitled',
+        title: nb.metadata?.title ?? nb.title ?? 'Untitled',
         cells,
         dirty: false,
         kernelStatus: 'idle',
