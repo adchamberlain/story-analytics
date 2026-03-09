@@ -4,6 +4,7 @@ Notebooks router: CRUD, upload, kernel execution, and DataFrame bridge.
 
 from __future__ import annotations
 
+import html as _html
 import json
 import logging
 import tempfile
@@ -184,7 +185,7 @@ def _next_sql_var(session) -> str:
     code = """
 import json as _json_
 _n_ = 1
-while f"sql_{_n_}" in dir():
+while f"sql_{_n_}" in globals():
     _n_ += 1
 print(_n_)
 del _n_, _json_
@@ -313,12 +314,12 @@ async def execute_all_endpoint(
 
                 html = '<table class="dataframe"><thead><tr>'
                 for col in columns:
-                    html += f"<th>{col}</th>"
+                    html += f"<th>{_html.escape(str(col))}</th>"
                 html += "</tr></thead><tbody>"
                 for row in rows[:500]:
                     html += "<tr>"
                     for val in row:
-                        html += f"<td>{val}</td>"
+                        html += f"<td>{_html.escape(str(val) if val is not None else '')}</td>"
                     html += "</tr>"
                 html += "</tbody></table>"
 
@@ -392,12 +393,12 @@ async def execute_sql_endpoint(
         # Build HTML table matching pandas DataFrame output format
         html = '<table class="dataframe"><thead><tr>'
         for col in columns:
-            html += f"<th>{col}</th>"
+            html += f"<th>{_html.escape(str(col))}</th>"
         html += "</tr></thead><tbody>"
         for row in rows[:500]:  # Limit display to 500 rows
             html += "<tr>"
             for val in row:
-                html += f"<td>{val}</td>"
+                html += f"<td>{_html.escape(str(val) if val is not None else '')}</td>"
             html += "</tr>"
         html += "</tbody></table>"
 
