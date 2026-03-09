@@ -297,7 +297,7 @@ export const useNotebookStore = create<NotebookState>((set, get) => ({
     if (!notebookId) return
 
     const cell = cells.find((c) => c.id === id)
-    if (!cell) return
+    if (!cell || cell.cell_type === 'markdown') return
 
     // Mark running
     set((s) => ({
@@ -314,7 +314,7 @@ export const useNotebookStore = create<NotebookState>((set, get) => ({
       const res = await authFetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ cell_id: id, source: cell.source }),
+        body: JSON.stringify({ code: cell.source }),
       })
 
       if (!res.ok) {
