@@ -33,6 +33,15 @@ Ships with **The Perfect Dashboard** — a showcase of all 25 chart types with s
 - **Templates** — Save chart configurations as reusable templates
 - **Folders** — Organize charts and dashboards into folders
 
+### Python Notebooks
+- **Jupyter-powered notebooks** — Write and execute Python code, SQL queries, and Markdown in an integrated notebook environment
+- **SQL cells** — Query your data sources directly with DuckDB SQL; results are automatically available as pandas DataFrames (`sql_1`, `sql_2`, etc.)
+- **Inline chart preview** — Render matplotlib and other Python visualizations directly in the notebook
+- **Data source integration** — All Story Analytics data sources are pre-loaded and queryable from notebook cells
+- **AI chat assistant** — Built-in AI assistant for writing Python code and SQL queries within the notebook
+- **DataFrame bridge** — Export any DataFrame from a notebook back into Story Analytics as a new data source
+- **Run All** — Execute all cells in order with a single click
+
 ### Dashboards & Export
 - **Drag-and-drop dashboards** — Responsive grid layout, drag to reposition, resize to adjust
 - **Export** — SVG, PNG, PDF, PowerPoint (PPTX), and CSV data download with embedded fonts for standalone rendering
@@ -132,8 +141,8 @@ story-analytics/
 │       ├── stores/         # Zustand state management
 │       └── types/          # TypeScript interfaces
 ├── api/                    # FastAPI backend
-│   ├── routers/            # REST endpoints (charts, data, auth, teams)
-│   └── services/           # Storage, DuckDB, connectors
+│   ├── routers/            # REST endpoints (charts, data, auth, teams, notebooks)
+│   └── services/           # Storage, DuckDB, connectors, kernel manager
 ├── engine/                 # LLM integration layer
 │   ├── v2/                 # Chart proposer and editor
 │   └── prompts/            # YAML prompt templates
@@ -153,6 +162,7 @@ story-analytics/
 | Charting | Observable Plot (D3-based) |
 | Frontend | React 18, TypeScript, Tailwind CSS v4, Zustand |
 | Backend | FastAPI, Python |
+| Notebooks | Jupyter kernel, pandas, matplotlib |
 | SQL Engine | DuckDB (in-process) |
 | Database | SQLite (local) or PostgreSQL (cloud) |
 | Storage | Local filesystem or S3 |
