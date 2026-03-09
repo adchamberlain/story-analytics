@@ -30,11 +30,13 @@ export async function exportSVG(svgElement: SVGSVGElement, filename: string): Pr
 
 /** Render an SVG element to a PNG at 2x resolution and download.
  *  Optionally draws title, subtitle, and source text around the chart. */
+export type ExportMetadata = { title?: string; subtitle?: string; source?: string; equation?: string }
+
 export function exportPNG(
   svgElement: SVGSVGElement,
   filename: string,
   scale = 2,
-  metadata?: { title?: string; subtitle?: string; source?: string },
+  metadata?: ExportMetadata,
 ): void {
   svgToCanvas(svgElement, scale)
     .then((chartCanvas) => {
@@ -52,11 +54,26 @@ export function exportPNG(
     })
 }
 
+/** Replace Unicode symbols that jsPDF's built-in fonts (WinAnsi) can't render */
+function sanitizeForPdf(text: string): string {
+  return text
+    .replace(/\u2248/g, '~')       // ≈ approx equal
+    .replace(/\u2264/g, '<=')
+    .replace(/\u2265/g, '>=')
+    .replace(/\u2260/g, '!=')
+    .replace(/\u00b2/g, '2')   // ² superscript
+    .replace(/\u2014/g, '--')  // em dash
+    .replace(/\u2013/g, '-')   // en dash
+    .replace(/\u2018|\u2019/g, "'") // smart quotes
+    .replace(/\u201c|\u201d/g, '"') // smart double quotes
+    .replace(/\u2026/g, '...')      // ellipsis
+}
+
 /** Render an SVG element to a PDF and download */
 export async function exportPDF(
   svgElement: SVGSVGElement,
   filename: string,
-  metadata?: { title?: string; subtitle?: string; source?: string }
+  metadata?: ExportMetadata,
 ): Promise<void> {
   const { jsPDF } = await import('jspdf')
   const canvas = await svgToCanvas(svgElement, 2)
@@ -72,6 +89,10 @@ export async function exportPDF(
   if (metadata?.title) headerH += 8
   if (metadata?.subtitle) headerH += 6
   let footerH = 3 // bottom margin
+  if (metadata?.equation) {
+    const eqLineCount = metadata.equation.split('\n').length
+    footerH += eqLineCount * 5 + 2
+  }
   if (metadata?.source) footerH += 6
 
   const pageH = pdfHeight + headerH + footerH
@@ -87,7 +108,7 @@ export async function exportPDF(
   if (metadata?.title) {
     doc.setFontSize(16)
     doc.setFont('helvetica', 'bold')
-    doc.text(metadata.title, 10, yOffset + 5)
+    doc.text(sanitizeForPdf(metadata.title), 10, yOffset + 5)
     yOffset += 8
   }
 
@@ -96,7 +117,7 @@ export async function exportPDF(
     doc.setFontSize(11)
     doc.setFont('helvetica', 'normal')
     doc.setTextColor(100)
-    doc.text(metadata.subtitle, 10, yOffset + 3)
+    doc.text(sanitizeForPdf(metadata.subtitle), 10, yOffset + 3)
     yOffset += 6
     doc.setTextColor(0) // reset
   }
@@ -106,12 +127,25 @@ export async function exportPDF(
   doc.addImage(imgData, 'PNG', 0, yOffset, pdfWidth, pdfHeight)
   yOffset += pdfHeight + 3
 
+  // Equation
+  if (metadata?.equation) {
+    doc.setFontSize(9)
+    doc.setFont('helvetica', 'normal')
+    doc.setTextColor(100)
+    for (const line of metadata.equation.split('\n')) {
+      doc.text(sanitizeForPdf(line), pdfWidth / 2, yOffset, { align: 'center' })
+      yOffset += 5
+    }
+    yOffset += 1
+    doc.setTextColor(0)
+  }
+
   // Source note
   if (metadata?.source) {
     doc.setFontSize(9)
     doc.setFont('helvetica', 'normal')
     doc.setTextColor(150)
-    doc.text(`Source: ${metadata.source}`, 10, yOffset)
+    doc.text(sanitizeForPdf(`Source: ${metadata.source}`), 10, yOffset)
   }
 
   doc.save(`${sanitizeFilename(filename)}.pdf`)
@@ -121,7 +155,7 @@ export async function exportPDF(
 export async function exportPPTX(
   svgElement: SVGSVGElement,
   filename: string,
-  metadata?: { title?: string; subtitle?: string; source?: string },
+  metadata?: ExportMetadata,
 ): Promise<void> {
   const pptxgenjs = await import('pptxgenjs')
   const PptxGenJS = pptxgenjs.default
@@ -160,7 +194,8 @@ export async function exportPPTX(
   const canvas = await svgToCanvas(svgElement, 2)
   const imgData = canvas.toDataURL('image/png')
   const chartY = metadata?.title ? (metadata?.subtitle ? 1.1 : 0.8) : 0.3
-  const chartH = metadata?.source ? 5.625 - chartY - 0.55 : 5.625 - chartY - 0.15
+  const hasFooter = metadata?.source || metadata?.equation
+  const chartH = hasFooter ? 5.625 - chartY - 0.55 : 5.625 - chartY - 0.15
   slide.addImage({
     data: imgData,
     x: 0.75,
@@ -169,6 +204,20 @@ export async function exportPPTX(
     h: chartH,
     sizing: { type: 'contain', w: 8.5, h: chartH },
   })
+
+  // Equation — positioned above source
+  if (metadata?.equation) {
+    const eqY = metadata?.source ? 5.05 : 5.25
+    slide.addText(metadata.equation, {
+      x: 0.5,
+      y: eqY,
+      w: 9,
+      h: 0.3,
+      fontSize: 9,
+      color: '64748b',
+      align: 'center',
+    })
+  }
 
   // Source — positioned above slide bottom (5.625")
   if (metadata?.source) {
@@ -237,18 +286,19 @@ export async function svgToCanvas(svgElement: SVGSVGElement, scale = 2): Promise
   })
 }
 
-/** Compose title/subtitle/source text around a chart canvas */
+/** Compose title/subtitle/source/equation text around a chart canvas */
 function addTextToCanvas(
   chartCanvas: HTMLCanvasElement,
   scale: number,
-  metadata?: { title?: string; subtitle?: string; source?: string },
+  metadata?: ExportMetadata,
 ): HTMLCanvasElement {
-  if (!metadata?.title && !metadata?.subtitle && !metadata?.source) return chartCanvas
+  if (!metadata?.title && !metadata?.subtitle && !metadata?.source && !metadata?.equation) return chartCanvas
 
   const pad = 20 * scale
   const titleSize = 18 * scale
   const subtitleSize = 13 * scale
   const sourceSize = 10 * scale
+  const equationSize = 10 * scale
   const lineGap = 6 * scale
 
   // Measure header height
@@ -258,6 +308,10 @@ function addTextToCanvas(
 
   // Measure footer height
   let footerH = pad
+  if (metadata.equation) {
+    const eqLineCount = metadata.equation.split('\n').length
+    footerH += (equationSize + lineGap * 0.5) * eqLineCount + lineGap
+  }
   if (metadata.source) footerH += sourceSize + lineGap
 
   const totalW = chartCanvas.width + pad * 2
@@ -293,11 +347,28 @@ function addTextToCanvas(
   // Chart image
   ctx.drawImage(chartCanvas, pad, headerH)
 
+  // Equation — rendered as pill(s) below chart
+  let footerY = headerH + chartCanvas.height + lineGap
+  if (metadata.equation) {
+    const lines = metadata.equation.split('\n')
+    ctx.font = `${equationSize}px Inter, system-ui, sans-serif`
+    for (const line of lines) {
+      // Equation text (centered)
+      ctx.fillStyle = '#64748b'
+      const textW = ctx.measureText(line).width
+      const centerX = (totalW - textW) / 2
+      ctx.fillText(line, centerX, footerY + equationSize * 0.85)
+
+      footerY += equationSize + lineGap * 0.5
+    }
+    footerY += lineGap * 0.5
+  }
+
   // Source
   if (metadata.source) {
     ctx.fillStyle = '#94a3b8'
     ctx.font = `${sourceSize}px Inter, system-ui, sans-serif`
-    ctx.fillText(`Source: ${metadata.source}`, pad, headerH + chartCanvas.height + sourceSize + lineGap)
+    ctx.fillText(`Source: ${metadata.source}`, pad, footerY + sourceSize * 0.85)
   }
 
   return canvas

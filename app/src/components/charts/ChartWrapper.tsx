@@ -99,32 +99,36 @@ export function ChartWrapper({ title, subtitle, source, sourceUrl, chartUrl, chi
     }
   }, [title, findSvg])
 
+  const findEquation = useCallback(() => {
+    return chartAreaRef.current?.querySelector('[data-equation]')?.getAttribute('data-equation') || undefined
+  }, [])
+
   const handleExportPNG = useCallback(() => {
     const svg = findSvg()
-    if (svg) exportPNG(svg, title ?? 'chart', 2, { title, subtitle, source })
-  }, [title, subtitle, source, findSvg])
+    if (svg) exportPNG(svg, title ?? 'chart', 2, { title, subtitle, source, equation: findEquation() })
+  }, [title, subtitle, source, findSvg, findEquation])
 
   const handleExportPDF = useCallback(async () => {
     const svg = findSvg()
     if (svg) {
       try {
-        await exportPDF(svg, title ?? 'chart', { title, subtitle, source })
+        await exportPDF(svg, title ?? 'chart', { title, subtitle, source, equation: findEquation() })
       } catch (err) {
         console.error('[ChartWrapper] PDF export failed:', err)
       }
     }
-  }, [title, subtitle, source, findSvg])
+  }, [title, subtitle, source, findSvg, findEquation])
 
   const handleExportPPTX = useCallback(async () => {
     const svg = findSvg()
     if (svg) {
       try {
-        await exportPPTX(svg, title ?? 'chart', { title, subtitle, source })
+        await exportPPTX(svg, title ?? 'chart', { title, subtitle, source, equation: findEquation() })
       } catch (err) {
         console.error('[ChartWrapper] PPTX export failed:', err)
       }
     }
-  }, [title, subtitle, source, findSvg])
+  }, [title, subtitle, source, findSvg, findEquation])
 
   const handleExportCSV = useCallback(() => {
     if (chartId) {

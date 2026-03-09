@@ -1,26 +1,34 @@
 import { useState, useEffect, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { authFetch } from '../../utils/authFetch'
 
-interface SourceSummary {
+interface TableInfo {
   source_id: string
-  name: string
+  table_name: string
+  view_name: string | null
+  display_name: string
   row_count: number
   column_count: number
 }
 
-export function NotebookSourcesPanel() {
-  const [sources, setSources] = useState<SourceSummary[]>([])
+interface NotebookSourcesPanelProps {
+  notebookId: string
+}
+
+export function NotebookSourcesPanel({ notebookId }: NotebookSourcesPanelProps) {
+  const navigate = useNavigate()
+  const [sources, setSources] = useState<TableInfo[]>([])
   const [loading, setLoading] = useState(true)
   const [copiedId, setCopiedId] = useState<string | null>(null)
 
   const fetchSources = useCallback(() => {
     setLoading(true)
-    authFetch('/api/data/sources')
+    authFetch('/api/data/tables')
       .then((res) => {
-        if (!res.ok) throw new Error(`Sources fetch failed: ${res.status}`)
+        if (!res.ok) throw new Error(`Tables fetch failed: ${res.status}`)
         return res.json()
       })
-      .then((data: SourceSummary[]) => {
+      .then((data: TableInfo[]) => {
         setSources(data)
         setLoading(false)
       })
@@ -31,9 +39,9 @@ export function NotebookSourcesPanel() {
     fetchSources()
   }, [fetchSources])
 
-  const copyTableName = (sourceId: string) => {
-    const tableName = `src_${sourceId}`
-    navigator.clipboard.writeText(tableName).then(() => {
+  const copyTableName = (sourceId: string, viewName: string | null) => {
+    const name = viewName || `src_${sourceId}`
+    navigator.clipboard.writeText(name).then(() => {
       setCopiedId(sourceId)
       setTimeout(() => setCopiedId(null), 1500)
     })
@@ -44,15 +52,26 @@ export function NotebookSourcesPanel() {
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-border-default shrink-0">
         <h3 className="text-sm font-semibold text-text-primary">Data Sources</h3>
-        <button
-          onClick={fetchSources}
-          className="p-1 rounded-md text-text-icon hover:text-text-primary hover:bg-surface-secondary transition-colors"
-          title="Refresh sources"
-        >
-          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182M2.985 19.644l3.181-3.182" />
-          </svg>
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => navigate(`/editor/new/source?returnTo=/notebook/${notebookId}`)}
+            className="p-1 rounded-md text-text-icon hover:text-text-primary hover:bg-surface-secondary transition-colors"
+            title="Add data source"
+          >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+            </svg>
+          </button>
+          <button
+            onClick={fetchSources}
+            className="p-1 rounded-md text-text-icon hover:text-text-primary hover:bg-surface-secondary transition-colors"
+            title="Refresh sources"
+          >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182M2.985 19.644l3.181-3.182" />
+            </svg>
+          </button>
+        </div>
       </div>
 
       {/* Content */}
@@ -85,7 +104,7 @@ export function NotebookSourcesPanel() {
         ) : (
           <div className="space-y-2">
             {sources.map((s) => {
-              const tableName = `src_${s.source_id}`
+              const displayTableName = s.view_name || s.table_name
               const isCopied = copiedId === s.source_id
               return (
                 <div
@@ -94,8 +113,8 @@ export function NotebookSourcesPanel() {
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <p className="text-xs font-medium text-text-primary truncate" title={s.name}>
-                        {s.name}
+                      <p className="text-xs font-medium text-text-primary truncate" title={s.display_name}>
+                        {s.display_name}
                       </p>
                       <p className="text-[10px] text-text-muted mt-0.5">
                         {s.row_count.toLocaleString()} rows · {s.column_count} cols
@@ -104,10 +123,10 @@ export function NotebookSourcesPanel() {
                   </div>
                   <div className="flex items-center gap-1.5 mt-1.5">
                     <code className="text-[10px] font-mono text-text-secondary bg-surface-secondary px-1.5 py-0.5 rounded truncate">
-                      {tableName}
+                      {displayTableName}
                     </code>
                     <button
-                      onClick={() => copyTableName(s.source_id)}
+                      onClick={() => copyTableName(s.source_id, s.view_name)}
                       className="p-0.5 rounded text-text-icon hover:text-text-primary hover:bg-surface-secondary transition-colors shrink-0"
                       title="Copy table name"
                     >
