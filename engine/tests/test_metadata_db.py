@@ -35,7 +35,7 @@ class TestSetDashboardMeta:
     def test_update_preserves_created_at(self):
         """Regression: updating visibility must not overwrite created_at."""
         set_dashboard_meta("dash_002", DEFAULT_USER_ID, "private")
-        meta_before = get_dashboard_meta("dash_002")
+        get_dashboard_meta("dash_002")
 
         # Fetch created_at from the database directly
         db = get_db()

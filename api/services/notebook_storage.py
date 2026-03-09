@@ -8,7 +8,7 @@ import logging
 import re
 import uuid
 from datetime import datetime, timezone
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass
 
 from api.services.storage import get_storage
 

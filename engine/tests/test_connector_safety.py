@@ -56,7 +56,7 @@ class TestDelimiterEscaping:
     """Regression: sniffed delimiters must be escaped for SQL interpolation."""
 
     def test_comma_delimiter_unchanged(self):
-        svc = DuckDBService()
+        DuckDBService()
         # _detect_delimiter returns a string; commas need no escaping
         assert "'" not in ","
 
@@ -832,7 +832,7 @@ class TestReloadSourceIdValidation:
     """Regression: _reload_uploaded_sources must skip directories with unsafe names."""
 
     def test_unsafe_directory_skipped(self, tmp_path, monkeypatch):
-        from api.services.duckdb_service import DuckDBService, DATA_DIR
+        from api.services.duckdb_service import DuckDBService
         # Create an unsafe directory name
         unsafe_dir = tmp_path / "x; DROP TABLE--"
         unsafe_dir.mkdir()
@@ -2130,8 +2130,8 @@ class TestMarginLeftOrdering:
         import re
         source = Path("app/src/components/charts/ObservableChartFactory.tsx").read_text()
         # horizontal marginLeft assignment must come BEFORE yAxisTitle addition
-        horiz_pos = source.find("config.horizontal")
-        ytitle_pos = source.find("config.yAxisTitle")
+        source.find("config.horizontal")
+        source.find("config.yAxisTitle")
         # There are multiple references; find the marginLeft-related ones
         margin_section = re.search(
             r'// Horizontal bars need wider.*?// Y-axis bounds',

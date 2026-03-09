@@ -8,7 +8,6 @@ Fix: Detect Array.isArray(y), use y[0] as the accessor and "metric" as the
 implicit series column (matching the UNPIVOT output from the backend).
 """
 
-import pytest
 
 from api.services.static_export import export_dashboard_html
 

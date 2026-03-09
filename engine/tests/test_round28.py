@@ -16,7 +16,6 @@ class TestJwtMalformedSubject:
 
     def test_non_numeric_sub_rejected(self):
         """Simulates decode_access_token returning a non-numeric sub."""
-        from api.dependencies import get_current_user
         # The actual fix is a try/except around int(user_id).
         # We verify by checking that int() on a non-numeric string raises ValueError
         # and our guard catches it.
@@ -35,7 +34,7 @@ class TestSavedChartReasoningDefault:
     """Regression: SavedChart must accept missing 'reasoning' key in old JSON."""
 
     def test_load_without_reasoning(self, tmp_data_dir):
-        from api.services.chart_storage import CHARTS_DIR, load_chart, _safe_load_chart
+        from api.services.chart_storage import CHARTS_DIR, load_chart
 
         # Write a chart JSON without 'reasoning' field (simulating old format)
         chart_data = {
