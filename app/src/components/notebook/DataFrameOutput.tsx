@@ -10,17 +10,38 @@ export function DataFrameOutput({ html }: DataFrameOutputProps) {
   const navigate = useNavigate()
   const { getDataframes, chartDataframe } = useNotebookStore()
   const [charting, setCharting] = useState(false)
+  const [showPicker, setShowPicker] = useState(false)
+  const [availableDfs, setAvailableDfs] = useState<Record<string, { rows: number; columns: string[] }>>({})
 
   const handleChart = async () => {
     setCharting(true)
     try {
       const dfs = await getDataframes()
-      if (dfs.length === 0) {
+      const names = Object.keys(dfs)
+      if (names.length === 0) {
         setCharting(false)
         return
       }
-      // Use the first dataframe (most common case)
-      const { sourceId } = await chartDataframe(dfs[0])
+      if (names.length === 1) {
+        // Only one DataFrame — chart it directly
+        const { sourceId } = await chartDataframe(names[0])
+        navigate(`/editor/new/source?sourceId=${sourceId}`)
+      } else {
+        // Multiple — show picker
+        setAvailableDfs(dfs)
+        setShowPicker(true)
+        setCharting(false)
+      }
+    } catch {
+      setCharting(false)
+    }
+  }
+
+  const handlePickDf = async (name: string) => {
+    setShowPicker(false)
+    setCharting(true)
+    try {
+      const { sourceId } = await chartDataframe(name)
       navigate(`/editor/new/source?sourceId=${sourceId}`)
     } catch {
       setCharting(false)
@@ -36,6 +57,23 @@ export function DataFrameOutput({ html }: DataFrameOutputProps) {
       >
         {charting ? 'Loading...' : 'Chart this →'}
       </button>
+
+      {showPicker && (
+        <div className="absolute top-10 right-2 bg-surface border border-border-default rounded-lg shadow-lg p-2 z-20">
+          <div className="text-xs text-text-muted mb-2 px-2">Select a DataFrame:</div>
+          {Object.entries(availableDfs).map(([name, info]) => (
+            <button
+              key={name}
+              onClick={() => handlePickDf(name)}
+              className="w-full text-left px-3 py-1.5 text-xs rounded hover:bg-surface-secondary transition-colors"
+            >
+              <span className="font-mono font-medium text-text-primary">{name}</span>
+              <span className="text-text-muted ml-2">({info.rows} rows, {info.columns.length} cols)</span>
+            </button>
+          ))}
+        </div>
+      )}
+
       <div
         className="notebook-dataframe overflow-x-auto"
         dangerouslySetInnerHTML={{ __html: html }}

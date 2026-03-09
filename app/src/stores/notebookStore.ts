@@ -75,7 +75,7 @@ interface NotebookState {
   restartKernel: () => Promise<void>
 
   // DataFrame bridge
-  getDataframes: () => Promise<string[]>
+  getDataframes: () => Promise<Record<string, { rows: number; columns: string[] }>>
   chartDataframe: (dfName: string) => Promise<{ sourceId: string }>
 
   // Cleanup
@@ -438,11 +438,11 @@ export const useNotebookStore = create<NotebookState>((set, get) => ({
 
   getDataframes: async () => {
     const { notebookId } = get()
-    if (!notebookId) return []
+    if (!notebookId) return {}
     const res = await authFetch(`${API}/${notebookId}/dataframes`)
-    if (!res.ok) return []
+    if (!res.ok) return {}
     const data = await res.json()
-    return (data.dataframes ?? []) as string[]
+    return (data.dataframes ?? {}) as Record<string, { rows: number; columns: string[] }>
   },
 
   chartDataframe: async (dfName: string) => {
