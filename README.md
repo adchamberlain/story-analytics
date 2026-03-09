@@ -4,6 +4,8 @@ Publication-ready dashboards from any data source.
 
 **Website:** [storyanalytics.ai](https://storyanalytics.ai)
 
+**Found a bug or have a feature idea?** [Open an issue](https://github.com/adchamberlain/story-analytics/issues/new/choose)
+
 ## What is Story Analytics?
 
 Story Analytics is an open-source dashboarding tool that produces publication-ready charts from any SQL database or CSV file. You build charts with a visual editor and built-in SQL workbench, arrange them on drag-and-drop dashboards, and export to SVG, PNG, PDF, or PowerPoint (PPTX).
