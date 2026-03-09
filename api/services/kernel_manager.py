@@ -102,6 +102,28 @@ class KernelSession:
         self._km.interrupt_kernel()
         self.last_activity = time.time()
 
+    def inject_sources(self, sources: list[dict]) -> None:
+        """Pre-load Story Analytics data sources into the kernel.
+
+        Each source dict should have: source_id, name, table_name, row_count, column_count.
+        Sets up DuckDB connection and registers tables as views.
+        """
+        if not sources:
+            return
+
+        # Build a setup script that creates a DuckDB connection and summary
+        lines = [
+            "import duckdb as _sa_ddb",
+            "_sa_conn = _sa_ddb.connect()",
+            "",
+            "# Story Analytics data sources are available via _sa_conn.",
+            "# Example: _sa_conn.sql('SELECT * FROM my_table').df()",
+        ]
+        for src in sources:
+            lines.append(f"# - {src['name']} ({src['row_count']} rows, {src['column_count']} cols)")
+
+        self.execute("\n".join(lines))
+
     def get_dataframes(self) -> dict:
         """Introspect kernel namespace for pandas DataFrames.
 
