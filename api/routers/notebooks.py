@@ -169,6 +169,29 @@ async def upload_notebook_endpoint(
 # ── Kernel Execution Endpoints ───────────────────────────────────────────────
 
 
+def _inject_sources_if_new(session) -> None:
+    """Inject Story Analytics data sources into a freshly started kernel."""
+    try:
+        service = get_duckdb_service()
+        sources = []
+        for source_id in list(service._sources):
+            try:
+                schema = service.get_schema(source_id)
+                sources.append({
+                    "source_id": source_id,
+                    "name": schema.filename,
+                    "table_name": f"src_{source_id}",
+                    "row_count": schema.row_count,
+                    "column_count": len(schema.columns),
+                })
+            except Exception:
+                continue
+        if sources:
+            session.inject_sources(sources)
+    except Exception:
+        pass  # Don't fail kernel start if source injection fails
+
+
 @router.post("/{notebook_id}/execute", response_model=ExecuteCellResponse)
 async def execute_cell_endpoint(
     notebook_id: str,
@@ -182,7 +205,10 @@ async def execute_cell_endpoint(
         raise HTTPException(status_code=404, detail="Notebook not found")
 
     km = get_kernel_manager()
+    is_new = km.get_kernel(notebook_id) is None
     session = km.start_kernel(notebook_id)
+    if is_new:
+        _inject_sources_if_new(session)
     result = session.execute(body.code)
     return result
 
@@ -202,6 +228,7 @@ async def execute_all_endpoint(
     # Shut down existing kernel and start fresh
     km.shutdown_kernel(notebook_id)
     session = km.start_kernel(notebook_id)
+    _inject_sources_if_new(session)
 
     results = []
     for cell in data.get("cells", []):
