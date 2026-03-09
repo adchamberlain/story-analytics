@@ -223,6 +223,67 @@ async def execute_all_endpoint(
     return {"results": results}
 
 
+@router.post("/{notebook_id}/execute-sql", response_model=ExecuteCellResponse)
+async def execute_sql_endpoint(
+    notebook_id: str,
+    body: ExecuteCellRequest,
+    user: dict = Depends(get_current_user),
+):
+    """Execute SQL against DuckDB and return results as an HTML table."""
+    data = get_notebook(notebook_id)
+    if data is None:
+        raise HTTPException(status_code=404, detail="Notebook not found")
+
+    sql_code = body.code.strip()
+    if not sql_code:
+        return {"status": "ok", "outputs": [], "execution_count": None}
+
+    service = get_duckdb_service()
+    try:
+        result = service._conn.execute(sql_code)
+        columns = [desc[0] for desc in result.description]
+        rows = result.fetchall()
+
+        # Build HTML table matching pandas DataFrame output format
+        html = '<table class="dataframe"><thead><tr>'
+        for col in columns:
+            html += f"<th>{col}</th>"
+        html += "</tr></thead><tbody>"
+        for row in rows[:500]:  # Limit display to 500 rows
+            html += "<tr>"
+            for val in row:
+                html += f"<td>{val}</td>"
+            html += "</tr>"
+        html += "</tbody></table>"
+
+        text_summary = f"{len(rows)} rows x {len(columns)} columns"
+
+        return {
+            "status": "ok",
+            "outputs": [
+                {
+                    "output_type": "execute_result",
+                    "data": {"text/html": html, "text/plain": text_summary},
+                    "metadata": {},
+                },
+            ],
+            "execution_count": None,
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "outputs": [
+                {
+                    "output_type": "error",
+                    "ename": "SQLError",
+                    "evalue": str(e),
+                    "traceback": [],
+                }
+            ],
+            "execution_count": None,
+        }
+
+
 @router.post("/{notebook_id}/interrupt")
 async def interrupt_kernel_endpoint(
     notebook_id: str,
