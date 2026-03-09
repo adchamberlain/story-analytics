@@ -39,7 +39,12 @@ output/
 
 # Regression test suite (local-only, not shipped with open-source repo)
 engine/tests/
+api/tests/
 app/src/__tests__/
+app/src/tests/
+app/src/**/*.test.ts
+app/src/**/*.test.tsx
+app/e2e/
 app/vitest.config.ts
 .husky/
 
