@@ -13,23 +13,40 @@ interface DataTransformGridProps {
   transforming?: boolean
 }
 
+// Inline prompt state for actions that need user input (replaces window.prompt which doesn't work in Electron)
+type InlinePrompt =
+  | { type: 'rename'; col: string; value: string }
+  | { type: 'round'; col: string; value: string }
+  | { type: 'prepend-append'; col: string; prepend: string; append: string }
+
 export function DataTransformGrid({ data, onTransform, transforming }: DataTransformGridProps) {
   const [editingCell, setEditingCell] = useState<{ row: number; col: string } | null>(null)
   const [editValue, setEditValue] = useState('')
   const [menuCol, setMenuCol] = useState<string | null>(null)
+  const [inlinePrompt, setInlinePrompt] = useState<InlinePrompt | null>(null)
   const menuRef = useRef<HTMLDivElement>(null)
+  const inlineInputRef = useRef<HTMLInputElement>(null)
 
   // Close dropdown when clicking outside
   useEffect(() => {
-    if (!menuCol) return
+    if (!menuCol && !inlinePrompt) return
     const handler = (e: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
         setMenuCol(null)
+        setInlinePrompt(null)
       }
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
-  }, [menuCol])
+  }, [menuCol, inlinePrompt])
+
+  // Auto-focus inline input when it appears
+  useEffect(() => {
+    if (inlinePrompt && inlineInputRef.current) {
+      inlineInputRef.current.focus()
+      inlineInputRef.current.select()
+    }
+  }, [inlinePrompt])
 
   const handleCellClick = useCallback((row: number, col: string, value: string) => {
     setEditingCell({ row, col })
@@ -61,41 +78,61 @@ export function DataTransformGrid({ data, onTransform, transforming }: DataTrans
   }, [])
 
   const handleColumnAction = useCallback(async (col: string, action: string) => {
-    setMenuCol(null)
     switch (action) {
       case 'delete':
+        setMenuCol(null)
+        setInlinePrompt(null)
         await onTransform('delete-column', { column: col })
         break
-      case 'rename': {
-        const newName = prompt('New column name:', col)
-        if (newName && newName !== col) {
-          await onTransform('rename-column', { old: col, new: newName })
-        }
+      case 'rename':
+        setMenuCol(null)
+        setInlinePrompt({ type: 'rename', col, value: col })
         break
-      }
-      case 'round': {
-        const decimals = prompt('Round to N decimals:', '2')
-        if (decimals != null) {
-          await onTransform('round', { column: col, decimals: parseInt(decimals) })
-        }
+      case 'round':
+        setMenuCol(null)
+        setInlinePrompt({ type: 'round', col, value: '2' })
         break
-      }
       case 'cast-number':
+        setMenuCol(null)
+        setInlinePrompt(null)
         await onTransform('cast-type', { column: col, type: 'number' })
         break
       case 'cast-text':
+        setMenuCol(null)
+        setInlinePrompt(null)
         await onTransform('cast-type', { column: col, type: 'text' })
         break
-      case 'prepend-append': {
-        const prepend = prompt('Prepend text (leave empty for none):', '') ?? ''
-        const append = prompt('Append text (leave empty for none):', '') ?? ''
-        if (prepend || append) {
-          await onTransform('prepend-append', { column: col, prepend, append })
+      case 'prepend-append':
+        setMenuCol(null)
+        setInlinePrompt({ type: 'prepend-append', col, prepend: '', append: '' })
+        break
+    }
+  }, [onTransform])
+
+  const handleInlineSubmit = useCallback(async () => {
+    if (!inlinePrompt) return
+    const p = inlinePrompt
+    setInlinePrompt(null)
+    switch (p.type) {
+      case 'rename':
+        if (p.value && p.value !== p.col) {
+          await onTransform('rename-column', { old: p.col, new: p.value })
+        }
+        break
+      case 'round': {
+        const decimals = parseInt(p.value)
+        if (!isNaN(decimals)) {
+          await onTransform('round', { column: p.col, decimals })
         }
         break
       }
+      case 'prepend-append':
+        if (p.prepend || p.append) {
+          await onTransform('prepend-append', { column: p.col, prepend: p.prepend, append: p.append })
+        }
+        break
     }
-  }, [onTransform])
+  }, [inlinePrompt, onTransform])
 
   if (!data.columns.length) {
     return (
@@ -126,6 +163,90 @@ export function DataTransformGrid({ data, onTransform, transforming }: DataTrans
           <span className="text-xs text-blue-600">Applying...</span>
         )}
       </div>
+
+      {/* Inline prompt for rename / round / prepend-append */}
+      {inlinePrompt && (
+        <div ref={menuRef} className="flex items-center gap-2 p-2 border-b border-border-default bg-blue-50 dark:bg-blue-950/30">
+          {inlinePrompt.type === 'rename' && (
+            <>
+              <span className="text-xs text-text-secondary whitespace-nowrap">
+                Rename <strong>{inlinePrompt.col}</strong> to:
+              </span>
+              <input
+                ref={inlineInputRef}
+                value={inlinePrompt.value}
+                onChange={(e) => setInlinePrompt({ ...inlinePrompt, value: e.target.value })}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleInlineSubmit()
+                  if (e.key === 'Escape') setInlinePrompt(null)
+                }}
+                className="px-2 py-1 text-xs border border-border-default rounded bg-white dark:bg-gray-900 outline-none focus:border-blue-400 min-w-[120px]"
+              />
+            </>
+          )}
+          {inlinePrompt.type === 'round' && (
+            <>
+              <span className="text-xs text-text-secondary whitespace-nowrap">
+                Round <strong>{inlinePrompt.col}</strong> to N decimals:
+              </span>
+              <input
+                ref={inlineInputRef}
+                type="number"
+                min={0}
+                value={inlinePrompt.value}
+                onChange={(e) => setInlinePrompt({ ...inlinePrompt, value: e.target.value })}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleInlineSubmit()
+                  if (e.key === 'Escape') setInlinePrompt(null)
+                }}
+                className="px-2 py-1 text-xs border border-border-default rounded bg-white dark:bg-gray-900 outline-none focus:border-blue-400 w-16"
+              />
+            </>
+          )}
+          {inlinePrompt.type === 'prepend-append' && (
+            <>
+              <span className="text-xs text-text-secondary whitespace-nowrap">
+                <strong>{inlinePrompt.col}</strong>:
+              </span>
+              <span className="text-xs text-text-muted">Prepend</span>
+              <input
+                ref={inlineInputRef}
+                value={inlinePrompt.prepend}
+                onChange={(e) => setInlinePrompt({ ...inlinePrompt, prepend: e.target.value })}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleInlineSubmit()
+                  if (e.key === 'Escape') setInlinePrompt(null)
+                }}
+                placeholder="e.g. $"
+                className="px-2 py-1 text-xs border border-border-default rounded bg-white dark:bg-gray-900 outline-none focus:border-blue-400 w-20"
+              />
+              <span className="text-xs text-text-muted">Append</span>
+              <input
+                value={inlinePrompt.append}
+                onChange={(e) => setInlinePrompt({ ...inlinePrompt, append: e.target.value })}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleInlineSubmit()
+                  if (e.key === 'Escape') setInlinePrompt(null)
+                }}
+                placeholder="e.g. %"
+                className="px-2 py-1 text-xs border border-border-default rounded bg-white dark:bg-gray-900 outline-none focus:border-blue-400 w-20"
+              />
+            </>
+          )}
+          <button
+            onClick={handleInlineSubmit}
+            className="px-2.5 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+          >
+            Apply
+          </button>
+          <button
+            onClick={() => setInlinePrompt(null)}
+            className="px-2.5 py-1 text-xs border border-border-default rounded hover:bg-surface-tertiary transition-colors"
+          >
+            Cancel
+          </button>
+        </div>
+      )}
 
       {/* Data grid */}
       <div className="overflow-x-auto">
